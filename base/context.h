@@ -1,6 +1,12 @@
 #ifndef BASE_CONTEXT_H
 #define BASE_CONTEXT_H
 
+// @note: Build options
+
+#ifndef ENABLE_ASSERT
+# define ENABLE_ASSERT 0
+#endif
+
 // @note: Compilers
 
 #if defined(__clang__)
@@ -13,7 +19,7 @@
 # define COMPILER_TCC 1
 #else
 # error "This compiler is not supported!"
-#endif // compilers
+#endif
 
 #define LLVM_LIKE_COMPILER COMPILER_CLANG || COMPILER_GCC || COMPILER_TCC
 
@@ -42,7 +48,7 @@
 # else
 #  error "How are you using msvc"
 # endif
-#endif // msvc
+#endif
 
 // @note: Architectures
 
