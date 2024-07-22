@@ -5,9 +5,9 @@
 
 // @note: Constant macros
 
-#if COMPILER_CL
+#if COMPILER_CL || COMPILER_TCC
 # define threadvar __declspec(thread)
-#elif LLVM_LIKE_COMPILER
+#elif COMPILER_CLANG || COMPILER_GCC
 # define threadvar __thread
 #else
 # error "Thread local storage not implemented for this compiler!"

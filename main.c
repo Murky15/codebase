@@ -9,6 +9,7 @@
 #include "base/memory.h"
 
 // Source
+#include "base/memory.c"
 
 int
 main (void) {
