@@ -53,9 +53,9 @@
 // @note: Architectures
 
 #if defined(__arm__) || defined(_M_ARM)
-# define ARCH_ARM32
+# define ARCH_ARM32 1
 #elif defined(__aarch64__) || defined(_M_ARM64)
-# define ARCH_ARM64
+# define ARCH_ARM64 1
 #elif defined(__i386__) || defined(_M_IX86)
 # define ARCH_X86 1
 #elif defined(__amd64__) || defined(_M_AMD64)
@@ -129,7 +129,7 @@
 # define LANG_C 0
 #endif
 
-inline void
+void
 print_context (void) {
   puts("--- CONTEXT REPORT ---");
   printf("Clang: %d\n", COMPILER_CLANG);

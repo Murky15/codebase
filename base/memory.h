@@ -1,6 +1,12 @@
 #ifndef BASE_MEMORY_H
 #define BASE_MEMORY_H
 
+#if OS_MAC && ARCH_ARM64
+# define PAGE_TABLE_SIZE Kilobytes(16)
+#else
+# define PAGE_TABLE_SIZE Kilobytes(4)
+#endif
+
 typedef u32 Arena_Backend_Flags;
 enum {
   ARENA_BACKEND_FIXED = (1 << 0),
