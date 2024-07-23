@@ -141,5 +141,5 @@ get_scratch (Arena **conflicts, u64 num_conflicts) {
     }
   }
 
-  return (Temp_Arena){0};
+  return (Temp_Arena)zero_struct;
 }

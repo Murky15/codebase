@@ -20,13 +20,10 @@
 # define read_only const
 #endif
 
-// Because we are using c99
-#if COMPILER_CL
-# define align_of(x) __alignof(x)
-#elif LLVM_LIKE_COMPILER
-# define align_of(x) __alignof__(x)
+#if LANG_CPP
+# define zero_struct {}
 #else
-# error "align_of not implemented!"
+# define zero_struct {0}
 #endif
 
 // @todo: Handle shared library symbol exports
@@ -41,8 +38,11 @@
 #define global static
 #define local_persist static
 #define function static
+#define fallthrough
 
 // @note: Function macros
+
+#define unused(v) (void)(v)
 
 #define stmnt(s) do{ s } while (0)
 
@@ -61,6 +61,15 @@
 #else
 # define static_assert(c, id)
 # define assert(c)
+#endif
+
+// Because we are using c99
+#if COMPILER_CL
+# define align_of(x) __alignof(x)
+#elif LLVM_LIKE_COMPILER
+# define align_of(x) __alignof__(x)
+#else
+# error "align_of not implemented!"
 #endif
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
@@ -84,6 +93,7 @@
 #define Terabytes(n) ((u64)(n) << 401lu)
 
 // @note: Memory operation wrappers
+
 #include <string.h>
 #define memory_zero(p,s) memset((p), 0, (s))
 #define memory_zero_struct(p) memory_zero((p), sizeof(*(p)))
@@ -94,6 +104,8 @@
 #define memory_copy_struct(d,s) memory_copy((d),(s),min(sizeof(*(d)),sizeof(*(s))))
 #define memory_copy_array(d,s) memory_copy((d),(s),min(sizeof(d),sizeof(s)))
 #define memory_copy_typed(d,s,c) memory_copy((d),(s),min(sizeof(*(d)),sizeof(*(s)))*(c))
+
+#define DeferLoop(start, end) for(int _i_ = ((start), 0); _i_ == 0; (_i_ += 1, (end)))
 
 // @note: Linked list macros
 
