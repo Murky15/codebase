@@ -7,9 +7,11 @@
 #include "base/macros.h"
 #include "base/types.h"
 #include "base/memory.h"
+#include "base/strings.h"
 
 // Source
 #include "base/memory.c"
+#include "base/strings.c"
 
 int
 main (void) {

@@ -32,7 +32,7 @@ link void       arena_pop_to(Arena *arena, u64 pos);
 link void       arena_pop(Arena *arena, u64 amount);
 link void       arena_clear(Arena *arena);
 link u64        arena_pos(Arena *arena);
-#define arena_push_n(a,T,c) arena_push((a), sizeof(T) * (c), align_of(T));
+#define arena_pushn(a,T,c) (T*)arena_push((a), sizeof(T) * (c), align_of(T));
 
 // @note: Temp arena functions
 

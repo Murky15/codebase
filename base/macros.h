@@ -77,6 +77,7 @@
 #define clamp(a,min,max) ((a) < (min) ? (min) : (a) > (max) ? (max) : (a))
 
 #define array_count(a) (sizeof(a) / sizeof(a[0]))
+#define swap(T, a, b) stmnt( T __temp = a; a = b; b = __temp; )
 
 #define int_from_ptr(p) (u64)((void*)p)
 #define ptr_from_int(i) (void*)(i)
