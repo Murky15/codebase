@@ -2,11 +2,13 @@
 
 // @todo: Move this to an "os" codebase layer
 #if OS_WINDOWS
+# undef function
 # include <windows.h>
 # define mem_reserve(size) VirtualAlloc(0, size, MEM_RESERVE, PAGE_READWRITE)
 # define mem_commit(ptr, size) VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE)
 # define mem_decommit(ptr, size) VirtualFree(ptr, size, MEM_DECOMMIT)
 # define mem_release(ptr, size) VirtualFree(ptr, size, MEM_RELEASE)
+# define function static
 #else
 # error "Memory backend not implemented for this OS!"
 #endif

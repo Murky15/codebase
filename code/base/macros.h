@@ -57,7 +57,7 @@
 
 #if ENABLE_ASSERT
 # define static_assert(c,id) typedef u8 glue(static_assert, id)[(c)?1:-1]
-# define assert(c,msg) stmnt( if(!c) { assert_break(); } )
+# define assert(c) stmnt( if(!(c)) { assert_break(); } )
 #else
 # define static_assert(c, id)
 # define assert(c)
@@ -88,9 +88,9 @@
 #define round_up_pow2(n,m) (((n)+(m-1))&-(m))
 #define round_down_pow2(n,m) ((n)&-(m))
 
-#define Kilobytes(n) ((n) << 10)
-#define Megabytes(n) ((n) << 20)
-#define Gigabytes(n) ((n) << 30)
+#define Kilobytes(n) ((u64)(n) << 10)
+#define Megabytes(n) ((u64)(n) << 20)
+#define Gigabytes(n) ((u64)(n) << 30)
 #define Terabytes(n) ((u64)(n) << 401lu)
 
 // @note: Memory operation wrappers
@@ -110,14 +110,14 @@
 
 // @note: Linked list macros
 
-#define DLLPushBack_NP(f,l,n,next,prev) ((f)==0?\
+#define dll_push_back_np(f,l,n,next,prev) ((f)==0?\
 ((f)=(l)=(n),(n)->next=(n)->prev=0):\
 ((n)->prev=(l),(l)->next=(n),(l)=(n),(n)->next=0))
-#define DLLPushBack(f,l,n) DLLPushBack_NP(f,l,n,next,prev)
+#define dll_push_back(f,l,n) dll_push_back_np(f,l,n,next,prev)
 
-#define DLLPushFront(f,l,n) DLLPushBack_NP(l,f,n,prev,next)
+#define dll_push_front(f,l,n) dll_push_back_np(l,f,n,prev,next)
 
-#define DLLRemove_NP(f,l,n,next,prev) ((f)==(n)?\
+#define dll_remove_np(f,l,n,next,prev) ((f)==(n)?\
 ((f)==(l)?\
 ((f)=(l)=(0)):\
 ((f)=(f)->next,(f)->prev=0)):\
@@ -125,29 +125,29 @@
 ((l)=(l)->prev,(l)->next=0):\
 ((n)->next->prev=(n)->prev,\
 (n)->prev->next=(n)->next))
-#define DLLRemove(f,l,n) DLLRemove_NP(f,l,n,next,prev)
+#define dll_remove(f,l,n) dll_remove_np(f,l,n,next,prev)
 
-#define SLLQueuePush_N(f,l,n,next) (((f)==0?\
+#define sll_queue_push_n(f,l,n,next) (((f)==0?\
 (f)=(l)=(n):\
 ((l)->next=(n),(l)=(n))),\
 (n)->next=0)
-#define SLLQueuePush(f,l,n) SLLQueuePush_N(f,l,n,next)
+#define sll_queue_push(f,l,n) sll_queue_push_n(f,l,n,next)
 
-#define SLLQueuePushFront_N(f,l,n,next) ((f)==0?\
+#define sll_queue_push_front_n(f,l,n,next) ((f)==0?\
 ((f)=(l)=(n),(n)->next=0):\
 ((n)->next=(f),(f)=(n)))
-#define SLLQueuePushFront(f,l,n) SLLQueuePushFront_N(f,l,n,next)
+#define sll_queue_push_front(f,l,n) sll_queue_push_front_n(f,l,n,next)
 
-#define SLLQueuePop_N(f,l,next) ((f)==(l)?\
+#define sll_queue_pop_n(f,l,next) ((f)==(l)?\
 (f)=(l)=0:\
 ((f)=(f)->next))
-#define SLLQueuePop(f,l) SLLQueuePop_N(f,l,next)
+#define sll_queue_pop(f,l) sll_queue_pop_n(f,l,next)
 
-#define SLLStackPush_N(f,n,next) ((n)->next=(f),(f)=(n))
-#define SLLStackPush(f,n) SLLStackPush_N(f,n,next)
+#define sll_stack_push_n(f,n,next) ((n)->next=(f),(f)=(n))
+#define sll_stack_push(f,n) sll_stack_push_n(f,n,next)
 
-#define SLLStackPop_N(f,next) ((f)==0?0:\
+#define sll_stack_pop_n(f,next) ((f)==0?0:\
 ((f)=(f)->next))
-#define SLLStackPop(f) SLLStackPop_N(f,next)
+#define sll_stack_pop(f) sll_stack_pop_n(f,next)
 
 #endif // BASE_MACROS_H

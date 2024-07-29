@@ -96,13 +96,13 @@ str8_sub (String8 string, u64 first, u64 opl) {
 
 link String8
 str8_skip (String8 string, u64 amount) {
-  amount = min(amount, string.size);
+  amount = min(amount, string.len);
   return (String8){string.str + amount, string.len - amount};
 }
 
 link String8
 str8_chop (String8 string, u64 amount) {
-  amount = min(amount, string.size);
+  amount = min(amount, string.len);
   return (String8){string.str, string.len - amount};
 }
 
@@ -139,6 +139,23 @@ str8_match (String8 a, String8 b, String8_Matchflags flags) {
   return result;
 }
 
+link u64
+str8_find (String8 haystack, String8 needle, u64 start_pos, String8_Matchflags flags) {
+  b32 found = 0;
+  u64 found_pos;
+  for (u64 i = start_pos; i < haystack.size; ++i) {
+    if (needle.len <= haystack.len - i) {
+      found = str8_match(str8_sub(haystack, i, i + needle.len), needle, flags);
+      if (found) {
+        found_pos = i;
+        break;
+      }
+    }
+  }
+
+  return found_pos;
+}
+
 // Allocation
 link String8
 str8_push_copy (Arena *arena, String8 string) {
@@ -150,7 +167,23 @@ str8_push_copy (Arena *arena, String8 string) {
 
 link String8
 str8_pushfv (Arena *arena, char *fmt, va_list args) {
+  va_list backup_args;
+  va_copy(backup_args, args);
 
+  u64 try_size = Kilobytes(1);
+  u8 *buffer = arena_pushn(arena, u8, try_size);
+  u64 actual_size = vsnprintf((char*)buffer, try_size, fmt, args);
+  actual_size += 1;
+  if (actual_size > try_size) {
+    arena_pop(arena, try_size);
+    buffer = arena_pushn(arena, u8, actual_size);
+    vsnprintf((char*)buffer, actual_size, fmt, backup_args);
+  } else {
+    arena_pop(arena, try_size - actual_size);
+  }
+  va_end(backup_args);
+
+  return (String8){buffer, actual_size};
 }
 
 link String8
@@ -164,55 +197,127 @@ str8_pushf (Arena *arena, char *fmt, ...) {
   return result;
 }
 
-
 // String lists
 link void
 str8_list_push_node (String8List *list, String8Node *node) {
-
+  sll_queue_push(list->first, list->last, node);
+  list->num_nodes++;
+  list->total_len += node->string.len;
 }
 
 link void
 str8_list_push_node_front (String8List *list, String8Node *node) {
-
+  sll_queue_push_front(list->first, list->last, node);
+  list->num_nodes++;
+  list->total_len += node->string.len;
 }
 
 link void
 str8_list_push (Arena *arena, String8List *list, String8 string) {
-
+  String8Node *node = arena_pushn(arena, String8Node, 1);
+  node->string = string;
+  str8_list_push_node(list, node);
 }
 
 link void
 str8_list_push_front (Arena *arena, String8List *list, String8 string) {
-
+  String8Node *node = arena_pushn(arena, String8Node, 1);
+  node->string = string;
+  str8_list_push_node_front(list, node);
 }
 
 link void
 str8_list_pushf (Arena *arena, String8List *list, char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  String8 string = str8_pushfv(arena, fmt, args);
+  va_end(args);
 
+  str8_list_push(arena, list, string);
 }
 
 link void
-str8_list_concat (String8List *base, String8List *to_append) {
-
+str8_list_concat (String8List *base, String8List *appending) {
+  if (appending->first) {
+    base->num_nodes += appending->num_nodes;
+    base->total_len += appending->total_len;
+    if (base->last == 0) {
+      *base = *appending;
+    } else {
+      base->last->next = appending->first;
+      base->last = appending->last;
+    }
+  }
+  memory_zero(appending, sizeof(String8List));
 }
 
 link String8List
-str8_split_by_strings (Arena *arena, String8 string, u64 num_splits, String8 *splits) {
+str8_split (Arena *arena, String8 string, u64 num_splits, char *splits) {
+  String8List result = zero_struct;
 
-}
+  u8 *ptr = string.str;
+  u8 *word = ptr;
+  u8 *opl = ptr + string.len;
+  for (;ptr < opl; ++ptr) {
+    u8 byte = *ptr;
+    b32 is_split = false;
+    for (u64 split = 0; split < num_splits; ++split) {
+      if (byte == splits[split]) {
+        is_split = true;
+        break;
+      }
+    }
 
-link String8List
-str8_split_by_chars (Arena *arena, String8 string, u64 num_splits, char *splits) {
+    if (is_split) {
+      if (word < ptr) {
+        str8_list_push(arena, &result, str8_range(word, ptr));
+      }
+      word = ptr + 1;
+    }
+  }
 
+  if (word < ptr) {
+    str8_list_push(arena, &result, str8_range(word, ptr));
+  }
+
+  return result;
 }
 
 link String8
 str8_list_join (Arena *arena, String8List list, String8Join *opt_join_params) {
+  String8Join join = zero_struct;
+  if (opt_join_params) memory_copy(&join, opt_join_params, sizeof(String8Join));
 
+  u64 size = join.pre.len + join.post.len + join.sep.len * (list.num_nodes - 1) + list.total_len;
+  u8 *buffer = arena_pushn(arena, u8, size + 1);
+  u8 *ptr = buffer;
+  String8 result = {buffer, size};
+
+  memory_copy(ptr, join.pre.str, join.pre.len);
+  ptr += join.pre.len;
+  for (String8Node *node = list.first; node != 0; node = node->next) {
+    memory_copy(ptr, node->string.str, node->string.len);
+    ptr += node->string.len;
+    if (node != list.last) {
+      memory_copy(ptr, join.sep.str, join.sep.len);
+      ptr += join.sep.len;
+    }
+  }
+  memory_copy(ptr, join.post.str, join.post.len);
+
+  return result;
 }
 
 // Conversions
 link String8Array
-str8_list_to_array (String8List *list) {
+str8_list_to_array (Arena *arena, String8List *list) {
+  String8Array result;
+  result.count = list->num_nodes;
+  result.strings = arena_pushn(arena, String8, result.count);
+  u64 idx = 0;
+  for (String8Node *node = list->first; node != 0; node = node->next, ++idx) {
+    result.strings[idx] = node->string;
+  }
 
+  return result;
 }

@@ -21,16 +21,16 @@ typedef struct String32 {
 // @note: String structure types
 
 typedef struct String8Node {
-  String8Node *next;
+  struct String8Node *next;
   String8 string;
 } String8Node;
 
 typedef struct String8List {
   String8Node *first;
   String8Node *last;
-  u64 num_strings;
+  u64 num_nodes;
   u64 total_len;
-}
+} String8List;
 
 typedef struct String8Array {
   u64 count;
@@ -91,6 +91,7 @@ link String8 str8_postfix(String8 string, u64 size);
 
 // Match
 link b32 str8_match(String8 a, String8 b, String8_Matchflags flags);
+link u64 str8_find(String8 haystack, String8 needle, u64 start_pos, String8_Matchflags flags);
 
 // Allocation
 link String8 str8_push_copy(Arena *arena, String8 string);
@@ -103,13 +104,12 @@ link void str8_list_push_node_front(String8List *list, String8Node *node);
 link void str8_list_push(Arena *arena, String8List *list, String8 string);
 link void str8_list_push_front(Arena *arena, String8List *list, String8 string);
 link void str8_list_pushf(Arena *arena, String8List *list, char *fmt, ...);
-link void str8_list_concat(String8List *base, String8List *to_append);
-link String8List str8_split_by_strings(Arena *arena, String8 string, u64 num_splits, String8 *splits);
-link String8List str8_split_by_chars(Arena *arena, String8 string, u64 num_splits, char *splits);
+link void str8_list_concat(String8List *base, String8List *appending);
+link String8List str8_split(Arena *arena, String8 string, u64 num_splits, char *splits);
 link String8 str8_list_join(Arena *arena, String8List list, String8Join *opt_join_params);
 
 // Conversions
-link String8Array str8_list_to_array(String8List *list);
+link String8Array str8_list_to_array(Arena *arena, String8List *list);
 
 // @todo: Unicode conversions
 
