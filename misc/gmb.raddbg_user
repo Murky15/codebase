@@ -20,61 +20,43 @@ window:
   hint_code_text: 1
   panels:
   {
-    0.85:
+    0.277342:
     {
-      0.606287:
+      0.333333:
       {
-        0.25:
-        {
-          0.5:
-          {
-            disassembly: {selected }
-          }
-          0.5:
-          {
-            breakpoints: {}
-            watch_pins: {}
-            output: {selected }
-            memory: {}
-          }
-        }
-        0.75:
-        {
-          code: {project:{"root.raddbg_project"} "main.c" cursor:140:1}
-          code: {selected project:{"root.raddbg_project"} "base/strings.c" cursor:255:24}
-        }
+        watch: {selected "input"}
+        locals: {}
       }
-      0.393713:
+      0.333333:
       {
-        0.6:
-        {
-          tabs_on_bottom
-          watch: {}
-          locals: {selected }
-          registers: {}
-          globals: {}
-          thread_locals: {}
-          types: {}
-          procedures: {}
-        }
-        0.4:
-        {
-          tabs_on_bottom
-          call_stack: {selected }
-          modules: {}
-        }
+        breakpoints: {selected }
+        watch_pins: {}
+      }
+      0.333333:
+      {
+        call_stack: {}
+        modules: {selected }
+        scheduler: {}
       }
     }
-    0.15:
+    0.722658:
     {
-      0.5:
+      0.692251:
       {
-        targets: {}
+        0.808862:
+        {
+          code: {selected project:{"root.raddbg_project"} "../code/Tracer/main.c" cursor:91:6}
+          disassembly: {}
+        }
+        0.191138:
+        {
+          targets: {selected }
+        }
       }
-      0.5:
+      0.307749:
       {
-        tabs_on_bottom
-        scheduler: {selected }
+        output: {selected }
+        memory: {}
       }
     }
   }
@@ -87,8 +69,6 @@ keybindings:
   {"accept"                                  return              }
   {"add_target"                              ctrl t              }
   {"attach"                                  shift f6            }
-  {""                                        ctrl shift n        }
-  {""                                        ctrl shift r        }
   {"backspace_chunk"                         ctrl backspace      }
   {"backspace_single"                        backspace           }
   {"cancel"                                  esc                 }
@@ -114,27 +94,27 @@ keybindings:
   {"focus_panel_up"                          ctrl alt up         }
   {"goto_address"                            alt g               }
   {"goto_line"                               ctrl g              }
-  {"goto_name_at_cursor"                     f12                 }
   {"goto_name"                               ctrl j              }
+  {"goto_name_at_cursor"                     f12                 }
   {"halt"                                    pause               }
   {"halt"                                    ctrl shift x        }
   {"inc_code_font_scale"                     shift alt equal     }
   {"inc_ui_font_scale"                       alt equal           }
   {"kill_all"                                shift f5            }
   {"log_marker"                              ctrl shift alt m    }
-  {"move_down_chunk"                         ctrl down           }
-  {"move_down_chunk_select"                  ctrl shift down     }
   {"move_down"                               down                }
+  {"move_down_chunk"                         ctrl down           }
   {"move_down_page"                          page_down           }
   {"move_down_page_select"                   shift page_down     }
   {"move_down_reorder"                       alt down            }
-  {"move_down_select"                        shift down          }
-  {"move_down_whole_select"                  ctrl shift end      }
   {"move_down_whole"                         ctrl end            }
+  {"move_down_whole_select"                  ctrl shift end      }
+  {"move_down_select"                        shift down          }
+  {"move_down_chunk_select"                  ctrl shift down     }
   {"move_end_select"                         shift end           }
   {"move_end"                                end                 }
-  {"move_home"                               home                }
   {"move_home_select"                        shift home          }
+  {"move_home"                               home                }
   {"move_left"                               left                }
   {"move_left_chunk_select"                  ctrl shift left     }
   {"move_left_chunk"                         ctrl left           }
@@ -165,8 +145,8 @@ keybindings:
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
-  {"prev_tab"                                ctrl shift tab      }
   {"prev_tab"                                ctrl page_up        }
+  {"prev_tab"                                ctrl shift tab      }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
   {"run"                                     f5                  }

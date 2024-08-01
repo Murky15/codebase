@@ -57,59 +57,59 @@ enum {
 
 // @note: Char functions
 
-link b32 char_is_alpha(u8 c);
-link b32 char_is_alpha_upper(u8 c);
-link b32 char_is_alpha_lower(u8 c);
-link b32 char_is_digit(u8 c);
-link b32 char_is_symbol(u8 c);
-link b32 char_is_control(u8 c);
-link b32 char_is_space(u8 c);
-link u8  char_to_upper(u8 c);
-link u8  char_to_lower(u8 c);
-link u8  char_to_forward_slash(u8 c);
-link u64 cstr_length(char *cstr);
+core_function b32 char_is_alpha(u8 c);
+core_function b32 char_is_alpha_upper(u8 c);
+core_function b32 char_is_alpha_lower(u8 c);
+core_function b32 char_is_digit(u8 c);
+core_function b32 char_is_symbol(u8 c);
+core_function b32 char_is_control(u8 c);
+core_function b32 char_is_space(u8 c);
+core_function u8  char_to_upper(u8 c);
+core_function u8  char_to_lower(u8 c);
+core_function u8  char_to_forward_slash(u8 c);
+core_function u64 cstr_length(char *cstr);
 
 // @note: String functions
 
 // Constructors
-link String8 str8(u8 *str, u64 len);
+core_function String8 str8(u8 *str, u64 len);
 #define str8_zero() str8(0, 0)
 #define str8_cstring(cstr) str8((u8*)cstr, cstr_length(cstr))
 #define str8_lit(s) str8((u8*)s, sizeof(s)-1)
-link String8 str8_range(u8 *first, u8 *opl);
-link String16 str16(u16 *str, u64 len);
-link String32 str32(u32 *str, u64 len);
+core_function String8 str8_range(u8 *first, u8 *opl);
+core_function String16 str16(u16 *str, u64 len);
+core_function String32 str32(u32 *str, u64 len);
 
 #define str8_expand(s) (int)((s).len), ((s).str)
 
 // Substrings
-link String8 str8_sub(String8 string, u64 first, u64 opl);
-link String8 str8_skip(String8 string, u64 amount);
-link String8 str8_chop(String8 string, u64 amount);
-link String8 str8_prefix(String8 string, u64 size);
-link String8 str8_postfix(String8 string, u64 size);
+core_function String8 str8_sub(String8 string, u64 first, u64 opl);
+core_function String8 str8_skip(String8 string, u64 amount);
+core_function String8 str8_chop(String8 string, u64 amount);
+core_function String8 str8_prefix(String8 string, u64 size);
+core_function String8 str8_postfix(String8 string, u64 size);
 
 // Match
-link b32 str8_match(String8 a, String8 b, String8_Matchflags flags);
-link u64 str8_find(String8 haystack, String8 needle, u64 start_pos, String8_Matchflags flags);
+core_function b32 str8_match(String8 a, String8 b, String8_Matchflags flags);
+core_function u64 str8_find(String8 haystack, String8 needle, u64 start_pos, String8_Matchflags flags);
 
 // Allocation
-link String8 str8_push_copy(Arena *arena, String8 string);
-link String8 str8_pushfv(Arena *arena, char *fmt, va_list args);
-link String8 str8_pushf(Arena *arena, char *fmt, ...);
+core_function String8 str8_push_copy(Arena *arena, String8 string);
+core_function String8 str8_pushfv(Arena *arena, char *fmt, va_list args);
+core_function String8 str8_pushf(Arena *arena, char *fmt, ...);
 
 // String lists
-link void str8_list_push_node(String8List *list, String8Node *node);
-link void str8_list_push_node_front(String8List *list, String8Node *node);
-link void str8_list_push(Arena *arena, String8List *list, String8 string);
-link void str8_list_push_front(Arena *arena, String8List *list, String8 string);
-link void str8_list_pushf(Arena *arena, String8List *list, char *fmt, ...);
-link void str8_list_concat(String8List *base, String8List *appending);
-link String8List str8_split(Arena *arena, String8 string, u64 num_splits, char *splits);
-link String8 str8_list_join(Arena *arena, String8List list, String8Join *opt_join_params);
+core_function void str8_list_push_node(String8List *list, String8Node *node);
+core_function void str8_list_push_node_front(String8List *list, String8Node *node);
+core_function void str8_list_push(Arena *arena, String8List *list, String8 string);
+core_function void str8_list_push_front(Arena *arena, String8List *list, String8 string);
+core_function void str8_list_pushf(Arena *arena, String8List *list, char *fmt, ...);
+core_function void str8_list_concat(String8List *base, String8List *appending);
+core_function String8List str8_split(Arena *arena, String8 string, u64 num_splits, char *splits);
+core_function String8 str8_list_join(Arena *arena, String8List list, String8Join *opt_join_params);
 
 // Conversions
-link String8Array str8_list_to_array(Arena *arena, String8List *list);
+core_function String8Array str8_list_to_array(Arena *arena, String8List *list);
 
 // @todo: Unicode conversions
 

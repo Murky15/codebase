@@ -4,24 +4,10 @@
 
 target:
 {
-  exe:               "build/main.exe"
+  exe:               "../build/Tracer.exe"
   arguments:         ""
-  working_directory: "build"
+  working_directory: "../build"
   active:            1
-}
-
-/// breakpoints ///////////////////////////////////////////////////////////////
-
-breakpoint:
-{
-  line: ("src/main.c":104)
-  enabled: 1
-}
-
-breakpoint:
-{
-  line: ("src/main.c":140)
-  enabled: 1
 }
 
 /// exception code filters ////////////////////////////////////////////////////

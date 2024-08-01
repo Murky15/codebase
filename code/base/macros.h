@@ -39,6 +39,7 @@
 #define local_persist static
 #define function static
 #define fallthrough
+#define core_function function // @note: So now we can change this if we want to build a dll or lib or something
 
 // @note: Function macros
 

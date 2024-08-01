@@ -2,9 +2,10 @@
 # Yes windows DOES have a builtin bash interpereter. Shocking, right?
 
 # Default config
-accepted_compilers=(msvc clang tcc gcc)
+accepted_compilers=(msvc clang tcc)
 accepted_compile_modes=(debug release)
 accepted_assemblers=(nasm ml64)
+additional_build_options=()
 
 compiler="${accepted_compilers[0]}"
 compile_mode="${accepted_compile_modes[0]}"
@@ -57,13 +58,13 @@ if [[ "$compiler" != "msvc" ]]; then
   gcc_like=1
 fi
 
-msvc_common="-I..\code\ -I..\local\ -nologo -FC -Z7"
+msvc_common="-I../code/ -I../local/ -nologo -FC -Z7 -wd4005"
 msvc_debug="cl -Od -DBUILD_DEBUG=1 $msvc_common"
 msvc_release="cl -O2 -DBUILD_DEBUG=0 $msvc_common"
 msvc_link="-link"
 msvc_out="-Fe"
 
-gcc_like_common="-I..\code\ -I..\local\ -Wall"
+gcc_like_common="-I../code/ -I../local/ -Wall -Wno-macro-redefined -Wno-unused-function -Wno-unused-variable"
 gcc_like_debug="$compiler -g -O0 -DBUILD_DEBUG=1$ $gcc_like_common"
 gcc_like_release="$compiler -g -O2 -DBUILD_DEBUG=0$ $gcc_like_common"
 gcc_like_link=""

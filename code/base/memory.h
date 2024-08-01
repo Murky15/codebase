@@ -24,24 +24,24 @@ typedef struct Temp_Arena {
 
 // @note: Arena functions
 
-link Arena*     arena_alloc(void);
-link void       arena_release(Arena *arena);
-link void*      arena_push_no_zero(Arena *arena, u64 size, u64 align);
-link void*      arena_push(Arena *arena, u64 size, u64 align);
-link void       arena_pop_to(Arena *arena, u64 pos);
-link void       arena_pop(Arena *arena, u64 amount);
-link void       arena_clear(Arena *arena);
-link u64        arena_pos(Arena *arena);
+core_function Arena*     arena_alloc(void);
+core_function void       arena_release(Arena *arena);
+core_function void*      arena_push_no_zero(Arena *arena, u64 size, u64 align);
+core_function void*      arena_push(Arena *arena, u64 size, u64 align);
+core_function void       arena_pop_to(Arena *arena, u64 pos);
+core_function void       arena_pop(Arena *arena, u64 amount);
+core_function void       arena_clear(Arena *arena);
+core_function u64        arena_pos(Arena *arena);
 #define arena_pushn(a,T,c) (T*)arena_push((a), sizeof(T) * (c), align_of(T));
 
 // @note: Temp arena functions
 
-link Temp_Arena temp_arena(Arena *arena);
-link void       temp_arena_end(Temp_Arena temp);
+core_function Temp_Arena temp_arena(Arena *arena);
+core_function void       temp_arena_end(Temp_Arena temp);
 
 // @note: Scratch arena
 
-link Temp_Arena get_scratch(Arena **conflicts, u64 num_conflicts);
+core_function Temp_Arena get_scratch(Arena **conflicts, u64 num_conflicts);
 #define release_scratch(t) temp_arena_end(t)
 
 #endif // BASE_MEMORY_H

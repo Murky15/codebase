@@ -15,7 +15,7 @@
 
 static_assert(PAGE_TABLE_SIZE >= sizeof(Arena), check_arena_size);
 
-link Arena*
+core_function Arena*
 arena_alloc (void) {
   Arena *result = 0;
   void *back_buffer = mem_reserve(ARENA_DEFAULT_RESERVE_SIZE);
@@ -30,12 +30,12 @@ arena_alloc (void) {
   return result;
 }
 
-link void
+core_function void
 arena_release (Arena *arena) {
   mem_release(arena, arena->cap);
 }
 
-link void*
+core_function void*
 arena_push_no_zero (Arena *arena, u64 size, u64 align) {
   assert(arena);
   void *result = 0;
@@ -60,7 +60,7 @@ arena_push_no_zero (Arena *arena, u64 size, u64 align) {
   return result;
 }
 
-link void*
+core_function void*
 arena_push (Arena *arena, u64 size, u64 align) {
   void *result = arena_push_no_zero(arena, size, align);
   memory_zero(result, size);
@@ -68,7 +68,7 @@ arena_push (Arena *arena, u64 size, u64 align) {
   return result;
 }
 
-link void
+core_function void
 arena_pop_to (Arena *arena, u64 pos) {
   assert(arena);
   u64 min_pos = sizeof(Arena);
@@ -84,30 +84,30 @@ arena_pop_to (Arena *arena, u64 pos) {
   }
 }
 
-link void
+core_function void
 arena_pop (Arena *arena, u64 amount) {
   u64 new_pos = arena->pos - amount;
   arena_pop_to(arena, new_pos);
 }
 
-link void
+core_function void
 arena_clear (Arena *arena) {
   arena_pop_to(arena, 0);
 }
 
-link u64
+core_function u64
 arena_pos (Arena *arena) {
   return arena->pos;
 }
 
 // @note: Temp arena functions
 
-link Temp_Arena
+core_function Temp_Arena
 temp_arena (Arena *arena) {
   return (Temp_Arena){arena, arena->pos};
 }
 
-link void
+core_function void
 temp_arena_end (Temp_Arena temp) {
   arena_pop_to(temp.arena, temp.pos);
 }
@@ -115,7 +115,7 @@ temp_arena_end (Temp_Arena temp) {
 // @note: Scratch arena
 
 
-link Temp_Arena
+core_function Temp_Arena
 get_scratch (Arena **conflicts, u64 num_conflicts) {
   threadvar local_persist Arena *scratch_pool[2];
 
