@@ -25,34 +25,61 @@ typedef void VoidFunc(void);
 // @todo: Fixed-point implementation
 
 // @note: Math types
-// @important: I would like to try and compile asm for vector ops instead of intrinsics
 
 #include <math.h>
 
-// Integers
-typedef struct Vec2 {
-  u64 x, y;
+// So for vectors, we can use SIMD intrinsics but between mangling the data into
+// the format we want and actually performing the operation it might just be good enough
+// to implement this in scalar, and rely on auto-vectorization or put in sse for bigger things
+// idk, I'll profile this later and see whats best. For now I'm gonna avoid the premature
+// optimization. 
+
+typedef union Vec2 {
+  struct { f32 x, y; };
+  f32 v[2];
 } Vec2;
 
-typedef struct Vec3 {
-  u64 x, y, z;
+typedef union Vec3 {
+  struct { f32 x, y, z; };
+  struct { f32 r, g, b; };
+  f32 v[3];
 } Vec3;
 
-typedef struct Vec4 {
-  u64 x, y, z, w;
-} Vec4;
+typedef union Vec4 {
+  struct { f32 x, y, z, w; };
+  struct { f32 r, g, b, a; };
+  struct { f32 x1, y1, x2, y2; };
+  f32 v[4];
+} Vec4, Rect;
 
-// Floats
-typedef struct Vec2f {
-  f32 x, y;
-} Vec2f;
+// @todo: How should I handle matricies?
 
-typedef struct Vec3f {
-  f32 x, y, z;
-} Vec3f;
+// @note: Constructors
 
-typedef struct Vec4f {
-  f32 x, y, z, w;
-} Vec4f;
+core_function Vec2 v2(f32 x, f32 y);
+core_function Vec3 v3(f32 x, f32 y, f32 z);
+core_function Vec4 v4(f32 x, f32 y, f32 z, f32 w);
+
+// @note: Arithmetic
+
+core_function f32  v2_mag(Vec2 v);
+core_function f32  v3_mag(Vec3 v);
+core_function f32  v4_mag(Vec4 v);
+core_function Vec2 v2_add(Vec2 a, Vec2 b);
+core_function Vec3 v3_add(Vec3 a, Vec3 b);
+core_function Vec4 v4_add(Vec4 a, Vec4 b);
+core_function Vec2 v2_sub(Vec2 a, Vec2 b);
+core_function Vec3 v3_sub(Vec3 a, Vec3 b);
+core_function Vec4 v4_sub(Vec4 a, Vec4 b);
+core_function Vec2 v2_muls(Vec2 v, f32 s);
+core_function Vec3 v3_muls(Vec3 v, f32 s);
+core_function Vec4 v4_muls(Vec4 v, f32 s);
+core_function Vec2 v2_norm(Vec2 v);
+core_function Vec3 v3_norm(Vec3 v);
+core_function Vec4 v4_norm(Vec4 v);
+core_function f32  v2_dot(Vec2 a, Vec2 b);
+core_function f32  v3_dot(Vec3 a, Vec3 b);
+core_function f32  v4_dot(Vec4 a, Vec4 b);
+core_function Vec3 v3_cross(Vec3 a, Vec3 b);
 
 #endif // BASE_TYPES_H

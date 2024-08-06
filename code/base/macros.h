@@ -73,9 +73,17 @@
 # error "align_of not implemented!"
 #endif
 
+#if COMPILER_CL
+# define set_align(x) __declspec(align(x))
+#else
+# error "Manual alignment not supported by this compiler!"
+#endif
+
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #define clamp(a,min,max) ((a) < (min) ? (min) : (a) > (max) ? (max) : (a))
+
+#define square(x) ((x)*(x))
 
 #define array_count(a) (sizeof(a) / sizeof(a[0]))
 #define swap(T, a, b) stmnt( T __temp = a; a = b; b = __temp; )

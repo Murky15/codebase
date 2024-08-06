@@ -1,6 +1,8 @@
-#include <Windows.h>
+// @todo: What if there was a way to pass these to build.sh when we're not on windows...
 #pragma comment(lib, "User32.lib")
 #pragma comment(lib, "Gdi32.lib")
+#pragma comment(linker, "/SUBSYSTEM:WINDOWS")
+#include <Windows.h>
 
 #include "base/include.h"
 
@@ -95,7 +97,7 @@ render_silly_little_thing (u32 *pixels, u32 width, u32 height) {
   // xOffset = ++yOffset;
 }
 
-function int
+int
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
   Arena *perm_arena = arena_alloc();
   Arena *frame_arena = arena_alloc();

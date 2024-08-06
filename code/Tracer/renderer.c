@@ -15,7 +15,7 @@ function void
 put_pixel (Bitmap *canvas, Vec2 p, Vec3 color) {
   u64 screen_x = canvas->width / 2 + p.x;
   u64 screen_y = canvas->height / 2 - p.y;
-  ((u32*)canvas->pixels)[screen_y * canvas->width + screen_x] = (color.x << 16 | color.y << 8 | color.z);
+  // ((u32*)canvas->pixels)[screen_y * canvas->width + screen_x] = @todo;
 }
 
 function Vec3
@@ -25,6 +25,12 @@ canvas_to_viewport (Bitmap *canvas, Camera *cam, Vec2 p) {
   u64 z = cam->distance;
 
   return (Vec3){x,y,z};
+}
+
+function Vec3
+point_on_ray (Vec3 origin, Vec3 dir, f32 advance) {
+  
+  return 
 }
 
 function void

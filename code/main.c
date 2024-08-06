@@ -5,15 +5,10 @@
 #define ENABLE_ASSERT 1
 
 // Headers
-#include "base/context.h"
-#include "base/macros.h"
-#include "base/types.h"
-#include "base/memory.h"
-#include "base/strings.h"
+#include "base/include.h"
 
 // Source
-#include "base/memory.c"
-#include "base/strings.c"
+#include "base/include.c"
 
 /*
   @todo:
