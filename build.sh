@@ -1,101 +1,49 @@
 #!/bin/bash
-# Yes windows DOES have a builtin bash interpereter. Shocking, right?
 
-# Default config
-accepted_compilers=(msvc clang tcc)
-accepted_compile_modes=(debug release)
-accepted_assemblers=(nasm ml64)
-additional_build_options=()
+# Constants
+codebase_root_dir="W:"
 
-compiler="${accepted_compilers[0]}"
-compile_mode="${accepted_compile_modes[0]}"
-assembler="${accepted_assemblers[0]}"
+# Parse command line
+for arg in "$@"; do declare "$arg"=1; done
 
-build_targets=()
-
-# Unpack command line arguments
-for arg in $@; do
-  parsed=0
-
-  # Get compiler
-  for c in "${accepted_compilers[@]}"; do
-    if [[ "$arg" == "$c" ]]; then
-      compiler="$c"
-      parsed=1
-    fi
-  done
-
-  # Get compile mode
-  for m in "${accepted_compile_modes[@]}"; do
-    if [[ "$arg" == "$m" ]]; then
-      compile_mode="$m"
-      parsed=1
-    fi
-  done
-
-  # Get assembler
-  for a in "${accepted_assemblers[@]}"; do
-    if [[ "$arg" == "$a" ]]; then
-      assembler="$a"
-      parsed=1
-    fi
-  done
-
-  if [[ "$parsed" != 1 ]]; then
-    # Treat option as build target
-    build_targets+=("$arg")
-  fi
-  parsed=0
-done
-
-# Print current configuration
-echo "Compiler: $compiler"
-echo "Compile mode: $compile_mode"
-echo "Assembler: $assembler"
-
-# Setup options
-if [[ "$compiler" != "msvc" ]]; then
-  gcc_like=1
+# @todo: Yadda yadda yadda add whatever option handling we want here
+if [[ "$release" == 0 ]]; then
+  debug=1
+  echo "[Debug mode]"
+else
+  echo "[Release mode]"
 fi
 
-msvc_common="-I../code/ -I../local/ -nologo -FC -Z7 -wd4005"
-msvc_debug="cl -Od -DBUILD_DEBUG=1 $msvc_common"
-msvc_release="cl -O2 -DBUILD_DEBUG=0 $msvc_common"
-msvc_link="-link"
-msvc_out="-Fe"
+# Right now let's just worry about supporting MSVC
+echo "[MSVC compile]"
+cl_debug="-Od -Zi -WX"
+cl_release="-O2"
+cl_common="-nologo -std:c11 -FC -J -I"$codebase_root_dir"/code -C -EHa- -GR- -W4" # -C might be helpful for our metaprogram
+cl_link=""
+cl_out="-Fe"
 
-gcc_like_common="-I../code/ -I../local/ -Wall -Wno-macro-redefined -Wno-unused-function -Wno-unused-variable"
-gcc_like_debug="$compiler -g -O0 -DBUILD_DEBUG=1$ $gcc_like_common"
-gcc_like_release="$compiler -g -O2 -DBUILD_DEBUG=0$ $gcc_like_common"
-gcc_like_link=""
-gcc_like_out="-o "
+jai_compile="jai -debugger -output_path $codebase_root_dir/build -quiet" # Most things will be handled by metaprogram
 
-# Compile lines
-if [[ "$compiler" == "msvc" ]]; then
-  compile="msvc_$compile_mode"
-  link="msvc_link"
-  out="msvc_out"
-elif [[ "$gcc_like" == 1 ]]; then
-  compile="gcc_like_$compile_mode"
-  link="gcc_like_link"
-  out="gcc_like_out"
+# @todo: Set per-build settings like 'only-compile', 'assemble', etc
+
+# Setup requested config
+if [[ "$debug" == 1 ]]; then
+  compile="$cl_debug $cl_common"
+else
+  compile="$cl_release $cl_common"
 fi
-
-# @hack
-if [[ "$OSTYPE" == "msys" ]]; then
-  exe_extension=".exe"
-fi
+link="$cl_link"
+out="$cl_out"
 
 # Prep build dirs
-mkdir -p build local
+mkdir -p build
 
-# @todo: Metagen
+# @todo: C metagen
 
-# Build targets
-# There are two ways we can do this, pull a Ryan Fleury and go down each project one by one and build it, or make a small
-# assumption about directory structure and save some lines of code. I will try the latter and revert to the former if it is better
+# Build
 pushd build >> /dev/null
-for target in "${build_targets[@]}"; do
-  eval "${!compile} ${!out}$target$exe_extension ../code/$target/main.c ${!link}"
-done
+built=0
+if [[ "$debaser" == 1 ]]; then built=1 && eval "$jai_compile $codebase_root_dir"/code/debaser/debaser.jai || exit 1; fi
+
+if [[ "$built" == 0 ]]; then echo "Unrecognized target!"; fi
 popd >> /dev/null
