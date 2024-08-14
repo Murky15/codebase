@@ -29,8 +29,8 @@ canvas_to_viewport (Bitmap *canvas, Camera *cam, Vec2 p) {
 
 function Vec3
 point_on_ray (Vec3 origin, Vec3 dir, f32 advance) {
-  
-  return 
+
+  return
 }
 
 function void

@@ -45,8 +45,7 @@ window:
       {
         0.808862:
         {
-          code: {selected project:{"root.raddbg_project"} "../code/Tracer/main.c" cursor:91:6}
-          disassembly: {}
+          code: {selected project:{"root.raddbg_project"} "../code/debaser/debaser.jai" cursor:101:23}
         }
         0.191138:
         {

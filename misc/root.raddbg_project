@@ -4,7 +4,7 @@
 
 target:
 {
-  exe:               "../build/Tracer.exe"
+  exe:               "../build/debaser.exe"
   arguments:         ""
   working_directory: "../build"
   active:            1
