@@ -22,6 +22,11 @@ char_is_digit (u8 c) {
 }
 
 core_function b32
+char_is_alpha_numeric(u8 c) {
+  return char_is_alpha(c) || char_is_digit(c);
+}
+
+core_function b32
 char_is_symbol (u8 c) {
   return (c >= 33 && c <= 47) || (c >= 58 && c <= 64) || (c >= 91 && c <= 96) || (c >= 123 && c < 127);
 }
@@ -63,22 +68,22 @@ cstr_length (char *cstr) {
 // Constructors
 core_function String8
 str8 (u8 *str, u64 len) {
-  return (String8){str, len};
+  return comp_lit(Strin8, str, len);
 }
 
 core_function String8
 str8_range (u8 *first, u8 *opl) {
-  return (String8){first, (u64)(opl-first)};
+  return comp_lit(String8, first, (u64)(opl-first));
 }
 
 core_function String16
 str16 (u16 *str, u64 len) {
-  return (String16){str, len};
+  return comp_lit(String16, str, len);
 }
 
 core_function String32
 str32 (u32 *str, u64 len) {
-  return (String32){str, len};
+  return comp_lit(String32, str, len);
 }
 
 // Substrings
@@ -97,26 +102,26 @@ str8_sub (String8 string, u64 first, u64 opl) {
 core_function String8
 str8_skip (String8 string, u64 amount) {
   amount = min(amount, string.len);
-  return (String8){string.str + amount, string.len - amount};
+  return comp_lit(String8, string.str + amount, string.len - amount);
 }
 
 core_function String8
 str8_chop (String8 string, u64 amount) {
   amount = min(amount, string.len);
-  return (String8){string.str, string.len - amount};
+  return comp_lit(String8, string.str, string.len - amount);
 }
 
 core_function String8
 str8_prefix (String8 string, u64 size) {
   size = min(size, string.len);
-  return (String8){string.str, size};
+  return comp_lit(String8, string.str, size);
 }
 
 core_function String8
 str8_postfix (String8 string, u64 size) {
   size = min(size, string.len);
   u64 skip = string.len - size;
-  return (String8){string.str + skip, size};
+  return comp_lit(String8, string.str + skip, size);
 }
 
 // Match
@@ -162,7 +167,7 @@ str8_push_copy (Arena *arena, String8 string) {
   u64 len = string.len;
   u8 *str = arena_pushn(arena, u8, len + 1);
   memory_copy(str, string.str, len);
-  return (String8){str, len};
+  return comp_lit(String8, str, len);
 }
 
 core_function String8
@@ -183,7 +188,7 @@ str8_pushfv (Arena *arena, char *fmt, va_list args) {
   }
   va_end(backup_args);
 
-  return (String8){buffer, actual_size};
+  return comp_lit(String8, buffer, actual_size);
 }
 
 core_function String8

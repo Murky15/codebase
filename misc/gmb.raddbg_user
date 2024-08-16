@@ -24,7 +24,7 @@ window:
     {
       0.333333:
       {
-        watch: {selected "input"}
+        watch: {selected "byte" "next_byte" "pos" "next_pos" "active_token_type"}
         locals: {}
       }
       0.333333:
@@ -45,7 +45,10 @@ window:
       {
         0.808862:
         {
-          code: {selected project:{"root.raddbg_project"} "../code/debaser/debaser.jai" cursor:101:23}
+          code: {project:{"root.raddbg_project"} "../code/debaser/debaser.jai" cursor:33:1}
+          disassembly: {}
+          code: {project:{"root.raddbg_project"} "../code/llvm_example/main.cpp" cursor:25:1}
+          code: {selected project:{"root.raddbg_project"} "../code/llvm_example/lexer.cpp" cursor:68:1}
         }
         0.191138:
         {

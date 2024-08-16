@@ -64,7 +64,6 @@
 # define assert(c)
 #endif
 
-// Because we are using c99
 #if COMPILER_CL
 # define align_of(x) __alignof(x)
 #elif LLVM_LIKE_COMPILER
@@ -77,6 +76,12 @@
 # define set_align(x) __declspec(align(x))
 #else
 # error "Manual alignment not supported by this compiler!"
+#endif
+
+#if LANG_CPP
+# define comp_lit(T, ...) {__VA_ARGS__} // The one time MSVC gets picky about the standard
+#else
+# define comp_lit(T, ...) (T){__VA_ARGS__}
 #endif
 
 #define min(a,b) ((a) < (b) ? (a) : (b))

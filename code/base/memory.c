@@ -104,7 +104,7 @@ arena_pos (Arena *arena) {
 
 core_function Temp_Arena
 temp_arena (Arena *arena) {
-  return (Temp_Arena){arena, arena->pos};
+  return comp_lit(Temp_Arena, arena, arena->pos);
 }
 
 core_function void
@@ -143,5 +143,5 @@ get_scratch (Arena **conflicts, u64 num_conflicts) {
     }
   }
 
-  return (Temp_Arena)zero_struct;
+  return comp_lit(Temp_Arena, zero_struct);
 }

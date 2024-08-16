@@ -7,7 +7,23 @@ target:
   exe:               "../build/debaser.exe"
   arguments:         ""
   working_directory: "../build"
+  active:            0
+}
+
+target:
+{
+  exe:               "../build/llvm-example.exe"
+  arguments:         ""
+  working_directory: "../build"
   active:            1
+}
+
+/// breakpoints ///////////////////////////////////////////////////////////////
+
+breakpoint:
+{
+  line: ("../code/llvm_example/lexer.cpp":46)
+  enabled: 1
 }
 
 /// exception code filters ////////////////////////////////////////////////////

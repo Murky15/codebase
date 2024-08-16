@@ -61,6 +61,7 @@ core_function b32 char_is_alpha(u8 c);
 core_function b32 char_is_alpha_upper(u8 c);
 core_function b32 char_is_alpha_lower(u8 c);
 core_function b32 char_is_digit(u8 c);
+core_function b32 char_is_alpha_numeric(u8 c);
 core_function b32 char_is_symbol(u8 c);
 core_function b32 char_is_control(u8 c);
 core_function b32 char_is_space(u8 c);
@@ -80,7 +81,8 @@ core_function String8 str8_range(u8 *first, u8 *opl);
 core_function String16 str16(u16 *str, u64 len);
 core_function String32 str32(u32 *str, u64 len);
 
-#define str8_expand(s) (int)((s).len), ((s).str)
+//@note: Use %.*s in format string
+#define str8_expand(s) (int)((s).len), (char*)((s).str)
 
 // Substrings
 core_function String8 str8_sub(String8 string, u64 first, u64 opl);
@@ -105,7 +107,7 @@ core_function void str8_list_push(Arena *arena, String8List *list, String8 strin
 core_function void str8_list_push_front(Arena *arena, String8List *list, String8 string);
 core_function void str8_list_pushf(Arena *arena, String8List *list, char *fmt, ...);
 core_function void str8_list_concat(String8List *base, String8List *appending);
-core_function String8List str8_split(Arena *arena, String8 string, u64 num_splits, char *splits);
+core_function String8List str8_split(Arena *arena, String8 string, u64 num_splitters, char *splits);
 core_function String8 str8_list_join(Arena *arena, String8List list, String8Join *opt_join_params);
 
 // Conversions
