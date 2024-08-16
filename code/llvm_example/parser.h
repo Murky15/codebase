@@ -1,4 +1,4 @@
-// Lexer for the "Kaleidoscope" language spec by the LLVM council
+// @note: Lexer for the "Kaleidoscope" language spec by the LLVM council
 
 typedef u32 Token_Kind;
 enum {

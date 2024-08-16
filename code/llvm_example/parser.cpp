@@ -1,14 +1,15 @@
+// @note: Lexer
 
 function String8
 str8_from_token_kind (Token_Kind type) {
   String8 string;
   switch (type) {
     default: string = str8_lit("null"); break;
-    case TOKEN_KIND_DEFINITION: string = str8_lit("definition"); break;
-    case TOKEN_KIND_EXTERN: string = str8_lit("extern"); break;
-    case TOKEN_KIND_IDENTIFIER: string = str8_lit("identifier"); break;
-    case TOKEN_KIND_NUM_LITERAL: string = str8_lit("num literal"); break;
-    case TOKEN_KIND_EOF: string = str8_lit("end of file"); break;
+    case TOKEN_KIND_DEFINITION: string = str8_lit("def "); break;
+    case TOKEN_KIND_EXTERN: string = str8_lit("ext "); break;
+    case TOKEN_KIND_IDENTIFIER: string = str8_lit("iden"); break;
+    case TOKEN_KIND_NUM_LITERAL: string = str8_lit("num "); break;
+    case TOKEN_KIND_EOF: string = str8_lit("eof "); break;
   }
 
   return string;
@@ -39,7 +40,6 @@ lex (Arena *arena, String8 input) {
   Token_Kind active_token_type = TOKEN_KIND_NULL;
   u64 lexeme = 0;
 
-  // @note: All these gotos are redundant but do they help readability?
   for (u64 pos = 0; pos < input.len; pos += 1) {
     u64 next_pos = pos + 1;
     u8 byte = input.str[pos];

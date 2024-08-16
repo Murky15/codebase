@@ -2,11 +2,11 @@
 
 // @note: Headers
 #include "base/include.h"
-#include "lexer.h"
+#include "parser.h"
 
 // @note: Source
 #include "base/include.c"
-#include "lexer.cpp"
+#include "parser.cpp"
 
 char *program = R"(
 def fib(x)
