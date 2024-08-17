@@ -68,7 +68,7 @@ cstr_length (char *cstr) {
 // Constructors
 core_function String8
 str8 (u8 *str, u64 len) {
-  return comp_lit(Strin8, str, len);
+  return comp_lit(String8, str, len);
 }
 
 core_function String8

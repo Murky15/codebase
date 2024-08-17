@@ -45,10 +45,10 @@ window:
       {
         0.808862:
         {
-          code: {project:{"root.raddbg_project"} "../code/debaser/debaser.jai" cursor:33:1}
+          code: {selected project:{"root.raddbg_project"} "../code/debaser/debaser.jai" cursor:91:2}
           disassembly: {}
           code: {project:{"root.raddbg_project"} "../code/llvm_example/main.cpp" cursor:25:1}
-          code: {selected project:{"root.raddbg_project"} "../code/llvm_example/lexer.cpp" cursor:68:1}
+          code: {project:{"root.raddbg_project"} "../code/llvm_example/lexer.cpp" cursor:83:1}
         }
         0.191138:
         {

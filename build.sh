@@ -18,7 +18,7 @@ fi
 echo "[MSVC compile]"
 cl_debug="-Od -Zi -WX"
 cl_release="-O2"
-cl_common="cl -nologo -FC -J -I"$codebase_root_dir"/code -EHa- -GR- -W3 -wd4146"
+cl_common="cl -nologo -FC -J -I"$codebase_root_dir"/code -EHa- -GR- -W3 -wd4146 -wd4005"
 cl_link=""
 cl_out="-Fe"
 
@@ -44,7 +44,8 @@ mkdir -p build
 pushd build >> /dev/null
 built=0
 if [[ "$debaser" == 1 ]]; then built=1 && eval "$jai_compile $codebase_root_dir"/code/debaser/debaser.jai || exit 1; fi
-if [[ "$llvm_example" == 1 ]]; then built=1 && eval "$compile $codebase_root_dir"/code/llvm_example/main.cpp "$link $out"llvm-example.exe || exit 1; fi
+if [[ "$llvm_example" == 1 ]]; then built=1 && eval "$compile $codebase_root_dir"/code/llvm_example/main.cpp "$link $out"llvm_example.exe || exit 1; fi
+if [[ "$d3d11_playground" == 1 ]]; then built=1 && eval "$compile $codebase_root_dir"/code/d3d11_playground/main.c "$link User32.lib Gdi32.lib d3d11.lib $out"d3d11_playground.exe || exit 1; fi
 
 if [[ "$built" == 0 ]]; then echo "Unrecognized target!"; fi
 popd >> /dev/null
