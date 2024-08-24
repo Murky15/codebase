@@ -1,0 +1,41 @@
+version(2);
+project_name = "root";
+patterns = {
+    "*.c",
+    "*.cpp",
+    "*.h",
+    "*.m",
+    "*.bat",
+    "*.sh",
+    "*.4coder",
+    "*.glsl",
+    "*.jai",
+    "*.odin",
+    "*.asm",
+    "*.mdesk",
+};
+
+blacklist_patterns = {
+    ".*",
+};
+
+paths = {
+    { .path = ".", .relative = true, .recursive = false, },
+    { .path = "code", .relative = true, .recursive = true, },
+};
+
+load_paths = {
+    .win = paths,
+    .linux = paths,
+    .mac = paths,
+};
+
+//
+//commands = {
+//};
+//
+
+fkey_command = {
+    .F1 = "build",
+    .F2 = "run",
+};
