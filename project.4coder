@@ -30,12 +30,16 @@ load_paths = {
     .mac = paths,
 };
 
-//
-//commands = {
-//};
-//
+
+commands = {
+    .build_llvm = {.win = "pushd code/llvm_example && bash build_fib_gen.sh && popd", .out="*compilation*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false},
+};
+
 
 fkey_command = {
-    .F1 = "build",
-    .F2 = "run",
+    
+    
+    
+    
+    .F6 = "build_llvm",
 };

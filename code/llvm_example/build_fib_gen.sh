@@ -1,3 +1,2 @@
-#!/bin/bash
-
-clang -IW:/code/third_party/llvm-project/llvm/include generate_fibonacci.cpp -LW:/code/third_party/llvm-project/build/Debug/lib -lLLVM-C -o gen_fib.exe
+llvm_opts=`llvm-config --system-libs --cxxflags --libs all`
+cl -MD -EHsc -wd4624 ${llvm_opts//\//-} generate_fibonacci.cpp -Fegen_fib.exe
