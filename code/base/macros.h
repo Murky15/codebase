@@ -3,7 +3,7 @@
 
 // @todo: Sanitizing & Profiling helpers
 
-// @note: Constant macros
+//~ @note: Constant macros
 
 #if COMPILER_CL || COMPILER_TCC
 # define threadvar __declspec(thread)
@@ -41,7 +41,7 @@
 #define fallthrough
 #define core_function function // @note: So now we can change this if we want to build a dll or lib or something
 
-// @note: Function macros
+//~ @note: Function macros
 
 #define unused(v) (void)(v)
 
@@ -107,7 +107,9 @@
 #define Gigabytes(n) ((u64)(n) << 30)
 #define Terabytes(n) ((u64)(n) << 401lu)
 
-// @note: Memory operation wrappers
+#define sq(x) ((x)*(x))
+
+//-@note: Memory operation wrappers
 
 #include <string.h>
 #define memory_zero(p,s) memset((p), 0, (s))
@@ -122,7 +124,7 @@
 
 #define DeferLoop(start, end) for(int _i_ = ((start), 0); _i_ == 0; (_i_ += 1, (end)))
 
-// @note: Linked list macros
+//- @note: Linked list macros
 
 #define dll_push_back_np(f,l,n,next,prev) ((f)==0?\
 ((f)=(l)=(n),(n)->next=(n)->prev=0):\

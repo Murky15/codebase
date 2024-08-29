@@ -24,7 +24,7 @@ window:
     {
       0.333333:
       {
-        watch: {selected "byte" "next_byte" "pos" "next_pos" "active_token_type"}
+        watch: {selected "player.pos" "dir"}
         locals: {}
       }
       0.333333:
@@ -45,10 +45,8 @@ window:
       {
         0.808862:
         {
-          code: {selected project:{"root.raddbg_project"} "../code/debaser/debaser.jai" cursor:91:2}
-          disassembly: {}
-          code: {project:{"root.raddbg_project"} "../code/llvm_example/main.cpp" cursor:25:1}
-          code: {project:{"root.raddbg_project"} "../code/llvm_example/lexer.cpp" cursor:83:1}
+          code: {selected project:{"root.raddbg_project"} "../code/dumb/main.c" cursor:241:14}
+          code: {project:{"root.raddbg_project"} "../code/third_party/handmademath.h" cursor:650:1}
         }
         0.191138:
         {

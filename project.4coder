@@ -32,14 +32,13 @@ load_paths = {
 
 
 commands = {
-    .build_llvm = {.win = "pushd code/llvm_example && bash build_fib_gen.sh && popd", .out="*compilation*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false},
+    //- Build commands
+    .build_dumb = {.win="bash build.sh dumb", .out="*compilation*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false}
+    //- Run commands
 };
 
 
+
 fkey_command = {
-    
-    
-    
-    
-    .F6 = "build_llvm",
+    .F1 = "build_dumb",
 };

@@ -1,6 +1,6 @@
 /*
   This file serves as a "control" by implementing a simple fibonacci function in C++.
-  Compile with `clang example.cpp fibonacci.cpp` and run. You know the drill.
+  Compile with `clang example.cpp fibonacci.cpp`
 */
 
 extern "C" int fib (int x) {

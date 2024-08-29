@@ -12,7 +12,7 @@ target:
 
 target:
 {
-  exe:               "../build/llvm-example.exe"
+  exe:               "../build/dumb.exe"
   arguments:         ""
   working_directory: "../build"
   active:            1
