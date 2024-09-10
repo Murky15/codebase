@@ -41,6 +41,11 @@
 #define fallthrough
 #define core_function function // @note: So now we can change this if we want to build a dll or lib or something
 
+#define M_PI32 ((f32)M_PI)
+#define rad2deg (180.f/M_PI32)
+#define deg2rad (M_PI32/180.f)
+
+
 //~ @note: Function macros
 
 #define unused(v) (void)(v)
@@ -53,7 +58,11 @@
 #define glue(a,b) glue_(a,b)
 
 #ifndef assert_break
-# define assert_break() (*(volatile int*)0 = 0)
+# if OS_WINDOWS
+#  define assert_break() __debugbreak()
+# else
+#  define assert_break() (*(volatile int*)0 = 0)
+# endif
 #endif
 
 #if ENABLE_ASSERT
@@ -76,6 +85,12 @@
 # define set_align(x) __declspec(align(x))
 #else
 # error "Manual alignment not supported by this compiler!"
+#endif
+
+#if OS_WINDOWS
+# define debug_print(str8) OutputDebugString((const char*)str8.str)
+#else
+# define debug_print(str8) fputs((const char*)str8.str, stderr)
 #endif
 
 #if LANG_CPP

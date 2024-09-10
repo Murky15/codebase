@@ -24,7 +24,7 @@ window:
     {
       0.333333:
       {
-        watch: {selected "player.pos" "dir"}
+        watch: {selected "cam_dist" "base0" "y0" "b0.y" "p_base0" "(((vp[1].x - vp[0].x) * (d0.y - vp[0].y)) - ((vp[1].y - vp[0].y) * (d0.x - vp[0].x)))" "(((vp[1].x - vp[0].x) * (d1.y - vp[0].y)) - ((vp[1].y - vp[0].y) * (d1.x - vp[0].x)))"}
         locals: {}
       }
       0.333333:
@@ -41,19 +41,19 @@ window:
     }
     0.722658:
     {
-      0.692251:
+      0.692982:
       {
-        0.808862:
+        0.755135:
         {
-          code: {selected project:{"root.raddbg_project"} "../code/dumb/main.c" cursor:241:14}
-          code: {project:{"root.raddbg_project"} "../code/third_party/handmademath.h" cursor:650:1}
+          code: {project:{"root.raddbg_project"} "../code/third_party/handmademath.h" cursor:655:31}
+          code: {selected project:{"root.raddbg_project"} "../code/dumb/main.c" cursor:397:43}
         }
-        0.191138:
+        0.244865:
         {
           targets: {selected }
         }
       }
-      0.307749:
+      0.307018:
       {
         output: {selected }
         memory: {}
@@ -145,8 +145,8 @@ keybindings:
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
-  {"prev_tab"                                ctrl page_up        }
   {"prev_tab"                                ctrl shift tab      }
+  {"prev_tab"                                ctrl page_up        }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
   {"run"                                     f5                  }

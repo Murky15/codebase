@@ -22,7 +22,7 @@ target:
 
 breakpoint:
 {
-  line: ("../code/llvm_example/lexer.cpp":46)
+  line: ("../code/dumb/main.c":392)
   enabled: 1
 }
 
