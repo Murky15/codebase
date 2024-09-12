@@ -95,6 +95,7 @@ core_function Vec3  pv2(Vec2 v, f32 z); // promote v2
 //- @note: Basic ops
 core_function f32  v2len(Vec2 v);
 core_function f32  v2dot(Vec2 a, Vec2 b);
+core_function f32  v2cross(Vec2 a, Vec2 b, Vec2 c); // https://en.wikipedia.org/wiki/Cross_product#Computational_geometry
 core_function Vec2 v2sub(Vec2 a, Vec2 b);
 core_function Vec2 v2add(Vec2 a, Vec2 b);
 core_function Vec2 v2muls(Vec2 v, f32 s);

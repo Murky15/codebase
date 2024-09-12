@@ -22,8 +22,58 @@ target:
 
 breakpoint:
 {
-  line: ("../code/dumb/main.c":392)
+  line: ("../code/dumb/main.c":47)
   enabled: 1
+}
+
+/// watches ///////////////////////////////////////////////////////////////////
+
+watch:
+{
+  expression:  "d0"
+  view_rule:   ""
+}
+
+watch:
+{
+  expression:  "in"
+  view_rule:   ""
+}
+
+watch:
+{
+  expression:  "d0_visibility"
+  view_rule:   ""
+}
+
+watch:
+{
+  expression:  "in"
+  view_rule:   ""
+}
+
+watch:
+{
+  expression:  "p0"
+  view_rule:   ""
+}
+
+watch:
+{
+  expression:  "p1"
+  view_rule:   ""
+}
+
+watch:
+{
+  expression:  "p2"
+  view_rule:   ""
+}
+
+watch:
+{
+  expression:  "p3"
+  view_rule:   ""
 }
 
 /// exception code filters ////////////////////////////////////////////////////

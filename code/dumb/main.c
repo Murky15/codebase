@@ -20,11 +20,6 @@ typedef struct Win32_Data {
     BITMAPINFO bitmap;
 } Win32_Data;
 
-typedef struct Bitmap_Data {
-    u32 *pixels;
-    u32 width, height;
-} Bitmap_Data;
-
 typedef struct Entity {
     Vec2 pos;
     f32 rotation_angle;
@@ -37,8 +32,8 @@ typedef struct Wall {
 } Wall;
 
 global b32 g_game_running = true;
-global int g_window_width = 1920;
-global int g_window_height = 1080;
+global int g_window_width = 1280;
+global int g_window_height = 720;
 global b32 g_draw_minimap = true;
 
 function LRESULT
@@ -285,10 +280,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
             if (msg.message == WM_QUIT) {
                 g_game_running = false;
-            }
-            
-            // @todo: Maybe move this to WndProc?
-            if (msg.message == WM_INPUT) {
+            } else if (msg.message == WM_INPUT) {
+                // @todo: Maybe move this to WndProc?
                 UINT size;
                 local_persist u8 data[sizeof(RAWINPUT)];
                 GetRawInputData((HRAWINPUT)msg.lParam, RID_INPUT, data, &size, sizeof(RAWINPUTHEADER));
@@ -335,10 +328,10 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
                         }
                     }
                 }
+            } else {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
             }
-            
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
         }
         
         //- @note: Update
@@ -367,7 +360,6 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         if (turn_right) player.rotation_angle -= turn_amount * dt;
         player.rotation_angle = fmod_cycling(player.rotation_angle, 2 * M_PI32);
         
-        
         //- @note: Render
         
         clear_screen(&bitmap);
@@ -389,29 +381,32 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         d1.x = t1.x * cosf(theta) - t1.y * sinf(theta);
         d1.y = t1.x * sinf(theta) + t1.y * cosf(theta);
         
+        assert(d0.x != 0 && d1.x != 0);
+        
         // @note: Clip walls behind player 
-        // https://en.wikipedia.org/wiki/Cross_product#Computational_geometry
         // https://www.jonolick.com/home/unusual-cross-product-tricks#:~:text=Then%2C%20you%20can%20find%20the,you%20have%20three%203D%20points.
+        Vec3 vpp[2] = {{-fixed_player.x, 1, 1}, {fixed_player.x, 1, 1}};
         
-        Vec3 vpp[2] = {{-fixed_player.x, 0, 1}, {fixed_player.x, 0, 1}};
-        //f32 d0_visible = (((vp[1].x - vp[0].x) * (d0.y - vp[0].y)) - ((vp[1].y - vp[0].y) * (d0.x - vp[0].x)));
-        //f32 d1_visible = (((vp[1].x - vp[0].x) * (d1.y - vp[0].y)) - ((vp[1].y - vp[0].y) * (d1.x - vp[0].x)));
-        Vec3 view_plane = v3norm(v3cross(vpp[0], vpp[1]));
-        Vec3 wall_line = v3norm(v3cross(pv2(d0, 1), pv2(d1, 1)));
-        Vec3 intersection = v3cross(view_plane, wall_line);
-        Vec2 in;
-        if (intersection.z != 0) {
-            in = v2(intersection.x / intersection.z, intersection.y / intersection.z);
-            f32 minx = min(d0.x, d1.x);
-            f32 maxx = max(d0.x, d1.x);
-            f32 miny = min(d0.y, d1.y);
-            f32 maxy = max(d0.y, d1.y);
-            if (!(minx < in.x && in.x < maxx && miny < in.y && in.y < maxy))
-                in = v2(INFINITY,INFINITY);
-        }
-        
-        // @todo: Why is this `or` laggy?
-        if (1) {
+        f32 d0_visibility = v2cross(dv3(vpp[0]), dv3(vpp[1]), d0);
+        f32 d1_visibility = v2cross(dv3(vpp[0]), dv3(vpp[1]), d1);
+        if (d0_visibility >= 0 || d1_visibility >= 0) {
+            Vec3 view_plane = v3norm(v3cross(vpp[0], vpp[1]));
+            Vec3 wall_line = v3norm(v3cross(pv2(d0, 1), pv2(d1, 1)));
+            Vec3 intersection = v3cross(view_plane, wall_line);
+            if (intersection.z != 0) {
+                Vec2 in = v2(intersection.x / intersection.z, intersection.y / intersection.z);
+                f32 minx = min(d0.x, d1.x);
+                f32 maxx = max(d0.x, d1.x);
+                f32 miny = min(d0.y, d1.y);
+                f32 maxy = max(d0.y, d1.y);
+                if ((minx < in.x && in.x < maxx && miny < in.y && in.y < maxy) && in.x != 0 && in.y != 0) {
+                    if (d0_visibility <= 0)
+                        d0 = in;
+                    else if (d1_visibility <= 0)
+                        d1 = in;
+                }
+            }
+            
             Vec2 b0, b1;
             f32 cam_dist = 1.f;
             f32 screen_middle = ((f32)bitmap.height / 2.f); 
@@ -449,8 +444,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
             p3.y = base1;
             
             draw_quad_frame(&bitmap, p0, p1, p2, p3, Color_Red);
+            
         }
-        
         // @note: Minimap
         if (g_draw_minimap)
         {
@@ -461,7 +456,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
             draw_line(&bitmap, player_minimap_pos,  v2add(player_minimap_pos, v2(cosf(forward) * turn_indicator_length, sinf(forward) * turn_indicator_length)), Color_Magenta);
             draw_line(&bitmap, v2muls(v2add(dv3(vpp[0]), fixed_player), MINIMAP_SCALE), v2muls(v2add(dv3(vpp[1]), fixed_player), MINIMAP_SCALE), Color_Lime);
             
-            draw_circle(&bitmap, v2muls(v2add(in, fixed_player), MINIMAP_SCALE), 2.f, Color_Yellow);
+            //draw_circle(&bitmap, v2muls(v2add(in, fixed_player), MINIMAP_SCALE), 2.f, Color_Yellow);
             draw_line(&bitmap, v2muls(v2add(d0, fixed_player), MINIMAP_SCALE), v2muls(v2add(d1, fixed_player), MINIMAP_SCALE), Color_Red);
             
             draw_quad_framef(&bitmap, 0, 0, bitmap.width * MINIMAP_SCALE, bitmap.height * MINIMAP_SCALE, Color_Blue);
