@@ -8,7 +8,6 @@ typedef struct Wall {
     f32 height;
 } Wall;
 
-
 #include "renderer.h"
 //- @note: Source
 #include "base/include.c"
@@ -21,6 +20,7 @@ typedef struct Wall {
 - [ ] sin/cos/tan table lookup: https://namoseley.wordpress.com/2015/07/26/sincos-generation-using-table-lookup-and-iterpolation/
 */
 
+#define MOUSE_SENSITIVITY 2.0f
 #define PLAYER_MOVE_SPEED 100.f
 
 typedef struct Win32_Data {
@@ -36,15 +36,96 @@ typedef struct Entity {
     f32 radius;
 } Entity;
 
-global b32 g_game_running = true;
 global int g_window_width = 1280;
 global int g_window_height = 720;
+global b32 g_game_running = true;
 global b32 g_draw_minimap = true;
+global b32 g_mouse_captured = false;
+
+// @todo: It is annoying to need to pull out these "action commands"
+global b32 move_forward, move_back, strafe_left, strafe_right, turn_left, turn_right;
+global f32 turn_amount;
+
+function void
+win32_capture_mouse (HWND hwnd) {
+    g_mouse_captured = true;
+    RECT wr;
+    GetWindowRect(hwnd, &wr);
+    ClipCursor(&wr);
+    ShowCursor(false);
+}
 
 function LRESULT
 Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_CLOSE: PostQuitMessage(0); return 0; break;
+        
+        case WM_INPUT: {
+            // @todo: Maybe move this to WndProc?
+            UINT size;
+            u8 data[sizeof(RAWINPUT)];
+            GetRawInputData((HRAWINPUT)lParam, RID_INPUT, data, &size, sizeof(RAWINPUTHEADER));
+            RAWINPUT *input = (RAWINPUT*)data;
+            
+            if (input->header.dwType == RIM_TYPEKEYBOARD) {
+                RAWKEYBOARD *keyboard = &input->data.keyboard;
+                b32 key_down = (keyboard->Flags & RI_KEY_BREAK) == 0;
+                if (keyboard->MakeCode != KEYBOARD_OVERRUN_MAKE_CODE) {
+                    u8 extension = keyboard->Flags & RI_KEY_E0 ? 0xE0 : keyboard->Flags & RI_KEY_E1 ? 0xE1 : 0x00;
+                    u16 scan_code = (extension << 8) | (keyboard->MakeCode & 0x7F);
+                    
+                    switch (scan_code) {
+                        case 0x0011: fallthrough; // W / up-arrow
+                        case 0xE048: {
+                            move_forward = key_down;
+                        } break;
+                        
+                        case 0x001F: fallthrough; // S / down-arrow
+                        case 0xE050: {
+                            move_back = key_down;
+                        } break;
+                        
+                        case 0x001E: fallthrough; // A / left-arrow
+                        case 0xE04B: {
+                            strafe_left = key_down;
+                        } break;
+                        
+                        case 0x0020: fallthrough; // D / right-arrow
+                        case 0xE04D: {
+                            strafe_right = key_down;
+                        } break;
+                        
+                        case 0x0010: {            // Q
+                            turn_left = key_down;
+                        } break;
+                        
+                        case 0x0012: {            // E
+                            turn_right = key_down;
+                        } break;
+                        
+                        case 0x0001: {            // Escape
+                            if (g_mouse_captured) {
+                                g_mouse_captured = false;
+                                ShowCursor(true);
+                                ClipCursor(0);
+                            }
+                        } break;
+                    }
+                }
+            } else if (input->header.dwType == RIM_TYPEMOUSE) {
+                RAWMOUSE *mouse = &input->data.mouse;
+                if (mouse->usButtonFlags & RI_MOUSE_BUTTON_1_DOWN) {
+                    if (!g_mouse_captured)
+                        win32_capture_mouse(hwnd);
+                }
+                
+                s32 movex = mouse->lLastX;
+                s32 movey = mouse->lLastY;
+                turn_amount = (f32)movex * MOUSE_SENSITIVITY;
+            }
+            
+            return 0;
+        } break;
     }
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
@@ -108,7 +189,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     Win32_Data platform = win32_create_window(hInstance);
     
     // @note: Register for input
-    RAWINPUTDEVICE input_devices[1];
+    RAWINPUTDEVICE input_devices[2];
     
     // Keyboard
     input_devices[0].usUsagePage = 0x01;
@@ -116,17 +197,16 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     input_devices[0].dwFlags = RIDEV_NOLEGACY;
     input_devices[0].hwndTarget = 0;
     
-#if 0
     // Mouse
     input_devices[1].usUsagePage = 0x01;
     input_devices[1].usUsage = 0x02;
-    input_devices[1].dwFlags = 0; // For some reason RIDEV_NOLEGACY hangs program?
+    input_devices[1].dwFlags = 0;
     input_devices[1].hwndTarget = 0;
-#endif
     
     if (RegisterRawInputDevices(input_devices, array_count(input_devices), sizeof(input_devices[0])) == FALSE) {
         OutputDebugString("Unable to register input devices\n");
     }
+    win32_capture_mouse(platform.hwnd);
     
     // @note: Timing
     LARGE_INTEGER frequency, start_time, end_time, elapsed_microseconds = {0};
@@ -156,59 +236,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         
         //~ @note: Message loop
         
-        // @todo: It is annoying to need to pull out these "action commands"
-        local_persist b32 move_forward, move_back, strafe_left, strafe_right, turn_left, turn_right; 
         for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
             if (msg.message == WM_QUIT) {
                 g_game_running = false;
-            } else if (msg.message == WM_INPUT) {
-                // @todo: Maybe move this to WndProc?
-                UINT size;
-                local_persist u8 data[sizeof(RAWINPUT)];
-                GetRawInputData((HRAWINPUT)msg.lParam, RID_INPUT, data, &size, sizeof(RAWINPUTHEADER));
-                RAWINPUT *input = (RAWINPUT*)data;
-                
-                if (input->header.dwType == RIM_TYPEKEYBOARD) {
-                    RAWKEYBOARD *keyboard = &input->data.keyboard;
-                    b32 key_down = (keyboard->Flags & RI_KEY_BREAK) == 0;
-                    if (keyboard->MakeCode != KEYBOARD_OVERRUN_MAKE_CODE) {
-                        u8 extension = keyboard->Flags & RI_KEY_E0 ? 0xE0 : keyboard->Flags & RI_KEY_E1 ? 0xE1 : 0x00;
-                        u16 scan_code = (extension << 8) | (keyboard->MakeCode & 0x7F);
-                        
-                        switch (scan_code) {
-                            case 0x0011: fallthrough; // W / up-arrow
-                            case 0xE048: {
-                                move_forward = key_down;
-                            } break;
-                            
-                            
-                            case 0x001F: fallthrough; // S / down-arrow
-                            case 0xE050: {
-                                move_back = key_down;
-                            } break;
-                            
-                            
-                            case 0x001E: fallthrough; // A / left-arrow
-                            case 0xE04B: {
-                                strafe_left = key_down;
-                            } break;
-                            
-                            
-                            case 0x0020: fallthrough; // D / right-arrow
-                            case 0xE04D: {
-                                strafe_right = key_down;
-                            } break;
-                            
-                            case 0x0010: {            // Q
-                                turn_left = key_down;
-                            } break;
-                            
-                            case 0x0012: {            // E
-                                turn_right = key_down;
-                            } break;
-                        }
-                    }
-                }
             } else {
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
@@ -221,6 +251,10 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         f32 dt = (f32)((f32)elapsed_microseconds.QuadPart / (f32)frequency.QuadPart);
         start_time = end_time;
         
+        player.rotation_angle -= turn_amount * dt;
+        player.rotation_angle = fmod_cycling(player.rotation_angle, 2 * M_PI32);
+        turn_amount = 0;
+        
         Vec2 dir;
         f32 x = 0, y = 0;
         if (move_forward)   x +=  1;
@@ -232,11 +266,6 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         if (v2len(dir) > 1)
             dir = v2norm(dir);
         player.pos = v2add(player.pos, v2muls(dir, PLAYER_MOVE_SPEED * dt));
-        
-        f32 turn_amount = 1.5f;
-        if (turn_left)  player.rotation_angle += turn_amount * dt;
-        if (turn_right) player.rotation_angle -= turn_amount * dt;
-        player.rotation_angle = fmod_cycling(player.rotation_angle, 2 * M_PI32);
         
         //- @note: Render
         r_clear();
