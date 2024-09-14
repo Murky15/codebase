@@ -40,6 +40,15 @@ r_clear (void) {
     memory_zero(canvas->pixels, canvas->width * canvas->height * sizeof(u32));
 }
 
+// @slow
+function void 
+r_clear_color (Color c) {
+    Bitmap *canvas = r_get_framebuffer();
+    for (u32 pidx = 0; pidx < canvas->width * canvas->height; ++pidx) {
+        canvas->pixels[pidx] = (c.r << 16 | c.g << 8 | c.b);
+    }
+}
+
 function void 
 r_draw_circle (Vec2 p, f32 r, Color c) {
     for (f32 y = -r; y <= r; ++y) {
@@ -109,6 +118,11 @@ r_draw_line (Vec2 p0, Vec2 p1, Color c) {
         else
             r_impl_draw_line_high(p0, p1, c);
     }
+}
+
+function void
+r_draw_vert () {
+    
 }
 
 function void 
@@ -215,7 +229,11 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
 #undef ndc_to_screen_y
         
         //- @note: Draw wall
-        r_draw_quad_frame(p0, p1, p2, p3, Color_Red);
+        r_draw_quad_frame(p0, p1, p2, p3, walls[wall_idx].color);
+        
+        /*for (f32 x = x0; x <= x1; ++x) {
+            
+        }*/
         
 #if 0
         //- @note: Minimap

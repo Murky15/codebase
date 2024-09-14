@@ -109,8 +109,8 @@ core_function Vec3 v3muls(Vec3 v, f32 s);
 core_function Vec3 v3norm(Vec3 v);
 core_function Vec3 v3cross(Vec3 a, Vec3 b);
 
-
-core_function f32 fmod_cycling(f32 x, f32 y);
+core_function f32 fmod_cycling(f32 x, f32 y); // Ripped this straight from Jai
+core_function f32 lerp (f32 v0, f32 v1, f32 t);
 
 // @todo: Fixed-point implementation
 

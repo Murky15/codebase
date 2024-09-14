@@ -122,3 +122,8 @@ fmod_cycling (f32 x, f32 y) {
     
     return remainder;
 }
+
+core_function f32
+lerp (f32 v0, f32 v1, f32 t) {
+    return (1.f - t) * v0 + t *   v1;
+}

@@ -6,6 +6,7 @@
 typedef struct Wall {
     Vec2 p0, p1;
     f32 height;
+    Color color;
 } Wall;
 
 #include "renderer.h"
@@ -43,14 +44,20 @@ global b32 g_draw_minimap = true;
 global b32 g_mouse_captured = false;
 
 // @todo: It is annoying to need to pull out these "action commands"
-global b32 move_forward, move_back, strafe_left, strafe_right, turn_left, turn_right;
+global b32 move_forward, move_back, strafe_left, strafe_right;
 global f32 turn_amount;
 
 function void
 win32_capture_mouse (HWND hwnd) {
     g_mouse_captured = true;
-    RECT wr;
-    GetWindowRect(hwnd, &wr);
+    RECT cr; 
+    GetClientRect(hwnd, &cr);
+    POINT lt = {cr.left, cr.top};
+    POINT rb = {cr.right, cr.bottom};
+    ClientToScreen(hwnd, &lt);
+    ClientToScreen(hwnd, &rb);
+    
+    RECT wr = {lt.x, lt.y, rb.x, rb.y};
     ClipCursor(&wr);
     ShowCursor(false);
 }
@@ -61,7 +68,6 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
         case WM_CLOSE: PostQuitMessage(0); return 0; break;
         
         case WM_INPUT: {
-            // @todo: Maybe move this to WndProc?
             UINT size;
             u8 data[sizeof(RAWINPUT)];
             GetRawInputData((HRAWINPUT)lParam, RID_INPUT, data, &size, sizeof(RAWINPUTHEADER));
@@ -95,14 +101,6 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                             strafe_right = key_down;
                         } break;
                         
-                        case 0x0010: {            // Q
-                            turn_left = key_down;
-                        } break;
-                        
-                        case 0x0012: {            // E
-                            turn_right = key_down;
-                        } break;
-                        
                         case 0x0001: {            // Escape
                             if (g_mouse_captured) {
                                 g_mouse_captured = false;
@@ -114,7 +112,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                 }
             } else if (input->header.dwType == RIM_TYPEMOUSE) {
                 RAWMOUSE *mouse = &input->data.mouse;
-                if (mouse->usButtonFlags & RI_MOUSE_BUTTON_1_DOWN) {
+                if (mouse->usButtonFlags & RI_MOUSE_BUTTON_1_UP) { // @hack
                     if (!g_mouse_captured)
                         win32_capture_mouse(hwnd);
                 }
@@ -228,6 +226,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     test_wall.p0 = v2(500, 100);
     test_wall.p1 = v2(500, 200);
     test_wall.height = 50.f;
+    test_wall.color = Color_Red;
     
     //~ @note: Main loop
     QueryPerformanceCounter(&start_time);
@@ -268,7 +267,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         player.pos = v2add(player.pos, v2muls(dir, PLAYER_MOVE_SPEED * dt));
         
         //- @note: Render
-        r_clear();
+        r_clear_color(Color_Cyan);
         r_scene(player.pos, player.rotation_angle, &test_wall, 1);
         
         StretchDIBits(
