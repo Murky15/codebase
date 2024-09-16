@@ -121,8 +121,10 @@ r_draw_line (Vec2 p0, Vec2 p1, Color c) {
 }
 
 function void
-r_draw_vert () {
-    
+r_draw_vert (f32 x, f32 y0, f32 y1, Color c) {
+    //assert(y0 <= y1);
+    for (f32 y = y0; y <= y1; ++y)
+        r_put_pixel_at(v2(x,y), c);
 }
 
 function void 
@@ -151,26 +153,21 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
     local_persist read_only f32 cam_dist = 1.f; // @todo: Have this be changable
     f32 width_middle = canvas->width/2.f;
     f32 height_middle = canvas->height/2.f;
-    //-
     
     for (u64 wall_idx = 0; wall_idx < num_walls; ++wall_idx) {
         //- @note: Transform wall relative to player
         Vec2 t0 = v2sub(walls[wall_idx].p0, cam_pos);
         Vec2 t1 = v2sub(walls[wall_idx].p1, cam_pos);
         
-#define rotate_x(p,t) (((p).x*cosf(t))-((p).y*sinf(t)))
-#define rotate_y(p,t) (((p).x*sinf(t))+((p).y*cosf(t)))
         f32 t = -cam_orientation + forward;
         Vec2 d0, d1;
-        d0.x = rotate_x(t0,t);
-        d0.y = rotate_y(t0,t);
-        d1.x = rotate_x(t1,t);
-        d1.y = rotate_y(t1,t);
-#undef rotate_x
-#undef rotate_y
+        d0.x = t0.x * cosf(t) - t0.y * sinf(t);
+        d0.y = t0.x * sinf(t) + t0.y * cosf(t);
+        d1.x = t1.x * cosf(t) - t1.y * sinf(t);
+        d1.y = t1.x * sinf(t) + t1.y * cosf(t);
         
         //- @note: Clip walls behind player
-        Vec2 vpp[2] = {{-width_middle,1},{width_middle,1}};
+        Vec2 vpp[2] = {{-width_middle,10},{width_middle,10}};
         f32 v0 = v2cross(vpp[0], vpp[1], d0);
         f32 v1 = v2cross(vpp[0], vpp[1], d1);
         if (v0 < 0 && v1 < 0)
@@ -190,7 +187,7 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
             if (minx <= i.x && i.x <= maxx && miny <= i.y && i.y <= maxy) {
                 if (v0 < 0) 
                     d0 = i;
-                else if (v1 < 0)
+                else if (v1 < 0) 
                     d1 = i;
             }
         }
@@ -212,6 +209,7 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
 #define ndc_to_screen_x(x) width_middle*(x)+((canvas->width-1.f)/2.f)
 #define ndc_to_screen_y(y) height_middle*(y)+((canvas->height-1.f)/2.f)
         
+#if 0
         Vec2 p0, p1, p2, p3;
         p0.x = ndc_to_screen_x(b0.x);
         p0.y = ndc_to_screen_y(f0);
@@ -225,17 +223,51 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
         p3.x = p2.x;
         p3.y = ndc_to_screen_y(f1);
         
+        //- @note: Draw wall
+        r_draw_quad_frame(p0, p1, p2, p3, walls[wall_idx].color);
+#endif
+        
+        f32 x0 = ndc_to_screen_x(b0.x);
+        f32 height0 = ndc_to_screen_y(b0.y);
+        f32 floor0 = ndc_to_screen_y(f0);
+        
+        f32 x1 = ndc_to_screen_x(b1.x);
+        f32 height1 = ndc_to_screen_y(b1.y);
+        f32 floor1 = ndc_to_screen_y(f1);
+        
 #undef ndc_to_screen_x
 #undef ndc_to_screen_y
         
-        //- @note: Draw wall
-        r_draw_quad_frame(p0, p1, p2, p3, walls[wall_idx].color);
+#if 1
+        // @todo: This is expensive and we already did it before
+        f32 minx = min(x0, x1);
+        f32 maxx = max(x0, x1);
+        f32 min_floor;
+        f32 max_floor;
+        f32 min_height;
+        f32 max_height;
+        if (minx == x0) {
+            min_floor = floor0;
+            max_floor = floor1;
+            min_height = height0;
+            max_height = height1;
+        } else {
+            min_floor = floor1;
+            max_floor = floor0;
+            min_height = height1;
+            max_height = height0;
+        }
         
-        /*for (f32 x = x0; x <= x1; ++x) {
-            
-        }*/
+        for (f32 x = minx; x <= maxx; ++x) {
+            // Wall line
+            f32 xnorm = norm(minx, maxx, x);
+            f32 f = lerp(min_floor, max_floor, xnorm);
+            f32 h = lerp(min_height, max_height, xnorm);
+            r_draw_vert(x, f, h, walls[wall_idx].color);
+        }
+#endif
         
-#if 0
+#if 1
         //- @note: Minimap
 #define MINIMAP_SCALE 0.3f
         Vec2 fixed_player = v2(width_middle, height_middle);
@@ -252,3 +284,4 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
 #endif
     }
 }
+

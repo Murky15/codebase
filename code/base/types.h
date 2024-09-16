@@ -24,7 +24,7 @@ typedef s16 b16;
 typedef s32 b32;
 typedef s64 b64;
 
-typedef void VoidFunc(void);
+typedef void void_func(void);
 
 //~ @note Tangible types
 
@@ -32,6 +32,7 @@ typedef struct Color {
     u8 r, g, b, a;
 } Color;
 
+// @todo: Maybe add functionality for defining per-project "color-pallettes"?
 #define colors \
 color(Black,   0,   0,   0)   \
 color(White,   255, 255, 255) \

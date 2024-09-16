@@ -4,10 +4,12 @@
 
 This directory serves to be a friendlier introduction to the LLVM compiler infrastructure.
 It will cover:
-1. [How to install and build the LLVM API and tools](#installing-llvm)
+1. [How to install and build the LLVM API and tools](#installing-and-building-llvm)
 2. [What LLVM intermediate representation is and how we can view LLVM IR output from the compiler](#intro-to-llvm-ir)
-3. [How to handwrite a trivial function in LLVM IR and call it from C++ code](#handwritten-ir)                                                                                                                                                                                  4. [How to generate a trivial function using the LLVM API and call it from C++ code](#generated-ir)
-## Installing and Building LLVM {#installing-llvm}
+3. [How to handwrite a trivial function in LLVM IR and call it from C++ code](#handwritten-ir)
+4. [How to generate a trivial function using the LLVM API and call it from C++ code](#generated-ir)
+
+## Installing and Building LLVM
 
 ### Installing
 There are a variety of ways one can install the LLVM toolchain on their system.
@@ -29,6 +31,7 @@ Now for the tricky part...
 ### Building
 > **Prerequisites**
 > * cmake >= 3.20.0
+> * A valid cmake [generator](https://cmake.org/cmake/help/latest/manual/cmake-generators.7.html) (more on this later)
 > * A C++ compiler (MSVC on Windows, g++ on Linux, etc)
 
 Now that we have the LLVM source installed on our system, we need to make another directory to store our outputted binaries.
@@ -47,13 +50,13 @@ Let's go over some other options
 * `-DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld"` - Marks additional subprojects for compilation other than base llvm. In this case,
 my project is now set to build: llvm, clang, clant-tools-extra, and lld.
 * `-DCMAKE_INSTALL_PREFIX="W:\llvm-build"` - Tells cmake where we want to install our binaries to. Set this to the absolute path of the `llvm-build` folder we created earlier.
-* `-DCMAKE_BUILD_TYPE=Release` - Sets optimization level for builds; release mode is best suited for users of LLVM and Clang. Debug mode is used for **developers of the LLVM project**.
+* `-DCMAKE_BUILD_TYPE=Release` - Sets optimization level for builds; release mode is best suited for users of LLVM and Clang. **Debug mode is used for developers of the LLVM project**.
 
 These are really all the options we need to care about; all together our command is:
 `cmake -S llvm -B build -G Ninja -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DCMAKE_INSTALL_PREFIX="W:\llvm-build" -DCMAKE_BUILD_TYPE=Release`
 
 If you made it this far without errors, congrats, that was the first hardest part.
-The second hardest part is compiling:
+The second hardest is compiling:
 `cmake --build build -j 18`
 > The `-j` option we pass here is the number of parallel jobs we want to run during compilation. I recommend your CPU thread count + 2 (This is the default on Ninja)
 
@@ -63,8 +66,8 @@ After this completes run:
 
 If you encountered any errors along the way please check the official documentation at: <https://llvm.org/docs/GettingStarted.html>
 
-## Viewing LLVM IR From the Compiler {#intro-to-llvm-ir}
+## Intro to LLVM IR
 
-## Handwritten IR {#handwritten-ir}
+## Handwritten IR
 
-## Generated IR {#generated-ir}
+## Generated IR

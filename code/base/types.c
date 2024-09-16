@@ -70,7 +70,7 @@ v2dot (Vec2 a, Vec2 b) {
 
 core_function f32  
 v2cross (Vec2 a, Vec2 b, Vec2 c) {
-    return (((b.x - a.x) * (c.y - a.y)) - ((b.y - a.y) * (c.x - a.x)));
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
 
 core_function f32  
@@ -125,5 +125,5 @@ fmod_cycling (f32 x, f32 y) {
 
 core_function f32
 lerp (f32 v0, f32 v1, f32 t) {
-    return (1.f - t) * v0 + t *   v1;
+    return (1.f - t) * v0 + t * v1;
 }

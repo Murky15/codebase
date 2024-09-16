@@ -117,9 +117,11 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                         win32_capture_mouse(hwnd);
                 }
                 
-                s32 movex = mouse->lLastX;
-                s32 movey = mouse->lLastY;
-                turn_amount = (f32)movex * MOUSE_SENSITIVITY;
+                if (g_mouse_captured) {
+                    s32 movex = mouse->lLastX;
+                    s32 movey = mouse->lLastY;
+                    turn_amount = (f32)movex * MOUSE_SENSITIVITY;
+                }
             }
             
             return 0;
@@ -267,7 +269,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         player.pos = v2add(player.pos, v2muls(dir, PLAYER_MOVE_SPEED * dt));
         
         //- @note: Render
-        r_clear_color(Color_Cyan);
+        r_clear();
         r_scene(player.pos, player.rotation_angle, &test_wall, 1);
         
         StretchDIBits(

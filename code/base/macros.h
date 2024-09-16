@@ -102,6 +102,7 @@
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #define clamp(a,min,max) ((a) < (min) ? (min) : (a) > (max) ? (max) : (a))
+#define norm(a,b,x) (((x)-(a))/((b)-(a)))
 
 #define square(x) ((x)*(x))
 
