@@ -153,6 +153,7 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
     local_persist read_only f32 cam_dist = 1.f; // @todo: Have this be changable
     f32 width_middle = canvas->width/2.f;
     f32 height_middle = canvas->height/2.f;
+    f32 near_plane = 10;
     
     for (u64 wall_idx = 0; wall_idx < num_walls; ++wall_idx) {
         //- @note: Transform wall relative to player
@@ -167,105 +168,26 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
         d1.y = t1.x * sinf(t) + t1.y * cosf(t);
         
         //- @note: Clip walls behind player
-        Vec2 vpp[2] = {{-width_middle,10},{width_middle,10}};
-        f32 v0 = v2cross(vpp[0], vpp[1], d0);
-        f32 v1 = v2cross(vpp[0], vpp[1], d1);
-        if (v0 < 0 && v1 < 0)
-            continue; // Wall is completely behind player
+        f32 z0 = d0.y;
+        f32 z1 = d1.y;
+        if (z0 < near_plane && z1 < near_plane) 
+            continue;
         
-        Vec3 vp = v3norm(v3cross(pv2(vpp[0],1), pv2(vpp[1],1)));
-        Vec3 line = v3norm(v3cross(pv2(d0,1), pv2(d1,1)));
-        Vec3 intersection = v3cross(vp, line);
-        if (intersection.z != 0) {
-            Vec2 i = v2(intersection.x / intersection.z, intersection.y / intersection.z);
-            f32 minx = min(d0.x, d1.x);
-            f32 maxx = max(d0.x, d1.x);
-            f32 miny = min(d0.y, d1.y);
-            f32 maxy = max(d0.y, d1.y);
-            
-            // Check if intersection is on line segment & clip walls accordingly
-            if (minx <= i.x && i.x <= maxx && miny <= i.y && i.y <= maxy) {
-                if (v0 < 0) 
-                    d0 = i;
-                else if (v1 < 0) 
-                    d1 = i;
-            }
+        f32 clipped_x = d0.x + (((d1.x - d0.x) * (near_plane - d0.y)) / (d1.y - d0.y));
+        if (z0 < near_plane) {
+            d0 = v2(clipped_x, near_plane);
+            z0 = near_plane;
+        } else if (z1 < 0) {
+            d1 = v2(clipped_x, near_plane);
+            z1 = near_plane;
         }
         
-        //- @note: Perform perspective projection
-        Vec2 b0, b1;
-        f32  f0, f1;
-        f32  height = walls[wall_idx].height;
-        f32  half_height = height/2.f;
+        f32 p0 = d0.x / z0;
+        f32 p1 = d1.x / z1;
         
-        b0.x = (cam_dist/d0.y)*d0.x;
-        b1.x = (cam_dist/d1.y)*d1.x;
-        b0.y = (cam_dist/d0.y)*half_height;
-        b1.y = (cam_dist/d1.y)*half_height;
-        f0   = (cam_dist/d0.y)*-half_height;
-        f1   = (cam_dist/d1.y)*-half_height;
-        
-        //- @note: NDC -> Screen coordinates
-#define ndc_to_screen_x(x) width_middle*(x)+((canvas->width-1.f)/2.f)
-#define ndc_to_screen_y(y) height_middle*(y)+((canvas->height-1.f)/2.f)
-        
-#if 0
-        Vec2 p0, p1, p2, p3;
-        p0.x = ndc_to_screen_x(b0.x);
-        p0.y = ndc_to_screen_y(f0);
-        
-        p1.x = p0.x;
-        p1.y = ndc_to_screen_y(b0.y);
-        
-        p2.x = ndc_to_screen_x(b1.x);
-        p2.y = ndc_to_screen_y(b1.y);
-        
-        p3.x = p2.x;
-        p3.y = ndc_to_screen_y(f1);
-        
-        //- @note: Draw wall
-        r_draw_quad_frame(p0, p1, p2, p3, walls[wall_idx].color);
-#endif
-        
-        f32 x0 = ndc_to_screen_x(b0.x);
-        f32 height0 = ndc_to_screen_y(b0.y);
-        f32 floor0 = ndc_to_screen_y(f0);
-        
-        f32 x1 = ndc_to_screen_x(b1.x);
-        f32 height1 = ndc_to_screen_y(b1.y);
-        f32 floor1 = ndc_to_screen_y(f1);
-        
-#undef ndc_to_screen_x
-#undef ndc_to_screen_y
-        
-#if 1
-        // @todo: This is expensive and we already did it before
-        f32 minx = min(x0, x1);
-        f32 maxx = max(x0, x1);
-        f32 min_floor;
-        f32 max_floor;
-        f32 min_height;
-        f32 max_height;
-        if (minx == x0) {
-            min_floor = floor0;
-            max_floor = floor1;
-            min_height = height0;
-            max_height = height1;
-        } else {
-            min_floor = floor1;
-            max_floor = floor0;
-            min_height = height1;
-            max_height = height0;
-        }
-        
-        for (f32 x = minx; x <= maxx; ++x) {
-            // Wall line
-            f32 xnorm = norm(minx, maxx, x);
-            f32 f = lerp(min_floor, max_floor, xnorm);
-            f32 h = lerp(min_height, max_height, xnorm);
-            r_draw_vert(x, f, h, walls[wall_idx].color);
-        }
-#endif
+        f32 s0 = width_middle + p0 * 80.f;
+        f32 s1 = width_middle + p1 * 80.f;
+        r_draw_line(v2(s0, height_middle), v2(s1, height_middle), walls[wall_idx].color);
         
 #if 1
         //- @note: Minimap
@@ -276,7 +198,7 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
         Vec2 player_minimap_pos = v2muls(fixed_player, MINIMAP_SCALE);
         r_draw_circle(player_minimap_pos, player_radius, Color_White);
         r_draw_line(player_minimap_pos,  v2add(player_minimap_pos, v2(cosf(forward) * turn_indicator_length, sinf(forward) * turn_indicator_length)), Color_Magenta);
-        r_draw_line(v2muls(v2add(vpp[0], fixed_player), MINIMAP_SCALE), v2muls(v2add(vpp[1], fixed_player), MINIMAP_SCALE), Color_Lime);
+        r_draw_line(v2muls(v2add(v2(-width_middle, 0), fixed_player), MINIMAP_SCALE), v2muls(v2add(v2(width_middle, 0), fixed_player), MINIMAP_SCALE), Color_Lime);
         
         r_draw_line(v2muls(v2add(d0, fixed_player), MINIMAP_SCALE), v2muls(v2add(d1, fixed_player), MINIMAP_SCALE), Color_Red);
         
@@ -284,4 +206,5 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
 #endif
     }
 }
+
 
