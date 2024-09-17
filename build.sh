@@ -10,12 +10,12 @@ for arg in "$@"; do declare "$arg"=1; done
 if [[ "$release" == "" ]]; then
   debug=1
   echo "[Debug mode]"
-  debug_defines="-DENABLE_ASSERT=1"
 else
   echo "[Release mode]"
 fi
 
 # Right now let's just worry about supporting MSVC
+debug_defines="-DENABLE_ASSERT=1"
 echo "[MSVC compile]"
 cl_debug="-Od -Zi -WX $debug_defines"
 cl_release="-O2"

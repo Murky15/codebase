@@ -153,6 +153,8 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
     f32 width_middle = canvas->width/2.f;
     f32 height_middle = canvas->height/2.f;
     f32 near_plane = 1.f;
+    f32 cam_dist = 1.f;
+    f32 view_angle = 2.f * atanf(1.f/cam_dist);
     
     for (u64 wall_idx = 0; wall_idx < num_walls; ++wall_idx) {
         //- @note: Transform wall relative to player
@@ -166,13 +168,46 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
         d1.x = t1.x * cosf(t) - t1.y * sinf(t);
         d1.y = t1.x * sinf(t) + t1.y * cosf(t);
         
-        //- @note: Clip walls behind player
+        //- @note: Clip walls behind camera
+        
         //- @todo: Need to find actual boundaries of view, not just line perp to player view dir.
         f32 z0 = d0.y;
         f32 z1 = d1.y;
         if (z0 <= near_plane && z1 <= near_plane) 
             continue;
         
+        // Find view boundaries of camera 
+        Vec3 wall_line = v3norm(v3cross(pv2(d0,1), pv2(d1,1)));
+        f32 hvpx = cam_dist * atanf(view_angle/2.f);
+        
+        f32 minx = min(d0.x, d1.x);
+        f32 miny = min(d0.y, d1.y);
+        f32 maxx = max(d0.x, d1.x);
+        f32 maxy = max(d0.y, d1.y);
+        
+        // Check for intersections
+        Vec2 in;
+        Vec2 hvp_left  = v2(-hvpx, cam_dist);
+        Vec3 left_boundary = v3norm(v3cross(v3(0,0,1), pv2(hvp_left,1)));
+        Vec3 left_intersection = v3cross(wall_line, left_boundary);
+        if (left_intersection.z != 0) {
+            in = v2(left_intersection.x / left_intersection.z, left_intersection.y / left_intersection.z);
+            if (minx <= in.x && in.x <= maxx && miny <= in.y && in.y <= maxy) {
+                
+            }
+        }
+        
+        Vec2 hvp_right = v2(hvpx, cam_dist);
+        Vec3 right_boundary = v3norm(v3cross(v3(0,0,1), pv2(hvp_right,1)));
+        Vec3 right_intersection = v3norm(v3cross(wall_line, right_boundary));
+        if (right_intersection.z != 0) {
+            in = v2(right_intersection.x / right_intersection.z, right_intersection.y / right_intersection.z);
+            if (minx <= in.x && in.x <= maxx && miny <= in.y && in.y <= maxy) {
+                
+            }
+        }
+        
+        /*
         f32 clipped_x = d0.x + (((d1.x - d0.x) * (near_plane - d0.y)) / (d1.y - d0.y));
         if (z0 < near_plane) {
             d0 = v2(clipped_x, near_plane);
@@ -181,9 +216,9 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
             d1 = v2(clipped_x, near_plane);
             z1 = near_plane;
         }
+        */
         
         //- @note: Perspective projection
-        f32 cam_dist = 1.f;
         f32 height = walls[wall_idx].height;
         f32 half_height = height/2.f;
         

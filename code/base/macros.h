@@ -47,9 +47,7 @@
 
 
 //~ @note: Function macros
-
 #define unused(v) (void)(v)
-
 #define stmnt(s) do{ s } while (0)
 
 #define stringify_(s) #s
