@@ -150,10 +150,9 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
     
     //- @note: Constants
     local_persist read_only f32 forward = M_PI32 / 2.f;
-    local_persist read_only f32 cam_dist = 1.f; // @todo: Have this be changable
     f32 width_middle = canvas->width/2.f;
     f32 height_middle = canvas->height/2.f;
-    f32 near_plane = 10;
+    f32 near_plane = 1.f;
     
     for (u64 wall_idx = 0; wall_idx < num_walls; ++wall_idx) {
         //- @note: Transform wall relative to player
@@ -168,9 +167,10 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
         d1.y = t1.x * sinf(t) + t1.y * cosf(t);
         
         //- @note: Clip walls behind player
+        //- @todo: Need to find actual boundaries of view, not just line perp to player view dir.
         f32 z0 = d0.y;
         f32 z1 = d1.y;
-        if (z0 < near_plane && z1 < near_plane) 
+        if (z0 <= near_plane && z1 <= near_plane) 
             continue;
         
         f32 clipped_x = d0.x + (((d1.x - d0.x) * (near_plane - d0.y)) / (d1.y - d0.y));
@@ -182,12 +182,54 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {
             z1 = near_plane;
         }
         
-        f32 p0 = d0.x / z0;
-        f32 p1 = d1.x / z1;
+        //- @note: Perspective projection
+        f32 cam_dist = 1.f;
+        f32 height = walls[wall_idx].height;
+        f32 half_height = height/2.f;
         
-        f32 s0 = width_middle + p0 * 80.f;
-        f32 s1 = width_middle + p1 * 80.f;
-        r_draw_line(v2(s0, height_middle), v2(s1, height_middle), walls[wall_idx].color);
+        f32 x0    = (cam_dist/z0) *  d0.x;
+        f32 ybot0 = (cam_dist/z0) * -half_height;
+        f32 ytop0 = (cam_dist/z0) *  half_height;
+        f32 x1    = (cam_dist/z1) *  d1.x;
+        f32 ybot1 = (cam_dist/z1) * -half_height;
+        f32 ytop1 = (cam_dist/z1) *  half_height;
+        
+        x0    = clamp(x0,    -1.f, 1.f);
+        ybot0 = clamp(ybot0, -1.f, 1.f);
+        ytop0 = clamp(ytop0, -1.f, 1.f);
+        x1    = clamp(x1,    -1.f, 1.f);
+        ybot1 = clamp(ybot1, -1.f, 1.f);
+        ytop1 = clamp(ytop1, -1.f, 1.f);
+        
+        //- @note: NDC -> Screen coordinates
+#define ndc_to_screen_x(x) (width_middle *x + (canvas->width -1.f)/2.f)
+#define ndc_to_screen_y(y) (height_middle*y + (canvas->height-1.f)/2.f)
+        
+        struct { f32 x,ybot,ytop; } temp, minp, maxp = {0};
+        minp.x    = ndc_to_screen_x(x0);
+        minp.ybot = ndc_to_screen_y(ybot0);
+        minp.ytop = ndc_to_screen_y(ytop0);
+        maxp.x    = ndc_to_screen_x(x1);
+        maxp.ybot = ndc_to_screen_y(ybot1);
+        maxp.ytop = ndc_to_screen_y(ytop1);
+        
+        if (x0 > x1) {
+            temp = minp;
+            minp = maxp;
+            maxp = temp;
+        }
+        
+        for (f32 x = minp.x; x <= maxp.x; ++x) {
+            f32 xnorm = norm(x, minp.x, maxp.x);
+            f32 ybot = lerp(minp.ybot, maxp.ybot, xnorm);
+            f32 ytop = lerp(minp.ytop, maxp.ytop, xnorm);
+            r_draw_vert(x, 0.f, ybot, Color_Gray); // floor
+            r_draw_vert(x, ybot, ytop, walls[wall_idx].color); // wall
+            r_draw_vert(x, ytop, (f32)canvas->height, Color_Cyan); // Cielling
+        }
+        
+#undef ndc_to_screen_x
+#undef ndc_to_screen_y
         
 #if 1
         //- @note: Minimap
