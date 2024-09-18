@@ -5,11 +5,11 @@
 
 typedef struct Wall {
     Vec2 p0, p1;
-    f32 height;
     Color color;
 } Wall;
 
 #include "renderer.h"
+
 //- @note: Source
 #include "base/include.c"
 #include "renderer.c"
@@ -224,11 +224,26 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     player.pos.x = bitmap->width / 2.f;
     player.pos.y = bitmap->height / 2.f;
     
-    Wall test_wall = {0};
-    test_wall.p0 = v2(500, 100);
-    test_wall.p1 = v2(500, 200);
-    test_wall.height = 50.f;
-    test_wall.color = Color_Red;
+    /*
+        Wall test_wall = {0};
+        test_wall.p0 = v2(500, 100);
+        test_wall.p1 = v2(500, 200);
+        test_wall.color = Color_Red;
+        */
+    
+    Wall walls[4];
+    walls[0].color = Color_Red;
+    walls[1].color = Color_Lime;
+    walls[2].color = Color_Purple;
+    walls[3].color = Color_Blue;
+    walls[0].p0 = v2add(player.pos, v2(100, 50));
+    walls[0].p1 = v2add(player.pos, v2(100, -100));
+    walls[1].p0 = v2add(player.pos, v2(100, -100));
+    walls[1].p1 = v2add(player.pos, v2(-100, -100));
+    walls[2].p0 = v2add(player.pos, v2(-100, -100));
+    walls[2].p1 = v2add(player.pos, v2(-100, 0));
+    walls[3].p0 = v2add(player.pos, v2(-100, 0));
+    walls[3].p1 = v2add(player.pos, v2(100,  50));
     
     //~ @note: Main loop
     QueryPerformanceCounter(&start_time);
@@ -236,7 +251,6 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         arena_clear(frame_arena);
         
         //~ @note: Message loop
-        
         for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
             if (msg.message == WM_QUIT) {
                 g_game_running = false;
@@ -270,7 +284,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         
         //- @note: Render
         r_clear();
-        r_scene(player.pos, player.rotation_angle, &test_wall, 1);
+        r_scene(player.pos, player.rotation_angle, walls, array_count(walls));
         
         StretchDIBits(
                       platform.win_dc,

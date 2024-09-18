@@ -8,33 +8,41 @@ for arg in "$@"; do declare "$arg"=1; done
 
 # @todo: Yadda yadda yadda add whatever option handling we want here
 if [[ "$release" == "" ]]; then
-  debug=1
+  mode_debug=1
   echo "[Debug mode]"
 else
   echo "[Release mode]"
 fi
 
-# Right now let's just worry about supporting MSVC
 debug_defines="-DENABLE_ASSERT=1"
-echo "[MSVC compile]"
-cl_debug="-Od -Zi -WX $debug_defines"
-cl_release="-O2"
-cl_common="cl -nologo -FC -J -I"$codebase_root_dir"/code -EHa- -GR- -W3 -wd4146 -wd4005 -wd4101"
-cl_link=""
-cl_out="-Fe"
+if [[ "$clang" == "" ]] || [[ "$msvc" == 1 ]]; then
+  echo "[MSVC compile]"
+  debug="-Od -Zi -WX $debug_defines"
+  release="-O2"
+  common="cl -nologo -FC -J -I"$codebase_root_dir"/code -EHa- -GR- -W3 -wd4146 -wd4005 -wd4101"
+  link=""
+  out="-Fe"
+else
+  echo "[Clang compile]"
+  debug="-O0 -g -Werror -Wall $debug_defines"
+  release="-O2"
+  common="clang -pedantic"
+  link=""
+  out="-o"
+fi
 
 jai_compile="jai -debugger -output_path $codebase_root_dir/build -quiet" # Most things will be handled by metaprogram
 
 # @todo: Set per-build settings like 'only-compile', 'assemble', etc
 
 # Setup requested config
-if [[ "$debug" == 1 ]]; then
-  compile="$cl_common $cl_debug"
+if [[ "$mode_debug" == 1 ]]; then
+  compile="$common $debug"
 else
-  compile="$cl_common $cl_release"
+  compile="$common $release"
 fi
-link="$cl_link"
-out="$cl_out"
+link="$link"
+out="$out"
 
 # Prep build dirs
 mkdir -p build
