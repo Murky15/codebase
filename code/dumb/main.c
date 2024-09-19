@@ -209,6 +209,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     }
     win32_capture_mouse(platform.hwnd);
     
+    // @note: Font setup
+    //HANDLE font_file = CreateFile();
+    
     // @note: Timing
     LARGE_INTEGER frequency, start_time, end_time, elapsed_microseconds = {0};
     QueryPerformanceFrequency(&frequency);
