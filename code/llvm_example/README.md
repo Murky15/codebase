@@ -97,7 +97,7 @@ LLVM IR can be represented in 2 main formats
 
 The vast and volatile landscape of LLVM IR is far outside the scope of this simple tutorial, to gain a comprehensive understanding for the basics of how LLVM IR is structured and how to handwrite your own .ll files I **strongly** recommend watching [this talk](https://www.youtube.com/watch?v=m8G_S5LwlTo) before continuing.
 
-LLVM additionally exposes a C++ API for building **in-memory** representations of LLVM IR for use when creating your own compiler.
+LLVM additionally exposes a C++ API for building **in-memory** representations of LLVM IR for modifying these constructs in code. This is helpful when, for example, you are creating your own compiler for a new language.
 
 ### The Goal
 Now that we have a basic understanding of LLVM, what it is, what it does, and why it's important; we can build our LLVM "Hello World" example program.
@@ -114,6 +114,14 @@ To get started, lets compile and link these two C++ files and verify the result.
 > Then the **linker** patches these two obj files together to satisfy the external dependency on `fib` referenced in `main.cpp`
 
 ## Handwritten IR
-> Remember! You can use `clang -emit-llvm fibonacci.cpp` to see what the compiler would've done 
+It's time to finally get our hands dirty and dig into some real IR. Let's open up `handwritten_fibonacci.ll`. 
+> If you can split-screen `handwritten_fibonacci.ll` and `fibonacci.cpp`, it will help you gain a better conceptual understanding of
+> what the IR is doing because it is just a transcribed version of `fibonacci.cpp`
+This is handwritten IR that I wrote to replicate `fibonacci.cpp` in LLVM IR.
+> Pro tip: You can use `clang -emit-llvm fibonacci.cpp` to see what the compiler would've done 
+
+Essentially, reading IR is very similar to platform-independent assembly. The file is commented to explain basic syntactical and semantic behavior, but for a comprehensive list of all instructions and their options you should look [here](https://llvm.org/docs/LangRef.html) 
+
+
 
 ## Generated IR

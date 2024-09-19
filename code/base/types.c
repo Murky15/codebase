@@ -1,11 +1,11 @@
 core_function Vec2
 v2 (f32 x, f32 y) {
-    return comp_lit(Vec2, x, y);
+    return comp_lit(Vec2, {x, y});
 }
 
 core_function Vec2i
 v2i (u32 x, u32 y) {
-    return comp_lit(Vec2i, x, y);
+    return comp_lit(Vec2i, {x, y});
 }
 
 core_function Vec2i
@@ -20,12 +20,12 @@ dv3 (Vec3 v) {
 
 core_function Vec3  
 v3 (f32 x, f32 y, f32 z) {
-    return comp_lit(Vec3, x, y, z);
+    return comp_lit(Vec3, {x, y, z});
 }
 
 core_function Vec3i 
 v3i (u32 x, u32 y, u32 z) {
-    return comp_lit(Vec3i, x, y, z);
+    return comp_lit(Vec3i, {x, y, z});
 }
 
 core_function Vec3i 

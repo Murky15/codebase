@@ -79,12 +79,6 @@
 # error "align_of not implemented!"
 #endif
 
-#if COMPILER_CL
-# define set_align(x) __declspec(align(x))
-#else
-# error "Manual alignment not supported by this compiler!"
-#endif
-
 #if OS_WINDOWS
 # define debug_print(str8) OutputDebugString((const char*)str8.str)
 #else

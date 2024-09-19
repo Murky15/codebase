@@ -40,7 +40,6 @@ typedef struct Entity {
 global int g_window_width = 1280;
 global int g_window_height = 720;
 global b32 g_game_running = true;
-global b32 g_draw_minimap = true;
 global b32 g_mouse_captured = false;
 
 // @todo: It is annoying to need to pull out these "action commands"
@@ -70,6 +69,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
         case WM_INPUT: {
             UINT size;
             u8 data[sizeof(RAWINPUT)];
+            memory_zero_array(data);
             GetRawInputData((HRAWINPUT)lParam, RID_INPUT, data, &size, sizeof(RAWINPUTHEADER));
             RAWINPUT *input = (RAWINPUT*)data;
             
@@ -120,6 +120,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                 if (g_mouse_captured) {
                     s32 movex = mouse->lLastX;
                     s32 movey = mouse->lLastY;
+                    unused(movey);
                     turn_amount = (f32)movex * MOUSE_SENSITIVITY;
                 }
             }
@@ -183,7 +184,7 @@ win32_create_bitmap (Bitmap *data) {
 int
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
     //~ @note: Platform setup
-    Arena *perm_arena = arena_alloc();
+    //Arena *perm_arena = arena_alloc();
     Arena *frame_arena = arena_alloc();
     
     Win32_Data platform = win32_create_window(hInstance);
@@ -223,13 +224,6 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     player.radius = 10.f;
     player.pos.x = bitmap->width / 2.f;
     player.pos.y = bitmap->height / 2.f;
-    
-    /*
-        Wall test_wall = {0};
-        test_wall.p0 = v2(500, 100);
-        test_wall.p1 = v2(500, 200);
-        test_wall.color = Color_Red;
-        */
     
     Wall walls[4];
     walls[0].color = Color_Red;
