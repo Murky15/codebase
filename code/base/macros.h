@@ -41,11 +41,6 @@
 #define fallthrough
 #define core_function function // @note: So now we can change this if we want to build a dll or lib or something
 
-#define M_PI32 ((f32)M_PI)
-#define rad2deg (180.f/M_PI32)
-#define deg2rad (M_PI32/180.f)
-
-
 //~ @note: Function macros
 #define unused(v) (void)(v)
 #define stmnt(s) do{ s } while (0)
@@ -73,7 +68,7 @@
 
 #if COMPILER_CL
 # define align_of(x) __alignof(x)
-#elif LLVM_LIKE_COMPILER
+#elif COMPILER_CLANG || COMPILER_GCC
 # define align_of(x) __alignof__(x)
 #else
 # error "align_of not implemented!"

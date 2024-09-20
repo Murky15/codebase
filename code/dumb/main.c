@@ -51,14 +51,9 @@ win32_capture_mouse (HWND hwnd) {
     g_mouse_captured = true;
     RECT cr; 
     GetClientRect(hwnd, &cr);
-    POINT lt = {cr.left, cr.top};
-    POINT rb = {cr.right, cr.bottom};
-    ClientToScreen(hwnd, &lt);
-    ClientToScreen(hwnd, &rb);
-    
-    RECT wr = {lt.x, lt.y, rb.x, rb.y};
-    ClipCursor(&wr);
-    ShowCursor(false);
+    POINT middle  = {cr.right/2, cr.bottom/2};
+    ClientToScreen(hwnd, &middle);
+    SetCursorPos(middle.x, middle.y);
 }
 
 function LRESULT
@@ -105,7 +100,6 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                             if (g_mouse_captured) {
                                 g_mouse_captured = false;
                                 ShowCursor(true);
-                                ClipCursor(0);
                             }
                         } break;
                     }
@@ -113,8 +107,10 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
             } else if (input->header.dwType == RIM_TYPEMOUSE) {
                 RAWMOUSE *mouse = &input->data.mouse;
                 if (mouse->usButtonFlags & RI_MOUSE_BUTTON_1_UP) { // @hack
-                    if (!g_mouse_captured)
+                    if (!g_mouse_captured) {
+                        ShowCursor(false);
                         win32_capture_mouse(hwnd);
+                    }
                 }
                 
                 if (g_mouse_captured) {
@@ -122,6 +118,8 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                     s32 movey = mouse->lLastY;
                     unused(movey);
                     turn_amount = (f32)movex * MOUSE_SENSITIVITY;
+                    
+                    win32_capture_mouse(hwnd);
                 }
             }
             
@@ -208,6 +206,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         OutputDebugString("Unable to register input devices\n");
     }
     win32_capture_mouse(platform.hwnd);
+    ShowCursor(false);
     
     // @note: Font setup
     //HANDLE font_file = CreateFile();

@@ -56,12 +56,11 @@ colors
 #undef color
 
 //~ @note: Math types
+#define M_PI  3.1415926535897932384626433
+#define M_PI32 ((f32)M_PI)
+#define rad2deg (180.f/M_PI32)
+#define deg2rad (M_PI32/180.f)
 
-#if COMPILER_CL
-# define _USE_MATH_DEFINES
-#else
-# define  M_PI  3.1415926535897932384626433
-#endif
 #include <math.h>
 
 typedef union Vec2 {

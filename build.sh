@@ -15,7 +15,7 @@ else
 fi
 
 debug_defines="-DENABLE_ASSERT=1"
-if [[ "$clang" == "" ]] || [[ "$msvc" == 1 ]]; then
+if [[ "$msvc" == 1 ]]; then
   echo "[MSVC compile]"
   debug="-Od -Zi -WX $debug_defines"
   release="-O2"
