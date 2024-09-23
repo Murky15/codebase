@@ -40,7 +40,7 @@ pv2 (Vec2 v, f32 z) {
 
 core_function f32  
 v2len (Vec2 v) {
-    return sqrtf(sq(v.x) + sq(v.y));
+    return sqrtf(sqr(v.x) + sqr(v.y));
 }
 
 core_function Vec2  
@@ -75,7 +75,7 @@ v2cross (Vec2 a, Vec2 b, Vec2 c) {
 
 core_function f32  
 v3len (Vec3 v) {
-    return sqrtf(sq(v.x) + sq(v.y) + sq(v.z));
+    return sqrtf(sqr(v.x) + sqr(v.y) + sqr(v.z));
 }
 
 core_function Vec3 

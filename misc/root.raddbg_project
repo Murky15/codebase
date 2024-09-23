@@ -18,13 +18,24 @@ target:
   active:            1
 }
 
-/// breakpoints ///////////////////////////////////////////////////////////////
+/// watches ///////////////////////////////////////////////////////////////////
 
-breakpoint:
+watch:
 {
-  line: ("../code/dumb/renderer.c":266)
-  condition: "if max_floor > min_floor"
-  enabled: 1
+  expression:  "font_dir"
+  view_rule:   ""
+}
+
+watch:
+{
+  expression:  "table"
+  view_rule:   ""
+}
+
+watch:
+{
+  expression:  "cmap"
+  view_rule:   ""
 }
 
 /// exception code filters ////////////////////////////////////////////////////

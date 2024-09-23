@@ -26,8 +26,23 @@ typedef s64 b64;
 
 typedef void void_func(void);
 
-//~ @note Tangible types
+read_only u8  u8_max  = 0xff;
+read_only u16 u16_max = 0xffff;
+read_only u32 u32_max = 0xffffffff;
+read_only u64 u64_max = 0xffffffffffffffff;
 
+read_only s8  s8_min  = 0x80;
+read_only s8  s8_max  = 0x7f;
+read_only s16 s16_min = 0x8000;
+read_only s16 s16_max = 0x7fff;
+read_only s32 s32_min = 0x80000000;
+read_only s32 s32_max = 0x7fffffff;
+read_only s64 s64_min = 0x8000000000000000;
+read_only s64 s64_max = 0x7fffffffffffffff;
+
+// @todo: Fixed-point implementation
+
+//~ @note Tangible types
 typedef struct Color {
     u8 r, g, b, a;
 } Color;
@@ -113,7 +128,5 @@ core_function Vec3 v3cross(Vec3 a, Vec3 b);
 
 core_function f32 fmod_cycling(f32 x, f32 y); // Ripped this straight from Jai
 core_function f32 lerp (f32 v0, f32 v1, f32 t);
-
-// @todo: Fixed-point implementation
 
 #endif // BASE_TYPES_H

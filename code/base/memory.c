@@ -114,7 +114,6 @@ temp_arena_end (Temp_Arena temp) {
 
 // @note: Scratch arena
 
-
 core_function Temp_Arena
 get_scratch (Arena **conflicts, u64 num_conflicts) {
     local_persist threadvar Arena *scratch_pool[2];

@@ -24,8 +24,8 @@ window:
     {
       0.454678:
       {
-        watch: {"minx" "maxx" "x" "floor" "height" "floor0" "floor1" "height0" "height1"}
-        locals: {selected }
+        watch: {selected }
+        locals: {}
       }
       0.211988:
       {
@@ -45,9 +45,12 @@ window:
       {
         0.718394:
         {
-          code: {project:{"root.raddbg_project"} "../code/dumb/main.c" cursor:238:1}
+          code: {selected project:{"root.raddbg_project"} "../code/dumb/main.c" cursor:244:41}
+          code: {project:{"root.raddbg_project"} "../code/dumb/renderer.c" cursor:128:2}
+          code: {project:{"root.raddbg_project"} "../code/base/strings.c" cursor:66:27}
+          code: {project:{"root.raddbg_project"} "../code/os/win32/io.c" cursor:41:1}
+          code: {project:{"root.raddbg_project"} "../code/truetype/truetype.c" cursor:31:6}
           disassembly: {}
-          code: {selected project:{"root.raddbg_project"} "../code/dumb/renderer.c" cursor:125:1}
         }
         0.281606:
         {
@@ -146,8 +149,8 @@ keybindings:
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
-  {"prev_tab"                                ctrl shift tab      }
   {"prev_tab"                                ctrl page_up        }
+  {"prev_tab"                                ctrl shift tab      }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
   {"run"                                     f5                  }

@@ -96,7 +96,7 @@ main :: () {
   Simp.texture_load_from_file(*tile_texture, tprint("%/iso_tiles/tile_000.png", ASSET_DIR));
 
   // Spawn tiles
-  axis := cast(int)sqrt(tiles.count);
+  axis := cast(int)sqrrt(tiles.count);
   for y: 0..axis-1 {
     for x: 0..axis-1 {
       tiles[y * axis + x].pos = .{xx x, xx y};

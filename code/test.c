@@ -163,10 +163,10 @@ int
 main (void) {
     Arena *arena = arena_alloc();
     
-    // Run tests
     print_context();
+    
+    // Run tests
     test_arena();
-    printf("\n\n");
     test_strings(arena);
     return 0;
 }

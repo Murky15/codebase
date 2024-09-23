@@ -1,25 +1,14 @@
-#ifndef IO_H
-#define IO_H
-
-// Provides interface for OS specific IO functions
+#ifndef OS_IO_H
+#define OS_IO_H
 
 /*
-@todo: Let's take a minute to think about what we want here
--[ ] printing & reading to/from stdout, stderr, etc
--[ ] assert messageboxes
--[ ] reading entire files (front to back)
--[ ] writing to files (whole files & with specified offset?)
--[ ] obtaining file properties
--[ ] deleting files
--[ ] renaming files
--[ ] creating directories
--[ ] deleting directories
--[ ] traversing directories
--[ ] looping through directories
--[ ] Pre-defined paths (pointing to codebase, user dir, etc)
--[ ] Could we make a better data structure to handle file paths?
+@todo:
+-[X] Reading & writing to files synchronously 
+-[ ] Std-free writing to console output
+-[ ] Directory managment
 */
 
+core_function String8 os_read_file(Arena *arena, String8 path, b32 create_if_not_exist);
+core_function b32     os_write_file(String8 path, String8 to_write, b32 create_if_not_exist);
 
-
-#endif //IO_H
+#endif //OS_IO_H

@@ -74,12 +74,6 @@
 # error "align_of not implemented!"
 #endif
 
-#if OS_WINDOWS
-# define debug_print(str8) OutputDebugString((const char*)str8.str)
-#else
-# define debug_print(str8) fputs((const char*)str8.str, stderr)
-#endif
-
 #if LANG_CPP
 # define comp_lit(T, ...) {__VA_ARGS__} // The one time MSVC gets picky about the standard
 #else
@@ -90,8 +84,6 @@
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #define clamp(a,min,max) ((a) < (min) ? (min) : (a) > (max) ? (max) : (a))
 #define norm(x,min,max) (((x)-(min))/((max)-(min)))
-
-#define square(x) ((x)*(x))
 
 #define array_count(a) (sizeof(a) / sizeof(a[0]))
 #define swap(T, a, b) stmnt( T __temp = a; a = b; b = __temp; )
@@ -110,7 +102,7 @@
 #define Gigabytes(n) ((u64)(n) << 30)
 #define Terabytes(n) ((u64)(n) << 401lu)
 
-#define sq(x) ((x)*(x))
+#define sqr(x) ((x)*(x))
 
 //-@note: Memory operation wrappers
 

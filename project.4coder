@@ -33,13 +33,11 @@ load_paths = {
 
 commands = {
     //- Build commands
-    .build_dumb = {.win="bash build.sh msvc dumb", .out="*compilation*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false},
+    .build_dumb = {.win="bash build.sh dumb", .out="*output*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false},
     
     //- Run commands
-    .run_dumb = {.win="build\dumb.exe"},
+    .run_dumb = {.win="build\dumb.exe", .out="*output*"},
 };
-
-
 
 fkey_command = {
     .F1 = "build_dumb",

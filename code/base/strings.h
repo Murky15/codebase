@@ -4,55 +4,55 @@
 // @note: Basic string types
 
 typedef struct String8 {
-  u8* str;
-  u64 len;
+    u8* str;
+    u64 len;
 } String8;
 
 typedef struct String16 {
-  u16* str;
-  u64 len;
+    u16* str;
+    u64 len;
 } String16;
 
 typedef struct String32 {
-  u32* str;
-  u64 len;
+    u32* str;
+    u64 len;
 } String32;
 
 // @note: String structure types
 
 typedef struct String8Node {
-  struct String8Node *next;
-  String8 string;
+    struct String8Node *next;
+    String8 string;
 } String8Node;
 
 typedef struct String8List {
-  String8Node *first;
-  String8Node *last;
-  u64 num_nodes;
-  u64 total_len;
+    String8Node *first;
+    String8Node *last;
+    u64 num_nodes;
+    u64 total_len;
 } String8List;
 
 typedef struct String8Array {
-  u64 count;
-  String8 *strings;
+    u64 count;
+    String8 *strings;
 } String8Array;
 
 // @note: String operation types
 
 typedef struct String8Join {
-  String8 pre, sep, post;
+    String8 pre, sep, post;
 } String8Join;
 
 typedef struct Decoded_Codepoint {
-  u32 codepoint;
-  u32 advance;
+    u32 codepoint;
+    u32 advance;
 } Decoded_Codepoint;
 
 typedef u32 String8_Matchflags;
 enum {
-  MATCH_CASE_INSENSITIVE = (1 << 0),
-  MATCH_RIGHT_SIDE_SLOPPY = (1 << 1),
-  MATCH_SLASH_INSENSITIVE = (1 << 2),
+    MATCH_CASE_INSENSITIVE = (1 << 0),
+    MATCH_RIGHT_SIDE_SLOPPY = (1 << 1),
+    MATCH_SLASH_INSENSITIVE = (1 << 2),
 };
 
 // @note: Char functions
@@ -111,6 +111,7 @@ core_function String8List str8_split(Arena *arena, String8 string, u64 num_split
 core_function String8 str8_list_join(Arena *arena, String8List list, String8Join *opt_join_params);
 
 // Conversions
+core_function u8* str8_to_cstr(Arena *arena, String8 string);
 core_function String8Array str8_list_to_array(Arena *arena, String8List *list);
 
 // @todo: Unicode conversions

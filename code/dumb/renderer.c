@@ -53,7 +53,7 @@ function void
 r_draw_circle (Vec2 p, f32 r, Color c) {
     for (f32 y = -r; y <= r; ++y) {
         for (f32 x = -r; x <= r; ++x) {
-            if (sq(x) + sq(y) <= sq(r))
+            if (sqr(x) + sqr(y) <= sqr(r))
                 r_put_pixel_at(v2(x + p.x, y + p.y), c);
         }
     }

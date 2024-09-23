@@ -513,7 +513,7 @@ extern "C"
         
 #ifdef HANDMADE_MATH__USE_SSE
         __m128 In = _mm_set_ss(Float);
-        __m128 Out = _mm_sqrt_ss(In);
+        __m128 Out = _mm_sqrrt_ss(In);
         Result = _mm_cvtss_f32(Out);
 #else
         Result = HMM_SQRTF(Float);
