@@ -41,4 +41,21 @@ typedef struct Cmap {
     Cmap_Subtable *subtables;
 } Cmap;
 
+// Most widely used format
+typedef struct Cmap_Format4 {
+    u16 format;
+    u16 len;
+    u16 lang;
+    u16 seg_count_x2;
+    u16 search_range;
+    u16 entry_selector;
+    u16 range_shift;
+    u16 _reserved_; // Must be 0
+    u16 *end_code;
+    u16 *start_code;
+    u16 *id_delta;
+    u16 *id_range_offset;
+    u16 *glyph_id_array;
+} Cmap_Format4;
+
 #endif //TRUETYPE_H

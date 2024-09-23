@@ -47,8 +47,10 @@ ttf_print_table_directory (Table_Directory *table_dir, u16 num_tables) {
 
 core_function void
 ttf_read_font_directory (Arena *arena, u8 **buff, Font_Directory *font_dir) {
+    u8 *restore = *buff;
     ttf_read_offset_subtable(buff, &font_dir->off_sub);
     ttf_read_table_directory(arena, buff, &font_dir->table_dir, font_dir->off_sub.num_tables);
+    *buff = restore;
 }
 
 core_function void

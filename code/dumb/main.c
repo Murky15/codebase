@@ -217,8 +217,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     String8 font_path = str8_lit("W:/assets/dumb/fonts/Envy Code R PR7/Envy Code R.ttf");
     //String8 font_path = str8_lit("W:/assets/dumb/fonts/Retro Gaming.ttf");
     String8 font_data = os_read_file(perm_arena, font_path, false);
-    Font_Directory font_dir = {0};;
+    Font_Directory font_dir = {0};
     ttf_read_font_directory(perm_arena, &font_data.str, &font_dir);
+    //ttf_print_table_directory(font_dir.table_dir, font_dir.off_sub.num_tables);
     for (u16 i = 0; i < font_dir.off_sub.num_tables; ++i) {
         if (font_dir.table_dir[i].tag == ttf_read_be32("cmap")) {
             Cmap cmap = {0};
