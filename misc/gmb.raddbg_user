@@ -45,8 +45,10 @@ window:
       {
         0.718394:
         {
-          code: {selected project:{"root.raddbg_project"} "../code/dumb/main.c" cursor:232:21}
+          code: {project:{"root.raddbg_project"} "../code/dumb/main.c" cursor:300:1}
           code: {project:{"root.raddbg_project"} "../code/truetype/truetype.c" cursor:65:23}
+          disassembly: {selected }
+          code: {project:{"root.raddbg_project"} "../code/dumb/renderer.c" cursor:153:1}
         }
         0.281606:
         {
@@ -145,8 +147,8 @@ keybindings:
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
-  {"prev_tab"                                ctrl shift tab      }
   {"prev_tab"                                ctrl page_up        }
+  {"prev_tab"                                ctrl shift tab      }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
   {"run"                                     f5                  }
