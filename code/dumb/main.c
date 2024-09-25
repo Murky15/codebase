@@ -3,7 +3,6 @@
 #include <Windows.h>
 #include "base/include.h"
 #include "os/include.h"
-#include "truetype/truetype.h"
 
 typedef struct Wall {
     Vec2 p0, p1;
@@ -15,7 +14,9 @@ typedef struct Wall {
 //- @note: Source
 #include "base/include.c"
 #include "os/include.c"
-#include "truetype/truetype.c"
+#define STB_TRUETYPE_IMPLEMENTATION
+#define STBTT_STATIC
+#include "third_party/stb_truetype.h"
 #include "renderer.c"
 
 /*
@@ -213,21 +214,10 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     win32_capture_mouse(platform.hwnd);
     ShowCursor(false);
     
-    // @note: Font setup
+    //- @note: Font setup
     String8 font_path = str8_lit("W:/assets/dumb/fonts/Envy Code R PR7/Envy Code R.ttf");
     //String8 font_path = str8_lit("W:/assets/dumb/fonts/Retro Gaming.ttf");
-    String8 font_data = os_read_file(perm_arena, font_path, false);
-    Font_Directory font_dir = {0};
-    ttf_read_font_directory(perm_arena, &font_data.str, &font_dir);
-    //ttf_print_table_directory(font_dir.table_dir, font_dir.off_sub.num_tables);
-    for (u16 i = 0; i < font_dir.off_sub.num_tables; ++i) {
-        if (font_dir.table_dir[i].tag == ttf_read_be32("cmap")) {
-            Cmap cmap = {0};
-            u8 *table = font_data.str + font_dir.table_dir[i].offset; // typo this should be offset from the other thing
-            ttf_read_cmap(perm_arena, table, &cmap);
-            ttf_print_cmap(&cmap);
-        }
-    }
+    
     
     // @note: Timing
     LARGE_INTEGER frequency, start_time, end_time, elapsed_microseconds = {0};
