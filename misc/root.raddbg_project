@@ -18,20 +18,6 @@ target:
   active:            1
 }
 
-/// breakpoints ///////////////////////////////////////////////////////////////
-
-breakpoint:
-{
-  line: ("../code/dumb/main.c":217)
-  enabled: 0
-}
-
-breakpoint:
-{
-  line: ("../code/dumb/main.c":299)
-  enabled: 1
-}
-
 /// watches ///////////////////////////////////////////////////////////////////
 
 watch:

@@ -29,7 +29,7 @@ else
   release="-O2 -w"
   common="clang -I$codebase_root_dir/code"
   add_lib="-l"
-  link=""
+  link="-Xlinker"
   out="-o"
 fi
 
@@ -54,10 +54,9 @@ mkdir -p build
 # Build
 pushd build >> /dev/null
 built=0
-if [[ "$dumb" == 1 ]]; then built=1 && eval "$compile $codebase_root_dir"/code/dumb/main.c "$link $add_lib User32.lib $add_lib Gdi32.lib $out"dumb.exe || exit 1; fi
-if [[ "$debaser" == 1 ]]; then built=1 && eval "$jai_compile $codebase_root_dir"/code/debaser/debaser.jai || exit 1; fi
+if [[ "$dumb" == 1 ]]; then built=1 && eval "$compile $codebase_root_dir"/code/dumb/main.c "$add_lib User32.lib $add_lib Gdi32.lib $out"dumb.exe || exit 1; fi
+
 if [[ "$llvm_example" == 1 ]]; then built=1 && eval "$compile $codebase_root_dir"/code/llvm_example/main.cpp "$link $out"llvm_example.exe || exit 1; fi
-if [[ "$d3d11_playground" == 1 ]]; then built=1 && eval "$compile $codebase_root_dir"/code/d3d11_playground/main.c "$link User32.lib Gdi32.lib d3d11.lib $out"d3d11_playground.exe || exit 1; fi
 
 if [[ "$built" == 0 ]]; then echo "Unrecognized target!"; fi
 popd >> /dev/null

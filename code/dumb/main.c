@@ -21,6 +21,16 @@ typedef struct Wall {
 
 /*
 @todo
+-[ ] Read AMD programming manual (I am so weird)
+-[ ] Rework build script to be more robust (codebase level work)
+-[ ] Random world generation OR store level data in json (make json parser codebase)
+-[ ] Figure out how to do sectors and portal rendering duke nukem style (fuck me)
+-[X] FPS profiling
+-[ ] Font rasterization
+-[ ] Multithreading??
+-[ ] Hot reloading??
+-[ ] SIMD????
+-[ ] Wall texture mapping
 -[ ] Optimize / profile render functions
 -[ ] Asan / Libfuzzer
 -[ ] sin/cos/tan table lookup: https://namoseley.wordpress.com/2015/07/26/sincos-generation-using-table-lookup-and-iterpolation/
@@ -188,7 +198,7 @@ win32_create_bitmap (Bitmap *data) {
 int
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
     //~ @note: Platform setup
-    Arena *perm_arena = arena_alloc();
+    //Arena *perm_arena = arena_alloc();
     Arena *frame_arena = arena_alloc();
     
     Win32_Data platform = win32_create_window(hInstance);
@@ -215,9 +225,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     ShowCursor(false);
     
     //- @note: Font setup
-    String8 font_path = str8_lit("W:/assets/dumb/fonts/Envy Code R PR7/Envy Code R.ttf");
+    //String8 font_path = str8_lit("W:/assets/dumb/fonts/Envy Code R PR7/Envy Code R.ttf");
     //String8 font_path = str8_lit("W:/assets/dumb/fonts/Retro Gaming.ttf");
-    
     
     // @note: Timing
     LARGE_INTEGER frequency, start_time, end_time, elapsed_microseconds = {0};
@@ -302,6 +311,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
                       DIB_RGB_COLORS,
                       SRCCOPY
                       );
+        
+        f32 fps = 1.f / dt;
+        OutputDebugString((LPCSTR)str8_pushf(frame_arena, "FPS: %f\n", fps).str);
     }
     
     return 0;
