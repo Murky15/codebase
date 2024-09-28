@@ -220,8 +220,15 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {\
 }
 
 function void
-r_scene_overview (Wall *walls, u64 num_walls) {
-    
+r_map (b32 show_player, Vec2 player_pos, f32 orientation, Wall *walls, u64 num_walls) {
+    if (show_player) {
+        r_draw_circle(player_pos, 5.f, Color_White);
+        r_draw_line(player_pos, v2add(player_pos, v2muls(v2(cosf(orientation), sinf(orientation)), 5.f)), Color_Red);
+    }
+    for (u64 i = 0; i < num_walls; ++i) {
+        Wall *w = &walls[i];
+        r_draw_line(w->p0, w->p1, w->color);
+    }
 }
 
 #if 0

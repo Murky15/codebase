@@ -24,5 +24,6 @@ function void r_draw_quad_frame(Vec2 p0, Vec2 p1, Vec2 p2, Vec2 p3, Color c);
 
 //- @note: Game specific functionality
 function void r_scene(Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls);
+function void r_map(b32 show_player, Vec2 player_pos, f32 orientation, Wall *walls, u64 num_walls);
 
 #endif //RENDERER_H

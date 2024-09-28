@@ -22,7 +22,7 @@ typedef struct Wall {
 /*
 @todo
 -[ ] Read AMD programming manual (I am so weird)
--[ ] Rework build script to be more robust (codebase level work)
+-[X] Rework build script to be more robust (codebase level work)
 -[ ] Random world generation OR store level data in json (make json parser codebase)
 -[ ] Figure out how to do sectors and portal rendering duke nukem style (fuck me)
 -[X] FPS profiling
@@ -35,9 +35,10 @@ typedef struct Wall {
 -[ ] Asan / Libfuzzer
 -[ ] sin/cos/tan table lookup: https://namoseley.wordpress.com/2015/07/26/sincos-generation-using-table-lookup-and-iterpolation/
 -[ ] Bake in "asset" dir for this game 
+-[ ] Metaprogramming
 */
 
-#define MOUSE_SENSITIVITY 2.0f
+#define MOUSE_SENSITIVITY 0.01f
 #define PLAYER_MOVE_SPEED 100.f
 
 typedef struct Win32_Data {
@@ -78,11 +79,10 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
         case WM_CLOSE: PostQuitMessage(0); return 0; break;
         
         case WM_INPUT: {
-            UINT size;
-            u8 data[sizeof(RAWINPUT)];
-            memory_zero_array(data);
-            GetRawInputData((HRAWINPUT)lParam, RID_INPUT, data, &size, sizeof(RAWINPUTHEADER));
-            RAWINPUT *input = (RAWINPUT*)data;
+            u32 size;
+            local_persist u8 buff[sizeof(RAWINPUT)];
+            GetRawInputData((HRAWINPUT)lParam, RID_INPUT, buff, &size, sizeof(RAWINPUTHEADER));
+            RAWINPUT *input = (RAWINPUT*)buff;
             
             if (input->header.dwType == RIM_TYPEKEYBOARD) {
                 RAWKEYBOARD *keyboard = &input->data.keyboard;
@@ -133,7 +133,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                     s32 movex = mouse->lLastX;
                     s32 movey = mouse->lLastY;
                     unused(movey);
-                    turn_amount = (f32)movex * MOUSE_SENSITIVITY;
+                    turn_amount = ((f32)movex * MOUSE_SENSITIVITY);
                     
                     win32_capture_mouse(hwnd);
                 }
@@ -278,7 +278,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         f32 dt = (f32)((f32)elapsed_microseconds.QuadPart / (f32)frequency.QuadPart);
         start_time = end_time;
         
-        player.rotation_angle -= turn_amount * dt;
+        player.rotation_angle -= turn_amount;
         player.rotation_angle = fmod_cycling(player.rotation_angle, 2 * M_PI32);
         turn_amount = 0;
         
@@ -296,8 +296,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         
         //- @note: Render
         r_clear();
-        r_scene(player.pos, player.rotation_angle, walls, array_count(walls));
-        
+        //r_scene(player.pos, player.rotation_angle, walls, array_count(walls));
+        r_map(true, player.pos, player.rotation_angle, walls, array_count(walls));
         StretchDIBits(
                       platform.win_dc,
                       0, 0,

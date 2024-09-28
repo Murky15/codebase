@@ -21,7 +21,7 @@ os_read_file (Arena *arena, String8 path, b32 create_if_not_exist) {
         buffer[file_size] = '\0';
         u64 bytes_read;
         if (file_size > u32_max) {
-            u32 diff = file_size - u32_max;
+            u32 diff = (u32)(file_size - u32_max);
             DWORD first_read, second_read;
             ReadFile(hFile, buffer, u32_max, &first_read, 0);
             ReadFile(hFile, buffer, diff, &second_read, 0);
@@ -56,7 +56,7 @@ os_write_file (String8 path, String8 to_write, b32 create_if_not_exist) {
                               0);
     if (hFile) {
         DWORD bytes_written;
-        BOOL result = WriteFile(hFile, to_write.str, to_write.len, &bytes_written, 0);
+        BOOL result = WriteFile(hFile, to_write.str, (u32)to_write.len, &bytes_written, 0);
         if (result == TRUE && bytes_written == to_write.len)
             success = true;
         
