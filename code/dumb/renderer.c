@@ -153,7 +153,7 @@ r_draw_rect (Vec2 p, Vec2 sz, Color c) {
 #define ndc_to_screen_x(x) (width_middle *x + (canvas->width -1.f)/2.f)
 #define ndc_to_screen_y(y) (height_middle*y + (canvas->height-1.f)/2.f)
 function void 
-r_scene (Vec2 cam_pos, f32 cam_orientation, Border *walls, u64 num_walls) {\
+r_scene (Entity cam, Border *walls, u64 num_walls) {\
     Bitmap *canvas = r_get_framebuffer();
     
     f32 forward = M_PI32 / 2.f;
@@ -164,10 +164,10 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Border *walls, u64 num_walls) {\
     
     for (u64 wall_idx = 0; wall_idx < num_walls; ++wall_idx) {
         //- @note: Transform wall relative to player
-        Vec2 t0 = v2sub(walls[wall_idx].p0, cam_pos);
-        Vec2 t1 = v2sub(walls[wall_idx].p1, cam_pos);
+        Vec2 t0 = v2sub(walls[wall_idx].p0, cam.pos);
+        Vec2 t1 = v2sub(walls[wall_idx].p1, cam.pos);
         
-        f32 t = -cam_orientation + forward;
+        f32 t = -cam.rotation_angle + forward;
         Vec2 d0, d1;
         d0.x = t0.x * cosf(t) - t0.y * sinf(t);
         d0.y = t0.x * sinf(t) + t0.y * cosf(t);
@@ -226,14 +226,17 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Border *walls, u64 num_walls) {\
 }
 
 function void
-r_map (b32 show_player, Vec2 player_pos, f32 orientation, Border *walls, u64 num_walls) {
+r_map (Cam_2D map_cam, b32 show_player, Entity player, Border *walls, u64 num_walls) {
     if (show_player) {
-        r_draw_circle(player_pos, 5.f, Color_White);
-        r_draw_line(player_pos, v2add(player_pos, v2muls(v2(cosf(orientation), sinf(orientation)), 5.f)), Color_Red);
+        Vec2 p = v2sub(player.pos, map_cam.pos);
+        r_draw_circle(p, 5.f, Color_White);
+        r_draw_line(p, v2add(p, v2muls(v2(cosf(player.rotation_angle), sinf(player.rotation_angle)), 5.f)), Color_Red);
     }
     for (u64 i = 0; i < num_walls; ++i) {
         Border *w = &walls[i];
-        r_draw_line(w->p0, w->p1, w->color);
+        Vec2 p0 = v2sub(v2add(w->p0, v2(map_cam.scale, map_cam.scale)), map_cam.pos);
+        Vec2 p1 = v2sub(v2add(w->p1, v2(map_cam.scale, map_cam.scale)), map_cam.pos);
+        r_draw_line(p0, p1, w->color);
     }
 }
 

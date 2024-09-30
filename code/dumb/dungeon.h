@@ -20,13 +20,13 @@ typedef struct BSP_Node {
     // BSP algorithm enforces dungeon rooms to be rectangles
     union {
         struct {
-            Border *top;
-            Border *bottom;
-            Border *left;
-            Border *right;
-        }
-        Border *borders[4];
-    }
+            Border t;
+            Border b;
+            Border l;
+            Border r;
+        };
+        Border borders[4];
+    };
 } BSP_Node;
 
 #endif //DUNGEON_H
