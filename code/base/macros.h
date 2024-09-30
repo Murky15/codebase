@@ -3,7 +3,7 @@
 
 // @todo: Sanitizing & Profiling helpers
 
-//~ @note: Constant macros
+//- @note: Constant macros
 
 #if COMPILER_CL || COMPILER_TCC
 # define threadvar __declspec(thread)
@@ -41,7 +41,7 @@
 #define fallthrough
 #define core_function function // @note: So now we can change this if we want to build a dll or lib or something
 
-//~ @note: Function macros
+//- @note: Function macros
 #define unused(v) (void)(v)
 #define stmnt(s) do{ s } while (0)
 
@@ -104,7 +104,7 @@
 
 #define sqr(x) ((x)*(x))
 
-//-@note: Memory operation wrappers
+//- @note: Memory operation wrappers
 
 #include <string.h>
 #define memory_zero(p,s) memset((p), 0, (s))

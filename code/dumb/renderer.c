@@ -143,11 +143,17 @@ r_draw_quad_frame (Vec2 p0, Vec2 p1, Vec2 p2, Vec2 p3, Color c) {
     r_draw_line(p3, p0, c);
 }
 
+function void
+r_draw_rect (Vec2 p, Vec2 sz, Color c) {
+    for (f32 x = p.x; x <= p.x + sz.x; ++x)
+        r_draw_vert(x, p.y, p.y + sz.y, c);
+}
+
 // @slow
 #define ndc_to_screen_x(x) (width_middle *x + (canvas->width -1.f)/2.f)
 #define ndc_to_screen_y(y) (height_middle*y + (canvas->height-1.f)/2.f)
 function void 
-r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {\
+r_scene (Vec2 cam_pos, f32 cam_orientation, Border *walls, u64 num_walls) {\
     Bitmap *canvas = r_get_framebuffer();
     
     f32 forward = M_PI32 / 2.f;
@@ -220,13 +226,13 @@ r_scene (Vec2 cam_pos, f32 cam_orientation, Wall *walls, u64 num_walls) {\
 }
 
 function void
-r_map (b32 show_player, Vec2 player_pos, f32 orientation, Wall *walls, u64 num_walls) {
+r_map (b32 show_player, Vec2 player_pos, f32 orientation, Border *walls, u64 num_walls) {
     if (show_player) {
         r_draw_circle(player_pos, 5.f, Color_White);
         r_draw_line(player_pos, v2add(player_pos, v2muls(v2(cosf(orientation), sinf(orientation)), 5.f)), Color_Red);
     }
     for (u64 i = 0; i < num_walls; ++i) {
-        Wall *w = &walls[i];
+        Border *w = &walls[i];
         r_draw_line(w->p0, w->p1, w->color);
     }
 }

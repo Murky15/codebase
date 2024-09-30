@@ -28,10 +28,12 @@
 #if LLVM_LIKE_COMPILER
 # if defined(__FreeBSD__) || defined(__OpenBSD__)
 #  define OS_BSD 1
+#  define OS_UNIX_LIKE 1
 # elif defined(__EMSCRIPTEN__)
 #  define OS_EMSCRIPTEN 1
 # elif defined(__gnu_linux__) || defined(__linux__)
 #  define OS_LINUX 1
+#  define OS_UNIX_LIKE 1
 # elif defined(__APPLE__) && defined(__MACH__)
 #  define OS_MAC 1
 #  define OS_UNIX_LIKE 1 // Because mac is "unique"
@@ -131,8 +133,43 @@
 
 #undef LLVM_LIKE_COMPILER
 
+typedef unsigned int OS_Type;
+enum {
+    OS_Null,
+    OS_Windows,
+    OS_Mac,
+    OS_Linux,
+    OS_Emscripten,
+    OS_Bsd,
+    
+    OS_Count
+};
+
+typedef unsigned int Arch_Type;
+enum {
+    Arch_Null,
+    Arch_Arm32,
+    Arch_Arm64,
+    Arch_X86,
+    Arch_X64,
+    Arch_RISCV,
+    
+    Arch_Count
+};
+
+typedef unsigned int Compiler_Type;
+enum {
+    Compiler_Null,
+    Compiler_Clang,
+    Compiler_GCC,
+    Compiler_CL,
+    Compiler_TCC,
+    
+    Compiler_Count
+};
+
 void
-print_context (void) {
+ctx_print (void) {
     puts("--- CONTEXT REPORT ---");
     printf("Clang: %d\n", COMPILER_CLANG);
     printf("GCC: %d\n", COMPILER_GCC);
@@ -151,6 +188,55 @@ print_context (void) {
     printf("riscv: %d\n", ARCH_RISCV);
     printf("cpp: %d\n", LANG_CPP);
     printf("c: %d\n\n", LANG_C);
+}
+
+OS_Type
+ctx_get_os (void) {
+#if OS_BSD
+    return OS_Bsd;
+#elif OS_EMSCRIPTEN
+    return OS_Emscripten;
+#elif OS_LINUX
+    return OS_Linux;
+#elif OS_MAC
+    return OS_Mac;
+#elif OS_WINDOWS
+    return OS_Windows;
+#else 
+    return OS_Null;
+#endif
+}
+
+Arch_Type
+ctx_get_arch (void) {
+#if ARCH_ARM32
+    return Arch_Arm32;
+#elif ARCH_ARM64
+    return Arch_Arm64;
+#elif ARCH_X86
+    return Arch_X86;
+#elif ARCH_X64
+    return Arch_X64;
+#elif ARCH_RISCV
+    return Arch_RISCV;
+#else
+    return Arch_Null;
+#endif
+}
+
+Compiler_Type
+ctx_get_compiler (void) {
+#if COMPILER_CLANG
+    return Compiler_Clang;
+#elif COMPILER_GCC
+    return Compiler_GCC;
+#elif COMPILER_CL
+    return Compiler_CL;
+#elif COMPILER_TCC
+    return Compiler_TCC;
+#else 
+    return Compiler_Null;
+#endif
 }
 
 #endif // BASE_CONTEXT_H

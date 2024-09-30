@@ -1,14 +1,10 @@
 //~ @note: Unity build
 //- @note: Headers
 #include <Windows.h>
+#include <time.h>
 #include "base/include.h"
 #include "os/include.h"
-
-typedef struct Wall {
-    Vec2 p0, p1;
-    Color color;
-} Wall;
-
+#include "dungeon.h"
 #include "renderer.h"
 
 //- @note: Source
@@ -17,6 +13,7 @@ typedef struct Wall {
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
 #include "third_party/stb_truetype.h"
+#include "dungeon.c"
 #include "renderer.c"
 
 /*
@@ -59,6 +56,9 @@ global int g_window_height = 720;
 global b32 g_game_running = true;
 global b32 g_mouse_captured = false;
 
+global Arena *perm_arena;
+global Arena *frame_arena;
+
 // @todo: It is annoying to need to pull out these "action commands"
 global b32 move_forward, move_back, strafe_left, strafe_right;
 global f32 turn_amount;
@@ -80,8 +80,11 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
         
         case WM_INPUT: {
             u32 size;
-            local_persist u8 buff[sizeof(RAWINPUT)];
-            GetRawInputData((HRAWINPUT)lParam, RID_INPUT, buff, &size, sizeof(RAWINPUTHEADER));
+            GetRawInputData((HRAWINPUT)lParam, RID_INPUT, 0, &size, sizeof(RAWINPUTHEADER));
+            LPBYTE buff = arena_pushn(frame_arena, BYTE, size);\
+            if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, buff, &size, sizeof(RAWINPUTHEADER)) != size)
+                OutputDebugString("GetRawInputData does not return correct size !\n"); 
+            
             RAWINPUT *input = (RAWINPUT*)buff;
             
             if (input->header.dwType == RIM_TYPEKEYBOARD) {
@@ -198,8 +201,8 @@ win32_create_bitmap (Bitmap *data) {
 int
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
     //~ @note: Platform setup
-    //Arena *perm_arena = arena_alloc();
-    Arena *frame_arena = arena_alloc();
+    perm_arena = arena_alloc();
+    frame_arena = arena_alloc();
     
     Win32_Data platform = win32_create_window(hInstance);
     
@@ -224,7 +227,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     win32_capture_mouse(platform.hwnd);
     ShowCursor(false);
     
-    //- @note: Font setup
+    // @note: Font setup
     //String8 font_path = str8_lit("W:/assets/dumb/fonts/Envy Code R PR7/Envy Code R.ttf");
     //String8 font_path = str8_lit("W:/assets/dumb/fonts/Retro Gaming.ttf");
     
@@ -237,12 +240,15 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     platform.bitmap = win32_create_bitmap(bitmap);
     
     //- @note: Game setup
+    Arena *level_arena = arena_alloc();
+    
     Entity player = {0};
     player.rotation_angle = 0;
     player.radius = 10.f;
     player.pos.x = bitmap->width / 2.f;
     player.pos.y = bitmap->height / 2.f;
     
+    /*
     Wall walls[4];
     walls[0].color = Color_Red;
     walls[1].color = Color_Lime;
@@ -256,6 +262,14 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     walls[2].p1 = v2add(player.pos, v2(-100, 0));
     walls[3].p0 = v2add(player.pos, v2(-100, 0));
     walls[3].p1 = v2add(player.pos, v2(100,  50));
+    */
+    // @todo: Change this to be like how Ryan Fleury does it with r_rectparams
+    u64 seed = time(0);
+    lcg_next(&seed);
+    Dungeon_Create_Params dungeon = {0};
+    dungeon.map_width = 1000;
+    dungeon.map_height = 1000;
+    generate_dungeon(level_arena, &dungeon);
     
     //~ @note: Main loop
     QueryPerformanceCounter(&start_time);
@@ -297,7 +311,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         //- @note: Render
         r_clear();
         //r_scene(player.pos, player.rotation_angle, walls, array_count(walls));
-        r_map(true, player.pos, player.rotation_angle, walls, array_count(walls));
+        //r_map(true, player.pos, player.rotation_angle, walls, array_count(walls));
         StretchDIBits(
                       platform.win_dc,
                       0, 0,

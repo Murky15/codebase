@@ -23,7 +23,7 @@ else
   echo "[Clang compile]"
   debug="-O0 -g -Werror -Wall -Wno-missing-braces -Wno-newline-eof -Wno-keyword-macro -Wno-macro-redefined -Wno-braced-scalar-init -Wno-unused-function $debug_defines"
   release="-O2"
-  common="clang -I../code"
+  common="clang -std=c99 -I../code"
   add_lib="-l"
   link="-Xlinker"
   out="-o"
