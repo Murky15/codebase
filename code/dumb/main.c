@@ -4,6 +4,7 @@
 #include <time.h>
 #include "base/include.h"
 #include "os/include.h"
+#include "game.h"
 #include "dungeon.h"
 #include "renderer.h"
 
@@ -37,6 +38,7 @@
 
 #define MOUSE_SENSITIVITY 0.01f
 #define PLAYER_MOVE_SPEED 100.f
+#define CAM_MOVE_SPEED 200.f
 
 typedef struct Win32_Data {
     HINSTANCE hInstance;
@@ -44,12 +46,6 @@ typedef struct Win32_Data {
     HDC win_dc;
     BITMAPINFO bitmap;
 } Win32_Data;
-
-typedef struct Entity {
-    Vec2 pos;
-    f32 rotation_angle;
-    f32 radius;
-} Entity;
 
 global int g_window_width = 1280;
 global int g_window_height = 720;
@@ -62,6 +58,8 @@ global Arena *frame_arena;
 // @todo: It is annoying to need to pull out these "action commands"
 global b32 move_forward, move_back, strafe_left, strafe_right;
 global f32 turn_amount;
+global b32 cam_up, cam_down, cam_left, cam_right;
+global f32 cam_zoom = 1;
 
 function void
 win32_capture_mouse (HWND hwnd) {
@@ -95,24 +93,36 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                     u16 scan_code = (extension << 8) | (keyboard->MakeCode & 0x7F);
                     
                     switch (scan_code) {
-                        case 0x0011: fallthrough; // W / up-arrow
-                        case 0xE048: {
+                        case 0x0011: {      // W
                             move_forward = key_down;
                         } break;
                         
-                        case 0x001F: fallthrough; // S / down-arrow
-                        case 0xE050: {
+                        case 0x001F: {      // S
                             move_back = key_down;
                         } break;
                         
-                        case 0x001E: fallthrough; // A / left-arrow
-                        case 0xE04B: {
+                        case 0x001E: {      // A
                             strafe_left = key_down;
                         } break;
                         
-                        case 0x0020: fallthrough; // D / right-arrow
-                        case 0xE04D: {
+                        case 0x0020: {      // D
                             strafe_right = key_down;
+                        } break;
+                        
+                        case 0xE048: {      // up
+                            cam_up = key_down;
+                        } break;
+                        
+                        case 0xE050: {      // down
+                            cam_down = key_down;
+                        } break;
+                        
+                        case 0xE04B: {      // left
+                            cam_left = key_down;
+                        } break;
+                        
+                        case 0xE04D: {      // right
+                            cam_right = key_down;
                         } break;
                         
                         case 0x0001: {            // Escape
@@ -132,12 +142,14 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                     }
                 }
                 
+                if (mouse->usButtonFlags & RI_MOUSE_WHEEL) {
+                    f32 wheel_delta = ((f32)mouse->usButtonData / WHEEL_DELTA);
+                    cam_zoom += wheel_delta;
+                }
+                
                 if (g_mouse_captured) {
                     s32 movex = mouse->lLastX;
-                    s32 movey = mouse->lLastY;
-                    unused(movey);
                     turn_amount = ((f32)movex * MOUSE_SENSITIVITY);
-                    
                     win32_capture_mouse(hwnd);
                 }
             }
@@ -248,8 +260,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     player.pos.x = bitmap->width / 2.f;
     player.pos.y = bitmap->height / 2.f;
     
-    /*
-    Wall walls[4];
+    Border walls[4];
     walls[0].color = Color_Red;
     walls[1].color = Color_Lime;
     walls[2].color = Color_Purple;
@@ -262,10 +273,12 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     walls[2].p1 = v2add(player.pos, v2(-100, 0));
     walls[3].p0 = v2add(player.pos, v2(-100, 0));
     walls[3].p1 = v2add(player.pos, v2(100,  50));
-    */
-    // @todo: Change this to be like how Ryan Fleury does it with r_rectparams
+    
+    Cam_2D map_cam = {v2(0,0), 1.f};
+    
     u64 seed = time(0);
     lcg_next(&seed);
+    // @todo: Change this to be like how Ryan Fleury does it with r_rectparams
     Dungeon_Create_Params dungeon = {0};
     dungeon.map_width = 1000;
     dungeon.map_height = 1000;
@@ -296,6 +309,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         player.rotation_angle = fmod_cycling(player.rotation_angle, 2 * M_PI32);
         turn_amount = 0;
         
+        // @todo: There has got to be a better/cleaner/faster way to calculate movement + dir for both of these things
         Vec2 dir;
         f32 x = 0, y = 0;
         if (move_forward)   x +=  1;
@@ -308,10 +322,19 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
             dir = v2norm(dir);
         player.pos = v2add(player.pos, v2muls(dir, PLAYER_MOVE_SPEED * dt));
         
+        Vec2 map_cam_dir = {0};
+        if (cam_up)    map_cam_dir.y += 1;
+        if (cam_down)  map_cam_dir.y -= 1;
+        if (cam_left)  map_cam_dir.x -= 1;
+        if (cam_right) map_cam_dir.x += 1;
+        if (v2len(map_cam_dir) > 1)
+            map_cam_dir = v2norm(map_cam_dir);
+        map_cam.pos = v2add(map_cam.pos, v2muls(map_cam_dir, CAM_MOVE_SPEED * dt));
+        map_cam.scale = cam_zoom;
         //- @note: Render
         r_clear();
-        //r_scene(player.pos, player.rotation_angle, walls, array_count(walls));
-        //r_map(true, player.pos, player.rotation_angle, walls, array_count(walls));
+        //r_scene(player, walls, array_count(walls));
+        r_map(map_cam, false, player, walls, array_count(walls));
         StretchDIBits(
                       platform.win_dc,
                       0, 0,
