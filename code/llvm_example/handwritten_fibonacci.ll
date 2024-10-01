@@ -9,7 +9,7 @@ define i32 @fib (i32 %x) {
   ; by special instructions like `ret` or `br`
   entry:                                      
     %cond = icmp sle i32 %x, 1                ; if (x <= 1)
-    br i1 %cond, label %x_le_1, label %x_gt_1 ; control-flow based on %cond
+    br i1 %cond, label %x_le_1, label %x_gt_1 ; branch based on %cond
   x_le_1:
     ret i32 %x                                ; return x
   x_gt_1:

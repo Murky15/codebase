@@ -121,6 +121,18 @@ This is handwritten IR that I wrote to replicate `fibonacci.cpp` in IR.
 > Pro tip: You can use `clang -emit-llvm fibonacci.cpp` to see how the compiler would've generated IR for the `fib` function. 
 Reading IR is very similar to platform-independent assembly. The file is commented to explain basic syntactical and semantic behavior, but for a comprehensive list of all instructions and their options you should look [here](https://llvm.org/docs/LangRef.html) 
 
-
+### Compiling
+Let's recall how we compiled our first "control" program. We fed both source files to the compiler which transformed them into object files which inevitably got linked together. In principle, what we want to do now is no different
+except now we are trying to transform our llvm IR into an object file directly, instead of starting with a c source file.
+To do this we must utilize a tool we installed when we built LLVM known as `llc`, the llvm system compiler.
+First let's ensure we properly installed the tool.
+`llc -help`
+If you do not see output, revisit [the installing stage](#installing-and-building-llvm)
+Otherwise, we can compile this IR into an object file by running:
+`llc handwritten_fibonacci.ll -filetype=obj`
+Then we can tell Clang to compile our `main.cpp` source and link it with `handwritten_fibonacci.obj` like so
+`clang main.cpp handwritten_fibonacci.obj -o handwritten.exe`
+`handwritten.exe`
+`> 0 1 1 2 3 5 8 13 21 34 55 89 144 233`
 
 ## Generated IR
