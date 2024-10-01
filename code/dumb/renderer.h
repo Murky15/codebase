@@ -8,11 +8,6 @@ typedef struct Bitmap {
     u32 width, height;
 } Bitmap;
 
-typedef struct Cam_2D {
-    Vec2 pos;
-    f32 scale;
-} Cam_2D;
-
 //- @note: Fundementals
 function Bitmap* r_get_framebuffer(void);
 function void r_test_gradient(void);
@@ -30,6 +25,6 @@ function void r_draw_rect(Vec2 p, Vec2 sz, Color c);
 
 //- @note: Game specific functionality
 function void r_scene(Entity cam, Border *walls, u64 num_walls);
-function void r_map(Cam_2D map_cam, b32 show_player, Entity player, Border *walls, u64 num_walls);
+function void r_map(Vec3 map_cam, b32 show_player, Entity player, Border *walls, u64 num_walls);
 
 #endif //RENDERER_H

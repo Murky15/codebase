@@ -18,41 +18,25 @@ target:
   active:            1
 }
 
+/// breakpoints ///////////////////////////////////////////////////////////////
+
+breakpoint:
+{
+  line: ("../code/dumb/main.c":148)
+  enabled: 1
+}
+
 /// watches ///////////////////////////////////////////////////////////////////
 
 watch:
 {
-  expression:  "font_dir"
+  expression:  "wheel_delta"
   view_rule:   ""
 }
 
 watch:
 {
-  expression:  "table"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "cmap"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "font_dir.table_dir[i]"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "font_dir.table_dir[i].offset"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "table + cmap.subtables[0].offset,2"
+  expression:  "mouse->usButtonData"
   view_rule:   ""
 }
 

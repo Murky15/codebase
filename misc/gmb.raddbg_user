@@ -8,9 +8,9 @@ recent_project: {"root.raddbg_project"}
 
 window:
 {
-  split_x maximized
+  split_x fullscreen maximized
   monitor: "\\.\DISPLAY1"
-  size: (1938 1098)
+  size: (1920 1080)
   dpi: 120.000000
   main_font_size: 15
   code_font_size: 15
@@ -45,10 +45,8 @@ window:
       {
         0.718394:
         {
-          code: {project:{"root.raddbg_project"} "../code/dumb/main.c" cursor:311:30}
-          code: {project:{"root.raddbg_project"} "../code/truetype/truetype.c" cursor:65:23}
-          disassembly: {selected }
-          code: {project:{"root.raddbg_project"} "../code/dumb/renderer.c" cursor:153:1}
+          code: {selected project:{"root.raddbg_project"} "../code/dumb/main.c" cursor:149:1}
+          disassembly: {}
         }
         0.281606:
         {

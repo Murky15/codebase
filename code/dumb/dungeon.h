@@ -3,11 +3,6 @@
 
 // https://www.roguebasin.com/index.php?title=Basic_BSP_Dungeon_generation
 
-typedef struct Dungeon_Create_Params {
-    u64 map_width;
-    u64 map_height;
-} Dungeon_Create_Params;
-
 typedef struct Border {
     Vec2 p0, p1;
     Color color;

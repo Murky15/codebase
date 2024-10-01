@@ -37,6 +37,7 @@
 */
 
 #define MOUSE_SENSITIVITY 0.01f
+#define MOUSE_SCROLL_SENSITIVITY 10.f
 #define PLAYER_MOVE_SPEED 100.f
 #define CAM_MOVE_SPEED 200.f
 
@@ -52,6 +53,8 @@ global int g_window_height = 720;
 global b32 g_game_running = true;
 global b32 g_mouse_captured = false;
 
+global Vec3 map_cam;
+
 global Arena *perm_arena;
 global Arena *frame_arena;
 
@@ -59,7 +62,6 @@ global Arena *frame_arena;
 global b32 move_forward, move_back, strafe_left, strafe_right;
 global f32 turn_amount;
 global b32 cam_up, cam_down, cam_left, cam_right;
-global f32 cam_zoom = 1;
 
 function void
 win32_capture_mouse (HWND hwnd) {
@@ -92,40 +94,46 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                     u8 extension = keyboard->Flags & RI_KEY_E0 ? 0xE0 : keyboard->Flags & RI_KEY_E1 ? 0xE1 : 0x00;
                     u16 scan_code = (extension << 8) | (keyboard->MakeCode & 0x7F);
                     
+                    b32 control_down = (GetKeyState(VK_CONTROL) < 0);
+                    
                     switch (scan_code) {
                         case 0x0011: {      // W
-                            move_forward = key_down;
+                            if (control_down) {
+                                cam_up = key_down;
+                            } else {
+                                cam_up = 0;
+                                move_forward = key_down;
+                            }
                         } break;
                         
                         case 0x001F: {      // S
-                            move_back = key_down;
+                            if (control_down) {
+                                cam_down = key_down;
+                            } else {
+                                cam_down = 0;
+                                move_back = key_down;
+                            }
                         } break;
                         
                         case 0x001E: {      // A
-                            strafe_left = key_down;
+                            if (control_down) {
+                                cam_left = key_down;
+                            } else {
+                                cam_left = 0;
+                                strafe_left = key_down;
+                            }
                         } break;
                         
                         case 0x0020: {      // D
-                            strafe_right = key_down;
+                            if (control_down) {
+                                cam_right = key_down;
+                            } else {
+                                cam_right = 0;
+                                strafe_right = key_down;
+                            }
                         } break;
                         
-                        case 0xE048: {      // up
-                            cam_up = key_down;
-                        } break;
-                        
-                        case 0xE050: {      // down
-                            cam_down = key_down;
-                        } break;
-                        
-                        case 0xE04B: {      // left
-                            cam_left = key_down;
-                        } break;
-                        
-                        case 0xE04D: {      // right
-                            cam_right = key_down;
-                        } break;
-                        
-                        case 0x0001: {            // Escape
+                        case 0x0001: {      // Escape
                             if (g_mouse_captured) {
                                 g_mouse_captured = false;
                                 ShowCursor(true);
@@ -135,16 +143,18 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                 }
             } else if (input->header.dwType == RIM_TYPEMOUSE) {
                 RAWMOUSE *mouse = &input->data.mouse;
+                /*
                 if (mouse->usButtonFlags & RI_MOUSE_BUTTON_1_UP) { // @hack
                     if (!g_mouse_captured) {
                         ShowCursor(false);
                         win32_capture_mouse(hwnd);
                     }
                 }
-                
+                */
                 if (mouse->usButtonFlags & RI_MOUSE_WHEEL) {
-                    f32 wheel_delta = ((f32)mouse->usButtonData / WHEEL_DELTA);
-                    cam_zoom += wheel_delta;
+                    short wheel = (short)mouse->usButtonData;
+                    f32 wheel_delta = (f32)wheel / (f32)WHEEL_DELTA;
+                    map_cam.z += wheel_delta * MOUSE_SCROLL_SENSITIVITY;
                 }
                 
                 if (g_mouse_captured) {
@@ -224,7 +234,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     // Keyboard
     input_devices[0].usUsagePage = 0x01;
     input_devices[0].usUsage = 0x06;
-    input_devices[0].dwFlags = RIDEV_NOLEGACY;
+    input_devices[0].dwFlags = 0;
     input_devices[0].hwndTarget = 0;
     
     // Mouse
@@ -236,8 +246,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     if (RegisterRawInputDevices(input_devices, array_count(input_devices), sizeof(input_devices[0])) == FALSE) {
         OutputDebugString("Unable to register input devices\n");
     }
-    win32_capture_mouse(platform.hwnd);
-    ShowCursor(false);
+    //win32_capture_mouse(platform.hwnd);
+    //ShowCursor(false);
     
     // @note: Font setup
     //String8 font_path = str8_lit("W:/assets/dumb/fonts/Envy Code R PR7/Envy Code R.ttf");
@@ -274,7 +284,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     walls[3].p0 = v2add(player.pos, v2(-100, 0));
     walls[3].p1 = v2add(player.pos, v2(100,  50));
     
-    Cam_2D map_cam = {v2(0,0), 1.f};
+    map_cam = v3(bitmap->width/2.f, bitmap->height/2.f, 250);
     
     u64 seed = time(0);
     lcg_next(&seed);
@@ -329,12 +339,13 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         if (cam_right) map_cam_dir.x += 1;
         if (v2len(map_cam_dir) > 1)
             map_cam_dir = v2norm(map_cam_dir);
-        map_cam.pos = v2add(map_cam.pos, v2muls(map_cam_dir, CAM_MOVE_SPEED * dt));
-        map_cam.scale = cam_zoom;
+        Vec2 map_cam_v2 = v2add(dv3(map_cam), v2muls(map_cam_dir, CAM_MOVE_SPEED * dt));
+        map_cam.x = map_cam_v2.x;
+        map_cam.y = map_cam_v2.y;
         //- @note: Render
         r_clear();
         //r_scene(player, walls, array_count(walls));
-        r_map(map_cam, false, player, walls, array_count(walls));
+        r_map_debug(map_cam, false, player, walls, array_count(walls));
         StretchDIBits(
                       platform.win_dc,
                       0, 0,

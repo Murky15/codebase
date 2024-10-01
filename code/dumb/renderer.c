@@ -152,6 +152,7 @@ r_draw_rect (Vec2 p, Vec2 sz, Color c) {
 // @slow
 #define ndc_to_screen_x(x) (width_middle *x + (canvas->width -1.f)/2.f)
 #define ndc_to_screen_y(y) (height_middle*y + (canvas->height-1.f)/2.f)
+
 function void 
 r_scene (Entity cam, Border *walls, u64 num_walls) {\
     Bitmap *canvas = r_get_framebuffer();
@@ -225,19 +226,25 @@ r_scene (Entity cam, Border *walls, u64 num_walls) {\
     }
 }
 
+// @slow
 function void
-r_map (Cam_2D map_cam, b32 show_player, Entity player, Border *walls, u64 num_walls) {
-    if (show_player) {
-        Vec2 p = v2sub(player.pos, map_cam.pos);
-        r_draw_circle(p, 5.f, Color_White);
-        r_draw_line(p, v2add(p, v2muls(v2(cosf(player.rotation_angle), sinf(player.rotation_angle)), 5.f)), Color_Red);
-    }
+r_map_debug (Vec3 map_cam, b32 show_player, Entity player, Border *walls, u64 num_walls) {
+    Bitmap *canvas = r_get_framebuffer();
+    
+    f32 width_middle = canvas->width/2.f;
+    f32 height_middle = canvas->height/2.f;
     for (u64 i = 0; i < num_walls; ++i) {
         Border *w = &walls[i];
-        Vec2 p0 = v2sub(v2add(w->p0, v2(map_cam.scale, map_cam.scale)), map_cam.pos);
-        Vec2 p1 = v2sub(v2add(w->p1, v2(map_cam.scale, map_cam.scale)), map_cam.pos);
+        Vec2 d0 = v2sub(w->p0, dv3(map_cam));
+        Vec2 d1 = v2sub(w->p1, dv3(map_cam));
+        Vec2 p0 = v2muls(d0, 1.f/map_cam.z);
+        Vec2 p1 = v2muls(d1, 1.f/map_cam.z);
+        p0.x = ndc_to_screen_x(p0.x);
+        p0.y = ndc_to_screen_y(p0.y);
+        p1.x = ndc_to_screen_x(p1.x);
+        p1.y = ndc_to_screen_y(p1.y);
         r_draw_line(p0, p1, w->color);
-    }
+    } 
 }
 
 #if 0
