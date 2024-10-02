@@ -16,13 +16,13 @@ There are a variety of ways one can install the LLVM toolchain on their system.\
 If you are interested in **actually using** the LLVM API and toolchain then **do not** download any pre-packaged releases published on the llvm-project github.\
 These distributions only include binaries for common tools like clang, rather than the full API.\
 Instead, we are going to clone the repository like so:\
-`git clone --depth 1 https://github.com/llvm/llvm-project.git llvm-source`\
+`git clone --depth 1 https://github.com/llvm/llvm-project.git llvm-source`
 > This `--depth 1` denotes a [shallow clone](git-scm.com/docs/git-clone#Documentation/git-clone.txt---depthltdepthgt), its purpose is to save storage and speed up checkout time.\
-> I am also naming the folder `llvm-source` instead of `llvm-project` to make it easier to understand what this folder actually is\
+> I am also naming the folder `llvm-source` instead of `llvm-project` to make it easier to understand what this folder actually is
 
 To save time for future updates we will also ignore the `user` branch.\
-`git config --add remote.origin.fetch '^refs/heads/users/*'\
-git config --add remote.origin.fetch '^refs/heads/revert-*'`\
+`git config --add remote.origin.fetch '^refs/heads/users/*'
+git config --add remote.origin.fetch '^refs/heads/revert-*'`
 
 What we just installed is the source for the complete LLVM toolchain.\
 This includes the compiler infrastructure tools and API, as well as the source for all the other LLVM projects we know and love (like Clang or LLD).\
@@ -36,13 +36,13 @@ Now for the tricky part...\
 
 Now that we have the LLVM source installed on our system, we need to make another directory to store our outputted binaries.\
 I like keeping this directory seperate from the source dir to avoid confusion when I inevitably add these tools to my `PATH` variable.\
-`mkdir llvm-build`\
+`mkdir llvm-build`
 > The pre-built Windows installer for the LLVM toolchain that you would have downloaded if you went to the "releases" page installs the LLVM binaries to `C:\Program Files\LLVM` by default.\
 > I **highly** recommend you to not make your build directory here because it requires admin permissions to access, and the path has whitespace in the name.\
 > Both of these things become a monsterous pain when trying to interface with LLVM on the command line.\
 
 Now let's cd into the source and get to work.\
-`cd llvm-source`\
+`cd llvm-source`
 
 Next we need to choose a cmake generator to compile the code, to view a list run `cmake -G` with no arguments.\
 I recommend choosing a build system that supports parallel building. If you are unsure which to pick, use `Ninja`.\
@@ -53,21 +53,21 @@ my project is now set to build: llvm, clang, clant-tools-extra, and lld.\
 * `-DCMAKE_BUILD_TYPE=Release` - Sets optimization level for builds; release mode is best suited for users of LLVM and Clang. **Debug mode is used for developers of the LLVM project**.\
 
 These are really all the options we need to care about; all together our command is:\
-`cmake -S llvm -B build -G Ninja -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DCMAKE_INSTALL_PREFIX="W:\llvm-build" -DCMAKE_BUILD_TYPE=Release`\
+`cmake -S llvm -B build -G Ninja -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DCMAKE_INSTALL_PREFIX="W:\llvm-build" -DCMAKE_BUILD_TYPE=Release`
 
 If you made it this far without errors, congrats, that was the first hardest part.\
 The second hardest is compiling:\
-`cmake --build build -j 18`\
+`cmake --build build -j 18`
 > The `-j` option we pass here is the number of parallel jobs we want to run during compilation. I recommend your CPU thread count + 2 (This is the default on Ninja)\
 
 Feel free to go grab a coffee or something now. This will take a while.\
 After this completes run:\
-`cmake --install build`\
-to install our compiled files into `llvm-build`\
+`cmake --install build`
+to install our compiled files into `llvm-build`
 
 To verify that everything installed correctly, let's go into our `llvm-build` directory and try running a command.\
-`cd W:\llvm-build\bin`\
-`llvm-config --help`\
+`cd W:\llvm-build\bin`
+`llvm-config --help`
 If you see output, congratulations! You've successfuly installed LLVM on your system. Feel free to add this directory to your `PATH` now.\
 If you encountered any errors along the way please check the official documentation at: <https://llvm.org/docs/GettingStarted.html>\
 
@@ -91,7 +91,7 @@ The goal of Intermediate Representation (or IR) is to serve as a language & plat
 effectively serving as the [middle and back end of the compiler](https://en.wikipedia.org/wiki/Compiler#Middle_end).\
 > This is exactly what the Clang C compiler does! Assuming you built\
 > Clang in the previous step you can actually see the LLVM IR code Clang generates for a particular **source file**\
-> `clang some_file.c -emit-llvm`\
+> `clang some_file.c -emit-llvm`
 
 ### The Basics
 LLVM IR can be represented in 2 main formats\
@@ -113,17 +113,17 @@ To satisfy our "Hello World" condition we will print the first 14 numbers of the
 First let's open `main.cpp`. This is a simple C++ program which calls an externally defined function, `fib` in a loop 14 times and prints each result.\
 Now open up `fibonacci.cpp`. This file defines a `fib` function in C++ to serve as a "control" to ensure everything is working properly while also acting as a model for our IR code.\
 To get started, lets compile and link these two C++ files and verify the result.\
-`clang main.cpp fibonacci.cpp -o control.exe`\
-`control.exe`\
-`> 0 1 1 2 3 5 8 13 21 34 55 89 144 233`\
+`clang main.cpp fibonacci.cpp -o control.exe`
+`control.exe`
+`> 0 1 1 2 3 5 8 13 21 34 55 89 144 233`
 > Remember to *really* think about what the compiler is doing here. We have `main.cpp` and `fibonacci.cpp`.\
 > When we ask the compiler to compile both these files, it generates `main.obj` and `fibonacci.obj`.\
-> Then the **linker** patches these two obj files together to satisfy the external dependency on `fib` referenced in `main.cpp`\
+> Then the **linker** patches these two obj files together to satisfy the external dependency on `fib` referenced in `main.cpp`
 
 ## Handwritten IR
 It's time to finally get our hands dirty and dig into some real IR. Let's open up `handwritten_fibonacci.ll`.\
 > If you can split-screen `handwritten_fibonacci.ll` and `fibonacci.cpp`, it will help you gain a better conceptual understanding of\
-> what the IR is doing because it is just a transcribed version of `fibonacci.cpp`\
+> what the IR is doing because it is just a transcribed version of `fibonacci.cpp`
 This is handwritten IR that I wrote to replicate `fibonacci.cpp` in IR.\
 > Pro tip: You can use `clang -emit-llvm fibonacci.cpp` to see how the compiler would've generated IR for the `fib` function.\
 Reading IR is very similar to platform-independent assembly. The file is commented to explain basic syntactical and semantic behavior,\
@@ -134,14 +134,14 @@ Let's recall how we compiled our first "control" program. We fed both source fil
 In principle, what we want to do now is no different except now we are trying to transform our llvm IR into an object file directly, instead of starting with a c source file.\
 To do this we must utilize a tool we installed when we built LLVM known as `llc`, the llvm system compiler.\
 First let's ensure we properly installed the tool.\
-`llc -help`\
+`llc -help`
 If you do not see output, revisit [the installing stage](#installing-and-building-llvm)\
 Otherwise, we can compile this IR into an object file by running:\
-`llc handwritten_fibonacci.ll -filetype=obj`\
+`llc handwritten_fibonacci.ll -filetype=obj`
 Then we can tell Clang to compile our `main.cpp` source and link it with `handwritten_fibonacci.obj` like so\
-`clang main.cpp handwritten_fibonacci.obj -o handwritten.exe`\
-`handwritten.exe`\
-`> 0 1 1 2 3 5 8 13 21 34 55 89 144 233`\
+`clang main.cpp handwritten_fibonacci.obj -o handwritten.exe`
+`handwritten.exe`
+`> 0 1 1 2 3 5 8 13 21 34 55 89 144 233`
 
 ## Generated IR
 This is without a doubt the hardest part of this whole ordeal.\
@@ -184,7 +184,7 @@ In short, what we are doing here is initializing all output types so that this w
 Then we select our target, open an iostream to our new `fibonacci.obj` file, and run our output pass through the file stream.\
 The majority of the work being done here is performed by the *legacy* LLVM pass manager.\
 > Don't ask me why, but the *new* LLVM pass manager is responsible for performing optimization passes and whatnot\
-> while the **sole** responsibility of the *legacy* pass manager today is to handle the output pass. For more information, look at the links inside `generate_fibonacci.cpp`\
+> while the **sole** responsibility of the *legacy* pass manager today is to handle the output pass. For more information, look at the links inside `generate_fibonacci.cpp`
 
 ### Compiling
 If actually programming against the LLVM API is the hardest part, this is definitely the scariest. If you have a genie lying around somewhere, this would be a good time to use a wish.\ 
@@ -193,13 +193,13 @@ It will give your compiler context about where everything is installed on your s
 > **Note that the compiler this tool expects is the same compiler you used to build LLVM in the first step.**\
 You're probably going to need to play with these flags, but what works for me on Windows 11, MSVC (version 19.38.33134) is:\
 `llvm-config --cxxflags --system-libs --libs all`. Next we pass this to our compiler **Remember: this part is specific to you!**\
-`cl -MD $llvm_info generate_fibonacci.cpp -Fegen_fib.exe`\
+`cl -MD $llvm_info generate_fibonacci.cpp -Fegen_fib.exe`
 > For those who don't know, the -MD flag specifies that the C Runtime Library (CRT) should be linked statically, because this is what LLVM expects.\
 Assuming everything compiled without error, let's run `gen_fib.exe` to get our `fibonacci.obj` file.\
 > You should now see the IR dumb of our `Module` in the terminal. Check back with `handwritten_fibonacci.ll`, is it identical? What is different? What is the same?\
 Now for the moment of truth:\
-`clang main.cpp fibonacci.obj -o api_test.exe`\
-`api_test.exe`\
-`> 0 1 1 2 3 5 8 13 21 34 55 89 144 233`\
+`clang main.cpp fibonacci.obj -o api_test.exe`
+`api_test.exe`
+`> 0 1 1 2 3 5 8 13 21 34 55 89 144 233`
 
 This sure has been a journey, hasn't it? Now you're ready to tame the beast on your own. Give yourself a pat on the back. This was definitely far from trivial. Good luck soldier.
