@@ -163,6 +163,7 @@ project is; but the general rule of thumb is to just include whatever classes yo
 All of the relevant documentation for how I made this program can be found in the [LLVM programmers manual](https://llvm.org/docs/ProgrammersManual.html#helpful-hints-for-common-operations).<br />
 This link takes you directly to the actual useful section dealing the API and bypasses all of the *modern C++* cruft for you. You're welcome.<br />
 > **BEWARE** the programming manual is *not* up to date so remember to periodically check back to the doxygen<br />
+
 Scrolling down to main, we do a quick version check and then jump right in to initializing LLVM.<br />
 The `LLVMContext` manages all internal references and data for the API and should be created on a per-thread basis to help with multithreading.<br />
 The `Module` effectively represents a source file or **translation unit** in C/.ll code. Next we get a handle to a basic 32-bit signed integer type because it is the only one which our function uses.<br />
@@ -191,12 +192,16 @@ If actually programming against the LLVM API is the hardest part, this is defini
 Run the `llvm-config` tool from your terminal. This is your new best friend.<br />
 It will give your compiler context about where everything is installed on your system.<br />
 > **Note that the compiler this tool expects is the same compiler you used to build LLVM in the first step.**<br />
+
 You're probably going to need to play with these flags, but what works for me on Windows 11, MSVC (version 19.38.33134) is:<br />
 `llvm-config --cxxflags --system-libs --libs all`. Next we pass this to our compiler **Remember: this part is specific to you!**<br />
 `cl -MD $llvm_info generate_fibonacci.cpp -Fegen_fib.exe`<br />
 > For those who don't know, the -MD flag specifies that the C Runtime Library (CRT) should be linked statically, because this is what LLVM expects.<br />
+
 Assuming everything compiled without error, let's run `gen_fib.exe` to get our `fibonacci.obj` file.<br />
+
 > You should now see the IR dumb of our `Module` in the terminal. Check back with `handwritten_fibonacci.ll`, is it identical? What is different? What is the same?<br />
+
 Now for the moment of truth:<br />
 `clang main.cpp fibonacci.obj -o api_test.exe`<br />
 `api_test.exe`<br />
