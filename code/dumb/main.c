@@ -14,7 +14,7 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
 #include "third_party/stb_truetype.h"
-#include "dungeon.c"
+//#include "dungeon.c"
 #include "renderer.c"
 
 /*
@@ -154,7 +154,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                 if (mouse->usButtonFlags & RI_MOUSE_WHEEL) {
                     short wheel = (short)mouse->usButtonData;
                     f32 wheel_delta = (f32)wheel / (f32)WHEEL_DELTA;
-                    map_cam.z += wheel_delta * MOUSE_SCROLL_SENSITIVITY;
+                    map_cam.z -= wheel_delta * MOUSE_SCROLL_SENSITIVITY;
                 }
                 
                 if (g_mouse_captured) {
@@ -262,8 +262,6 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     platform.bitmap = win32_create_bitmap(bitmap);
     
     //- @note: Game setup
-    Arena *level_arena = arena_alloc();
-    
     Entity player = {0};
     player.rotation_angle = 0;
     player.radius = 10.f;
@@ -288,11 +286,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     
     u64 seed = time(0);
     lcg_next(&seed);
-    // @todo: Change this to be like how Ryan Fleury does it with r_rectparams
-    Dungeon_Create_Params dungeon = {0};
-    dungeon.map_width = 1000;
-    dungeon.map_height = 1000;
-    generate_dungeon(level_arena, &dungeon);
+    
+    //generate_dungeon(level_arena, &dungeon);
     
     //~ @note: Main loop
     QueryPerformanceCounter(&start_time);
