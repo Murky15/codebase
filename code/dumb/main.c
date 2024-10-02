@@ -14,7 +14,7 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
 #include "third_party/stb_truetype.h"
-//#include "dungeon.c"
+#include "dungeon.c"
 #include "renderer.c"
 
 /*

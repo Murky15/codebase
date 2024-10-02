@@ -66,7 +66,7 @@ color(Purple,  128, 0,   128) \
 color(Teal,    0,   128, 128) \
 color(Navy,    0,   0,   128) \
 
-#define color(name, r, g, b) read_only Color glue(Color_,name) = {r,g,b};
+#define color(name, r, g, b) read_only Color glue(Color_,name) = {r,g,b,255};
 colors
 #undef color
 
@@ -90,13 +90,22 @@ typedef union Vec2i {
 
 typedef union Vec3 {
     struct { f32 x, y, z; };
+    Vec2 xy;
     f32 e[3];
 } Vec3;
 
 typedef union Vec3i {
     struct { u32 x, y, z; };
+    Vec2i xy;
     u32 e[2];
 } Vec3i;
+
+// @todo: Add functions for this (hard math)
+typedef union Vec4 {
+    struct { f32 x, y, z, w; };
+    struct { Vec2 xy, zw; };
+    f32 e[4];
+} Vec4, Rect;
 
 //- @note: Constructors
 core_function Vec2  v2(f32 x, f32 y);
