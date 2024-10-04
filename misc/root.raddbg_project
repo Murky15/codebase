@@ -18,25 +18,11 @@ target:
   active:            1
 }
 
-/// breakpoints ///////////////////////////////////////////////////////////////
-
-breakpoint:
-{
-  line: ("../code/dumb/main.c":148)
-  enabled: 1
-}
-
 /// watches ///////////////////////////////////////////////////////////////////
 
 watch:
 {
-  expression:  "wheel_delta"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "mouse->usButtonData"
+  expression:  "walls"
   view_rule:   ""
 }
 

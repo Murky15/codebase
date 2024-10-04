@@ -1,6 +1,7 @@
 //~ @note: Unity build
 //- @note: Headers
 #include <Windows.h>
+#include <stdlib.h>
 #include <time.h>
 #include "base/include.h"
 #include "os/include.h"
@@ -57,6 +58,7 @@ global Vec3 map_cam;
 
 global Arena *perm_arena;
 global Arena *frame_arena;
+global Arena *level_arena;
 
 // @todo: It is annoying to need to pull out these "action commands"
 global b32 move_forward, move_back, strafe_left, strafe_right;
@@ -225,6 +227,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     //~ @note: Platform setup
     perm_arena = arena_alloc();
     frame_arena = arena_alloc();
+    level_arena = arena_alloc();
     
     Win32_Data platform = win32_create_window(hInstance);
     
@@ -267,7 +270,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     player.radius = 10.f;
     player.pos.x = bitmap->width / 2.f;
     player.pos.y = bitmap->height / 2.f;
-    
+    /*
     Border walls[4];
     walls[0].color = Color_Red;
     walls[1].color = Color_Lime;
@@ -281,13 +284,16 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     walls[2].p1 = v2add(player.pos, v2(-100, 0));
     walls[3].p0 = v2add(player.pos, v2(-100, 0));
     walls[3].p1 = v2add(player.pos, v2(100,  50));
-    
+    */
     map_cam = v3(bitmap->width/2.f, bitmap->height/2.f, 250);
     
     u64 seed = time(0);
-    lcg_next(&seed);
-    
-    //generate_dungeon(level_arena, &dungeon);
+    srand(seed);
+    Dungeon_Params dungeon = {
+        .size = v2(500.f, 500.f),
+        .depth = 5,
+    };
+    Border_Array walls = generate_dungeon(level_arena, &dungeon);
     
     //~ @note: Main loop
     QueryPerformanceCounter(&start_time);
@@ -340,7 +346,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         //- @note: Render
         r_clear();
         //r_scene(player, walls, array_count(walls));
-        r_map_debug(map_cam, false, player, walls, array_count(walls));
+        r_map_debug(map_cam, false, player, walls.borders, walls.count);
         StretchDIBits(
                       platform.win_dc,
                       0, 0,
