@@ -230,19 +230,20 @@ r_scene (Entity cam, Border *walls, u64 num_walls) {\
 function void
 r_map_debug (Vec3 map_cam, b32 show_player, Entity player, Border *walls, u64 num_walls) {
     Bitmap *canvas = r_get_framebuffer();
-    
-    f32 width_middle = canvas->width/2.f;
-    f32 height_middle = canvas->height/2.f;
+    //f32 width_middle = canvas->width/2.f;
+    //f32 height_middle = canvas->height/2.f;
     for (u64 i = 0; i < num_walls; ++i) {
-        Border *w = &walls[i];
-        Vec2 d0 = v2sub(w->p0, dv3(map_cam));
-        Vec2 d1 = v2sub(w->p1, dv3(map_cam));
-        Vec2 p0 = v2muls(d0, 1.f/map_cam.z);
-        Vec2 p1 = v2muls(d1, 1.f/map_cam.z);
-        p0.x = ndc_to_screen_x(p0.x);
-        p0.y = ndc_to_screen_y(p0.y);
-        p1.x = ndc_to_screen_x(p1.x);
-        p1.y = ndc_to_screen_y(p1.y);
+        Border *w = &walls`[i];
+        
+        Vec2 p0 = v2sub(w->p0, dv3(map_cam));
+        Vec2 p1 = v2sub(w->p1, dv3(map_cam));
+        //p0 = v2muls(p0, 1.f/map_cam.z);
+        //p1 = v2muls(p1, 1.f/map_cam.z);
+        p0.x = (p0.x*canvas->width)/(map_cam.z*canvas->width)*1;
+        p0.y = (p0.y*canvas->height)/(map_cam.z*canvas->height)*1;
+        p1.x = (p1.x*canvas->width)/(map_cam.z*canvas->width)*1;
+        p1.y = (p1.y*canvas->height)/(map_cam.z*canvas->height)*1;
+        
         r_draw_line(p0, p1, w->color);
     } 
 }

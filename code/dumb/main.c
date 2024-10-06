@@ -38,7 +38,7 @@
 */
 
 #define MOUSE_SENSITIVITY 0.01f
-#define MOUSE_SCROLL_SENSITIVITY 10.f
+#define MOUSE_SCROLL_SENSITIVITY 1.f
 #define PLAYER_MOVE_SPEED 100.f
 #define CAM_MOVE_SPEED 200.f
 
@@ -270,27 +270,27 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     player.radius = 10.f;
     player.pos.x = bitmap->width / 2.f;
     player.pos.y = bitmap->height / 2.f;
-    /*
-    Border walls[4];
-    walls[0].color = Color_Red;
-    walls[1].color = Color_Lime;
-    walls[2].color = Color_Purple;
-    walls[3].color = Color_Blue;
-    walls[0].p0 = v2add(player.pos, v2(100, 50));
-    walls[0].p1 = v2add(player.pos, v2(100, -100));
-    walls[1].p0 = v2add(player.pos, v2(100, -100));
-    walls[1].p1 = v2add(player.pos, v2(-100, -100));
-    walls[2].p0 = v2add(player.pos, v2(-100, -100));
-    walls[2].p1 = v2add(player.pos, v2(-100, 0));
-    walls[3].p0 = v2add(player.pos, v2(-100, 0));
-    walls[3].p1 = v2add(player.pos, v2(100,  50));
-    */
-    map_cam = v3(bitmap->width/2.f, bitmap->height/2.f, 250);
+    
+    Border test_walls[4];
+    test_walls[0].color = Color_Red;
+    test_walls[1].color = Color_Lime;
+    test_walls[2].color = Color_Purple;
+    test_walls[3].color = Color_Blue;
+    test_walls[0].p0 = v2add(player.pos, v2(100, 50));
+    test_walls[0].p1 = v2add(player.pos, v2(100, -100));
+    test_walls[1].p0 = v2add(player.pos, v2(100, -100));
+    test_walls[1].p1 = v2add(player.pos, v2(-100, -100));
+    test_walls[2].p0 = v2add(player.pos, v2(-100, -100));
+    test_walls[2].p1 = v2add(player.pos, v2(-100, 0));
+    test_walls[3].p0 = v2add(player.pos, v2(-100, 0));
+    test_walls[3].p1 = v2add(player.pos, v2(100,  50));
+    
+    map_cam = v3(0, 0, 1);
     
     u64 seed = time(0);
     srand(seed);
     Dungeon_Params dungeon = {
-        .size = v2(500.f, 500.f),
+        .size = v2(200.f, 200.f),
         .depth = 5,
     };
     Border_Array walls = generate_dungeon(level_arena, &dungeon);
