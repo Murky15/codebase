@@ -1,5 +1,5 @@
 function Bitmap* 
-r_get_framebuffer (void) {
+r_get_framebuffer (void) { // @todo: This function call is generating a lot of overhead
     local_persist Bitmap f;
     if (f.width == 0) {
         f.width = 640;
@@ -51,8 +51,10 @@ r_clear_color (Color c) {
 
 function void 
 r_draw_circle (Vec2 p, f32 r, Color c) {
-    for (f32 y = -r; y <= r; ++y) {
-        for (f32 x = -r; x <= r; ++x) {
+    Bitmap *canvas = r_get_framebuffer();
+    
+    for (f32 y = max(-r,-1); y <= min(r,canvas->height); ++y) {
+        for (f32 x = max(-r,-1); x <= min(r,canvas->width); ++x) {
             if (sqr(x) + sqr(y) <= sqr(r))
                 r_put_pixel_at(v2(x + p.x, y + p.y), c);
         }
@@ -61,6 +63,8 @@ r_draw_circle (Vec2 p, f32 r, Color c) {
 
 function void
 r_impl_draw_line_low (Vec2 p0, Vec2 p1, Color c) {
+    Bitmap *canvas = r_get_framebuffer();
+    
     f32 dx = p1.x - p0.x;
     f32 dy = p1.y - p0.y;
     f32 yi = 1.f;
@@ -69,9 +73,9 @@ r_impl_draw_line_low (Vec2 p0, Vec2 p1, Color c) {
         dy = -dy;
     }
     f32 d = 2.f*dy - dx;
-    f32 y = p0.y;
+    f32 y = max(p0.y,-1);
     
-    for (f32 x = p0.x; x <= p1.x; ++x) {
+    for (f32 x = max(p0.x,-1); x <= min(p1.x,canvas->width); ++x) {
         r_put_pixel_at(v2(x,y), c);
         if (d > 0) {
             y += yi;
@@ -79,11 +83,14 @@ r_impl_draw_line_low (Vec2 p0, Vec2 p1, Color c) {
         } else {
             d += 2.f * dy;
         }
+        y = min(y,canvas->height);
     }
 }
 
 function void
 r_impl_draw_line_high (Vec2 p0, Vec2 p1, Color c) {
+    Bitmap *canvas = r_get_framebuffer(); 
+    
     f32 dx = p1.x - p0.x;
     f32 dy = p1.y - p0.y;
     f32 xi = 1.f;
@@ -92,9 +99,9 @@ r_impl_draw_line_high (Vec2 p0, Vec2 p1, Color c) {
         dx = -dx;
     }
     f32 d = 2.f*dx - dy;
-    f32 x = p0.x;
+    f32 x = max(p0.x,-1);
     
-    for (f32 y = p0.y; y <= p1.y; ++y) {
+    for (f32 y = max(p0.y,-1); y <= min(p1.y,canvas->height); ++y) {
         r_put_pixel_at(v2(x,y), c);
         if (d > 0) {
             x += xi;
@@ -102,6 +109,7 @@ r_impl_draw_line_high (Vec2 p0, Vec2 p1, Color c) {
         } else {
             d += 2.f * dx;
         }
+        x = min(x,canvas->width);
     }
 }
 
@@ -150,15 +158,19 @@ r_draw_rect (Vec2 p, Vec2 sz, Color c) {
 }
 
 // @slow
-#define ndc_to_screen_x(x) (width_middle *x + (canvas->width -1.f)/2.f)
-#define ndc_to_screen_y(y) (height_middle*y + (canvas->height-1.f)/2.f)
+#if 0
+# define ndc_to_screen_x(x) (width_middle *x + (canvas->width -1.f)/2.f)
+# define ndc_to_screen_y(y) (height_middle*y + (canvas->height-1.f)/2.f)
+#endif
+#define ndc_to_screen_x
+#define ndc_to_screen_y
 
 function void 
 r_scene (Entity cam, Border *walls, u64 num_walls) {\
     Bitmap *canvas = r_get_framebuffer();
     
     f32 forward = M_PI32 / 2.f;
-    f32 width_middle = canvas->width/2.f;
+    // f32 width_middle = canvas->width/2.f;
     f32 height_middle = canvas->height/2.f;
     f32 near_plane = 1.f;
     f32 cam_dist = 1.f;
@@ -230,20 +242,18 @@ r_scene (Entity cam, Border *walls, u64 num_walls) {\
 function void
 r_map_debug (Vec3 map_cam, b32 show_player, Entity player, Border *walls, u64 num_walls) {
     Bitmap *canvas = r_get_framebuffer();
-    //f32 width_middle = canvas->width/2.f;
-    //f32 height_middle = canvas->height/2.f;
+    f32 width_middle = canvas->width/2.f;
+    f32 height_middle = canvas->height/2.f;
     for (u64 i = 0; i < num_walls; ++i) {
-        Border *w = &walls`[i];
+        Border *w = &walls[i];
         
+        // @todo: Gotta be an easier way to do this but there are no simplifications it seems
         Vec2 p0 = v2sub(w->p0, dv3(map_cam));
         Vec2 p1 = v2sub(w->p1, dv3(map_cam));
-        //p0 = v2muls(p0, 1.f/map_cam.z);
-        //p1 = v2muls(p1, 1.f/map_cam.z);
-        p0.x = (p0.x*canvas->width)/(map_cam.z*canvas->width)*1;
-        p0.y = (p0.y*canvas->height)/(map_cam.z*canvas->height)*1;
-        p1.x = (p1.x*canvas->width)/(map_cam.z*canvas->width)*1;
-        p1.y = (p1.y*canvas->height)/(map_cam.z*canvas->height)*1;
-        
+        p0.x = (p0.x*canvas->width)/(map_cam.z*canvas->width) + width_middle;
+        p0.y = (p0.y*canvas->height)/(map_cam.z*canvas->height) + height_middle;
+        p1.x = (p1.x*canvas->width)/(map_cam.z*canvas->width) + width_middle;
+        p1.y = (p1.y*canvas->height)/(map_cam.z*canvas->height) + height_middle;
         r_draw_line(p0, p1, w->color);
     } 
 }

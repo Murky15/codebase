@@ -38,7 +38,7 @@
 */
 
 #define MOUSE_SENSITIVITY 0.01f
-#define MOUSE_SCROLL_SENSITIVITY 1.f
+#define MOUSE_SCROLL_SENSITIVITY 0.05f
 #define PLAYER_MOVE_SPEED 100.f
 #define CAM_MOVE_SPEED 200.f
 
@@ -157,6 +157,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                     short wheel = (short)mouse->usButtonData;
                     f32 wheel_delta = (f32)wheel / (f32)WHEEL_DELTA;
                     map_cam.z -= wheel_delta * MOUSE_SCROLL_SENSITIVITY;
+                    map_cam.z = max(map_cam.z,0);
                 }
                 
                 if (g_mouse_captured) {
@@ -291,9 +292,12 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     srand(seed);
     Dungeon_Params dungeon = {
         .size = v2(200.f, 200.f),
-        .depth = 5,
+        .depth = 4,
     };
-    Border_Array walls = generate_dungeon(level_arena, &dungeon);
+    
+    Border_Array debug_walls = {0};
+    Sector_Array sectors = {0};
+    generate_dungeon(level_arena, &dungeon, &debug_walls, &sectors);
     
     //~ @note: Main loop
     QueryPerformanceCounter(&start_time);
@@ -346,7 +350,10 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         //- @note: Render
         r_clear();
         //r_scene(player, walls, array_count(walls));
-        r_map_debug(map_cam, false, player, walls.borders, walls.count);
+        r_map_debug(map_cam, false, player, debug_walls.borders, debug_walls.count);
+        for (u64 sidx = 0; sidx < sectors.count; ++sidx) {
+            r_map_debug(map_cam, false, player, sectors.sectors[sidx].borders, 4);
+        }
         StretchDIBits(
                       platform.win_dc,
                       0, 0,

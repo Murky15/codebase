@@ -45,9 +45,10 @@ window:
       {
         0.718394:
         {
-          code: {selected project:{"root.raddbg_project"} "../code/dumb/main.c" cursor:291:17}
+          code: {project:{"root.raddbg_project"} "../code/dumb/main.c" cursor:356:10}
           disassembly: {}
-          code: {project:{"root.raddbg_project"} "../code/dumb/dungeon.c" cursor:55:1}
+          code: {selected project:{"root.raddbg_project"} "../code/dumb/dungeon.c" cursor:62:22}
+          code: {project:{"root.raddbg_project"} "../code/dumb/renderer.c" cursor:247:1}
         }
         0.281606:
         {
