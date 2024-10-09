@@ -1,4 +1,6 @@
 // Use dungeon create params like how fleury uses rectparams
+#define rnd_float() ((f32)rand()/(f32)RAND_MAX)
+
 function void
 generate_dungeon (Arena *arena, Dungeon_Params *params, Border_Array *debug_borders, Sector_Array *sectors_out) {
     Temp_Arena scratch = get_scratch(&arena, 1);
@@ -30,13 +32,31 @@ generate_dungeon (Arena *arena, Dungeon_Params *params, Border_Array *debug_bord
         BSP_Node *left_child = leaf ? 0 : &tree[lidx];
         BSP_Node *right_child = leaf ? 0 : &tree[ridx];
         
+        /*
+        So the way we handle the `min` sizes is kind of a lie, it's more of a "suggestion".
+The algorithm would balloon in complexity and time if we had to strictly follow
+the minimum size and then modify the new cell and loop over all cells and make sure they still
+fit the min size. See how this could get very messy very quickly? Instead if the size doesn't hit
+the requirements we flip the split direction and pray it comes out better. So far this looks
+good so I'm gonna keep it (for now).
+        */
+        
         if (!leaf) {
-            f32 split = (f32)rand()/(f32)RAND_MAX;
-            split = clamp(split, 0.45f, 0.55f);
-            
+            f32 split = rnd_float();
+            split = clamp(split, params->cell_split_bounds.first, params->cell_split_bounds.last);
             b32 split_horizontal = rand() % 2;
+            
+            // This is so we don't lock ourselves in an infinite loop by accident
+            b32 resplit = false;
+            new_cell:
             if (split_horizontal == true) {
                 f32 split_y = lerp(current->p3.y, current->p0.y, split);
+                if (!resplit && (current->p0.y - split_y < params->min_cell.height || 
+                                 split_y - current->p3.y < params->min_cell.height)) {
+                    split_horizontal = !(split_horizontal & 1);
+                    resplit = true;
+                    goto new_cell;
+                }
                 left_child->p0 = current->p0;
                 left_child->p1 = current->p1;
                 left_child->p2 = v2(current->p2.x, split_y);
@@ -48,6 +68,12 @@ generate_dungeon (Arena *arena, Dungeon_Params *params, Border_Array *debug_bord
                 right_child->p3 = current->p3;
             } else {
                 f32 split_x = lerp(current->p0.x, current->p1.x, split);
+                if (!resplit && (current->p1.x - split_x < params->min_cell.width || 
+                                 split_x - current->p0.x < params->min_cell.width)) {
+                    split_horizontal = !(split_horizontal & 1);
+                    resplit = true;
+                    goto new_cell;
+                }
                 left_child->p0 = current->p0;
                 left_child->p1 = v2(split_x, current->p1.y);
                 left_child->p2 = v2(split_x, current->p2.y);
@@ -70,24 +96,34 @@ generate_dungeon (Arena *arena, Dungeon_Params *params, Border_Array *debug_bord
             
             u64 j = i - (num_leaves - 1);
             
-            /*
-                        f32 width = current->p1.x - current->p0.x;
-                        f32 height = current->p0.y - current->p3.y;
-                        f32 rand_width  = ((f32)rand() / (f32)RAND_MAX) * width;
-                        f32 rand_height = ((f32)rand() / (f32)RAND_MAX) * height;
-                        f32 offx = (width - rand_width) / 2.f;
-                        f32 offy = (height - rand_height) / 2.f;
-                        
-                        sectors[j].top.p0 = v2(current->p0.x + offx, current->p0.y - offy);
-                        sectors[j].top.p1 = v2(current->p1.x - offx, current->p1.y - offy);
-                        sectors[j].bottom.p0 = v2(current->p3.x + offx, current->p3.y + offy);
-                        sectors[j].bottom.p1 = v2(current->p2.x - offx, current->p2.y + offy);
-                        sectors[j].left.p0 = sectors[j].top.p0;
-                        sectors[j].left.p1 = sectors[j].bottom.p0;
-                        sectors[j].right.p0 = sectors[j].top.p1;
-                        sectors[j].right.p1 = sectors[j].bottom.p1;
-                        */
+            // @todo: This is rlly ugly cause we can't call `min` or `max` with the raw function b/c it's a macro
+            // How can we fix this?
             
+            // I still don't like this, should be way to specify min room size
+            /*
+            f32 rnd1 = rnd_float();
+            f32 rnd2 = rnd_float();
+            f32 rnd3 = rnd_float();
+            f32 rnd4 = rnd_float();
+            f32 width  = current->p1.x - current->p0.x;
+            f32 height = current->p0.y - current->p3.y;
+            f32 randx  = min(rnd1,0.3f) * width;
+            f32 randy  = min(rnd2,0.3f) * height;
+            Vec2 p0 = v2(current->p0.x + randx, current->p0.y - randy);
+            Vec2 p1 = v2(p0.x + max(rnd3,0.4f) * (current->p1.x - p0.x), p0.y);
+            Vec2 p2 = v2(p1.x, p1.y - max(rnd4,0.4f) * (p1.y - current->p2.y));
+            Vec2 p3 = v2(p0.x, p2.y);
+            sectors[j].top    = (Border){p0, p1};
+            sectors[j].bottom = (Border){p3, p2};
+            sectors[j].left   = (Border){p0, p3};
+            sectors[j].right  = (Border){p1, p2};
+*/
+            
+            f32 width  = current->p1.x - current->p0.x;
+            f32 height = current->p0.y - current->p3.y;
+            // Calculate top-left point and adjust x & y based on min room size
+            
+            // @todo: Color should be stored per-sector instead of per-border so we don't need to do this
             for (u64 b = 0; b < 4; ++b) {
                 sectors[j].borders[b].color = Color_Cyan;
             }

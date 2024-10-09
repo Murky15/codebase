@@ -292,6 +292,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     srand(seed);
     Dungeon_Params dungeon = {
         .size = v2(200.f, 200.f),
+        .cell_split_bounds = v2(0.4f, 0.6f),
+        .min_cell = v2(20.f, 20.f),
+        .min_room = v2(5.f, 5.f),
         .depth = 4,
     };
     

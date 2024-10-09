@@ -4,7 +4,10 @@
 // https://www.roguebasin.com/index.php?title=Basic_BSP_Dungeon_generation
 
 typedef struct Dungeon_Params {
-    Vec2 size;
+    Vec2 size; // Size of bounding box
+    Range cell_split_bounds;
+    Vec2 min_cell;
+    Vec2 min_room;
     u64 depth; // # of rooms = 2^depth (this API kinda sucks)
 } Dungeon_Params;
 

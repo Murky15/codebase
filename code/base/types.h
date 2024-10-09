@@ -81,13 +81,17 @@ colors
 
 typedef union Vec2 {
     struct { f32 x, y; };
+    struct { f32 width, height; };
+    struct { f32 first, last; };
     f32 e[2];
-} Vec2;
+} Vec2, Range;
 
 typedef union Vec2i {
     struct { u32 x, y; };
+    struct { u32 width, height; };
+    struct { u32 first, last; };
     u32 e[2];
-} Vec2i;
+} Vec2i, Rangei;
 
 typedef union Vec3 {
     struct { f32 x, y, z; };
@@ -104,6 +108,7 @@ typedef union Vec3i {
 // @todo: Add functions for this (hard math)
 typedef union Vec4 {
     struct { f32 x, y, z, w; };
+    struct { Vec3 xyz; };
     struct { Vec2 xy, zw; };
     f32 e[4];
 } Vec4, Rect;
