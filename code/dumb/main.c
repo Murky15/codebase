@@ -232,6 +232,10 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     
     Win32_Data platform = win32_create_window(hInstance);
     
+    // @note: Seed renderer
+    u64 seed = time(0);
+    srand(seed);
+    
     // @note: Register for input
     RAWINPUTDEVICE input_devices[2];
     
@@ -284,20 +288,17 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     test_walls[2].p0 = v2add(player.pos, v2(-100, -100));
     test_walls[2].p1 = v2add(player.pos, v2(-100, 0));
     test_walls[3].p0 = v2add(player.pos, v2(-100, 0));
-    test_walls[3].p1 = v2add(player.pos, v2(100,  50));
+    test_walls[3].p1 = v2add(player.pos, v2(100, 50));
     
     map_cam = v3(0, 0, 1);
     
-    u64 seed = time(0);
-    srand(seed);
     Dungeon_Params dungeon = {
         .size = v2(200.f, 200.f),
         .cell_split_bounds = v2(0.4f, 0.6f),
         .min_cell = v2(20.f, 20.f),
-        .min_room = v2(5.f, 5.f),
+        .min_room = v2(20.f, 20.f),
         .depth = 4,
     };
-    
     Border_Array debug_walls = {0};
     Sector_Array sectors = {0};
     generate_dungeon(level_arena, &dungeon, &debug_walls, &sectors);
@@ -350,6 +351,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         Vec2 map_cam_v2 = v2add(dv3(map_cam), v2muls(map_cam_dir, CAM_MOVE_SPEED * dt));
         map_cam.x = map_cam_v2.x;
         map_cam.y = map_cam_v2.y;
+        
         //- @note: Render
         r_clear();
         //r_scene(player, walls, array_count(walls));
@@ -357,6 +359,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         for (u64 sidx = 0; sidx < sectors.count; ++sidx) {
             r_map_debug(map_cam, false, player, sectors.sectors[sidx].borders, 4);
         }
+        
+        // @todo: Would BitBlt be faster?
         StretchDIBits(
                       platform.win_dc,
                       0, 0,

@@ -1,12 +1,12 @@
 // Use dungeon create params like how fleury uses rectparams
-#define rnd_float() ((f32)rand()/(f32)RAND_MAX)
+#define rand_float() ((f32)rand()/(f32)RAND_MAX)
 
 function void
 generate_dungeon (Arena *arena, Dungeon_Params *params, Border_Array *debug_borders, Sector_Array *sectors_out) {
     Temp_Arena scratch = get_scratch(&arena, 1);
     
     u64 node_count = 0;
-    for (u64 i = 0; i <= params->depth; ++i) { node_count += pow(2, i); } 
+    for (u64 i = 0; i <= params->depth; ++i) { node_count += (1 << i); } 
     BSP_Node *tree = arena_pushn(scratch.arena, BSP_Node, node_count);
     
     u64 num_leaves = (1 << params->depth);
@@ -42,7 +42,7 @@ good so I'm gonna keep it (for now).
         */
         
         if (!leaf) {
-            f32 split = rnd_float();
+            f32 split = rand_float();
             split = clamp(split, params->cell_split_bounds.first, params->cell_split_bounds.last);
             b32 split_horizontal = rand() % 2;
             
@@ -85,6 +85,7 @@ good so I'm gonna keep it (for now).
                 right_child->p3 = left_child->p2;
             }
         } else {
+            
             // @debug
             for (u64 j = 0; j < 4; ++j) {
                 u64 idx = ((i - (num_leaves - 1)) * 4) + j; // Someone did not cook here
@@ -96,32 +97,29 @@ good so I'm gonna keep it (for now).
             
             u64 j = i - (num_leaves - 1);
             
-            // @todo: This is rlly ugly cause we can't call `min` or `max` with the raw function b/c it's a macro
-            // How can we fix this?
-            
-            // I still don't like this, should be way to specify min room size
-            /*
-            f32 rnd1 = rnd_float();
-            f32 rnd2 = rnd_float();
-            f32 rnd3 = rnd_float();
-            f32 rnd4 = rnd_float();
+            // Calculate bottom-left point and adjust x & y based on min room size
             f32 width  = current->p1.x - current->p0.x;
             f32 height = current->p0.y - current->p3.y;
-            f32 randx  = min(rnd1,0.3f) * width;
-            f32 randy  = min(rnd2,0.3f) * height;
-            Vec2 p0 = v2(current->p0.x + randx, current->p0.y - randy);
-            Vec2 p1 = v2(p0.x + max(rnd3,0.4f) * (current->p1.x - p0.x), p0.y);
-            Vec2 p2 = v2(p1.x, p1.y - max(rnd4,0.4f) * (p1.y - current->p2.y));
-            Vec2 p3 = v2(p0.x, p2.y);
+            f32 min_width = width < params->min_room.width ? width : params->min_room.width;
+            f32 min_height = height < params->min_room.height ? height : params->min_room.height;
+            Vec2 anchor = v2(width, height);
+            Vec2 remaining = v2sub(v2(width, height), anchor);
+            while (remaining.width < min_width || remaining.height < min_height) {
+                anchor = v2(rand_float() * width, rand_float() * height);
+                remaining = v2sub(v2(width, height), anchor);
+            }
+            anchor  = v2add(anchor, current->p3);
+            remaining = v2sub(remaining, v2(min_width, min_height));
+            f32 rand_height = rand_float() * remaining.height;
+            f32 rand_width  = rand_float() * remaining.width;
+            Vec2 p0 = v2add(anchor, v2(0, min_height + rand_height));
+            Vec2 p1 = v2add(p0, v2(min_width + rand_width, 0));
+            Vec2 p2 = v2(p1.x, anchor.y);
+            Vec2 p3 = anchor;
             sectors[j].top    = (Border){p0, p1};
             sectors[j].bottom = (Border){p3, p2};
             sectors[j].left   = (Border){p0, p3};
             sectors[j].right  = (Border){p1, p2};
-*/
-            
-            f32 width  = current->p1.x - current->p0.x;
-            f32 height = current->p0.y - current->p3.y;
-            // Calculate top-left point and adjust x & y based on min room size
             
             // @todo: Color should be stored per-sector instead of per-border so we don't need to do this
             for (u64 b = 0; b < 4; ++b) {

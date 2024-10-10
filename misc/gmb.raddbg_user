@@ -24,8 +24,8 @@ window:
     {
       0.454678:
       {
-        watch: {selected }
-        locals: {}
+        watch: {}
+        locals: {selected }
       }
       0.211988:
       {
@@ -46,9 +46,10 @@ window:
         0.718394:
         {
           code: {project:{"root.raddbg_project"} "../code/dumb/main.c" cursor:356:10}
-          disassembly: {}
-          code: {selected project:{"root.raddbg_project"} "../code/dumb/dungeon.c" cursor:62:22}
+          disassembly: {selected }
+          code: {project:{"root.raddbg_project"} "../code/dumb/dungeon.c" cursor:127:13}
           code: {project:{"root.raddbg_project"} "../code/dumb/renderer.c" cursor:247:1}
+          code: {project:{"root.raddbg_project"} "../code/base/types.c" cursor:43:17}
         }
         0.281606:
         {
@@ -147,8 +148,8 @@ keybindings:
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
-  {"prev_tab"                                ctrl shift tab      }
   {"prev_tab"                                ctrl page_up        }
+  {"prev_tab"                                ctrl shift tab      }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
   {"run"                                     f5                  }

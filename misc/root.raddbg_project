@@ -22,70 +22,8 @@ target:
 
 breakpoint:
 {
-  line: ("../code/dumb/dungeon.c":63)
-  enabled: 1
-}
-
-/// watches ///////////////////////////////////////////////////////////////////
-
-watch:
-{
-  expression:  "width"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "height"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "rand_width"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "rand_height"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "offx"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "offy"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "sectors[j]"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "current"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "i"
-  view_rule:   ""
-}
-
-watch:
-{
-  expression:  "num_leaves"
-  view_rule:   ""
+  line: ("../code/dumb/dungeon.c":123)
+  enabled: 0
 }
 
 /// exception code filters ////////////////////////////////////////////////////
