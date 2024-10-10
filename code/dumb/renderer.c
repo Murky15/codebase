@@ -214,12 +214,12 @@ r_scene (Entity cam, Border *walls, u64 num_walls) {\
         
         //- @note: NDC -> Screen coordinates
         struct { f32 x,ybot,ytop; } temp, minp, maxp = {0};
-        minp.x    = ndc_to_screen_x(x0);
-        minp.ybot = ndc_to_screen_y(ybot0);
-        minp.ytop = ndc_to_screen_y(ytop0);
-        maxp.x    = ndc_to_screen_x(x1);
-        maxp.ybot = ndc_to_screen_y(ybot1);
-        maxp.ytop = ndc_to_screen_y(ytop1);
+        minp.x    = x0;
+        minp.ybot = ybot0;
+        minp.ytop = ytop0;
+        maxp.x    = x1;
+        maxp.ybot = ybot1;
+        maxp.ytop = ytop1;
         
         if (x0 > x1) {
             temp = minp;

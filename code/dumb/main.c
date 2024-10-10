@@ -354,8 +354,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         
         //- @note: Render
         r_clear();
-        //r_scene(player, walls, array_count(walls));
-        r_map_debug(map_cam, false, player, debug_walls.borders, debug_walls.count);
+        r_scene(player, test_walls, array_count(test_walls));
+        //r_map_debug(map_cam, false, player, debug_walls.borders, debug_walls.count);
         for (u64 sidx = 0; sidx < sectors.count; ++sidx) {
             r_map_debug(map_cam, false, player, sectors.sectors[sidx].borders, 4);
         }

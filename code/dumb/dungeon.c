@@ -1,4 +1,3 @@
-// Use dungeon create params like how fleury uses rectparams
 #define rand_float() ((f32)rand()/(f32)RAND_MAX)
 
 function void
@@ -126,10 +125,12 @@ good so I'm gonna keep it (for now).
                 sectors[j].borders[b].color = Color_Cyan;
             }
             
-            current->child_sector = sectors + j;
             sectors_out->count++;
         }
     }
+    
+    // Generate a mst from the rooms
+    
     
     release_scratch(scratch);
 }

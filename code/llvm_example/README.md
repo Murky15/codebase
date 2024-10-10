@@ -21,8 +21,8 @@ Instead, we are going to clone the repository like so:<br />
 > I am also naming the folder `llvm-source` instead of `llvm-project` to make it easier to understand what this folder actually is<br />
 
 To save time for future updates we will also ignore the `user` branch.<br />
-`git config --add remote.origin.fetch '^refs/heads/users/*'<br />
-git config --add remote.origin.fetch '^refs/heads/revert-*'`<br />
+`git config --add remote.origin.fetch '^refs/heads/users/*'`<br />
+`git config --add remote.origin.fetch '^refs/heads/revert-*'`<br />
 
 What we just installed is the source for the complete LLVM toolchain.<br />
 This includes the compiler infrastructure tools and API, as well as the source for all the other LLVM projects we know and love (like Clang or LLD).<br />
@@ -37,23 +37,23 @@ Now for the tricky part...<br />
 Now that we have the LLVM source installed on our system, we need to make another directory to store our outputted binaries.<br />
 I like keeping this directory seperate from the source dir to avoid confusion when I inevitably add these tools to my `PATH` variable.<br />
 `mkdir llvm-build`<br />
-> The pre-built Windows installer for the LLVM toolchain that you would have downloaded if you went to the "releases" page installs the LLVM binaries to `C:<br />Program Files<br />LLVM` by default.<br />
-> I **highly** recommend you to not make your build directory here because it requires admin permissions to access, and the path has whitespace in the name.<br />
+> The pre-built Windows installer for the LLVM toolchain that you would have downloaded if you went to the "releases" page installs the LLVM binaries to `C:\Program Files\LLVM` by default.<br />
+> I **highly** recommend you to not make your build directory here because it requires admin permissions to access and the path has whitespace in the name.<br />
 > Both of these things become a monsterous pain when trying to interface with LLVM on the command line.<br />
 
 Now let's cd into the source and get to work.<br />
 `cd llvm-source`<br />
 
-Next we need to choose a cmake generator to compile the code, to view a list run `cmake -G` with no arguments.<br />
+Next we need to choose a cmake generator to compile the code; to view a list of possible generators run `cmake -G` with no arguments.<br />
 I recommend choosing a build system that supports parallel building. If you are unsure which to pick, use `Ninja`.<br />
 Let's go over some other options<br />
 * `-DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld"` - Marks additional subprojects for compilation other than base llvm. In this case,<br />
-my project is now set to build: llvm, clang, clant-tools-extra, and lld.<br />
-* `-DCMAKE_INSTALL_PREFIX="W:<br />llvm-build"` - Tells cmake where we want to install our binaries to. Set this to the absolute path of the `llvm-build` folder we created earlier.<br />
-* `-DCMAKE_BUILD_TYPE=Release` - Sets optimization level for builds; release mode is best suited for users of LLVM and Clang. **Debug mode is used for developers of the LLVM project**.<br />
+my config is now set to build: llvm, clang, clant-tools-extra, and lld.<br />
+* `-DCMAKE_INSTALL_PREFIX="W:\llvm-build"` - Tells cmake where we want to install our binaries to. Set this to the absolute path of the `llvm-build` folder we created earlier.<br />
+* `-DCMAKE_BUILD_TYPE=Release` - Sets optimization level for builds; release mode is best suited for users of LLVM and Clang. **Debug mode is used by developers of the LLVM project**.<br />
 
 These are really all the options we need to care about; all together our command is:<br />
-`cmake -S llvm -B build -G Ninja -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DCMAKE_INSTALL_PREFIX="W:<br />llvm-build" -DCMAKE_BUILD_TYPE=Release`<br />
+`cmake -S llvm -B build -G Ninja -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DCMAKE_INSTALL_PREFIX="W:\llvm-build" -DCMAKE_BUILD_TYPE=Release`<br />
 
 If you made it this far without errors, congrats, that was the first hardest part.<br />
 The second hardest is compiling:<br />
@@ -66,28 +66,28 @@ After this completes run:<br />
 to install our compiled files into `llvm-build`<br />
 
 To verify that everything installed correctly, let's go into our `llvm-build` directory and try running a command.<br />
-`cd W:<br />llvm-build<br />bin`<br />
+`cd W:\llvm-build\bin`<br />
 `llvm-config --help`<br />
 If you see output, congratulations! You've successfuly installed LLVM on your system. Feel free to add this directory to your `PATH` now.<br />
-If you encountered any errors along the way please check the official documentation at: <https://llvm.org/docs/GettingStarted.html><br />
+If you encountered any errors along the way make sure to check the official documentation at: <https://llvm.org/docs/GettingStarted.html><br />
 
 ## Intro to LLVM IR
 
 ### Background
 
 Now that we've successfuly built LLVM, we can take a deep dive into what LLVM *actually is*.<br />
-First let's recap the code generation pipeline. We'll use C to make things simple.<br />
+First let's recap the code generation pipeline. We'll use C as an example to make things simple.<br />
 We have our **source file** which contains the code we write. The compiler's ultimate job is to take our **.c** file(s) and output compiled [object file(s)](https://en.wikipedia.org/wiki/Object_file).<br />
 In short, object files contain the machine code (bytecode), metadata, relocation instructions, and other program symbols generated by the compiler per **translation unit** (source file).<br />
 Most programs are constructed from a variety of object files, it is the responsibility of the [linker](https://en.wikipedia.org/wiki/Linker_(computing)) to "patch" these symbols together<br />
 along with any system libraries they might refer to to create a complete, executable program or application.<br />
 
-But how do we **actually get** from point A to point B? In other words, after the compiler [front end](https://en.wikipedia.org/wiki/Compiler#Front_end) generates an internal map of the C code (known as an Abstract Syntax Tree),<br />
+But how do we **actually get** from point A to point B? In other words, after the compiler [front end](https://en.wikipedia.org/wiki/Compiler#Front_end) generates an internal map of the C code, known as an Abstract Syntax Tree,<br />
 how do we transform this arbitrary data structure into machine code?<br />
 
 This is where LLVM comes in. After the C compiler parses the textual code, it transcribes it into the **Intermediate Representation** langauge developed by LLVM.<br />
-The goal of Intermediate Representation (or IR) is to serve as a language & platform independent<br />
-"middle man" that arbitrary languages can transcribe into to facilitate easy transformation operations (optimizations, etc.) and generation of object code,<br />
+The goal of Intermediate Representation (or IR) is to serve as a language and platform independent<br />
+"middle man" that arbitrary languages can transcribe into to facilitate easy transformation operations (optimizations, etc.) and generation of object code,
 effectively serving as the [middle and back end of the compiler](https://en.wikipedia.org/wiki/Compiler#Middle_end).<br />
 > This is exactly what the Clang C compiler does! Assuming you built<br />
 > Clang in the previous step you can actually see the LLVM IR code Clang generates for a particular **source file**<br />
@@ -108,7 +108,7 @@ This is helpful when, for example, you are creating your own compiler for a new 
 ### The Goal
 Now that we have a basic understanding of LLVM, what it is, what it does, and why it's important; we can build our LLVM "Hello World" example program.<br />
 To satisfy our "Hello World" condition we will print the first 14 numbers of the fibonacci sequence by calling into 2 different fibonacci functions,<br />
- one generated by LLVM IR in handwritten .ll form and one using the LLVM API.<br />
+ one generated by LLVM IR in handwritten .ll form and one created using the LLVM API.<br />
 
 First let's open `main.cpp`. This is a simple C++ program which calls an externally defined function, `fib` in a loop 14 times and prints each result.<br />
 Now open up `fibonacci.cpp`. This file defines a `fib` function in C++ to serve as a "control" to ensure everything is working properly while also acting as a model for our IR code.<br />

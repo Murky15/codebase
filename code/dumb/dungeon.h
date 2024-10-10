@@ -4,6 +4,8 @@
 // https://www.roguebasin.com/index.php?title=Basic_BSP_Dungeon_generation
 
 typedef struct Dungeon_Params {
+    b32 debug_vis;
+    
     Vec2 size; // Size of bounding box
     Range cell_split_bounds;
     Vec2 min_cell;
@@ -35,7 +37,6 @@ typedef struct Sector_Array {
 } Sector_Array;
 
 typedef struct BSP_Node {
-    Sector *child_sector;
     // BSP algorithm enforces dungeon rooms to be rectangles
     union {
         struct { Vec2 p0, p1, p2, p3; }; // Starting with top left - goes in clockwise order
