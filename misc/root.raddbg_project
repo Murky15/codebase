@@ -4,18 +4,18 @@
 
 target:
 {
-  exe:               "../build/debaser.exe"
-  arguments:         ""
-  working_directory: "../build"
-  active:            0
-}
-
-target:
-{
   exe:               "../build/dumb.exe"
   arguments:         ""
   working_directory: "../build"
   active:            1
+}
+
+target:
+{
+  exe:               "C:/Users/gmb/Workspace/Projects/root/build/game_of_life.exe"
+  arguments:         ""
+  working_directory: "C:/Users/gmb/Workspace/Projects/root/build"
+  active:            0
 }
 
 /// breakpoints ///////////////////////////////////////////////////////////////

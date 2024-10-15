@@ -28,7 +28,7 @@
 -[ ] Font rasterization
 -[ ] Multithreading??
 -[ ] Hot reloading??
--[ ] SIMD????
+-[ ] SIMD???? -> compile renderer code into ISPC
 -[ ] Wall texture mapping
 -[ ] Optimize / profile render functions
 -[ ] Asan / Libfuzzer
@@ -38,7 +38,7 @@
 */
 
 #define MOUSE_SENSITIVITY 0.01f
-#define MOUSE_SCROLL_SENSITIVITY 0.05f
+#define MOUSE_SCROLL_SENSITIVITY 0.8f
 #define PLAYER_MOVE_SPEED 100.f
 #define CAM_MOVE_SPEED 200.f
 
@@ -62,8 +62,8 @@ global Arena *level_arena;
 
 // @todo: It is annoying to need to pull out these "action commands"
 global b32 move_forward, move_back, strafe_left, strafe_right;
-global f32 turn_amount;
 global b32 cam_up, cam_down, cam_left, cam_right;
+global f32 turn_amount;
 
 function void
 win32_capture_mouse (HWND hwnd) {
@@ -145,14 +145,15 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                 }
             } else if (input->header.dwType == RIM_TYPEMOUSE) {
                 RAWMOUSE *mouse = &input->data.mouse;
-                /*
+                
                 if (mouse->usButtonFlags & RI_MOUSE_BUTTON_1_UP) { // @hack
                     if (!g_mouse_captured) {
                         ShowCursor(false);
                         win32_capture_mouse(hwnd);
                     }
                 }
-                */
+                
+                
                 if (mouse->usButtonFlags & RI_MOUSE_WHEEL) {
                     short wheel = (short)mouse->usButtonData;
                     f32 wheel_delta = (f32)wheel / (f32)WHEEL_DELTA;
@@ -290,7 +291,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     test_walls[3].p0 = v2add(player.pos, v2(-100, 0));
     test_walls[3].p1 = v2add(player.pos, v2(100, 50));
     
-    map_cam = v3(0, 0, 1);
+    map_cam = v3(0, 0, 50);
     
     Dungeon_Params dungeon = {
         .size = v2(200.f, 200.f),
@@ -352,13 +353,16 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         map_cam.x = map_cam_v2.x;
         map_cam.y = map_cam_v2.y;
         
-        //- @note: Render
+        // @note: Render
         r_clear();
-        r_scene(player, test_walls, array_count(test_walls));
-        //r_map_debug(map_cam, false, player, debug_walls.borders, debug_walls.count);
+        //r_scene(player, test_walls, array_count(test_walls));
+        
+        r_map_debug(map_cam, false, player, debug_walls.borders, debug_walls.count);
         for (u64 sidx = 0; sidx < sectors.count; ++sidx) {
             r_map_debug(map_cam, false, player, sectors.sectors[sidx].borders, 4);
         }
+        
+        //r_map_debug(map_cam, true, player, test_walls, array_count(test_walls));
         
         // @todo: Would BitBlt be faster?
         StretchDIBits(
@@ -375,8 +379,10 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
                       SRCCOPY
                       );
         
+#if 0
         f32 fps = 1.f / dt;
         OutputDebugString((LPCSTR)str8_pushf(frame_arena, "FPS: %f\n", fps).str);
+#endif
     }
     
     return 0;

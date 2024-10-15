@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# How can we make this more platform-independent. Such as when including libs below?
+
 # Parse command line
 for arg in "$@"; do declare "$arg"=1; done
 
@@ -51,5 +53,6 @@ mkdir -p build
 pushd build >> /dev/null
 built=0
 if [[ "$dumb" == 1 ]]; then built=1 && eval "$compile ../code/dumb/main.c $add_lib User32.lib $add_lib Gdi32.lib $out"dumb.exe"" || exit 1; fi
+if [[ "$gol" == 1 ]]; then built=1 && eval "$compile ../code/gol/gol.c $add_lib User32.lib $add_lib Gdi32.lib $out"game_of_life.exe"" || exit 1; fi
 if [[ "$built" == 0 ]]; then echo "Unrecognized target!"; fi
 popd >> /dev/null
