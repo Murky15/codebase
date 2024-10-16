@@ -7,15 +7,23 @@ target:
   exe:               "../build/dumb.exe"
   arguments:         ""
   working_directory: "../build"
-  active:            1
+  active:            0
 }
 
 target:
 {
-  exe:               "C:/Users/gmb/Workspace/Projects/root/build/game_of_life.exe"
+  exe:               "../build/game_of_life.exe"
   arguments:         ""
-  working_directory: "C:/Users/gmb/Workspace/Projects/root/build"
+  working_directory: "../build"
   active:            0
+}
+
+target:
+{
+  exe:               "../code/comp_sci_assignments/game.exe"
+  arguments:         ""
+  working_directory: "../code/comp_sci_assignments"
+  active:            1
 }
 
 /// breakpoints ///////////////////////////////////////////////////////////////

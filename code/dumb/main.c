@@ -20,7 +20,7 @@
 
 /*
 @todo
--[ ] Read AMD programming manual (I am so weird)
+-[ ] Read AMD programming manual
 -[X] Rework build script to be more robust (codebase level work)
 -[ ] Random world generation OR store level data in json (make json parser codebase)
 -[ ] Figure out how to do sectors and portal rendering duke nukem style (fuck me)
