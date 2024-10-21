@@ -38,6 +38,7 @@ commands = {
     
     //- Run commands
     .run_dumb = {.win="build\dumb.exe", .out="*output*"},
+    .run_gol = {.win="build\game_of_life.exe", .out="*output*"},
     
     //- Misc commands
     .open_debugger = {.win="call misc\open_debugger.bat"},
@@ -46,6 +47,8 @@ commands = {
 fkey_command = {
     .F1 = "build_dumb",
     .F2 = "build_gol",
+    .F3 = "run_dumb",
+    .F4 = "run_gol",
     
     .F9 = "open_debugger",
 };

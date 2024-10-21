@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <math.h>
 
 #define SIM_TICK_RATE_MS 100
 #define NUM_CELLS_X 50
@@ -9,6 +10,7 @@
 
 HDC hdc;
 UINT timer_handle = -1;
+float scale = 1;
 bool cell_states[NUM_CELLS_X * NUM_CELLS_Y];
 
 LRESULT APIENTRY 
@@ -33,13 +35,17 @@ WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         return 0L;
         
         case WM_MOUSEWHEEL: {
-            short wheelDelta = (short)GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA;
-            fprintf(stderr, "Wheel delta: %d", wheelDelta);
-            if (wheelDelta) {
-                XFORM scale = {0};
-                scale.eM11 = 2.f;
-                scale.eM22 = 2.f;
-                SetWorldTransform(hdc, &scale);
+            // @todo: This is kinda weird on my trackpad
+            short wheelDelta = (short)GET_WHEEL_DELTA_WPARAM(wParam);
+            if (wheelDelta > 0)
+                scale *= 1.01f;
+            else if (wheelDelta < 0)
+                scale *= 0.99f;
+            if (fabs(wheelDelta)) {
+                XFORM op = {0};
+                op.eM11 = scale;
+                op.eM22 = scale;
+                SetWorldTransform(hdc, &op);
                 RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_ERASE);
             }
         }
@@ -47,9 +53,7 @@ WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         
         case WM_PAINT: {
             BeginPaint(hwnd, &ps);
-            
             // Draw Grid
-            RECT rc;
             GetClientRect(hwnd, &rc);
             DPtoLP(hdc, (LPPOINT)&rc, 2);
             SelectObject(hdc, GetStockObject(HOLLOW_BRUSH)); 
@@ -64,6 +68,7 @@ WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 MoveToEx(hdc, x, 0, NULL);
                 LineTo(hdc, x, rc.bottom);
             }
+            EndPaint(hwnd, &ps);
         }
         return 0L;
         
