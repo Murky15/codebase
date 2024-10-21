@@ -78,7 +78,7 @@ win32_capture_mouse (HWND hwnd) {
 function LRESULT
 Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
-        case WM_CLOSE: PostQuitMessage(0); return 0; break;
+        case WM_CLOSE: PostQuitMessage(0); return 0;
         
         case WM_INPUT: {
             u32 size;
@@ -169,7 +169,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
             }
             
             return 0;
-        } break;
+        }
     }
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }

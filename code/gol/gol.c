@@ -1,41 +1,95 @@
-/*
-Single file c implementation of conway's game of life.
-Just meant to be a fast and ugly implementation. No fancy tricks or optimizations (yet)
-*/
-
-#ifndef UNICODE
-#define UNICODE
-#endif 
-
 #include <windows.h>
-#include <stdint.h>
+#include <stdio.h>
+#include <stdbool.h>
+#include <assert.h>
 
-typedef struct Mem_Block {
-    void *mem;
-    uint64_t size;
-} Mem_Block;
+#define SIM_TICK_RATE_MS 100
+#define NUM_CELLS_X 50
+#define NUM_CELLS_Y 50
 
-// Measured in cells
-static uint32_t canvas_width  = 800;
-static uint32_t canvas_height = 800;
+HDC hdc;
+UINT timer_handle = -1;
+bool cell_states[NUM_CELLS_X * NUM_CELLS_Y];
 
-LRESULT CALLBACK WindowProc(HWND, UINT, WPARAM, LPARAM);
-DWORD WINAPI ThreadProc(LPVOID);
+LRESULT APIENTRY 
+WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
+{ 
+    PAINTSTRUCT ps; 
+    RECT rc; 
+    switch (message) 
+    { 
+        case WM_CREATE: {
+            hdc = GetDC(hwnd);
+            SetROP2(hdc, R2_NOT);
+            SetGraphicsMode(hdc, GM_ADVANCED);
+            SetMapMode(hdc, MM_LOENGLISH);
+            SetTimer(hwnd, timer_handle = 1, SIM_TICK_RATE_MS, NULL);
+        }
+        return 0L;
+        
+        case WM_TIMER: {
+            
+        }
+        return 0L;
+        
+        case WM_MOUSEWHEEL: {
+            short wheelDelta = (short)GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA;
+            fprintf(stderr, "Wheel delta: %d", wheelDelta);
+            if (wheelDelta) {
+                XFORM scale = {0};
+                scale.eM11 = 2.f;
+                scale.eM22 = 2.f;
+                SetWorldTransform(hdc, &scale);
+                RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_ERASE);
+            }
+        }
+        return 0L;
+        
+        case WM_PAINT: {
+            BeginPaint(hwnd, &ps);
+            
+            // Draw Grid
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+            DPtoLP(hdc, (LPPOINT)&rc, 2);
+            SelectObject(hdc, GetStockObject(HOLLOW_BRUSH)); 
+            
+            int cell_width = 50;
+            int cell_height = 50;
+            for (int y = rc.bottom; y < 0; y += cell_height) {
+                MoveToEx(hdc, 0, y, NULL);
+                LineTo(hdc, rc.right, y);
+            }
+            for (int x = 0; x < rc.right; x += cell_width) {
+                MoveToEx(hdc, x, 0, NULL);
+                LineTo(hdc, x, rc.bottom);
+            }
+        }
+        return 0L;
+        
+        case WM_DESTROY: 
+        PostQuitMessage(0); 
+        return 0L; 
+    } 
+    return DefWindowProc(hwnd, message, wParam, lParam); 
+}
 
 int WINAPI 
-wWinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
-    const wchar_t CLASS_NAME[]  = L"Window Class";
+WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdShow) {
+    const char CLASS_NAME[]  = "Window Class";
+    
     WNDCLASS wc = {0};
-    wc.lpfnWndProc   = WindowProc;
+    wc.lpfnWndProc   = WndProc;
     wc.hInstance     = hInstance;
     wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = GetStockObject(WHITE_BRUSH);
     wc.lpszClassName = CLASS_NAME;
+    wc.style         = CS_OWNDC;
     RegisterClass(&wc);
     HWND hwnd = CreateWindowEx(
                                0,                              
                                CLASS_NAME,                    
-                               L"Conway's Game of Life",   
+                               "Conway's Game of Life",   
                                WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME,            
                                CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
                                NULL,         
@@ -49,44 +103,12 @@ wWinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmd
     }
     ShowWindow(hwnd, nCmdShow);
     
-    // Create game thread
-    uint64_t mem_size = canvas_width*canvas_height*sizeof(uint8_t)*2;
-    void *mem = HeapAlloc(GetProcessHeap(), HEAP_GENERATE_EXCEPTIONS | HEAP_ZERO_MEMORY, mem_size);
-    Mem_Block game_memory = {mem, mem_size};
-    DWORD tid;
-    CreateThread(0, 0, ThreadProc, (LPVOID)&game_memory, 0, &tid);
-    
     MSG msg = {0};
     while (GetMessage(&msg, NULL, 0, 0) > 0)
     {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-    
-    return 0;
-}
-
-LRESULT CALLBACK 
-WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg)
-    {
-        case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-    }
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
-}
-
-DWORD WINAPI 
-ThreadProc (LPVOID game_memory) {
-    OutputDebugString(L"Hello from the game thread\n");
-    Mem_Block *memory = (Mem_Block*)game_memory;
-    uint64_t frame_size = (memory->size/2);
-    uint8_t *curr_frame = (uint8_t*)memory->mem;
-    uint8_t *next_frame = (uint8_t*)memory->mem + frame_size;
-    
-    // Right now I am just focusing on playing the game on a finite field
-    
     
     return 0;
 }
