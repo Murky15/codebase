@@ -33,7 +33,7 @@
 -[ ] Optimize / profile render functions
 -[ ] Asan / Libfuzzer
 -[ ] sin/cos/tan table lookup: https://namoseley.wordpress.com/2015/07/26/sincos-generation-using-table-lookup-and-iterpolation/
--[ ] Bake in "asset" dir for this game 
+-[ ] Bake in "asset" dir for this game
 -[ ] Metaprogramming
 */
 
@@ -68,36 +68,37 @@ global f32 turn_amount;
 function void
 win32_capture_mouse (HWND hwnd) {
     g_mouse_captured = true;
-    RECT cr; 
+    RECT cr;
     GetClientRect(hwnd, &cr);
     POINT middle  = {cr.right/2, cr.bottom/2};
     ClientToScreen(hwnd, &middle);
     SetCursorPos(middle.x, middle.y);
 }
 
+
 function LRESULT
 Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_CLOSE: PostQuitMessage(0); return 0;
-        
+
         case WM_INPUT: {
             u32 size;
             GetRawInputData((HRAWINPUT)lParam, RID_INPUT, 0, &size, sizeof(RAWINPUTHEADER));
             LPBYTE buff = arena_pushn(frame_arena, BYTE, size);\
             if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, buff, &size, sizeof(RAWINPUTHEADER)) != size)
-                OutputDebugString("GetRawInputData does not return correct size !\n"); 
-            
+                OutputDebugString("GetRawInputData does not return correct size !\n");
+
             RAWINPUT *input = (RAWINPUT*)buff;
-            
+
             if (input->header.dwType == RIM_TYPEKEYBOARD) {
                 RAWKEYBOARD *keyboard = &input->data.keyboard;
                 b32 key_down = (keyboard->Flags & RI_KEY_BREAK) == 0;
                 if (keyboard->MakeCode != KEYBOARD_OVERRUN_MAKE_CODE) {
                     u8 extension = keyboard->Flags & RI_KEY_E0 ? 0xE0 : keyboard->Flags & RI_KEY_E1 ? 0xE1 : 0x00;
                     u16 scan_code = (extension << 8) | (keyboard->MakeCode & 0x7F);
-                    
+
                     b32 control_down = (GetKeyState(VK_CONTROL) < 0);
-                    
+
                     switch (scan_code) {
                         case 0x0011: {      // W
                             if (control_down) {
@@ -107,7 +108,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                                 move_forward = key_down;
                             }
                         } break;
-                        
+
                         case 0x001F: {      // S
                             if (control_down) {
                                 cam_down = key_down;
@@ -116,7 +117,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                                 move_back = key_down;
                             }
                         } break;
-                        
+
                         case 0x001E: {      // A
                             if (control_down) {
                                 cam_left = key_down;
@@ -125,7 +126,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                                 strafe_left = key_down;
                             }
                         } break;
-                        
+
                         case 0x0020: {      // D
                             if (control_down) {
                                 cam_right = key_down;
@@ -134,7 +135,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                                 strafe_right = key_down;
                             }
                         } break;
-                        
+
                         case 0x0001: {      // Escape
                             if (g_mouse_captured) {
                                 g_mouse_captured = false;
@@ -145,29 +146,29 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                 }
             } else if (input->header.dwType == RIM_TYPEMOUSE) {
                 RAWMOUSE *mouse = &input->data.mouse;
-                
+
                 if (mouse->usButtonFlags & RI_MOUSE_BUTTON_1_UP) { // @hack
                     if (!g_mouse_captured) {
                         ShowCursor(false);
                         win32_capture_mouse(hwnd);
                     }
                 }
-                
-                
+
+
                 if (mouse->usButtonFlags & RI_MOUSE_WHEEL) {
                     short wheel = (short)mouse->usButtonData;
                     f32 wheel_delta = (f32)wheel / (f32)WHEEL_DELTA;
                     map_cam.z -= wheel_delta * MOUSE_SCROLL_SENSITIVITY;
                     map_cam.z = max(map_cam.z,0);
                 }
-                
+
                 if (g_mouse_captured) {
                     s32 movex = mouse->lLastX;
                     turn_amount = ((f32)movex * MOUSE_SENSITIVITY);
                     win32_capture_mouse(hwnd);
                 }
             }
-            
+
             return 0;
         }
     }
@@ -184,7 +185,7 @@ win32_create_window (HINSTANCE hInstance) {
     wc.hbrBackground = GetStockObject(WHITE_BRUSH);
     wc.lpszClassName = "dumb_main_window_class";
     RegisterClass(&wc);
-    
+
     RECT dim = {0, 0, g_window_width, g_window_height};
     AdjustWindowRect(&dim, WS_OVERLAPPEDWINDOW, 0);
     HWND hwnd = CreateWindow(
@@ -203,12 +204,12 @@ win32_create_window (HINSTANCE hInstance) {
         OutputDebugString("Window creation failed!\n");
         return (Win32_Data){0};
     }
-    
+
     Win32_Data result = {0};
     result.hInstance = hInstance;
     result.hwnd = hwnd;
     result.win_dc = GetDC(hwnd);
-    
+
     return result;
 }
 
@@ -230,53 +231,53 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     perm_arena = arena_alloc();
     frame_arena = arena_alloc();
     level_arena = arena_alloc();
-    
+
     Win32_Data platform = win32_create_window(hInstance);
-    
+
     // @note: Seed renderer
     u64 seed = time(0);
     srand(seed);
-    
+
     // @note: Register for input
     RAWINPUTDEVICE input_devices[2];
-    
+
     // Keyboard
     input_devices[0].usUsagePage = 0x01;
     input_devices[0].usUsage = 0x06;
     input_devices[0].dwFlags = 0;
     input_devices[0].hwndTarget = 0;
-    
+
     // Mouse
     input_devices[1].usUsagePage = 0x01;
     input_devices[1].usUsage = 0x02;
     input_devices[1].dwFlags = 0;
     input_devices[1].hwndTarget = 0;
-    
+
     if (RegisterRawInputDevices(input_devices, array_count(input_devices), sizeof(input_devices[0])) == FALSE) {
         OutputDebugString("Unable to register input devices\n");
     }
     //win32_capture_mouse(platform.hwnd);
     //ShowCursor(false);
-    
+
     // @note: Font setup
     //String8 font_path = str8_lit("W:/assets/dumb/fonts/Envy Code R PR7/Envy Code R.ttf");
     //String8 font_path = str8_lit("W:/assets/dumb/fonts/Retro Gaming.ttf");
-    
+
     // @note: Timing
     LARGE_INTEGER frequency, start_time, end_time, elapsed_microseconds = {0};
     QueryPerformanceFrequency(&frequency);
-    
+
     // @note: Create bitmap
     Bitmap *bitmap = r_get_framebuffer();
     platform.bitmap = win32_create_bitmap(bitmap);
-    
+
     //- @note: Game setup
     Entity player = {0};
     player.rotation_angle = 0;
     player.radius = 10.f;
     player.pos.x = bitmap->width / 2.f;
     player.pos.y = bitmap->height / 2.f;
-    
+
     Border test_walls[4];
     test_walls[0].color = Color_Red;
     test_walls[1].color = Color_Lime;
@@ -290,9 +291,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     test_walls[2].p1 = v2add(player.pos, v2(-100, 0));
     test_walls[3].p0 = v2add(player.pos, v2(-100, 0));
     test_walls[3].p1 = v2add(player.pos, v2(100, 50));
-    
+
     map_cam = v3(0, 0, 50);
-    
+
     Dungeon_Params dungeon = {
         .size = v2(200.f, 200.f),
         .cell_split_bounds = v2(0.4f, 0.6f),
@@ -303,12 +304,12 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     Border_Array debug_walls = {0};
     Sector_Array sectors = {0};
     generate_dungeon(level_arena, &dungeon, &debug_walls, &sectors);
-    
+
     //~ @note: Main loop
     QueryPerformanceCounter(&start_time);
     for (;g_game_running;) {
         arena_clear(frame_arena);
-        
+
         //~ @note: Message loop
         for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
             if (msg.message == WM_QUIT) {
@@ -318,17 +319,17 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
                 DispatchMessage(&msg);
             }
         }
-        
+
         //- @note: Update
         QueryPerformanceCounter(&end_time);
         elapsed_microseconds.QuadPart = end_time.QuadPart - start_time.QuadPart;
         f32 dt = (f32)((f32)elapsed_microseconds.QuadPart / (f32)frequency.QuadPart);
         start_time = end_time;
-        
+
         player.rotation_angle -= turn_amount;
         player.rotation_angle = fmod_cycling(player.rotation_angle, 2 * M_PI32);
         turn_amount = 0;
-        
+
         // @todo: There has got to be a better/cleaner/faster way to calculate movement + dir for both of these things
         Vec2 dir;
         f32 x = 0, y = 0;
@@ -341,7 +342,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         if (v2len(dir) > 1)
             dir = v2norm(dir);
         player.pos = v2add(player.pos, v2muls(dir, PLAYER_MOVE_SPEED * dt));
-        
+
         Vec2 map_cam_dir = {0};
         if (cam_up)    map_cam_dir.y += 1;
         if (cam_down)  map_cam_dir.y -= 1;
@@ -352,18 +353,18 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         Vec2 map_cam_v2 = v2add(dv3(map_cam), v2muls(map_cam_dir, CAM_MOVE_SPEED * dt));
         map_cam.x = map_cam_v2.x;
         map_cam.y = map_cam_v2.y;
-        
+
         // @note: Render
         r_clear();
         //r_scene(player, test_walls, array_count(test_walls));
-        
+
         r_map_debug(map_cam, false, player, debug_walls.borders, debug_walls.count);
         for (u64 sidx = 0; sidx < sectors.count; ++sidx) {
             r_map_debug(map_cam, false, player, sectors.sectors[sidx].borders, 4);
         }
-        
+
         //r_map_debug(map_cam, true, player, test_walls, array_count(test_walls));
-        
+
         // @todo: Would BitBlt be faster?
         StretchDIBits(
                       platform.win_dc,
@@ -378,12 +379,12 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
                       DIB_RGB_COLORS,
                       SRCCOPY
                       );
-        
+
 #if 0
         f32 fps = 1.f / dt;
         OutputDebugString((LPCSTR)str8_pushf(frame_arena, "FPS: %f\n", fps).str);
 #endif
     }
-    
+
     return 0;
 }

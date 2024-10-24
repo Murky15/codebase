@@ -1,3 +1,9 @@
+/*
+Naive zero dependency C implementation of Conway's game of life.
+Performance and fancy tricks are not the goal here, this was just supposed to be 
+a quick and simple implementation to learn the basics of cellular automata.
+*/
+
 #include <windows.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -7,6 +13,10 @@
 #define SIM_TICK_RATE_MS 100
 #define NUM_CELLS_X 50
 #define NUM_CELLS_Y 50
+#define CELL_WIDTH  50
+#define CELL_HEIGHT 50
+int grid_width = CELL_WIDTH * NUM_CELLS_X;
+int grid_height = CELL_HEIGHT * NUM_CELLS_Y;
 
 HDC hdc;
 UINT timer_handle = -1;
@@ -35,38 +45,49 @@ WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         return 0L;
         
         case WM_MOUSEWHEEL: {
-            // @todo: This is kinda weird on my trackpad
+            // @todo: This is kinda jank on my trackpad
             short wheelDelta = (short)GET_WHEEL_DELTA_WPARAM(wParam);
             if (wheelDelta > 0)
-                scale *= 1.01f;
+                scale *= 1.1f;
             else if (wheelDelta < 0)
-                scale *= 0.99f;
+                scale *= 0.9f;
             if (fabs(wheelDelta)) {
                 XFORM op = {0};
                 op.eM11 = scale;
                 op.eM22 = scale;
                 SetWorldTransform(hdc, &op);
+                // @todo: Super unoptimized
                 RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_ERASE);
             }
+        }
+        return 0L;
+        
+        case WM_MOUSEMOVE: {
+            
         }
         return 0L;
         
         case WM_PAINT: {
             BeginPaint(hwnd, &ps);
             // Draw Grid
+            SelectObject(hdc, GetStockObject(HOLLOW_BRUSH)); 
             GetClientRect(hwnd, &rc);
             DPtoLP(hdc, (LPPOINT)&rc, 2);
-            SelectObject(hdc, GetStockObject(HOLLOW_BRUSH)); 
             
-            int cell_width = 50;
-            int cell_height = 50;
-            for (int y = rc.bottom; y < 0; y += cell_height) {
-                MoveToEx(hdc, 0, y, NULL);
-                LineTo(hdc, rc.right, y);
+            for (int y = rc.bottom; y < rc.bottom + grid_height; y += CELL_HEIGHT) {
+                if (y < rc.top) {
+                    MoveToEx(hdc, 0, y, NULL);
+                    int draw_dist = grid_width > rc.right ? rc.right : grid_width;
+                    LineTo(hdc, draw_dist, y);
+                }
             }
-            for (int x = 0; x < rc.right; x += cell_width) {
-                MoveToEx(hdc, x, 0, NULL);
-                LineTo(hdc, x, rc.bottom);
+            for (int x = 0; x < grid_width; x += CELL_WIDTH) {
+                if (x < rc.right) {
+                    MoveToEx(hdc, x, rc.bottom, NULL);
+                    int real_grid_height = grid_height + rc.bottom; // Windows GDI makes absolutely zero sense
+                    int draw_dist = real_grid_height > rc.top ? rc.top : real_grid_height;
+                    LineTo(hdc, x, draw_dist);
+                }
             }
             EndPaint(hwnd, &ps);
         }
@@ -81,7 +102,7 @@ WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 int WINAPI 
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdShow) {
-    const char CLASS_NAME[]  = "Window Class";
+    char CLASS_NAME[]  = "Window Class";
     
     WNDCLASS wc = {0};
     wc.lpfnWndProc   = WndProc;
