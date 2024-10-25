@@ -34,11 +34,9 @@ load_paths = {
 commands = {
     //- Build commands
     .build_dumb = {.win="bash build.sh dumb", .out="*output*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false},
-    .build_gol = {.win="bash build.sh msvc gol", .out="*output*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false},
     
     //- Run commands
     .run_dumb = {.win="build\dumb.exe", .out="*output*"},
-    .run_gol = {.win="build\game_of_life.exe", .out="*output*"},
     
     //- Misc commands
     .open_debugger = {.win="call misc\open_debugger.bat"},
@@ -46,9 +44,7 @@ commands = {
 
 fkey_command = {
     .F1 = "build_dumb",
-    .F2 = "build_gol",
-    .F3 = "run_dumb",
-    .F4 = "run_gol",
+    .F2 = "run_dumb",
     
     .F9 = "open_debugger",
 };
