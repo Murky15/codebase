@@ -81,7 +81,7 @@ core_function String8 str8_range(u8 *first, u8 *opl);
 core_function String16 str16(u16 *str, u64 len);
 core_function String32 str32(u32 *str, u64 len);
 
-//@note: Use %.*s in format string
+// @note: Use %.*s in format string
 #define str8_expand(s) (int)((s).len), (char*)((s).str)
 
 // Substrings

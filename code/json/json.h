@@ -2,15 +2,33 @@
 #define JSON_H
 
 //- Lexical Analysis
-typedef u32 Json_Token;
+typedef u32 Json_Token_Type;
 enum {
     JSON_TOKEN_NULL,
+    JSON_TOKEN_PUNCTUATOR,
+    JSON_TOKEN_STRING,
+    JSON_TOKEN_NUMBER,
+    JSON_TOKEN_KEYWORD,
     
     JSON_TOKEN_COUNT
 };
 
-//- Parsed Data
+typedef struct Json_Token {
+    Json_Token_Type type;
+    Rangei src_rng;
+} Json_Token;
 
+typedef struct Json_Token_Node {
+    struct Json_Token_Node *next;
+    Json_Token token;
+} Json_Token_Node;
+
+typedef struct Json_Token_List {
+    Json_Token_Node *first, *last;
+    u64 count;
+} Json_Token_List;
+
+//- Parsed Data
 typedef u32 Json_Type;
 enum {
     JSON_OBJECT,
@@ -27,7 +45,7 @@ typedef union  Json_Value  Json_Value;
 
 typedef struct Json_Set {
     String8 key;
-    Json_Value value;
+    Json_Value *value;
 } Json_Set;
 
 struct Json_Object {
@@ -50,11 +68,11 @@ union Json_Value {
     struct {
         Json_Type __pad1;
         String8 string;
-    }
+    };
     struct {
         Json_Type __pad2;
         u64 number;
-    }
+    };
 };
 
 core_function Json_Value* json_parse(Arena *arena, String8 json);
