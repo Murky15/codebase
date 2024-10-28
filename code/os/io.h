@@ -4,8 +4,9 @@
 /*
 @todo:
 -[X] Reading & writing to files synchronously 
--[ ] Std-free writing to console output
+-[ ] Std-free writing to console output (error handling)
 -[ ] Directory managment
+-[ ] Assertions
 */
 
 core_function String8 os_read_file(Arena *arena, String8 path, b32 create_if_not_exist);

@@ -7,4 +7,9 @@ typedef struct Entity {
     f32 radius;
 } Entity;
 
+typedef struct Border {
+    Vec2 p0, p1;
+    Color color;
+} Border;
+
 #endif //GAME_H

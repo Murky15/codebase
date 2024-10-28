@@ -66,7 +66,7 @@
 # define assert(c)
 #endif
 
-#if COMPILER_CL
+#if COMPILER_CL || COMPILER_TCC
 # define align_of(x) __alignof(x)
 #elif COMPILER_CLANG || COMPILER_GCC
 # define align_of(x) __alignof__(x)

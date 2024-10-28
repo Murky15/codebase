@@ -252,8 +252,8 @@ r_map_debug (Vec3 map_cam, b32 show_player, Entity player, Border *walls, u64 nu
     
     if (show_player) {
         Vec2 pp = v2sub(player.pos, dv3(map_cam));
-        pp.x = (pp.x*(f32)canvas->width)/(map_cam.z*(f32)canvas->width) + width_middle;
-        pp.y = (pp.y*(f32)canvas->height)/(map_cam.z*(f32)canvas->height) + height_middle;
+        pp.x = (pp.x*(f32)canvas->width)/(map_cam.z*16) + width_middle;
+        pp.y = (pp.y*(f32)canvas->height)/(map_cam.z*9) + height_middle;
         r_draw_circle(pp, 5.f, Color_Purple);
         r_draw_line(pp,  v2add(pp, v2(cosf(player.rotation_angle) * 7.f, sinf(player.rotation_angle) * 7.f)), Color_Magenta);
     }

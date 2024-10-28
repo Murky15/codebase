@@ -71,13 +71,15 @@ color(Navy,    0,   0,   128) \
 colors
 #undef color
 
+#include <math.h>
+
 //~ @note: Math types
-#define M_PI  3.1415926535897932384626433
+#if !defined(M_PI)
+# define M_PI  3.1415926535897932384626433
+#endif
 #define M_PI32 ((f32)M_PI)
 #define rad2deg (180.f/M_PI32)
 #define deg2rad (M_PI32/180.f)
-
-#include <math.h>
 
 typedef union Vec2 {
     struct { f32 x, y; };

@@ -1,3 +1,7 @@
+/*
+@note: Deprecated!
+*/
+
 #define rand_float() ((f32)rand()/(f32)RAND_MAX)
 
 function void
