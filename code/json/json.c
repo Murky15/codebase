@@ -39,7 +39,7 @@ json_lex (Arena *arena, String8 json) {
                                || c == '[' || c == ']' 
                                || c == ','
                                || c == ':') {
-                        Json_Token new_token = {JSON_TOKEN_PUNCTUATOR, v2i(i, j)};
+                        Json_Token new_token = {JSON_TOKEN_PUNCTUATOR, str8_sub(json, i, j)};
                         json_token_list_push(arena, &tokens, new_token);
                     } else {
                         // @todo: Atrocious error handling
@@ -89,7 +89,7 @@ json_lex (Arena *arena, String8 json) {
         make_new_token:
         if (active_token_type != JSON_TOKEN_NULL && token_ready) {
             u64 end_idx = active_token_type == JSON_TOKEN_STRING ? i : j;
-            Json_Token new_token = {active_token_type, v2i(word_idx, end_idx)};
+            Json_Token new_token = {active_token_type, str8_sub(json, word_idx, end_idx)};
             json_token_list_push(arena, &tokens, new_token);
             active_token_type = JSON_TOKEN_NULL;
             token_ready = false;
@@ -109,18 +109,36 @@ json_dump_lex (Json_Token_List *tokens, String8 json) {
             case JSON_TOKEN_NUMBER:     printf("Number:     "); break;
             case JSON_TOKEN_KEYWORD:    printf("Keyword:    "); break;
         }
-        printf("%.*s\n", str8_expand(str8_sub(json, token.src_rng.first, token.src_rng.last)));
+        printf("%.*s\n", str8_expand(token.value));
+    }
+}
+
+core_function Json_Object
+json_process_object (Arena *arena, Json_Token_Node **token_stream) {
+    Json_Object result = zero_struct;
+    result.type = JSON_OBJECT;
+    
+    
+    if (str8_match(obj_start->value), str8_lit("{"),0) {
+        for (Json_Token_Node *token = *token_stream; 
+             !str8_match(token->value, str8_lit("}"),0);
+             token = token->next) {
+            
+        }
     }
 }
 
 core_function Json_Value* 
 json_parse (Arena *arena, String8 json) {
-    Temp_Arena scratch = get_scratch(&arena, 1);
-    Json_Token_List tokens = json_lex(scratch.arena, json);
     Json_Value *result = 0;
-    json_dump_lex(&tokens, json);
+    Temp_Arena scratch = get_scratch(&arena, 1);
     
-    
+    Json_Token_List tokens = json_lex(scratch.arena, json);
+    if (tokens.first != 0) {
+        // json_dump_lex(&tokens, json);
+        
+        
+    }
     release_scratch(scratch);
     return result;
 }

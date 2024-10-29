@@ -15,7 +15,7 @@ enum {
 
 typedef struct Json_Token {
     Json_Token_Type type;
-    Rangei src_rng;
+    String8 value;
 } Json_Token;
 
 typedef struct Json_Token_Node {
@@ -53,6 +53,7 @@ struct Json_Object {
     Json_Type type;
     Json_Set *table;
     u64 count;
+    u64 filled_slots;
 };
 
 struct Json_Array {
