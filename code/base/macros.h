@@ -79,6 +79,7 @@
 #else
 # define comp_lit(T, ...) (T){__VA_ARGS__}
 #endif
+#define comp_zero(T) comp_lit(T, zero_struct)
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #define max(a,b) ((a) > (b) ? (a) : (b))

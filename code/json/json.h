@@ -75,6 +75,12 @@ union Json_Value {
     };
 };
 
+//- Lexing functions
+core_function void json_token_list_push(Arena *arena, Json_Token_List *list, Json_Token token);
+core_function Json_Token_List json_lex(Arena *arena, String8 json);
+core_function void json_dump_lex(Json_Token_List *tokens, String8 json);
+
+//- Parsing functions
 core_function Json_Value* json_parse(Arena *arena, String8 json);
 
 #endif //JSON_H
