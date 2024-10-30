@@ -110,9 +110,13 @@ core_function void str8_list_concat(String8List *base, String8List *appending);
 core_function String8List str8_split(Arena *arena, String8 string, u64 num_splitters, char *splits);
 core_function String8 str8_list_join(Arena *arena, String8List list, String8Join *opt_join_params);
 
-// Conversions
+// Conversion routines
 core_function u8* str8_to_cstr(Arena *arena, String8 string);
 core_function String8Array str8_list_to_array(Arena *arena, String8List *list);
+core_function u64 u64_from_str8 (String8 string, u32 radix);
+core_function s64 cint_from_str8 (String8 string);
+core_function f64 f64_from_str8 (String8 string);
+
 
 // @todo: Unicode conversions
 

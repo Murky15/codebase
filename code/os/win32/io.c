@@ -16,7 +16,7 @@ os_read_file (Arena *arena, String8 path, b32 create_if_not_exist) {
     if (hFile) {
         LARGE_INTEGER sz;
         //GetFileSizeEx(hFile, &sz);
-        sz.LowPart = GetFileSize(hFile, &sz.HighPart); // Because TCC complains
+        sz.LowPart = GetFileSize(hFile, (LPDWORD)&sz.HighPart); // Because TCC complains
         u64 file_size = sz.QuadPart;
         u8 *buffer = arena_pushn(arena, u8, file_size+1);
         buffer[file_size] = '\0';

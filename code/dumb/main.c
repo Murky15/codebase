@@ -34,6 +34,7 @@
 -[ ] Bake in "asset" dir for this game
 -[ ] Metaprogramming
 -[ ] Make Arenas more flexible
+-[ ] Add better support for dynamic arrays in arenas
 */
 
 #define MOUSE_SENSITIVITY 0.01f

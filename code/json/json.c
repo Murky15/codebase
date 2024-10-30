@@ -16,7 +16,7 @@ json_token_list_push (Arena *arena, Json_Token_List *list, Json_Token token) {
 
 core_function Json_Token_List
 json_lex (Arena *arena, String8 json) {
-    // @todo: This lexer is evaluationless, merely including tokens which fit the regex. MUST FIX!!!!
+    // @todo: This lexer is evaluationless, merely including tokens which fit the basic regex. MUST FIX!!!!
     // Also all these "continue"'s are mad annoying
     Json_Token_List tokens = zero_struct;
     
@@ -43,7 +43,7 @@ json_lex (Arena *arena, String8 json) {
                         json_token_list_push(arena, &tokens, new_token);
                     } else {
                         // @todo: Atrocious error handling
-                        fprintf(stderr, "Json lex failed! Unrecognized Symbol.");
+                        fprintf(stderr, "Json lex failed! Unrecognized Symbol.\n");
                         return comp_zero(Json_Token_List);
                     }
                 } else if (char_is_digit(c) || c == '-') {
@@ -55,7 +55,7 @@ json_lex (Arena *arena, String8 json) {
             } break;
             
             case JSON_TOKEN_STRING: {
-                if (c == 34) {
+                if (c == 34) { // (")
                     // @todo: Handle escaped-string processing
                     token_ready = true;
                     goto make_new_token;
@@ -79,7 +79,7 @@ json_lex (Arena *arena, String8 json) {
                         token_ready = true;
                         goto make_new_token;
                     } else {
-                        fprintf(stderr, "Json lex failed! Unrecognized Keyword: %.*s", str8_expand(keyword));
+                        fprintf(stderr, "Json lex failed! Unrecognized Keyword: %.*s\n", str8_expand(keyword));
                         return comp_zero(Json_Token_List);
                     }
                 }
@@ -115,17 +115,46 @@ json_dump_lex (Json_Token_List *tokens, String8 json) {
 
 core_function Json_Object
 json_process_object (Arena *arena, Json_Token_Node **token_stream) {
+    Temp_Arena scratch = get_scratch(&arena, 1);
     Json_Object result = zero_struct;
-    result.type = JSON_OBJECT;
     
-    
-    if (str8_match(obj_start->value), str8_lit("{"),0) {
-        for (Json_Token_Node *token = *token_stream; 
-             !str8_match(token->value, str8_lit("}"),0);
-             token = token->next) {
-            
+    Json_Set *object_sets = 0;
+    u64 num_sets = 0;
+    if (str8_match(*token_steam->value), str8_lit("{"),0) {
+        for (Json_Token_Node *key = *token_stream->next, *next = 0; 
+             !str8_match(token->key, str8_lit("}"),0);
+             key= next) {
+            // Parse set
+            if (key->token.type == JSON_TOKEN_STRING) {
+                Json_Set *new_set = arena_pushn(scratch.arena, Json_Set, 1);
+                new_set.key = key->token.value;
+                Json_Token_Node *seperator = key->next;
+                if (str8_match(seperator->token.value, str8_lit(":"),0)) {
+                    Json_Token_Node *value_token = seperator->next;
+                    Json_Value value = zero_struct;
+                    switch (value_token->token.type) {
+                        case JSON_TOKEN_STRING: value = comp_lit(Json_Value, .type = JSON_STRING, .string = value_token->token.value); break;
+                        case JSON_TOKEN_NUMBER: /* Handle real num vs num distinction here */ break;
+                        case JSON_TOKEN_KEYWORD: break;
+                        case JSON_TOKEN_PUNCTUATOR: break;
+                        default: fprintf(stderr, "Json parse error: Invalid token found!\n"); break;
+                    }
+                } else {
+                    fprintf(stderr, "Json parse error: Invalid separator found in object!\n");
+                    return result;
+                }
+            } else {
+                fprintf(stderr, "Json parse error: Invalid key in object!\n");
+                return result;
+            }
         }
     }
+    
+    result.type  = JSON_TYPE_OBJECT:
+    result.count = ;
+    
+    release_scratch(scratch);
+    return result;
 }
 
 core_function Json_Value* 

@@ -335,3 +335,94 @@ str8_list_to_array (Arena *arena, String8List *list) {
     
     return result;
 }
+
+core_function u64
+u64_from_str8 (String8 string, u32 radix)
+{
+    assert(2 <= radix && radix <= 16);
+    local_persist u8 char_to_value[] =
+    {
+        0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,
+        0x08,0x09,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+        0xFF,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0xFF,
+        0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+    };
+    u64 value = 0;
+    for (u64 i = 0; i < string.len; i += 1)
+    {
+        value *= radix;
+        u8 c = string.str[i];
+        value += char_to_value[(c - 0x30)&0x1F];
+    }
+    return value;
+}
+
+core_function s64
+cint_from_str8 (String8 string)
+{
+    u64 p = 0;
+    
+    // consume sign
+    s64 sign = +1;
+    if(p < string.len)
+    {
+        u8 c = string.str[p];
+        if(c == '-')
+        {
+            sign = -1;
+            p += 1;
+        }
+        else if(c == '+')
+        {
+            p += 1;
+        }
+    }
+    
+    // radix from prefix
+    u64 radix = 10;
+    if(p < string.len)
+    {
+        u8 c0 = string.str[p];
+        if(c0 == '0')
+        {
+            p += 1;
+            radix = 8;
+            if(p < string.len)
+            {
+                u8 c1 = string.str[p];
+                if(c1 == 'x')
+                {
+                    p += 1;
+                    radix = 16;
+                }
+                else if(c1 == 'b')
+                {
+                    p += 1;
+                    radix = 2;
+                }
+            }
+        }
+    }
+    
+    // consume integer "digits"
+    String8 digits_substr = str8_skip(string, p);
+    u64 n = u64_from_str8(digits_substr, radix);
+    
+    // combine result
+    s64 result = sign*n;
+    return result;
+}
+
+core_function f64
+f64_from_str8 (String8 string)
+{
+    char str[64];
+    u64 str_len = string.len;
+    if(str_len > sizeof(str) - 1)
+    {
+        str_len = sizeof(str) - 1;
+    }
+    memory_copy(str, string.str, str_len);
+    str[str_len] = 0;
+    return atof(str);
+}

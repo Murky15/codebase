@@ -35,6 +35,7 @@ enum {
     JSON_ARRAY,
     JSON_STRING,
     JSON_NUMBER,
+    JSON_REAL_NUMBER,
     
     JSON_TYPE_COUNT
 };
@@ -42,18 +43,17 @@ enum {
 typedef struct Json_Object Json_Object;
 typedef struct Json_Array  Json_Array;
 typedef union  Json_Value  Json_Value;
-
-typedef struct Json_Set {
-    String8 key;
-    Json_Value *value;
-} Json_Set;
+typedef struct Json_Set    Json_Set;
 
 struct Json_Object {
     // Open-addressed hash table based on "key-value" pairs
+    // total_slots = count + count/2 just in case the user wants to append values to the object
+    // Json_Set(s) should only be returned by value just in case we need to do a full rehash 
+    // Maybe we should be chaining instead, who knows.
     Json_Type type;
     Json_Set *table;
     u64 count;
-    u64 filled_slots;
+    u64 total_slots;
 };
 
 struct Json_Array {
@@ -74,6 +74,15 @@ union Json_Value {
         Json_Type __pad2;
         u64 number;
     };
+    struct {
+        Json_Type __pad3;
+        f64 real_number;
+    };
+};
+
+struct Json_Set {
+    String8 key;
+    Json_Value value;
 };
 
 //- Lexing functions
