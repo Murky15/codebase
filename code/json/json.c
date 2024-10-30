@@ -114,47 +114,106 @@ json_dump_lex (Json_Token_List *tokens, String8 json) {
 }
 
 core_function Json_Object
-json_process_object (Arena *arena, Json_Token_Node **token_stream) {
+json_process_object (Arena *arena, Json_Token_Node **token) {
     Temp_Arena scratch = get_scratch(&arena, 1);
     Json_Object result = zero_struct;
     
     Json_Set *object_sets = 0;
     u64 num_sets = 0;
-    if (str8_match(*token_steam->value), str8_lit("{"),0) {
-        for (Json_Token_Node *key = *token_stream->next, *next = 0; 
-             !str8_match(token->key, str8_lit("}"),0);
-             key= next) {
+    if (str8_match((*token)->token.value, str8_lit("{"),0)) {
+        for (Json_Token_Node *key = (*token)->next, *next = 0; next;
+             key = next) {
+            
+            if (str8_match(key->token.value, str8_lit("}"),0)) 
+                break;
+            
             // Parse set
             if (key->token.type == JSON_TOKEN_STRING) {
                 Json_Set *new_set = arena_pushn(scratch.arena, Json_Set, 1);
-                new_set.key = key->token.value;
+                num_sets++;
+                object_sets = object_sets == 0 ? new_set : object_sets;
+                new_set->key = key->token.value;
                 Json_Token_Node *seperator = key->next;
                 if (str8_match(seperator->token.value, str8_lit(":"),0)) {
                     Json_Token_Node *value_token = seperator->next;
-                    Json_Value value = zero_struct;
-                    switch (value_token->token.type) {
-                        case JSON_TOKEN_STRING: value = comp_lit(Json_Value, .type = JSON_STRING, .string = value_token->token.value); break;
-                        case JSON_TOKEN_NUMBER: /* Handle real num vs num distinction here */ break;
-                        case JSON_TOKEN_KEYWORD: break;
-                        case JSON_TOKEN_PUNCTUATOR: break;
-                        default: fprintf(stderr, "Json parse error: Invalid token found!\n"); break;
-                    }
+                    Json_Value value = json_process_token(arena, &value_token);
+                    new_set->value = value;
+                    if (str8_match(value_token->token.value, str8_lit(","),0)) 
+                        next = value_token->next;
+                    else
+                        next = 0;
                 } else {
                     fprintf(stderr, "Json parse error: Invalid separator found in object!\n");
-                    return result;
+                    goto end;
                 }
             } else {
                 fprintf(stderr, "Json parse error: Invalid key in object!\n");
-                return result;
+                goto end;
             }
+        } else {
+            fprintf(stderr, "Json parse error: Unrecognized token!\n");
+            goto end;
         }
     }
     
-    result.type  = JSON_TYPE_OBJECT:
-    result.count = ;
+    result.type  = JSON_OBJECT;
+    result.count = num_sets;
+    result.total_slots = num_sets * 1.5f;
+    result.table = arena_pushn(arena, Json_Set, result.total_slots);
     
+    end:
     release_scratch(scratch);
     return result;
+}
+
+core_function Json_Array
+json_process_array () {
+    
+}
+
+core_function Json_Value
+json_process_token (Arena *arena, Json_Token_Node **token_stream) {
+    Json_Value value = zero_struct;
+    Json_Token token = (*token_stream)->token;
+    switch (token.type) {
+        case JSON_TOKEN_STRING: {
+            value.type = JSON_STRING;
+            value.string = token.value;
+        } break;
+        
+        case JSON_TOKEN_NUMBER: { 
+            value.type = JSON_NUMBER;
+            value.number = f64_from_str8(token.value);
+        } break;
+        
+        case JSON_TOKEN_KEYWORD: {
+            value.type = JSON_KEYWORD;
+            // @todo: We already make this comparison in the tokenizer, why are we doing this twice.
+            if (token.value.str[0] == 't') {
+                value.keyword = JSON_KEYWORD_TRUE;
+            } else if (token.value.str[0] == 'f') {
+                value.keyword = JSON_KEYWORD_FALSE;
+            } else if (token.value.str[0] == 'n') {
+                value.keyword = JSON_KEYWORD_NULL;
+            }
+        } break;
+        
+        case JSON_TOKEN_PUNCTUATOR: {
+            if (token.value.str[0] == '{') {
+                value = (Json_Value)json_process_object(arena, &token_stream);
+            } else if (token.value.str[0] == '[') {
+                value = (Json_Value)json_process_array(arena, &token_stream);
+            } else {
+                fprintf(stderr, "Json parse error: Unexpected symbol: %.*s\n", str8_expand(token.value));
+            }
+        } break;
+        
+        default: fprintf(stderr, "Json parse error: Invalid token found!\n"); break;
+        
+    }
+    
+    *token_stream = (*token_stream)->next;
+    return value;
 }
 
 core_function Json_Value* 
