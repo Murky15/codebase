@@ -15,7 +15,7 @@ function void r_put_pixel_at(Vec2 p, Color c);
 function void r_clear(void);
 function void r_clear_color(Color c);
 
-//- @note: Primatives
+//- @note: Primitives
 function void r_draw_circle(Vec2 p, f32 r, Color c);
 function void r_draw_line(Vec2 p0, Vec2 p1, Color c);
 function void r_draw_vert(f32 x, f32 y0, f32 y1, Color c);

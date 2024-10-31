@@ -337,8 +337,7 @@ str8_list_to_array (Arena *arena, String8List *list) {
 }
 
 core_function u64
-u64_from_str8 (String8 string, u32 radix)
-{
+u64_from_str8 (String8 string, u32 radix) {
     assert(2 <= radix && radix <= 16);
     local_persist u8 char_to_value[] =
     {
@@ -358,8 +357,7 @@ u64_from_str8 (String8 string, u32 radix)
 }
 
 core_function s64
-cint_from_str8 (String8 string)
-{
+cint_from_str8 (String8 string) {
     u64 p = 0;
     
     // consume sign
@@ -414,8 +412,7 @@ cint_from_str8 (String8 string)
 }
 
 core_function f64
-f64_from_str8 (String8 string)
-{
+f64_from_str8 (String8 string) {
     char str[64];
     u64 str_len = string.len;
     if(str_len > sizeof(str) - 1)
@@ -425,4 +422,14 @@ f64_from_str8 (String8 string)
     memory_copy(str, string.str, str_len);
     str[str_len] = 0;
     return atof(str);
+}
+
+core_function u64 
+str8_hash (String8 string) {
+    u64 hash = 5381;
+    for (u64 c = 0; c < string.len; ++c) {
+        hash = ((hash << 5) + hash) + c;
+    }
+    
+    return hash;
 }

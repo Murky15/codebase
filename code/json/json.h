@@ -55,10 +55,6 @@ typedef union  Json_Value  Json_Value;
 typedef struct Json_Set    Json_Set;
 
 struct Json_Object {
-    // Open-addressed hash table based on "key-value" pairs
-    // total_slots = count *= 1.5f just in case the user wants to append values to the object
-    // Json_Set(s) should only be returned by value just in case we need to do a full rehash 
-    // Maybe we should be chaining instead, who knows.
     Json_Type type;
     Json_Set *table;
     u64 count;
@@ -95,8 +91,14 @@ core_function void json_token_list_push(Arena *arena, Json_Token_List *list, Jso
 core_function Json_Token_List json_lex(Arena *arena, String8 json);
 core_function void json_dump_lex(Json_Token_List *tokens, String8 json);
 
+//- Object/Array manipulation
+core_function Json_Set json_object_fetch(Json_Object *object, String8 key);
+core_function void     json_object_add(Json_Object *object, Json_Set new_set);
+
 //- Parsing functions
 core_function Json_Object json_process_object(Arena *arena, Json_Token_Node **token);
+core_function Json_Array  json_process_array(Arena *arena, Json_Token_Node **token);
 core_function Json_Value  json_process_token(Arena *arena, Json_Token_Node **token_stream);
 core_function Json_Value* json_parse(Arena *arena, String8 json);
+
 #endif //JSON_H

@@ -113,18 +113,28 @@ json_dump_lex (Json_Token_List *tokens, String8 json) {
     }
 }
 
+core_function Json_Set 
+json_object_fetch (Json_Object *object, String8 key) {
+    
+}
+
+core_function void     
+json_object_add (Json_Object *object, Json_Set new_set) {
+    
+}
+
 core_function Json_Object
 json_process_object (Arena *arena, Json_Token_Node **token) {
     Temp_Arena scratch = get_scratch(&arena, 1);
     Json_Object result = zero_struct;
     
-    Json_Set *object_sets = 0;
-    u64 num_sets = 0;
-    if (str8_match((*token)->token.value, str8_lit("{"),0)) {
-        for (Json_Token_Node *key = (*token)->next, *next = 0; next;
-             key = next) {
+    if ((*token)->token.value.str[0] == '{') {
+        Json_Set *object_sets = 0;
+        u64 num_sets = 0;
+        Json_Token_Node *next = 0;
+        for (Json_Token_Node *key = (*token)->next; next; key = next) {
             
-            if (str8_match(key->token.value, str8_lit("}"),0)) 
+            if (key->token.value.str[0] == '}') 
                 break;
             
             // Parse set
@@ -134,11 +144,11 @@ json_process_object (Arena *arena, Json_Token_Node **token) {
                 object_sets = object_sets == 0 ? new_set : object_sets;
                 new_set->key = key->token.value;
                 Json_Token_Node *seperator = key->next;
-                if (str8_match(seperator->token.value, str8_lit(":"),0)) {
+                if (seperator->token.value.str[0] == ':') {
                     Json_Token_Node *value_token = seperator->next;
                     Json_Value value = json_process_token(arena, &value_token);
                     new_set->value = value;
-                    if (str8_match(value_token->token.value, str8_lit(","),0)) 
+                    if (value_token->token.value.str[0] == ',') 
                         next = value_token->next;
                     else
                         next = 0;
@@ -150,16 +160,23 @@ json_process_object (Arena *arena, Json_Token_Node **token) {
                 fprintf(stderr, "Json parse error: Invalid key in object!\n");
                 goto end;
             }
-        } else {
-            fprintf(stderr, "Json parse error: Unrecognized token!\n");
-            goto end;
         }
+        
+        *token = next;
+        result.type  = JSON_OBJECT;
+        result.count = num_sets;
+        result.total_slots = count; // num_sets * 1.5f;
+        result.table = arena_pushn(arena, Json_Set, result.total_slots);
+        
+        // Populate object with new sets
+        for (u64 i = 0; i < num_sets; ++i) {
+            
+        }
+        
+    } else {
+        fprintf(stderr, "Json parse error: Unrecognized token!\n");
+        goto end;
     }
-    
-    result.type  = JSON_OBJECT;
-    result.count = num_sets;
-    result.total_slots = num_sets * 1.5f;
-    result.table = arena_pushn(arena, Json_Set, result.total_slots);
     
     end:
     release_scratch(scratch);
@@ -200,9 +217,9 @@ json_process_token (Arena *arena, Json_Token_Node **token_stream) {
         
         case JSON_TOKEN_PUNCTUATOR: {
             if (token.value.str[0] == '{') {
-                value = (Json_Value)json_process_object(arena, &token_stream);
+                value = (Json_Value)json_process_object(arena, token_stream);
             } else if (token.value.str[0] == '[') {
-                value = (Json_Value)json_process_array(arena, &token_stream);
+                value = (Json_Value)json_process_array(arena, token_stream);
             } else {
                 fprintf(stderr, "Json parse error: Unexpected symbol: %.*s\n", str8_expand(token.value));
             }
@@ -222,10 +239,10 @@ json_parse (Arena *arena, String8 json) {
     Temp_Arena scratch = get_scratch(&arena, 1);
     
     Json_Token_List tokens = json_lex(scratch.arena, json);
+    Json_Token_Node *token_stream = tokens.first;
     if (tokens.first != 0) {
-        // json_dump_lex(&tokens, json);
-        
-        
+        //json_dump_lex(&tokens, json);
+        json_process_token(scratch.arena, &token_stream);
     }
     release_scratch(scratch);
     return result;
