@@ -31,7 +31,7 @@ typedef struct Json_Token_List {
 //- Parsed Data
 typedef u32 Json_Type;
 enum {
-    JSON_OBJECT,
+    JSON_OBJECT = 1,
     JSON_ARRAY,
     JSON_STRING,
     JSON_NUMBER,
@@ -52,6 +52,8 @@ enum {
 typedef struct Json_Object Json_Object;
 typedef struct Json_Array  Json_Array;
 typedef union  Json_Value  Json_Value;
+typedef struct Json_Value_Node Json_Value_Node;
+typedef struct Json_Value_List Json_Value_List;
 typedef struct Json_Set    Json_Set;
 
 struct Json_Object {
@@ -61,10 +63,14 @@ struct Json_Object {
     u64 total_slots;
 };
 
+struct Json_Value_List {
+    Json_Value_Node *first, *last;
+    u64 count;
+};
+
 struct Json_Array {
     Json_Type type;
-    Json_Value *values;
-    u64 count;
+    Json_Value_List values;
 };
 
 union Json_Value {
@@ -81,6 +87,11 @@ union Json_Value {
     };
 };
 
+struct Json_Value_Node {
+    Json_Value_Node *next;
+    Json_Value value;
+};
+
 struct Json_Set {
     String8 key;
     Json_Value value;
@@ -91,14 +102,15 @@ core_function void json_token_list_push(Arena *arena, Json_Token_List *list, Jso
 core_function Json_Token_List json_lex(Arena *arena, String8 json);
 core_function void json_dump_lex(Json_Token_List *tokens, String8 json);
 
-//- Object/Array manipulation
+//- @incomplete Object/Array manipulation
 core_function Json_Set json_object_fetch(Json_Object *object, String8 key);
-core_function void     json_object_add(Json_Object *object, Json_Set new_set);
+
+//- @todo Serialization functions & better program mutability
 
 //- Parsing functions
 core_function Json_Object json_process_object(Arena *arena, Json_Token_Node **token);
 core_function Json_Array  json_process_array(Arena *arena, Json_Token_Node **token);
 core_function Json_Value  json_process_token(Arena *arena, Json_Token_Node **token_stream);
-core_function Json_Value* json_parse(Arena *arena, String8 json);
+core_function Json_Value  json_parse(Arena *arena, String8 json);
 
 #endif //JSON_H

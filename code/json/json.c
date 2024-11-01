@@ -115,12 +115,21 @@ json_dump_lex (Json_Token_List *tokens, String8 json) {
 
 core_function Json_Set 
 json_object_fetch (Json_Object *object, String8 key) {
+    u64 hash = str8_hash(key) & object->total_slots;
+    while (!str8_match(object->table[hash].key, key, 0)) {
+        hash++;
+        hash %= object->total_slots;
+    }
     
+    return object->table[hash];
 }
 
-core_function void     
-json_object_add (Json_Object *object, Json_Set new_set) {
-    
+core_function void
+json_value_list_push (Arena *arena, Json_Value_List *list, Json_Value value) {
+    Json_Value_Node *node = arena_pushn(arena, Json_Value_Node, 1);
+    node->value = value;
+    sll_queue_push(list->first, list->last, node);
+    list->count++;
 }
 
 core_function Json_Object
@@ -131,11 +140,8 @@ json_process_object (Arena *arena, Json_Token_Node **token) {
     if ((*token)->token.value.str[0] == '{') {
         Json_Set *object_sets = 0;
         u64 num_sets = 0;
-        Json_Token_Node *next = 0;
-        for (Json_Token_Node *key = (*token)->next; next; key = next) {
-            
-            if (key->token.value.str[0] == '}') 
-                break;
+        Json_Token_Node *next = (*token);
+        for (Json_Token_Node *key = (*token)->next; next->token.value.str[0] != '}'; key = next) {
             
             // Parse set
             if (key->token.type == JSON_TOKEN_STRING) {
@@ -148,10 +154,14 @@ json_process_object (Arena *arena, Json_Token_Node **token) {
                     Json_Token_Node *value_token = seperator->next;
                     Json_Value value = json_process_token(arena, &value_token);
                     new_set->value = value;
-                    if (value_token->token.value.str[0] == ',') 
+                    if (value_token->token.value.str[0] == ',') {
                         next = value_token->next;
-                    else
-                        next = 0;
+                    } else if (value_token->token.value.str[0] == '}') {
+                        next = value_token;
+                    } else {
+                        fprintf(stderr, "Json parse error: Unexpected end of object found!\n");
+                        goto end;
+                    }
                 } else {
                     fprintf(stderr, "Json parse error: Invalid separator found in object!\n");
                     goto end;
@@ -165,17 +175,22 @@ json_process_object (Arena *arena, Json_Token_Node **token) {
         *token = next;
         result.type  = JSON_OBJECT;
         result.count = num_sets;
-        result.total_slots = count; // num_sets * 1.5f;
+        result.total_slots = num_sets; // num_sets * 1.5f;
+        // @todo: Maybe we should allocate more slots in case the user wants to mutate the data,
+        // but in most cases the user just reads it. IDK I have to profile this
         result.table = arena_pushn(arena, Json_Set, result.total_slots);
-        
-        // Populate object with new sets
-        for (u64 i = 0; i < num_sets; ++i) {
-            
+        for (u64 i = 0; i < result.count; ++i) {
+            Json_Set new_set = object_sets[i];
+            u64 hash = str8_hash(new_set.key) % result.total_slots;
+            while (result.table[hash].key.str != 0) {
+                hash += 1;
+                hash %= result.total_slots;
+            }
+            result.table[hash] = new_set;
         }
         
     } else {
         fprintf(stderr, "Json parse error: Unrecognized token!\n");
-        goto end;
     }
     
     end:
@@ -184,8 +199,19 @@ json_process_object (Arena *arena, Json_Token_Node **token) {
 }
 
 core_function Json_Array
-json_process_array () {
+json_process_array (Arena *arena, Json_Token_Node **token) {
+    Json_Array result = zero_struct;
+    result.type = JSON_ARRAY;
+    if ((*token)->token.value.str[0] == '[') {
+        for () {
+            Json_Token_Node *element = (*token)->next;
+            Json_Value value_to_add = json_process_token(arena, );
+        }
+    } else {
+        fprintf(stderr, "Json parse error: Unrecognized token!\n");
+    }
     
+    return result;
 }
 
 core_function Json_Value
@@ -226,24 +252,61 @@ json_process_token (Arena *arena, Json_Token_Node **token_stream) {
         } break;
         
         default: fprintf(stderr, "Json parse error: Invalid token found!\n"); break;
-        
     }
     
     *token_stream = (*token_stream)->next;
     return value;
 }
 
-core_function Json_Value* 
+core_function void
+json_print (Json_Value value) {
+    local_persist int depth;
+    depth++;
+    
+    switch (value.type) {
+        case JSON_OBJECT: {
+            printf("Object:\n");
+            Json_Object *object = (Json_Object*)&value.object;
+            for (u64 i = 0; i < object->count; ++i) {
+                Json_Set set = object->table[i];
+                for (int j = 0; j < depth; ++j) {
+                    printf("\t");
+                }
+                printf("%.*s: ", str8_expand(set.key));
+                json_print(set.value);
+            }
+        } break;
+        
+        case JSON_ARRAY: {
+            
+        } break;
+        
+        case JSON_STRING: {
+            printf("\"%.*s\"\n", str8_expand(value.string));
+        } break;
+        
+        case JSON_NUMBER: {
+            printf("%f\n", value.number);
+        } break;
+        
+        case JSON_KEYWORD: {
+            printf("%d\n", value.keyword);
+        } break;
+    }
+    depth--;
+}
+
+core_function Json_Value
 json_parse (Arena *arena, String8 json) {
-    Json_Value *result = 0;
+    Json_Value result = zero_struct;
     Temp_Arena scratch = get_scratch(&arena, 1);
     
     Json_Token_List tokens = json_lex(scratch.arena, json);
     Json_Token_Node *token_stream = tokens.first;
     if (tokens.first != 0) {
-        //json_dump_lex(&tokens, json);
-        json_process_token(scratch.arena, &token_stream);
+        result = json_process_token(arena, &token_stream);
     }
+    
     release_scratch(scratch);
     return result;
 }
@@ -252,8 +315,10 @@ json_parse (Arena *arena, String8 json) {
 int main (void) {
     // Read "test.json"
     Temp_Arena scratch = get_scratch(0,0);
+    
     String8 file = os_read_file(scratch.arena, str8_lit("test.json"), false);
-    Json_Value *value = json_parse(scratch.arena, file);
+    Json_Value value = json_parse(scratch.arena, file);
+    json_print(value);
     
     release_scratch(scratch);
 }
