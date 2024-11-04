@@ -63,7 +63,12 @@ json_lex (Arena *arena, String8 json) {
             } break;
             
             case JSON_TOKEN_NUMBER: {
-                b32 cond = char_is_digit(nc) || nc == 'E' || nc == 'e' || nc == '.' || nc == '+' || nc == '-';
+                b32 cond = char_is_digit(c) || 
+                    c == 'E' ||
+                    c == 'e' || 
+                    c == '.' || 
+                    c == '+' || 
+                    c == '-';
                 if (!cond) {
                     token_ready = true;
                     goto make_new_token;
@@ -88,7 +93,7 @@ json_lex (Arena *arena, String8 json) {
         
         make_new_token:
         if (active_token_type != JSON_TOKEN_NULL && token_ready) {
-            u64 end_idx = active_token_type == JSON_TOKEN_STRING ? i : j;
+            u64 end_idx = active_token_type == JSON_TOKEN_KEYWORD ? j : i;
             Json_Token new_token = {active_token_type, str8_sub(json, word_idx, end_idx)};
             json_token_list_push(arena, &tokens, new_token);
             active_token_type = JSON_TOKEN_NULL;
@@ -201,16 +206,31 @@ json_process_object (Arena *arena, Json_Token_Node **token) {
 core_function Json_Array
 json_process_array (Arena *arena, Json_Token_Node **token) {
     Json_Array result = zero_struct;
+    u64 backup_pos = arena_pos(arena);
     result.type = JSON_ARRAY;
     if ((*token)->token.value.str[0] == '[') {
-        for () {
-            Json_Token_Node *element = (*token)->next;
-            Json_Value value_to_add = json_process_token(arena, );
+        Json_Token_Node *token_idx = (*token)->next;
+        for (;; token_idx = token_idx->next) {
+            Json_Value value_to_add = json_process_token(arena, &token_idx);
+            json_value_list_push(arena, &result.values, value_to_add);
+            u8 punctuator = token_idx->token.type == JSON_TOKEN_PUNCTUATOR ? token_idx->token.value.str[0] : 0;
+            if (punctuator != ',') {
+                if (punctuator == ']') { // For some reason this doesn't work if I put it as the `for` condition and I think I might be tweaking but this works too.
+                    break;
+                } else {
+                    fprintf(stderr, "Json parse error: Unexpected end of array found!\n");
+                    arena_pop_to(arena, backup_pos);
+                    goto end;
+                }
+            }
         }
+        
+        *token = token_idx;
     } else {
         fprintf(stderr, "Json parse error: Unrecognized token!\n");
     }
     
+    end:
     return result;
 }
 
@@ -262,35 +282,44 @@ core_function void
 json_print (Json_Value value) {
     local_persist int depth;
     depth++;
-    
     switch (value.type) {
         case JSON_OBJECT: {
+            Json_Object *object = (Json_Object*)&value;
             printf("Object:\n");
-            Json_Object *object = (Json_Object*)&value.object;
             for (u64 i = 0; i < object->count; ++i) {
                 Json_Set set = object->table[i];
                 for (int j = 0; j < depth; ++j) {
-                    printf("\t");
+                    printf("  ");
                 }
                 printf("%.*s: ", str8_expand(set.key));
                 json_print(set.value);
+                printf("\n");
             }
         } break;
         
         case JSON_ARRAY: {
-            
+            Json_Array *array = (Json_Array*)&value;
+            printf("[");
+            u64 i = 1;
+            for (Json_Value_Node *value_node = array->values.first; 
+                 value_node; value_node = value_node->next, ++i) {
+                json_print(value_node->value);
+                if (i < array->values.count)
+                    printf(", ");
+            }
+            printf("]\n");
         } break;
         
         case JSON_STRING: {
-            printf("\"%.*s\"\n", str8_expand(value.string));
+            printf("\"%.*s\"", str8_expand(value.string));
         } break;
         
         case JSON_NUMBER: {
-            printf("%f\n", value.number);
+            printf("%f", value.number);
         } break;
         
         case JSON_KEYWORD: {
-            printf("%d\n", value.keyword);
+            printf("%d", value.keyword);
         } break;
     }
     depth--;
@@ -316,7 +345,7 @@ int main (void) {
     // Read "test.json"
     Temp_Arena scratch = get_scratch(0,0);
     
-    String8 file = os_read_file(scratch.arena, str8_lit("test.json"), false);
+    String8 file = os_read_file(scratch.arena, str8_lit("test3.json"), false);
     Json_Value value = json_parse(scratch.arena, file);
     json_print(value);
     
