@@ -26,74 +26,74 @@ json_lex (Arena *arena, String8 json) {
     for (u64 i = 0, j = 1; i < json.len; ++i, ++j) {
         u8 c = json.str[i];
         u8 nc = j < json.len ? json.str[j] : 0;
-        switch (active_token_type) {
-            case JSON_TOKEN_NULL: {
-                if (char_is_alpha(c)) {
-                    active_token_type = JSON_TOKEN_KEYWORD;
-                    word_idx = i;
-                } else if (char_is_symbol(c)) {
-                    if (c == 34) {
-                        active_token_type = JSON_TOKEN_STRING;
-                        word_idx = i + 1;
-                    } else if (c == '{' || c == '}' 
-                               || c == '[' || c == ']' 
-                               || c == ','
-                               || c == ':') {
-                        Json_Token new_token = {JSON_TOKEN_PUNCTUATOR, str8_sub(json, i, j)};
-                        json_token_list_push(arena, &tokens, new_token);
-                    } else {
-                        // @todo: Atrocious error handling
-                        fprintf(stderr, "Json lex failed! Unrecognized Symbol.\n");
-                        return comp_zero(Json_Token_List);
-                    }
-                } else if (char_is_digit(c) || c == '-') {
-                    active_token_type = JSON_TOKEN_NUMBER;
-                    word_idx = i;
-                } else if (char_is_space(c) || char_is_control(c)) {
+        
+        if (active_token_type == JSON_TOKEN_NULL) {
+            if (char_is_alpha(c)) {
+                active_token_type = JSON_TOKEN_KEYWORD;
+                word_idx = i;
+            } else if (char_is_symbol(c)) {
+                if (c == 34) {
+                    active_token_type = JSON_TOKEN_STRING;
+                    word_idx = i + 1;
                     continue;
+                } else if (c == '{' || c == '}' 
+                           || c == '[' || c == ']' 
+                           || c == ','
+                           || c == ':') {
+                    Json_Token new_token = {JSON_TOKEN_PUNCTUATOR, str8_sub(json, i, j)};
+                    json_token_list_push(arena, &tokens, new_token);
+                } else {
+                    // @todo: Atrocious error handling
+                    fprintf(stderr, "Json lex failed! Unrecognized Symbol.\n");
+                    return comp_zero(Json_Token_List);
                 }
-            } break;
-            
-            case JSON_TOKEN_STRING: {
-                if (c == 34) { // (")
-                    // @todo: Handle escaped-string processing
-                    token_ready = true;
-                    goto make_new_token;
-                }
-            } break;
-            
-            case JSON_TOKEN_NUMBER: {
-                b32 cond = char_is_digit(c) || 
-                    c == 'E' ||
-                    c == 'e' || 
-                    c == '.' || 
-                    c == '+' || 
-                    c == '-';
-                if (!cond) {
-                    token_ready = true;
-                    goto make_new_token;
-                }
-            } break;
-            
-            case JSON_TOKEN_KEYWORD: {
-                if (!char_is_alpha(nc)) {
-                    String8 keyword = str8_sub(json, word_idx, j);
-                    if (str8_match(keyword, str8_lit("true"),0) ||
-                        str8_match(keyword, str8_lit("false"),0) ||
-                        str8_match(keyword, str8_lit("null"),0)) {
-                        token_ready = true;
-                        goto make_new_token;
-                    } else {
-                        fprintf(stderr, "Json lex failed! Unrecognized Keyword: %.*s\n", str8_expand(keyword));
-                        return comp_zero(Json_Token_List);
-                    }
-                }
-            } break;
+            } else if (char_is_digit(c) || c == '-') {
+                active_token_type = JSON_TOKEN_NUMBER;
+                word_idx = i;
+            } else if (char_is_space(c) || char_is_control(c)) {
+                continue;
+            }
         }
+        
+        if (active_token_type == JSON_TOKEN_STRING) {
+            if (c == 34) { // (")
+                // @todo: Handle escaped-string processing
+                token_ready = true;
+                goto make_new_token;
+            }
+        }
+        
+        if (active_token_type == JSON_TOKEN_NUMBER) {
+            b32 cond = char_is_digit(nc) || 
+                nc == 'E' ||
+                nc == 'e' || 
+                nc == '.' || 
+                nc == '+' || 
+                nc == '-';
+            if (!cond) {
+                token_ready = true;
+                goto make_new_token;
+            }
+        }
+        
+        if (active_token_type == JSON_TOKEN_KEYWORD) {
+            if (!char_is_alpha(nc)) {
+                String8 keyword = str8_sub(json, word_idx, j);
+                if (str8_match(keyword, str8_lit("true"),0) ||
+                    str8_match(keyword, str8_lit("false"),0) ||
+                    str8_match(keyword, str8_lit("null"),0)) {
+                    token_ready = true;
+                    goto make_new_token;
+                } else {
+                    fprintf(stderr, "Json lex failed! Unrecognized Keyword: %.*s\n", str8_expand(keyword));
+                    return comp_zero(Json_Token_List);
+                }
+            }
+        } 
         
         make_new_token:
         if (active_token_type != JSON_TOKEN_NULL && token_ready) {
-            u64 end_idx = active_token_type == JSON_TOKEN_KEYWORD ? j : i;
+            u64 end_idx = active_token_type == JSON_TOKEN_STRING ? i : j;
             Json_Token new_token = {active_token_type, str8_sub(json, word_idx, end_idx)};
             json_token_list_push(arena, &tokens, new_token);
             active_token_type = JSON_TOKEN_NULL;
@@ -340,14 +340,12 @@ json_parse (Arena *arena, String8 json) {
     return result;
 }
 
-// Quick test
+#if 0
 int main (void) {
-    // Read "test.json"
     Temp_Arena scratch = get_scratch(0,0);
-    
     String8 file = os_read_file(scratch.arena, str8_lit("test3.json"), false);
     Json_Value value = json_parse(scratch.arena, file);
     json_print(value);
-    
     release_scratch(scratch);
 }
+#endif

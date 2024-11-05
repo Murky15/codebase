@@ -49,12 +49,12 @@ enum {
     JSON_KEYWORD_COUNT
 };
 
-typedef struct Json_Object Json_Object;
-typedef struct Json_Array  Json_Array;
-typedef union  Json_Value  Json_Value;
+typedef struct Json_Object     Json_Object;
+typedef struct Json_Array      Json_Array;
+typedef union  Json_Value      Json_Value;
 typedef struct Json_Value_Node Json_Value_Node;
 typedef struct Json_Value_List Json_Value_List;
-typedef struct Json_Set    Json_Set;
+typedef struct Json_Set        Json_Set;
 
 struct Json_Object {
     Json_Type type;
@@ -104,8 +104,10 @@ core_function void json_dump_lex(Json_Token_List *tokens, String8 json);
 
 //- @incomplete Object/Array manipulation
 core_function Json_Set json_object_fetch(Json_Object *object, String8 key);
+core_function void json_value_list_push(Arena *arena, Json_Value_List *list, Json_Value value);
 
-//- @todo Serialization functions & better program mutability
+//- @incomplete Serialization functions & better program-side data mutability
+core_function void json_print(Json_Value value);
 
 //- Parsing functions
 core_function Json_Object json_process_object(Arena *arena, Json_Token_Node **token);
