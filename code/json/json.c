@@ -1,11 +1,3 @@
-#include <stdio.h>
-
-#include "../base/include.h"
-#include "../os/include.h"
-#include "../base/include.c"
-#include "../os/include.c"
-#include "json.h"
-
 core_function void
 json_token_list_push (Arena *arena, Json_Token_List *list, Json_Token token) {
     Json_Token_Node *node = arena_pushn(arena, Json_Token_Node, 1);
@@ -182,7 +174,7 @@ json_process_object (Arena *arena, Json_Token_Node **token) {
         result.count = num_sets;
         result.total_slots = num_sets; // num_sets * 1.5f;
         // @todo: Maybe we should allocate more slots in case the user wants to mutate the data,
-        // but in most cases the user just reads it. IDK I have to profile this
+        // but in most cases the user just reads it. IDK I have to return to this
         result.table = arena_pushn(arena, Json_Set, result.total_slots);
         for (u64 i = 0; i < result.count; ++i) {
             Json_Set new_set = object_sets[i];
@@ -340,6 +332,7 @@ json_parse (Arena *arena, String8 json) {
     return result;
 }
 
+//- Example
 #if 0
 int main (void) {
     Temp_Arena scratch = get_scratch(0,0);
