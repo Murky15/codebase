@@ -20,7 +20,7 @@ os_read_file (Arena *arena, String8 path, b32 create_if_not_exist) {
         u64 file_size = sz.QuadPart;
         u8 *buffer = arena_pushn(arena, u8, file_size+1);
         buffer[file_size] = '\0';
-        u64 bytes_read;
+        u64 bytes_read = 0;
         if (file_size > u32_max) {
             u32 diff = (u32)(file_size - u32_max);
             DWORD first_read, second_read;
@@ -67,3 +67,19 @@ os_write_file (String8 path, String8 to_write, b32 create_if_not_exist) {
     release_scratch(scratch);
     return success;
 }
+
+core_function void
+os_debug_print (String8 string) {
+    char buff[string.len];
+    snprintf(buff, string.len, "%.*s", str8_expand(string));
+    OutputDebugString(buff);
+}
+/*
+core_function Console
+os_get_console (b32 create_if_not_exist) {
+    Console result = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (result == NULL && create_if_not_exist)
+Alloc
+
+    return result;
+}*/

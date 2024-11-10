@@ -110,6 +110,7 @@ core_function void json_value_list_push(Arena *arena, Json_Value_List *list, Jso
 core_function void json_print(Json_Value value);
 
 //- Parsing functions
+// @note: Trailing commas are *not supported*
 core_function Json_Object json_process_object(Arena *arena, Json_Token_Node **token);
 core_function Json_Array  json_process_array(Arena *arena, Json_Token_Node **token);
 core_function Json_Value  json_process_token(Arena *arena, Json_Token_Node **token_stream);

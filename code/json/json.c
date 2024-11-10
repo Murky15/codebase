@@ -23,6 +23,9 @@ json_lex (Arena *arena, String8 json) {
             if (char_is_alpha(c)) {
                 active_token_type = JSON_TOKEN_KEYWORD;
                 word_idx = i;
+            } else if (char_is_digit(c) || c == '-') {
+                active_token_type = JSON_TOKEN_NUMBER;
+                word_idx = i;
             } else if (char_is_symbol(c)) {
                 if (c == 34) {
                     active_token_type = JSON_TOKEN_STRING;
@@ -39,9 +42,6 @@ json_lex (Arena *arena, String8 json) {
                     fprintf(stderr, "Json lex failed! Unrecognized Symbol.\n");
                     return comp_zero(Json_Token_List);
                 }
-            } else if (char_is_digit(c) || c == '-') {
-                active_token_type = JSON_TOKEN_NUMBER;
-                word_idx = i;
             } else if (char_is_space(c) || char_is_control(c)) {
                 continue;
             }
@@ -112,7 +112,7 @@ json_dump_lex (Json_Token_List *tokens, String8 json) {
 
 core_function Json_Set 
 json_object_fetch (Json_Object *object, String8 key) {
-    u64 hash = str8_hash(key) & object->total_slots;
+    u64 hash = str8_hash(key) % object->total_slots;
     while (!str8_match(object->table[hash].key, key, 0)) {
         hash++;
         hash %= object->total_slots;
@@ -202,21 +202,22 @@ json_process_array (Arena *arena, Json_Token_Node **token) {
     result.type = JSON_ARRAY;
     if ((*token)->token.value.str[0] == '[') {
         Json_Token_Node *token_idx = (*token)->next;
-        for (;; token_idx = token_idx->next) {
-            Json_Value value_to_add = json_process_token(arena, &token_idx);
-            json_value_list_push(arena, &result.values, value_to_add);
-            u8 punctuator = token_idx->token.type == JSON_TOKEN_PUNCTUATOR ? token_idx->token.value.str[0] : 0;
-            if (punctuator != ',') {
-                if (punctuator == ']') { // For some reason this doesn't work if I put it as the `for` condition and I think I might be tweaking but this works too.
-                    break;
-                } else {
-                    fprintf(stderr, "Json parse error: Unexpected end of array found!\n");
-                    arena_pop_to(arena, backup_pos);
-                    goto end;
+        if (token_idx->token.value.str[0] != ']') { // empty array
+            for (;; token_idx = token_idx->next) {
+                Json_Value value_to_add = json_process_token(arena, &token_idx);
+                json_value_list_push(arena, &result.values, value_to_add);
+                u8 punctuator = token_idx->token.type == JSON_TOKEN_PUNCTUATOR ? token_idx->token.value.str[0] : 0;
+                if (punctuator != ',') {
+                    if (punctuator == ']') {
+                        break;
+                    } else {
+                        fprintf(stderr, "Json parse error: Unexpected end of array found!\n");
+                        arena_pop_to(arena, backup_pos);
+                        goto end;
+                    }
                 }
             }
         }
-        
         *token = token_idx;
     } else {
         fprintf(stderr, "Json parse error: Unrecognized token!\n");

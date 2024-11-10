@@ -12,7 +12,7 @@ else
   echo "[Release mode]"
 fi
 
-debug_defines="-DENABLE_ASSERT=1"
+debug_defines="-DDEBUG=1 -DENABLE_ASSERT=1"
 if [[ "$msvc" == 1 ]]; then
   echo "[MSVC compile]"
   debug="-Od -Zi -WX -W3 -wd4146 -wd4005 -wd4101 $debug_defines"
@@ -53,6 +53,5 @@ mkdir -p build
 pushd build >> /dev/null
 built=0
 if [[ "$dumb" == 1 ]]; then built=1 && eval "$compile ../code/dumb/main.c $add_lib User32.lib $add_lib Gdi32.lib $out"dumb.exe"" || exit 1; fi
-if [[ "$gol" == 1 ]]; then built=1 && eval "$compile ../code/gol/gol.c $add_lib User32.lib $add_lib Gdi32.lib $out"game_of_life.exe"" || exit 1; fi
 if [[ "$built" == 0 ]]; then echo "Unrecognized target!"; fi
 popd >> /dev/null

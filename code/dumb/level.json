@@ -1,0 +1,17 @@
+{
+	"name": "Test level",
+	"sectors": [
+		{
+			"id": 0,
+			"depth": 0,
+			"height": 30,
+			"ceiling_texture": null,
+			"floor_texture": null,
+			"wall_texture": null,
+			"walls": [
+				{"coords": ["x1", "y1", "x2", "y2"], "next_sector": -1}
+			],
+			"entities": []
+		}
+	]
+}

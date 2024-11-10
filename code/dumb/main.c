@@ -5,12 +5,14 @@
 #include <time.h>
 #include "base/include.h"
 #include "os/include.h"
+#include "json/json.h"
 #include "game.h"
 #include "renderer.h"
 
 //- @note: Source
 #include "base/include.c"
 #include "os/include.c"
+#include "json/json.c"
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
 #include "third_party/stb_truetype.h"
@@ -74,7 +76,6 @@ win32_capture_mouse (HWND hwnd) {
     ClientToScreen(hwnd, &middle);
     SetCursorPos(middle.x, middle.y);
 }
-
 
 function LRESULT
 Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -153,7 +154,6 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                         win32_capture_mouse(hwnd);
                     }
                 }
-                
                 
                 if (mouse->usButtonFlags & RI_MOUSE_WHEEL) {
                     short wheel = (short)mouse->usButtonData;
@@ -292,6 +292,11 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     test_walls[3].p0 = v2add(player.pos, v2(-100, 0));
     test_walls[3].p1 = v2add(player.pos, v2(100, 50));
     
+    // Load map data
+    String8 level_file = os_read_file(frame_arena, str8_lit("w:/code/dumb/level.json"), false);
+    Json_Value level_data = json_parse(perm_arena, level_file);
+    json_print(level_data);
+    
     map_cam = v3(0, 0, 50);
     
     //~ @note: Main loop
@@ -349,6 +354,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         r_map_debug(map_cam, true, player, test_walls, array_count(test_walls));
         
         // @todo: Would BitBlt be faster?
+        // @todo: Preserve aspect ratio
         StretchDIBits(
                       platform.win_dc,
                       0, 0,
