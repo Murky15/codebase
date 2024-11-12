@@ -13,10 +13,12 @@
 #include "base/include.c"
 #include "os/include.c"
 #include "json/json.c"
+#include "map.c"
+#include "renderer.c"
+
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
 #include "third_party/stb_truetype.h"
-#include "renderer.c"
 
 /*
 @todo

@@ -74,12 +74,11 @@ os_debug_print (String8 string) {
     snprintf(buff, string.len, "%.*s", str8_expand(string));
     OutputDebugString(buff);
 }
-/*
-core_function Console
-os_get_console (b32 create_if_not_exist) {
-    Console result = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (result == NULL && create_if_not_exist)
-Alloc
 
-    return result;
-}*/
+
+/*
+Okay, how are we going to do console IO. Any Input/Output operations require a handle. These are windows resources
+so we can't just be handing them out like candy, we can make one handle and put it in static memory. That would allow us to redirect 
+and stuff while also minimizing resource fragmentation. That means that we should destinguish between an input, output, and error handle. 
+
+*/
