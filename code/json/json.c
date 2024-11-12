@@ -271,23 +271,32 @@ json_process_token (Arena *arena, Json_Token_Node **token_stream) {
     return value;
 }
 
+// I hate formatting so much
 core_function void
 json_print (Json_Value value) {
-    local_persist int depth;
+    local_persist int depth=-1;
     depth++;
+    
+#define print_depth() \
+for (int j = 0; j < depth; ++j) { \
+printf("  "); \
+} 
+    
     switch (value.type) {
         case JSON_OBJECT: {
             Json_Object *object = (Json_Object*)&value;
+            printf("\n");
+            print_depth();
             printf("Object:\n");
+            depth++;
             for (u64 i = 0; i < object->count; ++i) {
                 Json_Set set = object->table[i];
-                for (int j = 0; j < depth; ++j) {
-                    printf("  ");
-                }
-                printf("%.*s: ", str8_expand(set.key));
+                print_depth()
+                    printf("%.*s: ", str8_expand(set.key));
                 json_print(set.value);
-                printf("\n");
+                if (i < object->count-1) printf("\n");
             }
+            depth--;
         } break;
         
         case JSON_ARRAY: {
@@ -316,6 +325,7 @@ json_print (Json_Value value) {
         } break;
     }
     depth--;
+#undef print_depth
 }
 
 core_function Json_Value
