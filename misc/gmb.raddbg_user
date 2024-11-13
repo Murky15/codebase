@@ -1,8 +1,11 @@
 // raddbg user file
 
-/// recent projects ///////////////////////////////////////////////////////////
+/// windows ///////////////////////////////////////////////////////////////////
 
-recent_project: {"root.raddbg_project"}
+
+/// recent_projects ///////////////////////////////////////////////////////////
+
+recent_project: "root.raddbg_project"
 
 /// windows ///////////////////////////////////////////////////////////////////
 
@@ -10,53 +13,41 @@ window:
 {
   split_x fullscreen maximized
   monitor: "\\.\DISPLAY1"
-  size: (2560 1440)
-  dpi: 96.000000
-  main_font_size: 12
-  code_font_size: 12
+  size: (1920 1080)
+  dpi: 120.000000
+  main_font_size: 15
+  code_font_size: 15
   smooth_ui_text: 1
   smooth_code_text: 0
   hint_ui_text: 1
   hint_code_text: 1
   panels:
   {
-    0.345334:
+    0.412803:
     {
-      0.454678:
+      0.563567:
       {
-        watch: {}
-        locals: {selected }
+        watch: {project:{"root.raddbg_project"} }
+        locals: {selected project:{"root.raddbg_project"} }
+        breakpoints: {project:{"root.raddbg_project"} }
       }
-      0.211988:
+      0.436431:
       {
-        breakpoints: {selected }
-        watch_pins: {}
-      }
-      0.333333:
-      {
-        call_stack: {selected }
-        modules: {}
-        scheduler: {}
+        call_stack: {selected project:{"root.raddbg_project"} }
+        modules: {project:{"root.raddbg_project"} }
+        scheduler: {project:{"root.raddbg_project"} }
       }
     }
-    0.654666:
+    0.587197:
     {
       0.692982:
       {
-        0.718394:
-        {
-          disassembly: {}
-          code: {selected project:{"root.raddbg_project"} "../code/gol/gol.c" cursor:44:1}
-        }
-        0.281606:
-        {
-          targets: {selected }
-        }
+        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/dumb/main.c\""} cursor_line:{ 299} cursor_column:{ 14} mark_line:{ 299} mark_column:{14} }
       }
       0.307018:
       {
-        output: {selected }
-        memory: {}
+        output: {selected project:{"root.raddbg_project"} cursor_line:{ 2} cursor_column:{ 1} mark_line:{ 2} mark_column:{1} }
+        memory: {project:{"root.raddbg_project"} }
       }
     }
   }
@@ -67,7 +58,6 @@ window:
 keybindings:
 {
   {"accept"                                  return              }
-  {"add_target"                              ctrl t              }
   {"attach"                                  shift f6            }
   {"backspace_chunk"                         ctrl backspace      }
   {"backspace_single"                        backspace           }
@@ -96,40 +86,40 @@ keybindings:
   {"goto_line"                               ctrl g              }
   {"goto_name"                               ctrl j              }
   {"goto_name_at_cursor"                     f12                 }
-  {"halt"                                    pause               }
   {"halt"                                    ctrl shift x        }
+  {"halt"                                    pause               }
   {"inc_code_font_scale"                     shift alt equal     }
   {"inc_ui_font_scale"                       alt equal           }
   {"kill_all"                                shift f5            }
   {"log_marker"                              ctrl shift alt m    }
-  {"move_down"                               down                }
-  {"move_down_chunk"                         ctrl down           }
-  {"move_down_page"                          page_down           }
-  {"move_down_page_select"                   shift page_down     }
-  {"move_down_reorder"                       alt down            }
-  {"move_down_whole"                         ctrl end            }
-  {"move_down_whole_select"                  ctrl shift end      }
-  {"move_down_select"                        shift down          }
   {"move_down_chunk_select"                  ctrl shift down     }
+  {"move_down_chunk"                         ctrl down           }
+  {"move_down_page_select"                   shift page_down     }
+  {"move_down_page"                          page_down           }
+  {"move_down_reorder"                       alt down            }
+  {"move_down"                               down                }
+  {"move_down_select"                        shift down          }
+  {"move_down_whole_select"                  ctrl shift end      }
+  {"move_down_whole"                         ctrl end            }
   {"move_end_select"                         shift end           }
   {"move_end"                                end                 }
-  {"move_home_select"                        shift home          }
   {"move_home"                               home                }
+  {"move_home_select"                        shift home          }
   {"move_left"                               left                }
   {"move_left_chunk_select"                  ctrl shift left     }
   {"move_left_chunk"                         ctrl left           }
   {"move_left_select"                        shift left          }
   {"move_right"                              right               }
-  {"move_right_chunk"                        ctrl right          }
-  {"move_right_chunk_select"                 ctrl shift right    }
   {"move_right_select"                       shift right         }
+  {"move_right_chunk_select"                 ctrl shift right    }
+  {"move_right_chunk"                        ctrl right          }
   {"move_tab_left"                           ctrl shift page_up  }
   {"move_tab_right"                          ctrl shift page_down}
-  {"move_up_chunk"                           ctrl up             }
-  {"move_up"                                 up                  }
   {"move_up_chunk_select"                    ctrl shift up       }
-  {"move_up_page"                            page_up             }
+  {"move_up"                                 up                  }
+  {"move_up_chunk"                           ctrl up             }
   {"move_up_page_select"                     shift page_up       }
+  {"move_up_page"                            page_up             }
   {"move_up_reorder"                         alt up              }
   {"move_up_select"                          shift up            }
   {"move_up_whole"                           ctrl home           }
@@ -140,8 +130,8 @@ keybindings:
   {"next_tab"                                ctrl page_down      }
   {"next_tab"                                ctrl tab            }
   {"open_project"                            ctrl alt o          }
-  {"open"                                    ctrl o              }
   {"open_user"                               ctrl shift alt o    }
+  {"open"                                    ctrl o              }
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
@@ -149,22 +139,22 @@ keybindings:
   {"prev_tab"                                ctrl shift tab      }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
-  {"run"                                     f5                  }
   {"run_command"                             f1                  }
+  {"run"                                     f5                  }
   {"run_to_cursor"                           ctrl f10            }
   {"select_all"                              ctrl a              }
   {"set_next_statement"                      ctrl shift f10      }
   {"soft_halt_refresh"                       alt r               }
-  {"step_into_inst"                          alt f11             }
   {"step_into"                               f11                 }
+  {"step_into_inst"                          alt f11             }
   {"step_out"                                shift f11           }
-  {"step_over_inst"                          alt f10             }
   {"step_over"                               f10                 }
-  {"switch"                                  ctrl i              }
+  {"step_over_inst"                          alt f10             }
   {"switch_to_partner_file"                  alt o               }
+  {"switch"                                  ctrl i              }
   {"tab_bar_bottom"                          ctrl shift alt down }
   {"tab_bar_top"                             ctrl shift alt up   }
-  {"toggle_breakpoint_cursor"                f9                  }
+  {"toggle_breakpoint"                       f9                  }
   {"toggle_fullscreen"                       ctrl return         }
   {"toggle_watch_expr_at_cursor"             alt w               }
   {"toggle_watch_expr_at_mouse"              ctrl d              }

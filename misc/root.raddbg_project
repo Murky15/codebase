@@ -1,44 +1,29 @@
 // raddbg project file
 
-/// targets ///////////////////////////////////////////////////////////////////
-
-target:
-{
-  exe:               "../build/dumb.exe"
-  arguments:         ""
-  working_directory: "../build"
-  active:            0
-}
-
-target:
-{
-  exe:               "../build/game_of_life.exe"
-  arguments:         ""
-  working_directory: "../build"
-  active:            1
-}
-
-target:
-{
-  exe:               "../code/comp_sci_assignments/game.exe"
-  arguments:         ""
-  working_directory: "../code/comp_sci_assignments"
-  active:            0
-}
-
 /// breakpoints ///////////////////////////////////////////////////////////////
 
 breakpoint:
 {
-  line: ("../code/dumb/dungeon.c":123)
-  enabled: 0
+  disabled: 1
+  line: 0
 }
-
 breakpoint:
 {
-  line: ("../code/gol/gol.c":38)
-  enabled: 1
+  line: 0
 }
+
+/// targets ///////////////////////////////////////////////////////////////////
+
+target:
+{
+  executable: "../build/dumb.exe"
+  working_directory: "../build"
+}
+
+/// recent_files //////////////////////////////////////////////////////////////
+
+recent_file: "../code/dumb/main.c"
+recent_file: "../code/dumb/level.json"
 
 /// exception code filters ////////////////////////////////////////////////////
 

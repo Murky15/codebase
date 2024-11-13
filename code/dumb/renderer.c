@@ -198,12 +198,12 @@ r_scene (Entity cam, Border *walls, u64 num_walls) {\
         f32 z1 = d1.y;
         f32 cam_dist = 0.89f * 9; // 90 Degree FOV
         
-        f32 x0    = ((( d0.x*canvas_width)        /(z0*16.f)) * cam_dist) + width_middle;
-        f32 ybot0 = (((-half_height*canvas_height)/(z0*9.f))  * cam_dist) + height_middle;
-        f32 ytop0 = ((( half_height*canvas_height)/(z0*9.f))  * cam_dist) + height_middle;
-        f32 x1    = ((( d1.x*canvas_width)        /(z1*16.f)) * cam_dist) + width_middle;
-        f32 ybot1 = (((-half_height*canvas_height)/(z1*9.f))  * cam_dist) + height_middle;
-        f32 ytop1 = ((( half_height*canvas_height)/(z1*9.f))  * cam_dist) + height_middle;
+        f32 x0    = ((( d0.x*canvas_width)        /(z0*ASPECT_W)) * cam_dist) + width_middle;
+        f32 ybot0 = (((-half_height*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
+        f32 ytop0 = ((( half_height*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
+        f32 x1    = ((( d1.x*canvas_width)        /(z1*ASPECT_W)) * cam_dist) + width_middle;
+        f32 ybot1 = (((-half_height*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
+        f32 ytop1 = ((( half_height*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
         
         //- @note: NDC -> Screen coordinates (These macros do nothing now. Remove them!)
         struct { f32 x,ybot,ytop; } temp, minp, maxp = {0};
@@ -240,13 +240,12 @@ r_map_debug (Vec3 map_cam, b32 show_player, Entity player, Border *walls, u64 nu
     for (u64 i = 0; i < num_walls; ++i) {
         Border *w = &walls[i];
         
-        // @todo: Gotta be an easier way to do this but there are no simplifications it seems
         Vec2 p0 = v2sub(w->p0, dv3(map_cam));
         Vec2 p1 = v2sub(w->p1, dv3(map_cam));
-        p0.x = (p0.x*(f32)canvas->width) /(map_cam.z*16) + width_middle;
-        p0.y = (p0.y*(f32)canvas->height)/(map_cam.z*9)  + height_middle;
-        p1.x = (p1.x*(f32)canvas->width) /(map_cam.z*16) + width_middle;
-        p1.y = (p1.y*(f32)canvas->height)/(map_cam.z*9)  + height_middle;
+        p0.x = (p0.x*(f32)canvas->width) /(map_cam.z*ASPECT_W) + width_middle;
+        p0.y = (p0.y*(f32)canvas->height)/(map_cam.z*ASPECT_H) + height_middle;
+        p1.x = (p1.x*(f32)canvas->width) /(map_cam.z*ASPECT_W) + width_middle;
+        p1.y = (p1.y*(f32)canvas->height)/(map_cam.z*ASPECT_H) + height_middle;
         r_draw_line(p0, p1, w->color);
     } 
     
@@ -258,6 +257,19 @@ r_map_debug (Vec3 map_cam, b32 show_player, Entity player, Border *walls, u64 nu
         r_draw_line(pp,  v2add(pp, v2(cosf(player.rotation_angle) * 7.f, sinf(player.rotation_angle) * 7.f)), Color_Magenta);
     }
 }
+
+function void
+r_map (Map map, Vec3 map_cam, Entity player, b32 show_player) {
+    for (u64 si = 0; si < map.num_sectors; ++si) {
+        Sector *sector = map.sectors + si;
+        for (u64 wi = 0; ) {
+            
+        }
+    }
+}
+
+
+//- @junk
 
 #if 0
 //- @note: Minimap

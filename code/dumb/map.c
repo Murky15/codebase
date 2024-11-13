@@ -1,25 +1,5 @@
 // @todo: Textures should be stored per-wall for more flexibility
 
-typedef struct Wall {
-    Vec2 p1, p2;
-    u64 next_sector;
-} Wall;
-
-typedef struct Sector {
-    u16 id;
-    u16 depth;
-    u16 height;
-    // @todo: Texture references
-    Wall *walls;
-    u64 num_walls;
-} Sector;
-
-typedef struct Map {
-    String8 name;
-    Sector *sectors;
-    u64 num_sectors;
-} Map;
-
 function Map
 map_load (Arena *arena, String8 path) {
     Temp_Arena scratch = get_scratch(&arena, 1);
@@ -44,7 +24,12 @@ map_load (Arena *arena, String8 path) {
             sector->walls = arena_pushn(arena, Wall, sector->num_walls);
             u64 j = 0;
             for (Json_Value_Node *wall_node = walls.values.first; wall_node; wall_node = wall_node->next, ++j) {
-                sector->walls[j].p1 = ;
+                Json_Object wall_data = wall_node->value.object;
+                sector->walls[j].p1.x = json_object_fetch(&wall_data, str8_lit("x1")).value.number;
+                sector->walls[j].p1.y = json_object_fetch(&wall_data, str8_lit("y1")).value.number;
+                sector->walls[j].p2.x = json_object_fetch(&wall_data, str8_lit("x2")).value.number;
+                sector->walls[j].p2.y = json_object_fetch(&wall_data, str8_lit("y2")).value.number;
+                sector->walls[j].next_sector = json_object_fetch(&wall_data, str8_lit("next_sector")).value.number;
             }
         }
     } else {

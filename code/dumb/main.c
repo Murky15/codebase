@@ -1,4 +1,5 @@
 //~ @note: Unity build
+
 //- @note: Headers
 #include <Windows.h>
 #include <stdlib.h>
@@ -7,6 +8,7 @@
 #include "os/include.h"
 #include "json/json.h"
 #include "game.h"
+#include "map.h"
 #include "renderer.h"
 
 //- @note: Source
@@ -23,7 +25,7 @@
 /*
 @todo
 -[ ] Read AMD programming manual
--[X] Rework build script to be more robust (codebase level work)
+-[ ] Rework build script to be more robust (codebase level work)
 -[ ] Random world generation OR store level data in json (make json parser codebase)
 -[ ] Figure out how to do sectors and portal rendering duke nukem style (fuck me)
 -[X] FPS profiling
@@ -41,6 +43,8 @@
 -[ ] Add better support for dynamic arrays in arenas
 */
 
+#define ASPECT_W 16.f
+#define ASPECT_H 9.f
 #define MOUSE_SENSITIVITY 0.01f
 #define MOUSE_SCROLL_SENSITIVITY 0.8f
 #define PLAYER_MOVE_SPEED 100.f
@@ -295,10 +299,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     test_walls[3].p1 = v2add(player.pos, v2(100, 50));
     
     // Load map data
-    String8 level_file = os_read_file(frame_arena, str8_lit("w:/code/dumb/level.json"), false);
-    Json_Value level_data = json_parse(perm_arena, level_file);
-    json_print(level_data);
-    
+    Map test_level = map_load(perm_arena, str8_lit("w:/code/dumb/level.json"));
     map_cam = v3(0, 0, 50);
     
     //~ @note: Main loop
