@@ -25,11 +25,11 @@ map_load (Arena *arena, String8 path) {
             u64 j = 0;
             for (Json_Value_Node *wall_node = walls.values.first; wall_node; wall_node = wall_node->next, ++j) {
                 Json_Object wall_data = wall_node->value.object;
-                sector->walls[j].p1.x = json_object_fetch(&wall_data, str8_lit("x1")).value.number;
-                sector->walls[j].p1.y = json_object_fetch(&wall_data, str8_lit("y1")).value.number;
-                sector->walls[j].p2.x = json_object_fetch(&wall_data, str8_lit("x2")).value.number;
-                sector->walls[j].p2.y = json_object_fetch(&wall_data, str8_lit("y2")).value.number;
-                sector->walls[j].next_sector = json_object_fetch(&wall_data, str8_lit("next_sector")).value.number;
+                sector->walls[j].p0.x = json_object_fetch(&wall_data, str8_lit("x1")).value.number;
+                sector->walls[j].p0.y = json_object_fetch(&wall_data, str8_lit("y1")).value.number;
+                sector->walls[j].p1.x = json_object_fetch(&wall_data, str8_lit("x2")).value.number;
+                sector->walls[j].p1.y = json_object_fetch(&wall_data, str8_lit("y2")).value.number;
+                sector->walls[j].next_sector = json_object_fetch(&wall_data, str8_lit("next sector")).value.number;
             }
         }
     } else {

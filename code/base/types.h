@@ -70,6 +70,7 @@ color(Navy,    0,   0,   128) \
 #define color(name, r, g, b) read_only Color glue(Color_,name) = {r,g,b,255};
 colors
 #undef color
+#undef colors
 
 #include <math.h>
 

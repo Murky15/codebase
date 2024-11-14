@@ -4,7 +4,7 @@
 // @todo: Need to think about map mutability for editors and stuff
 
 typedef struct Wall {
-    Vec2 p1, p2;
+    Vec2 p0, p1;
     s32 next_sector;
 } Wall;
 

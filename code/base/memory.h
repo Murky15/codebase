@@ -1,6 +1,9 @@
 #ifndef BASE_MEMORY_H
 #define BASE_MEMORY_H
 
+// @todo: Need to query this programmatically instead of baking it in.
+// GetSystemInfo for win32 and getpagesize() for posix
+
 #if OS_MAC && ARCH_ARM64
 # define PAGE_TABLE_SIZE Kilobytes(16)
 #else
@@ -11,15 +14,15 @@
 #define ARENA_DECOMMIT_THRESHOLD Megabytes(64)
 
 typedef struct Arena {
-  struct Arena *next;
-  u64 pos;
-  u64 commit_pos;
-  u64 cap;
+    struct Arena *next;
+    u64 pos;
+    u64 commit_pos;
+    u64 cap;
 } Arena;
 
 typedef struct Temp_Arena {
-  Arena *arena;
-  u64 pos;
+    Arena *arena;
+    u64 pos;
 } Temp_Arena;
 
 // @note: Arena functions

@@ -1,11 +1,8 @@
 // raddbg user file
 
-/// windows ///////////////////////////////////////////////////////////////////
+/// recent projects ///////////////////////////////////////////////////////////
 
-
-/// recent_projects ///////////////////////////////////////////////////////////
-
-recent_project: "root.raddbg_project"
+recent_project: {"root.raddbg_project"}
 
 /// windows ///////////////////////////////////////////////////////////////////
 
@@ -13,10 +10,10 @@ window:
 {
   split_x fullscreen maximized
   monitor: "\\.\DISPLAY1"
-  size: (1920 1080)
-  dpi: 120.000000
-  main_font_size: 15
-  code_font_size: 15
+  size: (2560 1440)
+  dpi: 96.000000
+  main_font_size: 12
+  code_font_size: 12
   smooth_ui_text: 1
   smooth_code_text: 0
   hint_ui_text: 1
@@ -42,11 +39,10 @@ window:
     {
       0.692982:
       {
-        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/dumb/main.c\""} cursor_line:{ 299} cursor_column:{ 14} mark_line:{ 299} mark_column:{14} }
       }
       0.307018:
       {
-        output: {selected project:{"root.raddbg_project"} cursor_line:{ 2} cursor_column:{ 1} mark_line:{ 2} mark_column:{1} }
+        output: {selected project:{"root.raddbg_project"} }
         memory: {project:{"root.raddbg_project"} }
       }
     }
@@ -92,34 +88,34 @@ keybindings:
   {"inc_ui_font_scale"                       alt equal           }
   {"kill_all"                                shift f5            }
   {"log_marker"                              ctrl shift alt m    }
+  {"move_down"                               down                }
   {"move_down_chunk_select"                  ctrl shift down     }
   {"move_down_chunk"                         ctrl down           }
   {"move_down_page_select"                   shift page_down     }
   {"move_down_page"                          page_down           }
   {"move_down_reorder"                       alt down            }
-  {"move_down"                               down                }
   {"move_down_select"                        shift down          }
   {"move_down_whole_select"                  ctrl shift end      }
   {"move_down_whole"                         ctrl end            }
   {"move_end_select"                         shift end           }
   {"move_end"                                end                 }
-  {"move_home"                               home                }
   {"move_home_select"                        shift home          }
+  {"move_home"                               home                }
   {"move_left"                               left                }
   {"move_left_chunk_select"                  ctrl shift left     }
   {"move_left_chunk"                         ctrl left           }
   {"move_left_select"                        shift left          }
   {"move_right"                              right               }
-  {"move_right_select"                       shift right         }
-  {"move_right_chunk_select"                 ctrl shift right    }
   {"move_right_chunk"                        ctrl right          }
+  {"move_right_chunk_select"                 ctrl shift right    }
+  {"move_right_select"                       shift right         }
   {"move_tab_left"                           ctrl shift page_up  }
   {"move_tab_right"                          ctrl shift page_down}
-  {"move_up_chunk_select"                    ctrl shift up       }
-  {"move_up"                                 up                  }
   {"move_up_chunk"                           ctrl up             }
-  {"move_up_page_select"                     shift page_up       }
+  {"move_up"                                 up                  }
+  {"move_up_chunk_select"                    ctrl shift up       }
   {"move_up_page"                            page_up             }
+  {"move_up_page_select"                     shift page_up       }
   {"move_up_reorder"                         alt up              }
   {"move_up_select"                          shift up            }
   {"move_up_whole"                           ctrl home           }
@@ -127,34 +123,33 @@ keybindings:
   {"new_panel_down"                          ctrl minus          }
   {"new_panel_right"                         ctrl p              }
   {"next_panel"                              ctrl comma          }
-  {"next_tab"                                ctrl page_down      }
   {"next_tab"                                ctrl tab            }
+  {"next_tab"                                ctrl page_down      }
   {"open_project"                            ctrl alt o          }
-  {"open_user"                               ctrl shift alt o    }
   {"open"                                    ctrl o              }
+  {"open_user"                               ctrl shift alt o    }
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
-  {"prev_tab"                                ctrl page_up        }
   {"prev_tab"                                ctrl shift tab      }
+  {"prev_tab"                                ctrl page_up        }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
-  {"run_command"                             f1                  }
   {"run"                                     f5                  }
+  {"run_command"                             f1                  }
   {"run_to_cursor"                           ctrl f10            }
   {"select_all"                              ctrl a              }
   {"set_next_statement"                      ctrl shift f10      }
   {"soft_halt_refresh"                       alt r               }
-  {"step_into"                               f11                 }
   {"step_into_inst"                          alt f11             }
+  {"step_into"                               f11                 }
   {"step_out"                                shift f11           }
-  {"step_over"                               f10                 }
   {"step_over_inst"                          alt f10             }
-  {"switch_to_partner_file"                  alt o               }
+  {"step_over"                               f10                 }
   {"switch"                                  ctrl i              }
+  {"switch_to_partner_file"                  alt o               }
   {"tab_bar_bottom"                          ctrl shift alt down }
   {"tab_bar_top"                             ctrl shift alt up   }
-  {"toggle_breakpoint"                       f9                  }
   {"toggle_fullscreen"                       ctrl return         }
   {"toggle_watch_expr_at_cursor"             alt w               }
   {"toggle_watch_expr_at_mouse"              ctrl d              }

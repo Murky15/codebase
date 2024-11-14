@@ -1,26 +1,36 @@
 //~ @note: Unity build
 
 //- @note: Headers
+
+#include "third_party/microui/microui.h"
+
 #include <Windows.h>
 #include <stdlib.h>
 #include <time.h>
+
 #include "base/include.h"
 #include "os/include.h"
 #include "json/json.h"
+
 #include "game.h"
 #include "map.h"
 #include "renderer.h"
 
 //- @note: Source
-#include "base/include.c"
-#include "os/include.c"
-#include "json/json.c"
-#include "map.c"
-#include "renderer.c"
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
 #include "third_party/stb_truetype.h"
+#undef RELATIVE
+#undef ABSOLUTE
+#include "third_party/microui/microui.c"
+
+#include "base/include.c"
+#include "os/include.c"
+#include "json/json.c"
+
+#include "map.c"
+#include "renderer.c"
 
 /*
 @todo
@@ -43,8 +53,6 @@
 -[ ] Add better support for dynamic arrays in arenas
 */
 
-#define ASPECT_W 16.f
-#define ASPECT_H 9.f
 #define MOUSE_SENSITIVITY 0.01f
 #define MOUSE_SCROLL_SENSITIVITY 0.8f
 #define PLAYER_MOVE_SPEED 100.f
@@ -165,7 +173,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                     short wheel = (short)mouse->usButtonData;
                     f32 wheel_delta = (f32)wheel / (f32)WHEEL_DELTA;
                     map_cam.z -= wheel_delta * MOUSE_SCROLL_SENSITIVITY;
-                    map_cam.z = max(map_cam.z,0);
+                    map_cam.z = max(map_cam.z,1);
                 }
                 
                 if (g_mouse_captured) {
@@ -281,24 +289,11 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     Entity player = {0};
     player.rotation_angle = 0;
     player.radius = 10.f;
-    player.pos.x = bitmap->width / 2.f;
-    player.pos.y = bitmap->height / 2.f;
+    player.pos.x = 0;
+    player.pos.y = 0;
     
-    Border test_walls[4];
-    test_walls[0].color = Color_Red;
-    test_walls[1].color = Color_Lime;
-    test_walls[2].color = Color_Purple;
-    test_walls[3].color = Color_Blue;
-    test_walls[0].p0 = v2add(player.pos, v2(100, 50));
-    test_walls[0].p1 = v2add(player.pos, v2(100, -100));
-    test_walls[1].p0 = v2add(player.pos, v2(100, -100));
-    test_walls[1].p1 = v2add(player.pos, v2(-100, -100));
-    test_walls[2].p0 = v2add(player.pos, v2(-100, -100));
-    test_walls[2].p1 = v2add(player.pos, v2(-100, 0));
-    test_walls[3].p0 = v2add(player.pos, v2(-100, 0));
-    test_walls[3].p1 = v2add(player.pos, v2(100, 50));
-    
-    // Load map data
+    // I wish I had made a level editor
+    // Load map data 
     Map test_level = map_load(perm_arena, str8_lit("w:/code/dumb/level.json"));
     map_cam = v3(0, 0, 50);
     
@@ -354,7 +349,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         // @note: Render
         r_clear();
         //r_scene(player, test_walls, array_count(test_walls));
-        r_map_debug(map_cam, true, player, test_walls, array_count(test_walls));
+        r_map(test_level, map_cam, player, false);
         
         // @todo: Would BitBlt be faster?
         // @todo: Preserve aspect ratio

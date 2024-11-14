@@ -1,7 +1,8 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-// This might be the worst software renderer ever
+#define ASPECT_W 16.f
+#define ASPECT_H 9.f
 
 typedef struct Bitmap {
     u32 *pixels;
@@ -25,6 +26,6 @@ function void r_draw_rect(Vec2 p, Vec2 sz, Color c);
 
 //- @note: Game specific functionality
 function void r_scene(Entity cam, Border *walls, u64 num_walls);
-function void r_map(Vec3 map_cam, b32 show_player, Entity player, Border *walls, u64 num_walls);
+function void r_map(Map map, Vec3 map_cam, Entity player, b32 show_player);
 
 #endif //RENDERER_H

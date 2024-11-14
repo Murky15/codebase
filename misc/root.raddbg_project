@@ -1,29 +1,26 @@
 // raddbg project file
 
-/// breakpoints ///////////////////////////////////////////////////////////////
-
-breakpoint:
-{
-  disabled: 1
-  line: 0
-}
-breakpoint:
-{
-  line: 0
-}
-
 /// targets ///////////////////////////////////////////////////////////////////
 
 target:
 {
-  executable: "../build/dumb.exe"
+  exe:               "../misc"
+  arguments:         ""
   working_directory: "../build"
+  active:            1
 }
 
-/// recent_files //////////////////////////////////////////////////////////////
+/// breakpoints ///////////////////////////////////////////////////////////////
 
-recent_file: "../code/dumb/main.c"
-recent_file: "../code/dumb/level.json"
+breakpoint:
+{
+  enabled: 1
+}
+
+breakpoint:
+{
+  enabled: 1
+}
 
 /// exception code filters ////////////////////////////////////////////////////
 
