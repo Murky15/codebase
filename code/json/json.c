@@ -110,15 +110,21 @@ json_dump_lex (Json_Token_List *tokens, String8 json) {
     }
 }
 
-core_function Json_Set 
+// @todo: Probably a smarter way to do this
+core_function Json_Value
 json_object_fetch (Json_Object *object, String8 key) {
     u64 hash = str8_hash(key) % object->total_slots;
-    while (!str8_match(object->table[hash].key, key, 0)) {
+    b32 found = true;
+    for (u64 start_hash = hash, i = 0; !str8_match(object->table[hash].key, key, 0); ++i) {
+        if (i > 0 && start_hash == hash) {
+            found = false;
+            break;
+        }
         hash++;
         hash %= object->total_slots;
     }
     
-    return object->table[hash];
+    return found == true ? object->table[hash].value : comp_zero(Json_Value);
 }
 
 core_function void

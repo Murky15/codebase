@@ -103,7 +103,7 @@ core_function Json_Token_List json_lex(Arena *arena, String8 json);
 core_function void json_dump_lex(Json_Token_List *tokens, String8 json);
 
 //- @incomplete Object/Array manipulation
-core_function Json_Set json_object_fetch(Json_Object *object, String8 key);
+core_function Json_Value json_object_fetch(Json_Object *object, String8 key);
 core_function void json_value_list_push(Arena *arena, Json_Value_List *list, Json_Value value);
 
 //- @incomplete Serialization functions & better program-side data mutability

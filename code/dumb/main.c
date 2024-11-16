@@ -2,6 +2,7 @@
 
 //- @note: Headers
 
+#include <freetype/freetype.h>
 #include "third_party/microui/microui.h"
 
 #include <Windows.h>
@@ -18,9 +19,6 @@
 
 //- @note: Source
 
-#define STB_TRUETYPE_IMPLEMENTATION
-#define STBTT_STATIC
-#include "third_party/stb_truetype.h"
 #undef RELATIVE
 #undef ABSOLUTE
 #include "third_party/microui/microui.c"

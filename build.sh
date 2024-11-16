@@ -52,6 +52,6 @@ mkdir -p build
 # Build
 pushd build >> /dev/null
 built=0
-if [[ "$dumb" == 1 ]]; then built=1 && eval "$compile ../code/dumb/main.c $add_lib User32.lib $add_lib Gdi32.lib $out"dumb.exe"" || exit 1; fi
+if [[ "$dumb" == 1 ]]; then built=1 && eval "$compile ../code/dumb/main.c -I../code/third_party/freetype2/include $add_lib User32.lib $add_lib Gdi32.lib $add_lib ../code/third_party/freetype2/release_static/vs2015-2022/win64/freetype.lib $out"dumb.exe"" || exit 1; fi
 if [[ "$built" == 0 ]]; then echo "Unrecognized target!"; fi
 popd >> /dev/null
