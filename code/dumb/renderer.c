@@ -1,4 +1,4 @@
-function Bitmap* 
+function Bitmap*
 r_get_framebuffer (void) { // @todo: This function call is generating a lot of overhead
     local_persist Bitmap f;
     if (f.width == 0) {
@@ -9,10 +9,10 @@ r_get_framebuffer (void) { // @todo: This function call is generating a lot of o
     return &f;
 }
 
-function void 
+function void
 r_test_gradient (void) {
     Bitmap *canvas = r_get_framebuffer();
-    
+
     local_persist u8 xOffset, yOffset;
     for (u32 y = 0; y < canvas->height; ++y) {
         for (u32 x = 0; x < canvas->width; ++x) {
@@ -25,23 +25,23 @@ r_test_gradient (void) {
     xOffset = ++yOffset;
 }
 
-function void 
+function void
 r_put_pixel_at (Vec2 p, Color c) {
     Bitmap *canvas = r_get_framebuffer();
-    
+
     Vec2i pi = v2i_from_v2(p);
     if (pi.x >= 0 && pi.y >= 0 && pi.x < canvas->width && pi.y < canvas->height)
         canvas->pixels[pi.y * canvas->width + pi.x] = (c.r << 16 | c.g << 8 | c.b);
 }
 
-function void 
+function void
 r_clear (void) {
     Bitmap *canvas = r_get_framebuffer();
     memory_zero(canvas->pixels, canvas->width * canvas->height * sizeof(u32));
 }
 
 // @slow
-function void 
+function void
 r_clear_color (Color c) {
     Bitmap *canvas = r_get_framebuffer();
     for (u32 pidx = 0; pidx < canvas->width * canvas->height; ++pidx) {
@@ -49,7 +49,7 @@ r_clear_color (Color c) {
     }
 }
 
-function void 
+function void
 r_draw_circle (Vec2 p, f32 r, Color c) {
     for (f32 y = -r; y <= r; ++y) {
         for (f32 x = -r; x <= r; ++x) {
@@ -70,7 +70,7 @@ r_impl_draw_line_low (Vec2 p0, Vec2 p1, Color c) {
     }
     f32 d = 2.f*dy - dx;
     f32 y = p0.y;
-    
+
     for (f32 x = p0.x; x <= p1.x; ++x) {
         r_put_pixel_at(v2(x,y), c);
         if (d > 0) {
@@ -93,7 +93,7 @@ r_impl_draw_line_high (Vec2 p0, Vec2 p1, Color c) {
     }
     f32 d = 2.f*dx - dy;
     f32 x = p0.x;
-    
+
     for (f32 y = p0.y; y <= p1.y; ++y) {
         r_put_pixel_at(v2(x,y), c);
         if (d > 0) {
@@ -105,7 +105,7 @@ r_impl_draw_line_high (Vec2 p0, Vec2 p1, Color c) {
     }
 }
 
-function void 
+function void
 r_draw_line (Vec2 p0, Vec2 p1, Color c) {
     if (fabs(p1.y - p0.y) < fabs(p1.x - p0.x)) {
         if (p0.x > p1.x)
@@ -127,7 +127,7 @@ r_draw_vert (f32 x, f32 y0, f32 y1, Color c) {
         r_put_pixel_at(v2(x,y), c);
 }
 
-function void 
+function void
 r_draw_quad_framef (f32 x0, f32 y0, f32 x1, f32 y1, Color c) {
     r_draw_line(v2(x0, y0), v2(x1, y0), c);
     r_draw_line(v2(x1, y0), v2(x1, y1), c);
@@ -135,7 +135,7 @@ r_draw_quad_framef (f32 x0, f32 y0, f32 x1, f32 y1, Color c) {
     r_draw_line(v2(x0, y1), v2(x0, y0), c);
 }
 
-function void 
+function void
 r_draw_quad_frame (Vec2 p0, Vec2 p1, Vec2 p2, Vec2 p3, Color c) {
     r_draw_line(p0, p1, c);
     r_draw_line(p1, p2, c);
@@ -150,55 +150,55 @@ r_draw_rect (Vec2 p, Vec2 sz, Color c) {
 }
 
 // @slow
-function void 
+function void
 r_scene (Entity cam, Border *walls, u64 num_walls) {\
     Bitmap *canvas = r_get_framebuffer();
-    
+
     f32 forward = M_PI32 / 2.f;
     f32 canvas_width = (f32)canvas->width;
     f32 canvas_height = (f32)canvas->height;
     f32 width_middle = canvas->width/2.f;
     f32 height_middle = canvas->height/2.f;
     f32 near_plane = 1.f;
-    
+
     for (u64 wall_idx = 0; wall_idx < num_walls; ++wall_idx) {
         //- @note: Transform wall relative to player
         Vec2 t0 = v2sub(walls[wall_idx].p0, cam.pos);
         Vec2 t1 = v2sub(walls[wall_idx].p1, cam.pos);
-        
+
         f32 t = -cam.rotation_angle + forward;
         Vec2 d0, d1;
         d0.x = t0.x * cosf(t) - t0.y * sinf(t);
         d0.y = t0.x * sinf(t) + t0.y * cosf(t);
         d1.x = t1.x * cosf(t) - t1.y * sinf(t);
         d1.y = t1.x * sinf(t) + t1.y * cosf(t);
-        
+
         //- @note: Clip walls behind camera
-        if (d0.y <= near_plane && d1.y <= near_plane) 
+        if (d0.y <= near_plane && d1.y <= near_plane)
             continue;
-        
+
         f32 clipped_x = d0.x + (((d1.x - d0.x) * (near_plane - d0.y)) / (d1.y - d0.y));
-        if (d0.y <= near_plane) 
+        if (d0.y <= near_plane)
             d0 = v2(clipped_x, near_plane);
-        else if (d1.y <= near_plane) 
+        else if (d1.y <= near_plane)
             d1 = v2(clipped_x, near_plane);
-        
-        
+
+
         //- @note: Perspective projection
         f32 height = 50.f; // Height should be determined by sector
         f32 half_height = height/2.f;
-        
+
         f32 z0 = d0.y;
         f32 z1 = d1.y;
         f32 cam_dist = 0.89f * 9; // 90 Degree FOV
-        
+
         f32 x0    = ((( d0.x*canvas_width)        /(z0*ASPECT_W)) * cam_dist) + width_middle;
         f32 ybot0 = (((-half_height*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
         f32 ytop0 = ((( half_height*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
         f32 x1    = ((( d1.x*canvas_width)        /(z1*ASPECT_W)) * cam_dist) + width_middle;
         f32 ybot1 = (((-half_height*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
         f32 ytop1 = ((( half_height*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
-        
+
         //- @note: NDC -> Screen coordinates (These macros do nothing now. Remove them!)
         struct { f32 x,ybot,ytop; } temp, minp, maxp = {0};
         minp.x    = x0;
@@ -207,13 +207,13 @@ r_scene (Entity cam, Border *walls, u64 num_walls) {\
         maxp.x    = x1;
         maxp.ybot = ybot1;
         maxp.ytop = ytop1;
-        
+
         if (x0 > x1) {
             temp = minp;
             minp = maxp;
             maxp = temp;
         }
-        
+
         for (f32 x = max(minp.x, 0.f); x <= min(maxp.x, canvas_width); ++x) {
             f32 xnorm = norm(x, minp.x, maxp.x);
             f32 ybot = clamp(lerp(minp.ybot, maxp.ybot, xnorm), 0.f, height_middle);
@@ -230,13 +230,13 @@ r_map (Map map, Vec3 map_cam, Entity player, b32 show_player) {
     Bitmap *canvas = r_get_framebuffer();
     f32 width_middle = (f32)canvas->width/2.f;
     f32 height_middle = (f32)canvas->height/2.f;
-    
+
     for (u64 si = 0; si < map.num_sectors; ++si) {
         Sector *sector = map.sectors + si;
         for (u64 wi = 0; wi < sector->num_walls; ++wi) {
             Wall *wall = sector->walls + wi;
             Color color = wall->next_sector >= 0 ? Color_Lime : Color_Red;
-            
+
             Vec2 p0 = v2sub(wall->p0, dv3(map_cam));
             Vec2 p1 = v2sub(wall->p1, dv3(map_cam));
             p0.x = (p0.x*(f32)canvas->width) /(map_cam.z*ASPECT_W) + width_middle;
@@ -247,7 +247,7 @@ r_map (Map map, Vec3 map_cam, Entity player, b32 show_player) {
             r_draw_line(p0, p1, color);
         }
     }
-    
+
     if (show_player) {
         Vec2 pp = v2sub(player.pos, dv3(map_cam));
         pp.x = (pp.x*(f32)canvas->width) /(map_cam.z*ASPECT_W) + width_middle;
@@ -273,15 +273,15 @@ r_draw_minimap (void) {
     // Player (camera)
     r_draw_circle(player_minimap_pos, player_radius, Color_White);
     r_draw_line(player_minimap_pos,  v2add(player_minimap_pos, v2(cosf(forward) * turn_indicator_length, sinf(forward) * turn_indicator_length)), Color_Magenta);
-    
+
     // View boundaries
     r_draw_line(v2muls(v2add(v2(-width_middle, 0), fixed_player), MINIMAP_SCALE), v2muls(v2add(v2(width_middle, 0), fixed_player), MINIMAP_SCALE), Color_Lime);
     r_draw_line(player_minimap_pos, v2add(player_minimap_pos, v2muls(hvp_left, 50)), Color_Lime);
     r_draw_line(player_minimap_pos, v2add(player_minimap_pos, v2muls(hvp_right, 50)), Color_Lime);
-    
+
     // Wall
     r_draw_line(v2muls(v2add(d0, fixed_player), MINIMAP_SCALE), v2muls(v2add(d1, fixed_player), MINIMAP_SCALE), Color_Red);
-    
+
     // Border
     r_draw_quad_framef(0, 0, canvas->width * MINIMAP_SCALE, canvas->height * MINIMAP_SCALE, Color_Blue);
 }
@@ -293,7 +293,7 @@ r_map_debug (Vec3 map_cam, b32 show_player, Entity player, Border *walls, u64 nu
     f32 height_middle = (f32)canvas->height/2.f;
     for (u64 i = 0; i < num_walls; ++i) {
         Border *w = &walls[i];
-        
+
         Vec2 p0 = v2sub(w->p0, dv3(map_cam));
         Vec2 p1 = v2sub(w->p1, dv3(map_cam));
         p0.x = (p0.x*(f32)canvas->width) /(map_cam.z*ASPECT_W) + width_middle;
@@ -301,8 +301,8 @@ r_map_debug (Vec3 map_cam, b32 show_player, Entity player, Border *walls, u64 nu
         p1.x = (p1.x*(f32)canvas->width) /(map_cam.z*ASPECT_W) + width_middle;
         p1.y = (p1.y*(f32)canvas->height)/(map_cam.z*ASPECT_H) + height_middle;
         r_draw_line(p0, p1, w->color);
-    } 
-    
+    }
+
     if (show_player) {
         Vec2 pp = v2sub(player.pos, dv3(map_cam));
         pp.x = (pp.x*(f32)canvas->width)/(map_cam.z*16) + width_middle;

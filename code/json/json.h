@@ -13,6 +13,7 @@ enum {
     JSON_TOKEN_COUNT
 };
 
+// @todo: Add line + column info for better error messages
 typedef struct Json_Token {
     Json_Token_Type type;
     String8 value;
@@ -57,7 +58,6 @@ typedef struct Json_Value_List Json_Value_List;
 typedef struct Json_Set        Json_Set;
 
 struct Json_Object {
-    Json_Type type;
     Json_Set *table;
     u64 count;
     u64 total_slots;
@@ -69,21 +69,17 @@ struct Json_Value_List {
 };
 
 struct Json_Array {
-    Json_Type type;
     Json_Value_List values;
 };
 
-union Json_Value {
+struct Json_Value {
     Json_Type type;
-    Json_Object object;
-    Json_Array array;
-    struct {
-        Json_Type pad__;
-        union {
-            String8 string;
-            f64 number;
-            Json_Keyword keyword;
-        };
+    union {
+        Json_Object object;
+        Json_Array array;
+        String8 string;
+        f64 number;
+        Json_Keyword keyword;
     };
 };
 

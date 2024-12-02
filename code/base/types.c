@@ -40,7 +40,7 @@ pv2 (Vec2 v, f32 z) {
 
 core_function f32  
 v2len (Vec2 v) {
-    return sqrt(sqr(v.x) + sqr(v.y));
+    return (f32)sqrt(sqr(v.x) + sqr(v.y));
 }
 
 core_function Vec2  
@@ -75,7 +75,7 @@ v2cross (Vec2 a, Vec2 b, Vec2 c) {
 
 core_function f32  
 v3len (Vec3 v) {
-    return sqrt(sqr(v.x) + sqr(v.y) + sqr(v.z));
+    return (f32)sqrt(sqr(v.x) + sqr(v.y) + sqr(v.z));
 }
 
 core_function Vec3 
@@ -118,7 +118,7 @@ fmod_cycling (f32 x, f32 y) {
     if (y == 0) {
         return INFINITY;
     }
-    f32 remainder = x - (floor(x/y) * y);
+    f32 remainder = x - ((f32)floor(x/y) * y);
     
     return remainder;
 }

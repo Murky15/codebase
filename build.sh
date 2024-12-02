@@ -31,7 +31,7 @@ else
   out="-o"
 fi
 
-jai_compile="jai -debugger -output_path ..//build -quiet" # Most things will be handled by metaprogram
+jai_compile="jai -debugger -output_path ../build -quiet" # Most things will be handled by metaprogram
 
 # @todo: Set per-build settings like 'only-compile', 'assemble', etc
 

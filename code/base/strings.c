@@ -404,7 +404,7 @@ cint_from_str8 (String8 string) {
     
     // consume integer "digits"
     String8 digits_substr = str8_skip(string, p);
-    u64 n = u64_from_str8(digits_substr, radix);
+    u64 n = u64_from_str8(digits_substr, (u32)radix);
     
     // combine result
     s64 result = sign*n;

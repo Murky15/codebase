@@ -13,6 +13,8 @@ patterns = {
     "*.odin",
     "*.asm",
     "*.mdesk",
+    "*.json",
+    "*.tcl"
 };
 
 blacklist_patterns = {

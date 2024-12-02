@@ -262,9 +262,11 @@ json_process_token (Arena *arena, Json_Token_Node **token_stream) {
         
         case JSON_TOKEN_PUNCTUATOR: {
             if (token.value.str[0] == '{') {
-                value = (Json_Value)json_process_object(arena, token_stream);
+                Json_Object obj = json_process_object(arena, token_stream);
+                value = *(Json_Value*)&obj;
             } else if (token.value.str[0] == '[') {
-                value = (Json_Value)json_process_array(arena, token_stream);
+                Json_Array arr = json_process_array(arena, token_stream);
+                value = *(Json_Value*)&arr;
             } else {
                 fprintf(stderr, "Json parse error: Unexpected symbol: %.*s\n", str8_expand(token.value));
             }

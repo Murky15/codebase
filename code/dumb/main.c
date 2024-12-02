@@ -1,9 +1,7 @@
 //~ @note: Unity build
 
 //- @note: Headers
-
-#include <freetype/freetype.h>
-#include "third_party/microui/microui.h"
+//#include "third_party/microui/microui.h"
 
 #include <Windows.h>
 #include <stdlib.h>
@@ -21,7 +19,7 @@
 
 #undef RELATIVE
 #undef ABSOLUTE
-#include "third_party/microui/microui.c"
+//#include "third_party/microui/microui.c"
 
 #include "base/include.c"
 #include "os/include.c"
@@ -247,8 +245,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     Win32_Data platform = win32_create_window(hInstance);
     
     // @note: Seed renderer
-    u64 seed = time(0);
-    srand(seed);
+    time_t seed = time(0);
+    srand((u32)seed);
     
     // @note: Register for input
     RAWINPUTDEVICE input_devices[2];
