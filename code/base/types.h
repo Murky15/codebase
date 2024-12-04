@@ -10,20 +10,16 @@
 #endif
 
 #include <stdint.h>
-typedef int8_t   s8;
-typedef int16_t  s16;
-typedef int32_t  s32;
-typedef int64_t  s64;
+typedef int8_t   s8,  b8;
+typedef int16_t  s16, b16;
+typedef int32_t  s32, b32;
+typedef int64_t  s64, b64;
 typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 typedef float    f32;
 typedef double   f64;
-typedef s8  b8;
-typedef s16 b16;
-typedef s32 b32;
-typedef s64 b64;
 
 typedef void void_func(void);
 
@@ -87,14 +83,14 @@ typedef union Vec2 {
     struct { f32 width, height; };
     struct { f32 first, last; };
     f32 e[2];
-} Vec2, Range;
+} Vec2, Range, Pair;
 
 typedef union Vec2i {
     struct { u32 x, y; };
     struct { u32 width, height; };
     struct { u32 first, last; };
     u32 e[2];
-} Vec2i, Rangei;
+} Vec2i, Rangei, Pairi;
 
 typedef union Vec3 {
     struct { f32 x, y, z; };

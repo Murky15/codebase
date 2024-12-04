@@ -176,7 +176,6 @@ json_process_object (Arena *arena, Json_Token_Node **token) {
         }
         
         *token = next;
-        result.type  = JSON_OBJECT;
         result.count = num_sets;
         result.total_slots = num_sets; // num_sets * 1.5f;
         // @todo: Maybe we should allocate more slots in case the user wants to mutate the data,
@@ -205,7 +204,6 @@ core_function Json_Array
 json_process_array (Arena *arena, Json_Token_Node **token) {
     Json_Array result = zero_struct;
     u64 backup_pos = arena_pos(arena);
-    result.type = JSON_ARRAY;
     if ((*token)->token.value.str[0] == '[') {
         Json_Token_Node *token_idx = (*token)->next;
         if (token_idx->token.value.str[0] != ']') { // empty array

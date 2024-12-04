@@ -9,8 +9,6 @@ enum {
     JSON_TOKEN_STRING,
     JSON_TOKEN_NUMBER,
     JSON_TOKEN_KEYWORD,
-    
-    JSON_TOKEN_COUNT
 };
 
 // @todo: Add line + column info for better error messages
@@ -37,8 +35,6 @@ enum {
     JSON_STRING,
     JSON_NUMBER,
     JSON_KEYWORD,
-    
-    JSON_TYPE_COUNT
 };
 
 typedef u32 Json_Keyword;
@@ -46,8 +42,6 @@ enum {
     JSON_KEYWORD_TRUE  = 1,
     JSON_KEYWORD_FALSE = 0,
     JSON_KEYWORD_NULL  = 0,
-    
-    JSON_KEYWORD_COUNT
 };
 
 typedef struct Json_Object     Json_Object;
