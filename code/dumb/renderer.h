@@ -25,7 +25,7 @@ function void r_draw_quad_frame(Vec2 p0, Vec2 p1, Vec2 p2, Vec2 p3, Color c);
 function void r_draw_rect(Vec2 p, Vec2 sz, Color c);
 
 //- @note: Game specific functionality
-function void r_scene(Entity cam, Border *walls, u64 num_walls);
 function void r_map(Map map, Vec3 map_cam, Entity player, b32 show_player);
+function void r_sector(Sector *sector, Entity *cam);
 
 #endif //RENDERER_H

@@ -5,6 +5,7 @@ typedef struct Entity {
     Vec2 pos;
     f32 rotation_angle;
     f32 radius;
+    u16 curr_sector;
 } Entity;
 
 typedef struct Border {

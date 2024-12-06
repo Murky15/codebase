@@ -1,4 +1,4 @@
-//~ @note: Unity build
+//- @note: Unity build
 
 //- @note: Headers
 //#include "third_party/microui/microui.h"
@@ -31,8 +31,8 @@
 /*
 @todo
 -[ ] Read AMD programming manual
--[ ] Rework build script to be more robust (codebase level work)
--[ ] Random world generation OR store level data in json (make json parser codebase)
+-[X] Rework build script to be more robust (codebase level work)
+-[X] Store level data in json (make json parser codebase)
 -[ ] Figure out how to do sectors and portal rendering duke nukem style (fuck me)
 -[X] FPS profiling
 -[ ] Font rasterization
@@ -43,7 +43,7 @@
 -[ ] Optimize / profile render functions
 -[ ] Asan / Libfuzzer
 -[ ] sin/cos/tan table lookup: https://namoseley.wordpress.com/2015/07/26/sincos-generation-using-table-lookup-and-iterpolation/
--[ ] Bake in "asset" dir for this game
+-[X] Bake in "asset" dir for this game
 -[ ] Metaprogramming
 -[ ] Make Arenas more flexible
 -[ ] Add better support for dynamic arrays in arenas
@@ -237,7 +237,7 @@ win32_create_bitmap (Bitmap *data) {
 
 int
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
-    //~ @note: Platform setup
+    //- @note: Platform setup
     perm_arena = arena_alloc();
     frame_arena = arena_alloc();
     level_arena = arena_alloc();
@@ -282,23 +282,25 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     platform.bitmap = win32_create_bitmap(bitmap);
     
     //- @note: Game setup
+    
     Entity player = {0};
     player.rotation_angle = 0;
     player.radius = 10.f;
     player.pos.x = 0;
     player.pos.y = 0;
+    player.curr_sector = 0;
     
     // I wish I had made a level editor
     // Load map data 
     Map test_level = map_load(perm_arena, str8_lit("w:/code/dumb/level.json"));
     map_cam = v3(0, 0, 50);
     
-    //~ @note: Main loop
+    //- @note: Main loop
     QueryPerformanceCounter(&start_time);
     for (;g_game_running;) {
         arena_clear(frame_arena);
         
-        //~ @note: Message loop
+        //- @note: Message loop
         for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
             if (msg.message == WM_QUIT) {
                 g_game_running = false;
@@ -309,6 +311,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         }
         
         //- @note: Update
+        
         QueryPerformanceCounter(&end_time);
         elapsed_microseconds.QuadPart = end_time.QuadPart - start_time.QuadPart;
         f32 dt = (f32)((f32)elapsed_microseconds.QuadPart / (f32)frequency.QuadPart);
@@ -342,12 +345,11 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         map_cam.x = map_cam_v2.x;
         map_cam.y = map_cam_v2.y;
         
-        // @note: Render
+        //- @note: Render
         r_clear();
-        //r_scene(player, test_walls, array_count(test_walls));
-        r_map(test_level, map_cam, player, false);
+        r_sector(&test_level.sectors[player.curr_sector], &player);
+        //r_map(test_level, map_cam, player, false);
         
-        // @todo: Would BitBlt be faster?
         // @todo: Preserve aspect ratio
         StretchDIBits(
                       platform.win_dc,

@@ -2,7 +2,7 @@
 #ifndef BASE_TYPES_H
 #define BASE_TYPES_H
 
-//~ @note: Base types
+//- @note: Base types
 
 #if LANG_C
 # define true 1
@@ -39,7 +39,7 @@ read_only s64 s64_max = 0x7fffffffffffffff;
 
 // @todo: Fixed-point implementation
 
-//~ @note Tangible types
+//- @note Tangible types
 typedef struct Color {
     u8 r, g, b, a;
 } Color;
@@ -70,7 +70,7 @@ colors
 
 #include <math.h>
 
-//~ @note: Math types
+//- @note: Math types
 #if !defined(M_PI)
 # define M_PI  3.1415926535897932384626433
 #endif
