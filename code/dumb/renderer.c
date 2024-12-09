@@ -158,7 +158,7 @@ r_sector (Sector *sector, Entity *cam) {
     f32 canvas_height = (f32)canvas->height;
     f32 width_middle = canvas->width/2.f;
     f32 height_middle = canvas->height/2.f;
-    f32 near_plane = 1.f;
+    f32 near_plane = 0.001f;
     
     for (u64 wall_idx = 0; wall_idx < sector->num_walls; ++wall_idx) {
         //- Transform wall relative to player
@@ -174,7 +174,7 @@ r_sector (Sector *sector, Entity *cam) {
         d1.y = t1.x * sinf(t) + t1.y * cosf(t);
         
         //- Clip walls behind camera
-        if (d0.y <= near_plane && d1.y <= near_plane)
+        if (d0.y < near_plane && d1.y < near_plane)
             continue;
         
         f32 clipped_x = d0.x + (((d1.x - d0.x) * (near_plane - d0.y)) / (d1.y - d0.y));
@@ -184,7 +184,8 @@ r_sector (Sector *sector, Entity *cam) {
             d1 = v2(clipped_x, near_plane);
         
         //- Perspective projection
-        f32 height = sector->height;
+        f32 ceiling = (f32)sector->ceiling;
+        f32 floor = (f32)sector->floor;
         f32 half_height = height/2.f;
         
         f32 z0 = d0.y;
@@ -218,10 +219,10 @@ r_sector (Sector *sector, Entity *cam) {
             f32 xnorm = norm(x, minp.x, maxp.x);
             f32 ybot = clamp(lerp(minp.ybot, maxp.ybot, xnorm), 0.f, height_middle);
             f32 ytop = clamp(lerp(minp.ytop, maxp.ytop, xnorm), height_middle, canvas_height);
-            Color wall_color = 
-                r_draw_vert(x, 0.f, ybot, Color_Gray); // floor
-            r_draw_vert(x, ybot, ytop, wall->next_sector >= 0 ? Color_Lime : Color_Red); // wall
-            r_draw_vert(x, ytop, (f32)canvas->height, Color_Cyan); // Cielling
+            Color wall_color = (x == start_x || x == end_x) ? Color_Black : wall->next_sector >= 0 ? Color_Lime : Color_Maroon; 
+            r_draw_vert(x, 0.f, ybot, Color_Gray); // floor
+            r_draw_vert(x, ybot, ytop, wall_color); // wall
+            r_draw_vert(x, ytop, (f32)canvas->height, Color_Blue); // Cielling
         }
     }
 }
@@ -286,81 +287,6 @@ r_draw_minimap (void) {
     
     // Border
     r_draw_quad_framef(0, 0, canvas->width * MINIMAP_SCALE, canvas->height * MINIMAP_SCALE, Color_Blue);
-}
-
-// Prototype software renderer
-function void
-r_scene (Entity cam, Border *walls, u64 num_walls) {
-    Bitmap *canvas = r_get_framebuffer();
-    
-    f32 forward = M_PI32 / 2.f;
-    f32 canvas_width = (f32)canvas->width;
-    f32 canvas_height = (f32)canvas->height;
-    f32 width_middle = canvas->width/2.f;
-    f32 height_middle = canvas->height/2.f;
-    f32 near_plane = 1.f;
-    
-    for (u64 wall_idx = 0; wall_idx < num_walls; ++wall_idx) {
-        //- @note: Transform wall relative to player
-        Vec2 t0 = v2sub(walls[wall_idx].p0, cam.pos);
-        Vec2 t1 = v2sub(walls[wall_idx].p1, cam.pos);
-        
-        f32 t = -cam.rotation_angle + forward;
-        Vec2 d0, d1;
-        d0.x = t0.x * cosf(t) - t0.y * sinf(t);
-        d0.y = t0.x * sinf(t) + t0.y * cosf(t);
-        d1.x = t1.x * cosf(t) - t1.y * sinf(t);
-        d1.y = t1.x * sinf(t) + t1.y * cosf(t);
-        
-        //- @note: Clip walls behind camera
-        if (d0.y <= near_plane && d1.y <= near_plane)
-            continue;
-        
-        f32 clipped_x = d0.x + (((d1.x - d0.x) * (near_plane - d0.y)) / (d1.y - d0.y));
-        if (d0.y <= near_plane)
-            d0 = v2(clipped_x, near_plane);
-        else if (d1.y <= near_plane)
-            d1 = v2(clipped_x, near_plane);
-        
-        
-        //- @note: Perspective projection
-        f32 height = 50.f; // Height should be determined by sector
-        f32 half_height = height/2.f;
-        
-        f32 z0 = d0.y;
-        f32 z1 = d1.y;
-        f32 cam_dist = 0.89f * 9; // 90 Degree FOV
-        
-        f32 x0    = ((( d0.x*canvas_width)        /(z0*ASPECT_W)) * cam_dist) + width_middle;
-        f32 ybot0 = (((-half_height*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
-        f32 ytop0 = ((( half_height*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
-        f32 x1    = ((( d1.x*canvas_width)        /(z1*ASPECT_W)) * cam_dist) + width_middle;
-        f32 ybot1 = (((-half_height*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
-        f32 ytop1 = ((( half_height*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
-        
-        struct { f32 x,ybot,ytop; } temp, minp, maxp = {0};
-        minp.x    = x0;
-        minp.ybot = ybot0;
-        minp.ytop = ytop0;
-        maxp.x    = x1;
-        maxp.ybot = ybot1;
-        maxp.ytop = ytop1;
-        
-        if (x0 > x1) {
-            temp = minp;
-            minp = maxp;
-            maxp = temp;
-        }
-        
-        for (f32 x = max(minp.x, 0.f); x <= min(maxp.x, canvas_width); ++x) {
-            f32 xnorm = norm(x, minp.x, maxp.x);
-            f32 ybot = clamp(lerp(minp.ybot, maxp.ybot, xnorm), 0.f, height_middle);
-            f32 ytop = clamp(lerp(minp.ytop, maxp.ytop, xnorm), height_middle, canvas_height);
-            r_draw_vert(x, 0.f, ybot, Color_Gray); // floor
-            r_draw_vert(x, ybot, ytop, walls[wall_idx].color); // wall
-            r_draw_vert(x, ytop, (f32)canvas->height, Color_Cyan); // Cielling
-        }
-    }
 }
 
 #endif

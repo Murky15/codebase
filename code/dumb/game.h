@@ -3,9 +3,10 @@
 
 typedef struct Entity {
     Vec2 pos;
+    f32 height;
     f32 rotation_angle;
     f32 radius;
-    u16 curr_sector;
+    s32 curr_sector;
 } Entity;
 
 typedef struct Border {

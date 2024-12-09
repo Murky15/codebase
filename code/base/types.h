@@ -112,6 +112,12 @@ typedef union Vec4 {
     f32 e[4];
 } Vec4, Rect;
 
+//- @note: Vector constants
+read_only Vec2 V2_Up    = { 0,  1};
+read_only Vec2 V2_Down  = { 0, -1};
+read_only Vec2 V2_Left  = {-1,  0};
+read_only Vec2 V2_Right = { 1,  0};
+
 //- @note: Constructors
 core_function Vec2  v2(f32 x, f32 y);
 core_function Vec2i v2i(u32 x, u32 y);
@@ -126,7 +132,8 @@ core_function Vec3  pv2(Vec2 v, f32 z); // promote v2
 //- @note: Basic ops
 core_function f32  v2len(Vec2 v);
 core_function f32  v2dot(Vec2 a, Vec2 b);
-core_function f32  v2cross(Vec2 a, Vec2 b, Vec2 c); // https://en.wikipedia.org/wiki/Cross_product#Computational_geometry
+core_function f32  v2cross(Vec2 a, Vec2 b);
+core_function f32  v2cross3(Vec2 a, Vec2 b, Vec2 c); // https://en.wikipedia.org/wiki/Cross_product#Computational_geometry
 core_function Vec2 v2sub(Vec2 a, Vec2 b);
 core_function Vec2 v2add(Vec2 a, Vec2 b);
 core_function Vec2 v2muls(Vec2 v, f32 s);

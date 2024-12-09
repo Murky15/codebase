@@ -16,7 +16,6 @@
 #include "renderer.h"
 
 //- @note: Source
-
 #undef RELATIVE
 #undef ABSOLUTE
 //#include "third_party/microui/microui.c"
@@ -30,28 +29,23 @@
 
 /*
 @todo
+-[ ] Debug Window
+-[ ] Hot Reloading
 -[ ] Read AMD programming manual
--[X] Rework build script to be more robust (codebase level work)
--[X] Store level data in json (make json parser codebase)
 -[ ] Figure out how to do sectors and portal rendering duke nukem style (fuck me)
--[X] FPS profiling
 -[ ] Font rasterization
 -[ ] Multithreading??
--[ ] Hot reloading??
 -[ ] SIMD???? -> compile renderer code into ISPC
 -[ ] Wall texture mapping
 -[ ] Optimize / profile render functions
 -[ ] Asan / Libfuzzer
 -[ ] sin/cos/tan table lookup: https://namoseley.wordpress.com/2015/07/26/sincos-generation-using-table-lookup-and-iterpolation/
--[X] Bake in "asset" dir for this game
--[ ] Metaprogramming
 -[ ] Make Arenas more flexible
--[ ] Add better support for dynamic arrays in arenas
 */
 
 #define MOUSE_SENSITIVITY 0.01f
 #define MOUSE_SCROLL_SENSITIVITY 0.8f
-#define PLAYER_MOVE_SPEED 100.f
+#define PLAYER_MOVE_SPEED 150.f
 #define CAM_MOVE_SPEED 200.f
 
 typedef struct Win32_Data {
@@ -95,7 +89,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
         case WM_INPUT: {
             u32 size;
             GetRawInputData((HRAWINPUT)lParam, RID_INPUT, 0, &size, sizeof(RAWINPUTHEADER));
-            LPBYTE buff = arena_pushn(frame_arena, BYTE, size);\
+            LPBYTE buff = arena_pushn(frame_arena, BYTE, size);
             if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, buff, &size, sizeof(RAWINPUTHEADER)) != size)
                 OutputDebugString("GetRawInputData does not return correct size !\n");
             
@@ -285,7 +279,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     
     Entity player = {0};
     player.rotation_angle = 0;
-    player.radius = 10.f;
+    player.radius = 20.f;
     player.pos.x = 0;
     player.pos.y = 0;
     player.curr_sector = 0;
@@ -345,10 +339,13 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         map_cam.x = map_cam_v2.x;
         map_cam.y = map_cam_v2.y;
         
+        // @todo: Can we avoid polling every frame?
+        update_current_sector(&player, &test_level);
+        
         //- @note: Render
-        r_clear();
         r_sector(&test_level.sectors[player.curr_sector], &player);
-        //r_map(test_level, map_cam, player, false);
+        //r_clear();
+        //r_map(test_level, map_cam, player, true);
         
         // @todo: Preserve aspect ratio
         StretchDIBits(

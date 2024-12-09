@@ -94,6 +94,12 @@ core_function void json_dump_lex(Json_Token_List *tokens, String8 json);
 
 //- @incomplete Object/Array manipulation
 core_function Json_Value json_object_fetch(Json_Object *object, String8 key);
+#define json_fetch_num(j,T,str) (T)json_object_fetch(j,str).number
+#define json_fetch_str(j,str) json_object_fetch(j,str).string
+#define json_fetch_obj(j,str) json_object_fetch(j,str).object
+#define json_fetch_arr(j,str) json_object_fetch(j,str).array
+#define json_fetch_keyword(j,str) json_object_fetch(j,str).keyword
+
 core_function void json_value_list_push(Arena *arena, Json_Value_List *list, Json_Value value);
 
 //- @incomplete Serialization functions & better program-side data mutability

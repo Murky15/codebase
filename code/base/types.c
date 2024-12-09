@@ -69,7 +69,12 @@ v2dot (Vec2 a, Vec2 b) {
 }
 
 core_function f32  
-v2cross (Vec2 a, Vec2 b, Vec2 c) {
+v2cross (Vec2 a, Vec2 b) {
+    return a.x * b.y - a.y * b.x;
+}
+
+core_function f32  
+v2cross3 (Vec2 a, Vec2 b, Vec2 c) {
     return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
 
