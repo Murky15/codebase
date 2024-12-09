@@ -184,20 +184,19 @@ r_sector (Sector *sector, Entity *cam) {
             d1 = v2(clipped_x, near_plane);
         
         //- Perspective projection
-        f32 ceiling = (f32)sector->ceiling;
-        f32 floor = (f32)sector->floor;
-        f32 half_height = height/2.f;
-        
         f32 z0 = d0.y;
         f32 z1 = d1.y;
-        f32 cam_dist = 0.89f * 9; // 90 Degree FOV
+        f32 cam_dist = 0.89f * ASPECT_H; // 90 Degree horizontal FOV
+        
+        f32 ceiling = (f32)sector->ceiling - cam->height;
+        f32 floor =   (f32)sector->floor   - cam->height;
         
         f32 x0    = ((( d0.x*canvas_width)        /(z0*ASPECT_W)) * cam_dist) + width_middle;
-        f32 ybot0 = (((-half_height*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
-        f32 ytop0 = ((( half_height*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
+        f32 ybot0 = ((( floor*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
+        f32 ytop0 = ((( ceiling*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
         f32 x1    = ((( d1.x*canvas_width)        /(z1*ASPECT_W)) * cam_dist) + width_middle;
-        f32 ybot1 = (((-half_height*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
-        f32 ytop1 = ((( half_height*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
+        f32 ybot1 = ((( floor*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
+        f32 ytop1 = ((( ceiling*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
         
         struct { f32 x,ybot,ytop; } temp, minp, maxp = {0};
         minp.x    = x0;
@@ -210,19 +209,22 @@ r_sector (Sector *sector, Entity *cam) {
         if (x0 > x1) {
             temp = minp;
             minp = maxp;
-            maxp = temp;
+            maxp = temp; 
         }
         
         f32 start_x = max(minp.x, 0.f);
         f32 end_x = min(maxp.x, canvas_width);
         for (f32 x = start_x; x <= end_x; ++x) {
             f32 xnorm = norm(x, minp.x, maxp.x);
+            
+            
             f32 ybot = clamp(lerp(minp.ybot, maxp.ybot, xnorm), 0.f, height_middle);
             f32 ytop = clamp(lerp(minp.ytop, maxp.ytop, xnorm), height_middle, canvas_height);
+            
             Color wall_color = (x == start_x || x == end_x) ? Color_Black : wall->next_sector >= 0 ? Color_Lime : Color_Maroon; 
-            r_draw_vert(x, 0.f, ybot, Color_Gray); // floor
+            r_draw_vert(x, 0.f, ybot, Color_Silver); // floor
             r_draw_vert(x, ybot, ytop, wall_color); // wall
-            r_draw_vert(x, ytop, (f32)canvas->height, Color_Blue); // Cielling
+            r_draw_vert(x, ytop, (f32)canvas->height, Color_Gray); // Cielling
         }
     }
 }

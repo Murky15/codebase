@@ -74,32 +74,40 @@ point_in_sector (Vec2 p, Sector *sector) {
     u64 num_intersections = 0;
     for (u64 widx = 0; widx < sector->num_walls; ++widx) {
         Wall *w = &sector->walls[widx];
-        if (wall_intersect(p, V2_Right, *w)) num_intersections++;
+        if (wall_intersect(p, V2_Up, *w)) num_intersections++;
     }
     
     return ((num_intersections % 2) != 0);
 }
 
 function void
-update_current_sector (Entity *entity, Map *map) {
+update_current_sector_and_adjust_height (Entity *entity, Map *map) {
     // First check if we haven't moved
     Sector *curr_sector = &map->sectors[entity->curr_sector];
+    Sector *new_sector = curr_sector;
     if (point_in_sector(entity->pos, curr_sector)) return;
     
     // Check connecting sectors
     for (u64 w = 0; w < curr_sector->num_walls; ++w) {
         Wall *wall = &curr_sector->walls[w];
-        if (wall->next_sector >= 0 && point_in_sector(entity->pos, &map->sectors[wall->next_sector])) {
-            entity->curr_sector = wall->next_sector;
-            return;
+        Sector *sector =  &map->sectors[wall->next_sector];
+        if (wall->next_sector >= 0 && point_in_sector(entity->pos, sector)) {
+            new_sector = sector;
+            goto sector_change;
         }
     }
     
     // Linearly search (where did our entity go??)
     for (u64 s = 0; s < map->num_sectors; ++s) {
-        if (point_in_sector(entity->pos, &map->sectors[s])) {
-            entity->curr_sector = (u16)s;
-            return;
+        Sector *sector = &map->sectors[s];
+        if (point_in_sector(entity->pos, sector)) {
+            new_sector = sector;
+            goto sector_change;
         }
     }
+    
+    sector_change:
+    s32 diff = new_sector->floor - curr_sector->floor;
+    entity->height += diff;
+    entity->curr_sector = new_sector->id;
 }

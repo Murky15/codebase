@@ -4,7 +4,7 @@
                 {
                     "id": 0,
                     "floor": 0,
-                    "ceiling": 30,
+                    "ceiling": 50,
                     "ceiling_texture": null,
                     "floor_texture": null,
                     "wall_texture": null,
@@ -63,7 +63,7 @@
                 {
                     "id": 1,
                     "floor": 0,
-                    "ceiling": 30,
+                    "ceiling": 20,
                     "ceiling_texture": null,
                     "floor_texture": null,
                     "wall_texture": null,
@@ -139,7 +139,7 @@
                 {
                     "id": 2,
                     "floor": 0,
-                    "ceiling": 30,
+                    "ceiling": 100,
                     "ceiling_texture": null,
                     "floor_texture": null,
                     "wall_texture": null,
@@ -183,7 +183,7 @@
                 {
                     "id": 3,
                     "floor": 0,
-                    "ceiling": 30,
+                    "ceiling": 16,
                     "ceiling_texture": null,
                     "floor_texture": null,
                     "wall_texture": null,

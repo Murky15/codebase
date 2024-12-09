@@ -278,6 +278,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     //- @note: Game setup
     
     Entity player = {0};
+    player.height = 15;
     player.rotation_angle = 0;
     player.radius = 20.f;
     player.pos.x = 0;
@@ -311,6 +312,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         f32 dt = (f32)((f32)elapsed_microseconds.QuadPart / (f32)frequency.QuadPart);
         start_time = end_time;
         
+        Sector *player_sector = &test_level.sectors[player.curr_sector];
+        
         player.rotation_angle -= turn_amount;
         player.rotation_angle = fmod_cycling(player.rotation_angle, 2 * M_PI32);
         turn_amount = 0;
@@ -340,10 +343,10 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         map_cam.y = map_cam_v2.y;
         
         // @todo: Can we avoid polling every frame?
-        update_current_sector(&player, &test_level);
+        update_current_sector_and_adjust_height(&player, &test_level);
         
         //- @note: Render
-        r_sector(&test_level.sectors[player.curr_sector], &player);
+        r_sector(player_sector, &player);
         //r_clear();
         //r_map(test_level, map_cam, player, true);
         
