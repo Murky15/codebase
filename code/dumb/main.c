@@ -43,6 +43,9 @@
 -[ ] Make Arenas more flexible
 */
 
+#define RESOLUTION_W 320
+#define RESOLUTION_H 180
+
 #define MOUSE_SENSITIVITY 0.01f
 #define MOUSE_SCROLL_SENSITIVITY 0.8f
 #define PLAYER_MOVE_SPEED 150.f
@@ -273,6 +276,10 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     
     // @note: Create bitmap
     Bitmap *bitmap = r_get_framebuffer();
+    bitmap->width = RESOLUTION_W;
+    bitmap->height = RESOLUTION_H;
+    bitmap->pixels = arena_pushn(perm_arena, u32, bitmap->width * bitmap->height);
+    
     platform.bitmap = win32_create_bitmap(bitmap);
     
     //- @note: Game setup
@@ -346,7 +353,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         update_current_sector_and_adjust_height(&player, &test_level);
         
         //- @note: Render
-        r_sector(player_sector, &player);
+        r_sector(&test_level, player_sector, &player);
         //r_clear();
         //r_map(test_level, map_cam, player, true);
         

@@ -1,11 +1,6 @@
 function Bitmap*
 r_get_framebuffer (void) { // @todo: This function call is generating a lot of overhead
     local_persist Bitmap f;
-    if (f.width == 0) {
-        f.width = 640;
-        f.height = 360;
-        f.pixels = malloc(f.width * f.height * sizeof(u32));
-    }
     return &f;
 }
 
@@ -18,7 +13,7 @@ r_test_gradient (void) {
         for (u32 x = 0; x < canvas->width; ++x) {
             u8 r = (u8)x + xOffset;
             u8 g = (u8)y + yOffset;
-            u8 b = 0;
+            u8 b = 0;  
             canvas->pixels[y * canvas->width + x] = (r << 16 | g << 8 | b);
         }
     }
@@ -150,7 +145,7 @@ r_draw_rect (Vec2 p, Vec2 sz, Color c) {
 }
 
 function void
-r_sector (Sector *sector, Entity *cam) {
+r_sector (Map *map, Sector *sector, Entity *cam) {
     Bitmap *canvas = r_get_framebuffer();
     
     f32 forward = M_PI32 / 2.f;
@@ -188,23 +183,43 @@ r_sector (Sector *sector, Entity *cam) {
         f32 z1 = d1.y;
         f32 cam_dist = 0.89f * ASPECT_H; // 90 Degree horizontal FOV
         
-        f32 ceiling = (f32)sector->ceiling - cam->height;
-        f32 floor =   (f32)sector->floor   - cam->height;
+        s32 ceil_diff = 0, floor_diff = 0;
+        if (wall->next_sector >= 0) {
+            Sector *next = &map->sectors[wall->next_sector];
+            ceil_diff = next->ceiling - sector->ceiling;
+            floor_diff = next->floor - sector->floor;
+        }
         
-        f32 x0    = ((( d0.x*canvas_width)        /(z0*ASPECT_W)) * cam_dist) + width_middle;
-        f32 ybot0 = ((( floor*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
-        f32 ytop0 = ((( ceiling*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
-        f32 x1    = ((( d1.x*canvas_width)        /(z1*ASPECT_W)) * cam_dist) + width_middle;
-        f32 ybot1 = ((( floor*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
-        f32 ytop1 = ((( ceiling*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
+        f32 actual_height = cam->height + (f32)sector->floor;
+        f32 ceiling = (f32)sector->ceiling + ceil_diff - actual_height;
+        f32 floor = (f32)sector->floor + floor_diff - actual_height;
+        f32 full_height = ceiling - ceil_diff;
+        f32 full_depth = floor - floor_diff;
         
-        struct { f32 x,ybot,ytop; } temp, minp, maxp = {0};
-        minp.x    = x0;
-        minp.ybot = ybot0;
-        minp.ytop = ytop0;
-        maxp.x    = x1;
-        maxp.ybot = ybot1;
-        maxp.ytop = ytop1;
+        // @todo: Pull these out into macros?
+        f32 x0    = ((( d0.x*canvas_width)/(z0*ASPECT_W)) * cam_dist) + width_middle;
+        f32 floor0 = ((( floor*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
+        f32 ceil0 = ((( ceiling*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
+        f32 depth0 = ((( full_depth*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
+        f32 height0 = ((( full_height*canvas_height)/(z0*ASPECT_H)) * cam_dist) + height_middle;
+        
+        f32 x1    = ((( d1.x*canvas_width)/(z1*ASPECT_W)) * cam_dist) + width_middle;
+        f32 floor1 = ((( floor*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
+        f32 ceil1 = ((( ceiling*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
+        f32 depth1 = ((( full_depth*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
+        f32 height1 = ((( full_height*canvas_height)/(z1*ASPECT_H)) * cam_dist) + height_middle;
+        
+        struct { f32 x,floor,ceil,depth,height; } temp, minp, maxp = {0};
+        minp.x = x0;
+        minp.floor = floor0;
+        minp.ceil = ceil0;
+        minp.depth = depth0;
+        minp.height = height0;
+        maxp.x = x1;
+        maxp.floor = floor1;
+        maxp.ceil = ceil1;
+        maxp.depth = depth1;
+        maxp.height = height1;
         
         if (x0 > x1) {
             temp = minp;
@@ -215,16 +230,18 @@ r_sector (Sector *sector, Entity *cam) {
         f32 start_x = max(minp.x, 0.f);
         f32 end_x = min(maxp.x, canvas_width);
         for (f32 x = start_x; x <= end_x; ++x) {
-            f32 xnorm = norm(x, minp.x, maxp.x);
-            
-            
-            f32 ybot = clamp(lerp(minp.ybot, maxp.ybot, xnorm), 0.f, height_middle);
-            f32 ytop = clamp(lerp(minp.ytop, maxp.ytop, xnorm), height_middle, canvas_height);
+            f32 xnorm  = norm(x, minp.x, maxp.x);
+            f32 depth  = clamp(lerp(minp.depth, maxp.depth, xnorm), 0.f, canvas_height);
+            f32 height = clamp(lerp(minp.height, maxp.height, xnorm), depth, canvas_height);
+            f32 floor  = clamp(lerp(minp.floor, maxp.floor, xnorm), depth, height);
+            f32 ceil   = clamp(lerp(minp.ceil, maxp.ceil, xnorm), depth, height);
             
             Color wall_color = (x == start_x || x == end_x) ? Color_Black : wall->next_sector >= 0 ? Color_Lime : Color_Maroon; 
-            r_draw_vert(x, 0.f, ybot, Color_Silver); // floor
-            r_draw_vert(x, ybot, ytop, wall_color); // wall
-            r_draw_vert(x, ytop, (f32)canvas->height, Color_Gray); // Cielling
+            r_draw_vert(x, 0.f, depth, Color_Blue); // floor
+            r_draw_vert(x, depth, floor, Color_Maroon); // ledge
+            r_draw_vert(x, floor, ceil, wall_color); // wall
+            r_draw_vert(x, ceil, height, Color_Maroon); // ledge
+            r_draw_vert(x, height, (f32)canvas->height, Color_Black); // Cielling
         }
     }
 }

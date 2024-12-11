@@ -3,8 +3,8 @@
 	"sectors": [
                 {
                     "id": 0,
-                    "floor": 0,
-                    "ceiling": 50,
+                    "floor": 15,
+                    "ceiling": 40,
                     "ceiling_texture": null,
                     "floor_texture": null,
                     "wall_texture": null,
@@ -62,8 +62,8 @@
                 
                 {
                     "id": 1,
-                    "floor": 0,
-                    "ceiling": 20,
+                    "floor": 10,
+                    "ceiling": 50,
                     "ceiling_texture": null,
                     "floor_texture": null,
                     "wall_texture": null,
@@ -138,8 +138,8 @@
                 
                 {
                     "id": 2,
-                    "floor": 0,
-                    "ceiling": 100,
+                    "floor": -5,
+                    "ceiling": 30,
                     "ceiling_texture": null,
                     "floor_texture": null,
                     "wall_texture": null,
@@ -182,8 +182,8 @@
                 
                 {
                     "id": 3,
-                    "floor": 0,
-                    "ceiling": 16,
+                    "floor": 10,
+                    "ceiling": 40,
                     "ceiling_texture": null,
                     "floor_texture": null,
                     "wall_texture": null,
@@ -217,8 +217,8 @@
                 
                 {
                     "id": 4,
-                    "floor": 0,
-                    "ceiling": 30,
+                    "floor": -5,
+                    "ceiling": 25,
                     "ceiling_texture": null,
                     "floor_texture": null,
                     "wall_texture": null,

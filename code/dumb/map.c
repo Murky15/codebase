@@ -84,7 +84,6 @@ function void
 update_current_sector_and_adjust_height (Entity *entity, Map *map) {
     // First check if we haven't moved
     Sector *curr_sector = &map->sectors[entity->curr_sector];
-    Sector *new_sector = curr_sector;
     if (point_in_sector(entity->pos, curr_sector)) return;
     
     // Check connecting sectors
@@ -92,8 +91,8 @@ update_current_sector_and_adjust_height (Entity *entity, Map *map) {
         Wall *wall = &curr_sector->walls[w];
         Sector *sector =  &map->sectors[wall->next_sector];
         if (wall->next_sector >= 0 && point_in_sector(entity->pos, sector)) {
-            new_sector = sector;
-            goto sector_change;
+            entity->curr_sector = sector->id;
+            return;
         }
     }
     
@@ -101,13 +100,8 @@ update_current_sector_and_adjust_height (Entity *entity, Map *map) {
     for (u64 s = 0; s < map->num_sectors; ++s) {
         Sector *sector = &map->sectors[s];
         if (point_in_sector(entity->pos, sector)) {
-            new_sector = sector;
-            goto sector_change;
+            entity->curr_sector = sector->id;
+            return;
         }
     }
-    
-    sector_change:
-    s32 diff = new_sector->floor - curr_sector->floor;
-    entity->height += diff;
-    entity->curr_sector = new_sector->id;
 }
