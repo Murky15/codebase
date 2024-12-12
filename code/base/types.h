@@ -106,7 +106,7 @@ typedef union Vec3i {
     u32 e[2];
 } Vec3i;
 
-// @todo: Add functions for this (hard math)
+// @todo: Add functions for this
 typedef union Vec4 {
     struct { f32 x, y, z, w; };
     struct { Vec3 xyz; };

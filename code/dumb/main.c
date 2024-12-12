@@ -29,7 +29,7 @@
 
 /*
 @todo
--[ ] Debug Window
+-[ ] Make another window using win ui for like dev tweaking n stuff
 -[ ] Hot Reloading
 -[ ] Read AMD programming manual
 -[ ] Figure out how to do sectors and portal rendering duke nukem style (fuck me)
@@ -46,7 +46,7 @@
 #define RESOLUTION_W 320
 #define RESOLUTION_H 180
 
-#define MOUSE_SENSITIVITY 0.01f
+#define MOUSE_SENSITIVITY 0.005f
 #define MOUSE_SCROLL_SENSITIVITY 0.8f
 #define PLAYER_MOVE_SPEED 150.f
 #define CAM_MOVE_SPEED 200.f

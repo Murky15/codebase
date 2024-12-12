@@ -186,15 +186,16 @@ r_sector (Map *map, Sector *sector, Entity *cam) {
         s32 ceil_diff = 0, floor_diff = 0;
         if (wall->next_sector >= 0) {
             Sector *next = &map->sectors[wall->next_sector];
-            ceil_diff = next->ceiling - sector->ceiling;
-            floor_diff = next->floor - sector->floor;
+            ceil_diff = next->ceiling < sector->ceiling ? next->ceiling - sector->ceiling : 0;
+            floor_diff = next->floor > sector->floor ? next->floor - sector->floor: 0;
         }
         
         f32 actual_height = cam->height + (f32)sector->floor;
-        f32 ceiling = (f32)sector->ceiling + ceil_diff - actual_height;
-        f32 floor = (f32)sector->floor + floor_diff - actual_height;
-        f32 full_height = ceiling - ceil_diff;
-        f32 full_depth = floor - floor_diff;
+        f32 full_height = (f32)sector->ceiling - actual_height;
+        f32 full_depth  = (f32)sector->floor - actual_height;
+        f32 ceiling = full_height + ceil_diff;
+        f32 floor = full_depth + floor_diff;
+        assert(ceiling && floor); // @patch: If these are *perfectly* zero it messes up wall rendering
         
         // @todo: Pull these out into macros?
         f32 x0    = ((( d0.x*canvas_width)/(z0*ASPECT_W)) * cam_dist) + width_middle;
@@ -232,16 +233,16 @@ r_sector (Map *map, Sector *sector, Entity *cam) {
         for (f32 x = start_x; x <= end_x; ++x) {
             f32 xnorm  = norm(x, minp.x, maxp.x);
             f32 depth  = clamp(lerp(minp.depth, maxp.depth, xnorm), 0.f, canvas_height);
-            f32 height = clamp(lerp(minp.height, maxp.height, xnorm), depth, canvas_height);
-            f32 floor  = clamp(lerp(minp.floor, maxp.floor, xnorm), depth, height);
-            f32 ceil   = clamp(lerp(minp.ceil, maxp.ceil, xnorm), depth, height);
+            f32 height = clamp(lerp(minp.height, maxp.height, xnorm), 0.f, canvas_height);
+            f32 floor  = clamp(lerp(minp.floor, maxp.floor, xnorm), 0.f, canvas_height);
+            f32 ceil   = clamp(lerp(minp.ceil, maxp.ceil, xnorm), 0.f, canvas_height);
             
             Color wall_color = (x == start_x || x == end_x) ? Color_Black : wall->next_sector >= 0 ? Color_Lime : Color_Maroon; 
             r_draw_vert(x, 0.f, depth, Color_Blue); // floor
-            r_draw_vert(x, depth, floor, Color_Maroon); // ledge
+            r_draw_vert(x, depth, floor, Color_Silver); // ledge
             r_draw_vert(x, floor, ceil, wall_color); // wall
-            r_draw_vert(x, ceil, height, Color_Maroon); // ledge
-            r_draw_vert(x, height, (f32)canvas->height, Color_Black); // Cielling
+            r_draw_vert(x, ceil, height, Color_Silver); // ledge
+            r_draw_vert(x, height, canvas_height, Color_Black); // Cielling
         }
     }
 }
