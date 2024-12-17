@@ -4,8 +4,6 @@
 //#include "third_party/microui/microui.h"
 
 #include <Windows.h>
-#include <stdlib.h>
-#include <time.h>
 
 #include "base/include.h"
 #include "os/include.h"
@@ -243,10 +241,6 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     
     Win32_Data platform = win32_create_window(hInstance);
     
-    // @note: Seed renderer
-    time_t seed = time(0);
-    srand((u32)seed);
-    
     // @note: Register for input
     RAWINPUTDEVICE input_devices[2];
     
@@ -281,11 +275,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     bitmap->width = RESOLUTION_W;
     bitmap->height = RESOLUTION_H;
     bitmap->pixels = arena_pushn(perm_arena, u32, bitmap->width * bitmap->height);
-    Quad2D screen_rect;
-    screen_rect.p0 = v2(0, (f32)bitmap->height);
-    screen_rect.p1 = v2((f32)bitmap->width, (f32)bitmap->height);
-    screen_rect.p2 = v2((f32)bitmap->width, 0);
-    screen_rect.p3 = v2(0,0);
+    Range initial_bounds = v2(0, (f32)bitmap->width);
     platform.bitmap = win32_create_bitmap(bitmap);
     
     //- @note: Game setup
@@ -359,8 +349,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         update_current_sector(&player, &test_level);
         
         //- @note: Render
-        r_clear();
-        r_sector(&test_level, player_sector, &player, -1, screen_rect);
+        //r_clear_color(Color_Black);
+        r_sector(&test_level, player_sector, &player, -1, initial_bounds);
         //r_map(test_level, map_cam, player, true);
         
         // @todo: Preserve aspect ratio

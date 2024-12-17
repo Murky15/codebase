@@ -242,12 +242,10 @@ r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) 
         // How can we pass the bounds onwards
         if (wall->next_sector >= 0) {
             Sector *next_sector = &map->sectors[wall->next_sector];
-            Quad2D bounds;
+            Range bounds;
             // @todo: Revisit this (we can make this faster by removing Y checks)
-            bounds.p0 = v2(max(minp.x, window.p0.x), min(minp.ceil, window.p0.y));
-            bounds.p1 = v2(min(maxp.x, window.p1.x), min(maxp.ceil, window.p1.y));
-            bounds.p2 = v2(min(maxp.x, window.p2.x), max(maxp.floor, window.p2.y));
-            bounds.p3 = v2(max(minp.x, window.p3.x), max(minp.floor, window.p3.y));
+            bounds.first = max(minp.x, window.first);
+            bounds.last  = min(maxp.x, window.last);
             Entity modified_cam = *cam;
             modified_cam.height = actual_height - next_sector->floor;
             r_sector(map, next_sector, &modified_cam, sector->id, bounds);
@@ -256,10 +254,8 @@ r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) 
         f32 start_x = max(minp.x, -1.f);
         f32 end_x = min(maxp.x, canvas_width);
         for (f32 x = start_x; x <= end_x; ++x) {
-            if (x >= window.p0.x && x <= window.p1.x) {
+            if (x >= window.first && x <= window.last) {
                 f32 xnorm  = norm(x, minp.x, maxp.x);
-                f32 bound_height = lerp(window.p0.y, window.p1.y, xnorm);
-                
                 f32 depth  = max(lerp(minp.depth, maxp.depth, xnorm), -1);
                 f32 height = min(lerp(minp.height, maxp.height, xnorm), canvas_height);
                 f32 floor  = clamp(lerp(minp.floor, maxp.floor, xnorm), depth, height);

@@ -86,16 +86,15 @@ update_current_sector (Entity *entity, Map *map) {
     Sector *curr_sector = &map->sectors[entity->curr_sector];
     if (point_in_sector(entity->pos, curr_sector)) return;
     
-    // Check connecting sectors
-    for (u64 w = 0; w < curr_sector->num_walls; ++w) {
-        Wall *wall = &curr_sector->walls[w];
-        Sector *sector =  &map->sectors[wall->next_sector];
-        if (wall->next_sector >= 0 && point_in_sector(entity->pos, sector)) {
-            entity->curr_sector = sector->id;
+    // Check adjacent sectors
+    for (Sector_Ref *adj = curr_sector->adjacent.first; adj; adj = adj->next) {
+        if (point_in_sector(entity->pos, adj->sector)) {
+            entity->curr_sector = adj->sector->id;
             return;
         }
     }
     
+#if 0
     // Linearly search (where did our entity go??)
     for (u64 s = 0; s < map->num_sectors; ++s) {
         Sector *sector = &map->sectors[s];
@@ -104,4 +103,5 @@ update_current_sector (Entity *entity, Map *map) {
             return;
         }
     }
+#endif
 }
