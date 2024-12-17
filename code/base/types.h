@@ -85,14 +85,16 @@ typedef union Vec2 {
     struct { f32 width, height; };
     struct { f32 first, last; };
     f32 e[2];
-} Vec2, Range, Pair;
+} Vec2;
+typedef Vec2 Range, Pair;
 
 typedef union Vec2i {
     struct { u32 x, y; };
     struct { u32 width, height; };
     struct { u32 first, last; };
     u32 e[2];
-} Vec2i, Rangei, Pairi;
+} Vec2i;
+typedef Vec2i Rangei, Pairi;
 
 typedef union Vec3 {
     struct { f32 x, y, z; };
@@ -110,9 +112,16 @@ typedef union Vec3i {
 typedef union Vec4 {
     struct { f32 x, y, z, w; };
     struct { Vec3 xyz; };
-    struct { Vec2 xy, zw; };
     f32 e[4];
-} Vec4, Rect;
+} Vec4;
+
+typedef struct Quad2D {
+    Vec2 p0, p1, p2, p3;
+} Quad2D;
+
+typedef struct Quad3D {
+    Vec3 p0, p1, p2, p3;
+} Quad3D;
 
 //- @note: Vector constants
 read_only Vec2 V2_Up    = { 0,  1};

@@ -27,6 +27,8 @@
 #include "map.c"
 #include "renderer.c"
 
+// Voodoo is a sick name
+
 /*
 @todo
 -[ ] Make another window using win ui for like dev tweaking n stuff
@@ -279,7 +281,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     bitmap->width = RESOLUTION_W;
     bitmap->height = RESOLUTION_H;
     bitmap->pixels = arena_pushn(perm_arena, u32, bitmap->width * bitmap->height);
-    
+    Quad2D screen_rect = {0};
+    screen_rect.p1 = v2((f32)bitmap->width, (f32)bitmap->height);
+    screen_rect.p2 = v2((f32)bitmap->width, 0);
     platform.bitmap = win32_create_bitmap(bitmap);
     
     //- @note: Game setup
@@ -350,11 +354,10 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         map_cam.y = map_cam_v2.y;
         
         // @todo: Can we avoid polling every frame?
-        update_current_sector_and_adjust_height(&player, &test_level);
+        update_current_sector(&player, &test_level);
         
         //- @note: Render
-        r_sector(&test_level, player_sector, &player);
-        //r_clear();
+        r_sector(&test_level, player_sector, &player, screen_rect);
         //r_map(test_level, map_cam, player, true);
         
         // @todo: Preserve aspect ratio

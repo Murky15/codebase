@@ -26,6 +26,6 @@ function void r_draw_rect(Vec2 p, Vec2 sz, Color c);
 
 //- @note: Game specific functionality
 function void r_map(Map map, Vec3 map_cam, Entity player, b32 show_player);
-function void r_sector(Map *map, Sector *sector, Entity *cam);
+function void r_sector(Map *map, Sector *sector, Entity *cam, Quad2D window);
 
 #endif //RENDERER_H

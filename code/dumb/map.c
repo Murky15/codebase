@@ -81,7 +81,7 @@ point_in_sector (Vec2 p, Sector *sector) {
 }
 
 function void
-update_current_sector_and_adjust_height (Entity *entity, Map *map) {
+update_current_sector (Entity *entity, Map *map) {
     // First check if we haven't moved
     Sector *curr_sector = &map->sectors[entity->curr_sector];
     if (point_in_sector(entity->pos, curr_sector)) return;
