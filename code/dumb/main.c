@@ -29,24 +29,23 @@
 
 /*
 @todo
--[ ] Make another window using win ui for like dev tweaking n stuff
--[ ] Hot Reloading
--[ ] Read AMD programming manual
--[ ] Figure out how to do sectors and portal rendering duke nukem style (fuck me)
--[ ] Font rasterization
--[ ] Multithreading??
--[ ] SIMD???? -> compile renderer code into ISPC
--[ ] Wall texture mapping
--[ ] Optimize / profile render functions
--[ ] Asan / Libfuzzer
--[ ] sin/cos/tan table lookup: https://namoseley.wordpress.com/2015/07/26/sincos-generation-using-table-lookup-and-iterpolation/
--[ ] Make Arenas more flexible
+-Make another window using win ui for like dev tweaking n stuff
+-Hot Reloading
+-Read AMD programming manual
+-Lighting
+-Font rasterization
+-Multithreading??
+-SIMD???? -> compile renderer code into ISPC
+-Wall texture mapping
+-Optimize / profile render functions
+-Asan / Libfuzzer
+-sin/cos/tan table lookup: https://namoseley.wordpress.com/2015/07/26/sincos-generation-using-table-lookup-and-iterpolation/
 */
 
-#define RESOLUTION_W 320
-#define RESOLUTION_H 180
+#define RESOLUTION_W 640
+#define RESOLUTION_H 360
 
-#define MOUSE_SENSITIVITY 0.005f
+#define MOUSE_SENSITIVITY 0.01f
 #define MOUSE_SCROLL_SENSITIVITY 0.8f
 #define PLAYER_MOVE_SPEED 150.f
 #define CAM_MOVE_SPEED 200.f
@@ -282,11 +281,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     
     Entity player = {0};
     player.height = 15;
-    player.rotation_angle = 0;
     player.radius = 20.f;
-    player.pos.x = 0;
-    player.pos.y = 0;
-    player.curr_sector = 0;
     
     // I wish I had made a level editor
     // Load map data 
@@ -349,9 +344,13 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         update_current_sector(&player, &test_level);
         
         //- @note: Render
-        //r_clear_color(Color_Black);
+#if 1
         r_sector(&test_level, player_sector, &player, -1, initial_bounds);
-        //r_map(test_level, map_cam, player, true);
+#else
+        // @todo: This causes the screen to flicker when changing rooms in 3D. Keep an eye on this one...
+        r_clear_color(Color_Black);
+        r_map(test_level, map_cam, player, true);
+#endif
         
         // @todo: Preserve aspect ratio
         StretchDIBits(

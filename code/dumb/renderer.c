@@ -239,11 +239,9 @@ r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) 
         }
         
         // Render into next scene (if applicable)
-        // How can we pass the bounds onwards
         if (wall->next_sector >= 0) {
             Sector *next_sector = &map->sectors[wall->next_sector];
             Range bounds;
-            // @todo: Revisit this (we can make this faster by removing Y checks)
             bounds.first = max(minp.x, window.first);
             bounds.last  = min(maxp.x, window.last);
             Entity modified_cam = *cam;
