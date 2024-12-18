@@ -14,7 +14,7 @@ namespace eval dumb {
         
 # This doesn't show cmd output if compile is successful, but do we really need to see that?
 		try {
-    		set results [exec {*}{cl -nologo -FC -J -I./code -EHa- -GR- -Od -Zi -WX -W3 -wd4146 -wd4005 -wd4101 -DDEBUG=1 -DENABLE_ASSERT=1 ./code/dumb/main.c User32.lib Gdi32.lib -Fo./build/ -Fd./build/ -Fe./build/dumb.exe}]
+    		set results [exec {*}{cl -nologo -FC -J -I./code -EHa- -GR- -Od -Zi -WX -W3 -wd4146 -wd4005 -wd4101 -DDEBUG=1 -DENABLE_ASSERT=1 ./code/dumb/platform_win32.c User32.lib Gdi32.lib -Fo./build/ -Fd./build/ -Fe./build/dumb.exe}]
                 set status 0
 		} trap CHILDSTATUS {results options} {
 			puts $results

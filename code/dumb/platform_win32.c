@@ -1,14 +1,12 @@
-#include <Windows.h>
-
-#include "game.h"
 #include "game.c"
 
-#define RESOLUTION_W 640
-#define RESOLUTION_H 360
+#include <Windows.h>
+
+#define RESOLUTION_W 320
+#define RESOLUTION_H 180
 
 #define MOUSE_SENSITIVITY 0.01f
 #define MOUSE_SCROLL_SENSITIVITY 0.8f
-#define PLAYER_MOVE_SPEED 150.f
 #define CAM_MOVE_SPEED 200.f
 
 typedef struct Win32_Data {
@@ -18,23 +16,21 @@ typedef struct Win32_Data {
     BITMAPINFO bitmap;
 } Win32_Data;
 
-global int g_window_width = 1280;
-global int g_window_height = 720;
-global b32 g_game_running = true;
-global b32 g_mouse_captured = false;
+global int window_width = 1280;
+global int window_height = 720;
+global b32 game_running = true;
+global b32 mouse_captured = false;
 
 global Arena *perm_arena;
 global Arena *frame_arena;
 global Arena *level_arena;
 
-// @todo: It is annoying to need to pull out these "action commands"
-global b32 move_forward, move_back, strafe_left, strafe_right;
+global Game_Input_Package game_input;
 global b32 cam_up, cam_down, cam_left, cam_right;
-global f32 turn_amount;
 
 function void
 win32_capture_mouse (HWND hwnd) {
-    g_mouse_captured = true;
+    mouse_captured = true;
     RECT cr;
     GetClientRect(hwnd, &cr);
     POINT middle  = {cr.right/2, cr.bottom/2};
@@ -43,7 +39,7 @@ win32_capture_mouse (HWND hwnd) {
 }
 
 function LRESULT
-Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_CLOSE: PostQuitMessage(0); return 0;
         
@@ -71,7 +67,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                                 cam_up = key_down;
                             } else {
                                 cam_up = 0;
-                                move_forward = key_down;
+                                game_input.move_forward = key_down;
                             }
                         } break;
                         
@@ -80,7 +76,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                                 cam_down = key_down;
                             } else {
                                 cam_down = 0;
-                                move_back = key_down;
+                                game_input.move_back = key_down;
                             }
                         } break;
                         
@@ -89,7 +85,7 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                                 cam_left = key_down;
                             } else {
                                 cam_left = 0;
-                                strafe_left = key_down;
+                                game_input.strafe_left = key_down;
                             }
                         } break;
                         
@@ -98,13 +94,13 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                                 cam_right = key_down;
                             } else {
                                 cam_right = 0;
-                                strafe_right = key_down;
+                                game_input.strafe_right = key_down;
                             }
                         } break;
                         
                         case 0x0001: {      // Escape
-                            if (g_mouse_captured) {
-                                g_mouse_captured = false;
+                            if (mouse_captured) {
+                                mouse_captured = false;
                                 ShowCursor(true);
                             }
                         } break;
@@ -114,22 +110,22 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                 RAWMOUSE *mouse = &input->data.mouse;
                 
                 if (mouse->usButtonFlags & RI_MOUSE_BUTTON_1_UP) { // @hack
-                    if (!g_mouse_captured) {
+                    if (!mouse_captured) {
                         ShowCursor(false);
                         win32_capture_mouse(hwnd);
                     }
                 }
-                
+#if 0
                 if (mouse->usButtonFlags & RI_MOUSE_WHEEL) {
                     short wheel = (short)mouse->usButtonData;
                     f32 wheel_delta = (f32)wheel / (f32)WHEEL_DELTA;
                     map_cam.z -= wheel_delta * MOUSE_SCROLL_SENSITIVITY;
                     map_cam.z = max(map_cam.z,1);
                 }
-                
-                if (g_mouse_captured) {
+#endif
+                if (mouse_captured) {
                     s32 movex = mouse->lLastX;
-                    turn_amount = ((f32)movex * MOUSE_SENSITIVITY);
+                    game_input.turn_amount = ((f32)movex * MOUSE_SENSITIVITY);
                     win32_capture_mouse(hwnd);
                 }
             }
@@ -141,17 +137,17 @@ Wndproc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 }
 
 function Win32_Data
-win32_create_window (HINSTANCE hInstance) {
+win32_create_game_window (HINSTANCE hInstance) {
     WNDCLASS wc = {0};
     wc.style = CS_OWNDC;
-    wc.lpfnWndProc = Wndproc;
+    wc.lpfnWndProc = win32_game_window_proc;
     wc.hInstance = hInstance;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = GetStockObject(WHITE_BRUSH);
     wc.lpszClassName = "dumb_main_window_class";
     RegisterClass(&wc);
     
-    RECT dim = {0, 0, g_window_width, g_window_height};
+    RECT dim = {0, 0, window_width, window_height};
     AdjustWindowRect(&dim, WS_OVERLAPPEDWINDOW, 0);
     HWND hwnd = CreateWindow(
                              wc.lpszClassName,
@@ -192,14 +188,14 @@ win32_create_bitmap (Bitmap *data) {
 
 int
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
-    //- @note: Platform setup
+    //- @note: Init
     perm_arena = arena_alloc();
     frame_arena = arena_alloc();
     level_arena = arena_alloc();
     
-    Win32_Data platform = win32_create_window(hInstance);
+    Win32_Data platform = win32_create_game_window(hInstance);
     
-    // @note: Register for input
+    //- @note: Register for input
     RAWINPUTDEVICE input_devices[2];
     
     // Keyboard
@@ -220,29 +216,29 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     //win32_capture_mouse(platform.hwnd);
     //ShowCursor(false);
     
-    // @note: Timing
+    //- @note: Timing
     LARGE_INTEGER frequency, start_time, end_time, elapsed_microseconds = {0};
     QueryPerformanceFrequency(&frequency);
     
-    // @note: Create bitmap
+    //- @note: Create bitmap
     Bitmap *bitmap = r_get_framebuffer();
     bitmap->width = RESOLUTION_W;
     bitmap->height = RESOLUTION_H;
     bitmap->pixels = arena_pushn(perm_arena, u32, bitmap->width * bitmap->height);
-    Range initial_bounds = v2(0, (f32)bitmap->width);
+    Range view_bounds = v2(0, (f32)bitmap->width);
     platform.bitmap = win32_create_bitmap(bitmap);
     
     Game_Memory_Package game_memory = {perm_arena, frame_arena, level_arena};
-    game_init(game_memory);
+    game_init(&game_memory, view_bounds);
     
     //- @note: Main loop
     QueryPerformanceCounter(&start_time);
-    for (;g_game_running;) {
+    for (;game_running;) {
         arena_clear(frame_arena);
         
         for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
             if (msg.message == WM_QUIT) {
-                g_game_running = false;
+                game_running = false;
             } else {
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
@@ -254,16 +250,16 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         f32 dt = (f32)((f32)elapsed_microseconds.QuadPart / (f32)frequency.QuadPart);
         start_time = end_time;
         
-        Game_Tick_Package tick = {dt, ??}
-        game_tick(game_memory, tick);
+        Game_Tick_Package tick = {dt};
+        game_tick(game_memory, game_input, tick);
         game_render(game_memory);
         
         // @todo: Preserve aspect ratio
         StretchDIBits(
                       platform.win_dc,
                       0, 0,
-                      g_window_width,
-                      g_window_height,
+                      window_width,
+                      window_height,
                       0, 0,
                       bitmap->width,
                       bitmap->height,
@@ -272,7 +268,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
                       DIB_RGB_COLORS,
                       SRCCOPY
                       );
-#if 0
+        game_input.turn_amount = 0; // @fix: Mad jank
+#if 1
         f32 fps = 1.f / dt;
         OutputDebugString((LPCSTR)str8_pushf(frame_arena, "FPS: %f\n", fps).str);
 #endif
