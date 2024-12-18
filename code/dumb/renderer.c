@@ -1,5 +1,5 @@
 function Bitmap*
-r_get_framebuffer (void) { // @todo: This function call is generating a lot of overhead
+r_get_framebuffer (void) {
     local_persist Bitmap f;
     return &f;
 }
@@ -117,7 +117,6 @@ r_draw_line (Vec2 p0, Vec2 p1, Color c) {
 
 function void
 r_draw_vert (f32 x, f32 y0, f32 y1, Color c) {
-    assert(y0 <= y1);
     for (f32 y = y0; y <= y1; ++y)
         r_put_pixel_at(v2(x,y), c);
 }
@@ -144,8 +143,6 @@ r_draw_rect (Vec2 p, Vec2 sz, Color c) {
         r_draw_vert(x, p.y, p.y + sz.y, c);
 }
 
-// @todo: Actually, the whole idea of using a quad for this is wrong, we can get by just with
-// having an x-range
 function void
 r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) {
     Bitmap *canvas = r_get_framebuffer();
@@ -200,9 +197,7 @@ r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) 
         f32 full_depth  = (f32)sector->floor - actual_height;
         f32 ceiling = full_height + ceil_diff;
         f32 floor = full_depth + floor_diff;
-        //assert(ceiling && floor); // @patch: If these are *perfectly* zero it messes up wall rendering
         
-        // @todo: Pull these out into macros?
 #define proj_x(x,z) (((x*canvas_width)/(z*ASPECT_W))*cam_dist)+width_middle
 #define proj_y(y,z) (((y*canvas_height)/(z*ASPECT_H))*cam_dist)+height_middle
         
@@ -256,7 +251,7 @@ r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) 
                 f32 xnorm  = norm(x, minp.x, maxp.x);
                 f32 depth  = max(lerp(minp.depth, maxp.depth, xnorm), -1);
                 f32 height = min(lerp(minp.height, maxp.height, xnorm), canvas_height);
-                f32 floor  = clamp(lerp(minp.floor, maxp.floor, xnorm), depth, height);
+                f32 floor  = clamp(lerp(minp.floor, maxp.floor, xnorm), depth-1, height);
                 f32 ceil   = clamp(lerp(minp.ceil, maxp.ceil, xnorm), depth, height);
                 
                 Color wall_color = (x == start_x || x == end_x) ? Color_Black : Color_Maroon; 
@@ -288,7 +283,6 @@ r_map (Map map, Vec3 map_cam, Entity player, b32 show_player) {
             p0.y = (p0.y*(f32)canvas->height)/(map_cam.z*ASPECT_H) + height_middle;
             p1.x = (p1.x*(f32)canvas->width) /(map_cam.z*ASPECT_W) + width_middle;
             p1.y = (p1.y*(f32)canvas->height)/(map_cam.z*ASPECT_H) + height_middle;
-            // @todo: Clamp within screen edges
             r_draw_line(p0, p1, color);
         }
     }
