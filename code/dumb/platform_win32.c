@@ -1,29 +1,7 @@
-//- @note: Unity build
-
-//- @note: Headers
-//#include "third_party/microui/microui.h"
-
 #include <Windows.h>
 
-#include "base/include.h"
-#include "os/include.h"
-#include "json/json.h"
-
 #include "game.h"
-#include "map.h"
-#include "renderer.h"
-
-//- @note: Source
-#undef RELATIVE
-#undef ABSOLUTE
-//#include "third_party/microui/microui.c"
-
-#include "base/include.c"
-#include "os/include.c"
-#include "json/json.c"
-
-#include "map.c"
-#include "renderer.c"
+#include "game.c"
 
 #define RESOLUTION_W 640
 #define RESOLUTION_H 360
@@ -44,8 +22,6 @@ global int g_window_width = 1280;
 global int g_window_height = 720;
 global b32 g_game_running = true;
 global b32 g_mouse_captured = false;
-
-global Vec3 map_cam;
 
 global Arena *perm_arena;
 global Arena *frame_arena;
@@ -256,6 +232,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     Range initial_bounds = v2(0, (f32)bitmap->width);
     platform.bitmap = win32_create_bitmap(bitmap);
     
+    Game_Memory_Package game_memory = {perm_arena, frame_arena, level_arena};
+    game_init(game_memory);
+    
     //- @note: Main loop
     QueryPerformanceCounter(&start_time);
     for (;g_game_running;) {
@@ -275,6 +254,10 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         f32 dt = (f32)((f32)elapsed_microseconds.QuadPart / (f32)frequency.QuadPart);
         start_time = end_time;
         
+        Game_Tick_Package tick = {dt, ??}
+        game_tick(game_memory, tick);
+        game_render(game_memory);
+        
         // @todo: Preserve aspect ratio
         StretchDIBits(
                       platform.win_dc,
@@ -289,7 +272,10 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
                       DIB_RGB_COLORS,
                       SRCCOPY
                       );
+#if 0
+        f32 fps = 1.f / dt;
+        OutputDebugString((LPCSTR)str8_pushf(frame_arena, "FPS: %f\n", fps).str);
+#endif
     }
-    
     return 0;
 }
