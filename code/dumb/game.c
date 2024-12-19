@@ -36,7 +36,7 @@
 -Lighting
 -Wall texture mapping
 -SIMD???? -> compile renderer code into ISPC
--Multithreading??
+-Multithreading?? (Like how Ryan Fleury does it)
 -Optimize / profile render functions
 -Parse c file and pass #run directive to stdin of compiler, link with result
 -sin/cos/tan table lookup: https://namoseley.wordpress.com/2015/07/26/sincos-generation-using-table-lookup-and-iterpolation/
