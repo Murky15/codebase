@@ -12,9 +12,8 @@ namespace eval dumb {
 			puts "dumb - Let's just use msvc for now..."
 		}
         
-# This doesn't show cmd output if compile is successful, but do we really need to see that?
 		try {
-    		set results [exec {*}{cl -nologo -FC -J -I./code -EHa- -GR- -Od -Zi -WX -W3 -wd4146 -wd4005 -wd4101 -DDEBUG=1 -DENABLE_ASSERT=1 ./code/dumb/platform_win32.c User32.lib Gdi32.lib -Fo./build/ -Fd./build/ -Fe./build/dumb.exe}]
+    		set results [exec {*}{cl -nologo -FC -J -I./code -EHa- -GR- -Od -Zi -WX -W3 -wd4146 -wd4005 -wd4101 -wd4267 -wd4244 -wd4996 -DDEBUG=1 -DENABLE_ASSERT=1 ./code/dumb/platform_win32.c ./code/third_party/microui/microui.c User32.lib Gdi32.lib Opengl32.lib -Fo./build/ -Fd./build/ -Fe./build/dumb.exe}]
                 set status 0
 		} trap CHILDSTATUS {results options} {
 			puts $results

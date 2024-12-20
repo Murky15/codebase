@@ -1,6 +1,9 @@
 #include "game.c"
 
+#include "third_party/microui/microui.h"
+
 #include <Windows.h>
+#include <GL/gl.h>
 
 #define RESOLUTION_W 320
 #define RESOLUTION_H 180
@@ -14,7 +17,10 @@ typedef struct Win32_Data {
     HWND hwnd;
     HDC win_dc;
     BITMAPINFO bitmap;
+    
     HWND tool_window;
+    HDC dev_dc;
+    HGLRC dev_gl_ctx;
 } Win32_Data;
 
 global Win32_Data platform;
@@ -43,7 +49,7 @@ win32_capture_mouse (HWND hwnd) {
 
 function LRESULT
 win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    if (hwnd == platform.hwnd) {
+    if (hwnd == platform.hwnd) { // @todo: Be careful here...
         switch (uMsg) {
             case WM_CLOSE: PostQuitMessage(0); return 0;
             
@@ -113,6 +119,7 @@ win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                 } else if (input->header.dwType == RIM_TYPEMOUSE) {
                     RAWMOUSE *mouse = &input->data.mouse;
                     
+                    // @todo: Only capture the mouse if it is in client rect
                     if (mouse->usButtonFlags & RI_MOUSE_BUTTON_1_UP) { // @hack
                         if (!mouse_captured) {
                             ShowCursor(false);
@@ -179,6 +186,57 @@ win32_create_game_window_and_init (HINSTANCE hInstance) {
     return result;
 }
 
+function void
+win32_create_dev_window (Win32_Data *win32) {
+    HWND dev_window = CreateWindow("default window class",
+                                   "VOODOO: DEVELOPER TOOLS",
+                                   WS_OVERLAPPED | WS_VISIBLE | WS_THICKFRAME,
+                                   CW_USEDEFAULT,
+                                   CW_USEDEFAULT,
+                                   800,
+                                   600,
+                                   0,0,
+                                   win32->hInstance,
+                                   0
+                                   );
+    if (dev_window) {
+        win32->tool_window = dev_window;
+        win32->dev_dc = GetDC(dev_window);
+        
+        PIXELFORMATDESCRIPTOR pfd =
+        {
+            sizeof(PIXELFORMATDESCRIPTOR),
+            1,
+            PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+            PFD_TYPE_RGBA,
+            32,
+            0, 0, 0, 0, 0, 0,
+            0,
+            0,
+            0,
+            0, 0, 0, 0,
+            24,
+            8,
+            0,
+            PFD_MAIN_PLANE,
+            0,
+            0, 0, 0
+        };
+        
+        int fid = ChoosePixelFormat(win32->dev_dc, &pfd);
+        if (fid != 0) {
+            SetPixelFormat(win32->dev_dc, fid, &pfd);
+            win32->dev_gl_ctx = wglCreateContext(win32->dev_dc);
+            wglMakeCurrent(win32->dev_dc, win32->dev_gl_ctx);
+            glClearColor(0, 0, 0, 0);
+            glClear(GL_COLOR_BUFFER_BIT);
+            SwapBuffers(win32->dev_dc);
+        }
+    } else {
+        OutputDebugString("Failure to create developer window!\n");
+    }
+}
+
 function BITMAPINFO
 win32_create_bitmap (Bitmap *data) {
     BITMAPINFOHEADER header = {0};
@@ -189,26 +247,6 @@ win32_create_bitmap (Bitmap *data) {
     header.biBitCount = 32;
     header.biCompression = BI_RGB;
     return (BITMAPINFO){header};
-}
-
-function void
-win32_create_dev_window (Win32_Data *win32) {
-    HWND dev_window = CreateWindow("default window class", 
-                                   "VOODOO: DEVELOPER TOOLS", 
-                                   WS_OVERLAPPED | WS_VISIBLE | WS_THICKFRAME,
-                                   CW_USEDEFAULT,
-                                   CW_USEDEFAULT,
-                                   800,
-                                   600,
-                                   win32->hwnd,
-                                   0,
-                                   win32->hInstance,
-                                   0
-                                   );
-    if (dev_window)
-        win32->tool_window = dev_window;
-    else
-        OutputDebugString("Failure to create developer window!\n");
 }
 
 int
@@ -294,6 +332,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
                       DIB_RGB_COLORS,
                       SRCCOPY
                       );
+        SwapBuffers(platform.dev_dc);
+        
+        
         game_input.turn_amount = 0; // @fix: Mad jank
 #if 0
         f32 fps = 1.f / dt;

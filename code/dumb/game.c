@@ -3,8 +3,6 @@
 //- @note: Unity build
 
 //- @note: Headers
-//#include "third_party/microui/microui.h"
-
 #include "base/include.h"
 #include "os/include.h"
 #include "json/json.h"
@@ -14,10 +12,6 @@
 #include "renderer.h"
 
 //- @note: Source
-#undef RELATIVE
-#undef ABSOLUTE
-//#include "third_party/microui/microui.c"
-
 #include "base/include.c"
 #include "os/include.c"
 #include "json/json.c"
