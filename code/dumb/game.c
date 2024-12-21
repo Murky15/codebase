@@ -1,8 +1,8 @@
 // Voodoo is a sick name
 
-//- @note: Unity build
-
 //- @note: Headers
+#include <stdio.h>
+
 #include "base/include.h"
 #include "os/include.h"
 #include "json/json.h"
@@ -18,6 +18,8 @@
 
 #include "map.c"
 #include "renderer.c"
+
+#define MIN_EXCESS_MEMORY Kilobytes(2)
 
 #define PLAYER_MOVE_SPEED 150.f
 
@@ -38,32 +40,48 @@
 -Aspect ratio correction
 */
 
-typedef struct Permanent_Data {
+typedef struct Game_State {
     Entity player;
     Map test_level;
     Range view_bounds;
-} Permanent_Data;
+    
+    Arena *frame_arena;
+    Arena *level_arena;
+} Game_State;
 
 function void
-game_init (Game_Memory_Package *memory, Range view_bounds) {
-    Permanent_Data *data = arena_pushn(memory->forever, Permanent_Data, 1);
-    memory->permanent_data = data;
-    Entity *player = &data->player;
-    player->height = 15;
-    player->radius = 20.f;
-    
-    data->test_level = map_load(memory->forever, str8_lit("w:/code/dumb/level.json"));
-    data->view_bounds = view_bounds;
+game_init (Game_Memory_Package memory, Range view_bounds) {
+    assert(memory.size >= sizeof(Game_State));
+    u64 remaining_size = memory.size - sizeof(Game_State);
+    if (remaining_size >= MIN_EXCESS_MEMORY) {
+        // @todo: Need to revisit and come up with a better memory partitioning scheme
+        Game_State *gs = (Game_State*)memory.memory;
+        u64 arena_size = remaining_size / 2;
+        u8 *frame_addr = (u8*)memory.memory + sizeof(Game_State);
+        u8 *level_addr = frame_addr + arena_size;
+        gs->frame_arena = arena_alloc_fixed(frame_addr, arena_size);
+        gs->level_arena = arena_alloc_fixed(level_addr, arena_size);
+        gs->player.height = 15;
+        gs->player.radius = 20.f;
+        gs->view_bounds = view_bounds;
+        gs->test_level = map_load(gs->level_arena, str8_lit("w:/code/dumb/level.json"));
+    } else {
+        fprintf(stderr, "Insufficient memory!\n");
+    }
 }
 
 function void
-game_tick (Game_Memory_Package memory, Game_Input_Package input, Game_Tick_Package tick) {
-    Permanent_Data *data = (Permanent_Data*)memory.permanent_data;
-    Entity *player = &data->player;
+game_tick (Game_Memory_Package memory, Game_Input_Package input, f32 dt) {
+    assert(memory.memory);
+    Game_State *gs = (Game_State*)memory.memory;
+    
+    // @note: Responsibility of platform or game to clear this?
+    arena_clear(gs->frame_arena);
+    
+    Entity *player = &gs->player;
     player->rotation_angle -= input.turn_amount;
     player->rotation_angle = fmod_cycling(player->rotation_angle, 2 * M_PI32);
     
-    // @todo: There has got to be a better/cleaner/faster way to calculate movement + dir for both of these things
     Vec2 dir;
     f32 x = 0, y = 0;
     if (input.move_forward)   x +=  1;
@@ -74,18 +92,15 @@ game_tick (Game_Memory_Package memory, Game_Input_Package input, Game_Tick_Packa
     dir.y = x * sinf(player->rotation_angle) + y * cosf(player->rotation_angle);
     if (v2len(dir) > 1)
         dir = v2norm(dir);
-    player->pos = v2add(player->pos, v2muls(dir, PLAYER_MOVE_SPEED * tick.dt));
+    player->pos = v2add(player->pos, v2muls(dir, PLAYER_MOVE_SPEED * dt));
     
     // @todo: Can we avoid polling every frame?
-    update_current_sector(player, &data->test_level);
+    update_current_sector(player, &gs->test_level);
 }
 
 function void
 game_render (Game_Memory_Package memory) {
-    Permanent_Data *data = (Permanent_Data*)memory.permanent_data;
-    Entity *player = &data->player;
-    Map *test_level = &data->test_level;
-    Range view_bounds = data->view_bounds;
-    Sector *player_sector = &test_level->sectors[player->curr_sector];
-    r_sector(test_level, player_sector, player, -1, view_bounds);
+    Game_State *gs = (Game_State*)memory.memory;
+    Sector *player_sector = &gs->test_level.sectors[gs->player.curr_sector];
+    r_sector(&gs->test_level, player_sector, &gs->player, -1, gs->view_bounds);
 }

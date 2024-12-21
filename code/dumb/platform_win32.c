@@ -8,11 +8,16 @@
 #define RESOLUTION_W 320
 #define RESOLUTION_H 180
 
+#define GAME_MEMORY_SIZE Kilobytes(4)
+
 #define MOUSE_SENSITIVITY 0.01f
 #define MOUSE_SCROLL_SENSITIVITY 0.8f
 #define CAM_MOVE_SPEED 200.f
 
 typedef struct Win32_Data {
+    Arena *perm_arena;
+    Arena *frame_arena;
+    
     HINSTANCE hInstance;
     HWND hwnd;
     HDC win_dc;
@@ -29,10 +34,6 @@ global int window_width = 1280;
 global int window_height = 720;
 global b32 game_running = true;
 global b32 mouse_captured = false;
-
-global Arena *perm_arena;
-global Arena *frame_arena;
-global Arena *level_arena;
 
 global Game_Input_Package game_input;
 global b32 cam_up, cam_down, cam_left, cam_right;
@@ -56,7 +57,7 @@ win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
             case WM_INPUT: {
                 u32 size;
                 GetRawInputData((HRAWINPUT)lParam, RID_INPUT, 0, &size, sizeof(RAWINPUTHEADER));
-                LPBYTE buff = arena_pushn(frame_arena, BYTE, size);
+                LPBYTE buff = arena_pushn(platform.frame_arena, BYTE, size);
                 if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, buff, &size, sizeof(RAWINPUTHEADER)) != size)
                     OutputDebugString("GetRawInputData does not return correct size !\n");
                 
@@ -182,6 +183,8 @@ win32_create_game_window_and_init (HINSTANCE hInstance) {
     result.hInstance = hInstance;
     result.hwnd = hwnd;
     result.win_dc = GetDC(hwnd);
+    result.perm_arena = arena_alloc();
+    result.frame_arena = arena_alloc();
     
     return result;
 }
@@ -252,10 +255,6 @@ win32_create_bitmap (Bitmap *data) {
 int
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
     //- @note: Init
-    perm_arena = arena_alloc();
-    frame_arena = arena_alloc();
-    level_arena = arena_alloc();
-    
     platform = win32_create_game_window_and_init(hInstance);
     win32_create_dev_window(&platform);
     
@@ -288,17 +287,20 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     Bitmap *bitmap = r_get_framebuffer();
     bitmap->width = RESOLUTION_W;
     bitmap->height = RESOLUTION_H;
-    bitmap->pixels = arena_pushn(perm_arena, u32, bitmap->width * bitmap->height);
+    bitmap->pixels = arena_pushn(platform.perm_arena, u32, bitmap->width * bitmap->height);
     Range view_bounds = v2(0, (f32)bitmap->width);
     platform.bitmap = win32_create_bitmap(bitmap);
     
-    Game_Memory_Package game_memory = {perm_arena, frame_arena, level_arena};
-    game_init(&game_memory, view_bounds);
+    //- @note: Create dev UI
+    //mu_Context *mu_ctx = arena_pushn(platform.perm_arena, );
+    void *buff = arena_pushn(platform.perm_arena, u8, GAME_MEMORY_SIZE);
+    Game_Memory_Package game_memory = {buff, GAME_MEMORY_SIZE};
+    game_init(game_memory, view_bounds);
     
     //- @note: Main loop
     QueryPerformanceCounter(&start_time);
     for (;game_running;) {
-        arena_clear(frame_arena);
+        arena_clear(platform.frame_arena);
         
         for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
             if (msg.message == WM_QUIT) {
@@ -314,8 +316,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         f32 dt = (f32)((f32)elapsed_microseconds.QuadPart / (f32)frequency.QuadPart);
         start_time = end_time;
         
-        Game_Tick_Package tick = {dt};
-        game_tick(game_memory, game_input, tick);
+        game_tick(game_memory, game_input, dt);
         game_render(game_memory);
         
         // @todo: Preserve aspect ratio

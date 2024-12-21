@@ -16,11 +16,26 @@
 static_assert(PAGE_TABLE_SIZE >= sizeof(Arena), check_arena_size);
 
 core_function Arena*
+arena_alloc_fixed (void* buff, u64 size) {
+    Arena *result = 0;
+    if (buff) {
+        result = (Arena*)buff;
+        result->type = Arena_Type_Fixed;
+        result->next = 0;
+        result->pos = sizeof(Arena);
+        result->commit_pos = size;
+        result->cap = size;
+    }
+    return result;
+}
+
+core_function Arena*
 arena_alloc (void) {
     Arena *result = 0;
     void *back_buffer = mem_reserve(ARENA_DEFAULT_RESERVE_SIZE);
     if (mem_commit(back_buffer, PAGE_TABLE_SIZE)) {
         result = (Arena*)back_buffer;
+        result->type = Arena_Type_MMU;
         result->next = 0;
         result->pos = sizeof(Arena);
         result->commit_pos = PAGE_TABLE_SIZE;
@@ -77,7 +92,7 @@ arena_pop_to (Arena *arena, u64 pos) {
     
     arena->pos = pos;
     u64 nearest_commit = round_up_pow2(pos, PAGE_TABLE_SIZE);
-    if (nearest_commit + ARENA_DECOMMIT_THRESHOLD <= arena->commit_pos) {
+    if (arena->type == Arena_Type_MMU && nearest_commit + ARENA_DECOMMIT_THRESHOLD <= arena->commit_pos) {
         u64 commit_diff = arena->commit_pos - nearest_commit;
         mem_decommit((u8*)arena + nearest_commit, commit_diff);
         arena->commit_pos = nearest_commit;

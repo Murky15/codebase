@@ -13,8 +13,15 @@
 #define ARENA_DEFAULT_RESERVE_SIZE Gigabytes(8)
 #define ARENA_DECOMMIT_THRESHOLD Megabytes(64)
 
+typedef u32 Arena_Type;
+enum {
+    Arena_Type_MMU,
+    Arena_Type_Fixed
+};
+
 typedef struct Arena {
     struct Arena *next;
+    Arena_Type type;
     u64 pos;
     u64 commit_pos;
     u64 cap;
@@ -27,6 +34,7 @@ typedef struct Temp_Arena {
 
 // @note: Arena functions
 
+core_function Arena*     arena_alloc_fixed(void* buff, u64 size);
 core_function Arena*     arena_alloc(void);
 core_function void       arena_release(Arena *arena);
 core_function void*      arena_push_no_zero(Arena *arena, u64 size, u64 align);
@@ -35,7 +43,7 @@ core_function void       arena_pop_to(Arena *arena, u64 pos);
 core_function void       arena_pop(Arena *arena, u64 amount);
 core_function void       arena_clear(Arena *arena);
 core_function u64        arena_pos(Arena *arena);
-#define arena_pushn(a,T,c) (T*)arena_push((a), sizeof(T) * (c), align_of(T));
+#define arena_pushn(a,T,c) (T*)arena_push((a), sizeof(T)*(c), align_of(T));
 
 // @note: Temp arena functions
 
