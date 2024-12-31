@@ -89,6 +89,16 @@
 #define array_count(a) (sizeof(a) / sizeof(a[0]))
 #define swap(T, a, b) stmnt( T __temp = a; a = b; b = __temp; )
 
+#define be_to_le16(x) ((((u8*)(x))[0] << 8) | (((u8*)(x))[1]))
+#define be_to_le32(x) ((((u8*)(x))[0] << 24) | (((u8*)(x))[1] << 16) | (((u8*)(x))[2] << 8) | (((u8*)(x))[3]))
+#define be_to_le(x) _Generic((x), \
+u16: be_to_le16(x), \
+s16: be_to_le16(x), \
+u32: be_to_le32(x), \
+s32: be_to_le32(x)
+
+#define check_bit(x,b) ((x)&(1<<(b)))
+
 #define int_from_ptr(p) (u64)((void*)p)
 #define ptr_from_int(i) (void*)(i)
 #define member(T,m) (((T*)0)->m)

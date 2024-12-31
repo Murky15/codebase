@@ -57,8 +57,8 @@ char_to_forward_slash (u8 c) {
 }
 
 core_function u64
-cstr_length (char *cstr) {
-    char *c;
+cstr_length (const char *cstr) {
+    const char *c;
     for (c = cstr; *c; ++c);
     return c - cstr;
 }

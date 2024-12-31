@@ -5,7 +5,7 @@
 
 #include "base/include.h"
 #include "os/include.h"
-#include "json/json.h"
+#include "file/json.h"
 
 #include "game.h"
 #include "map.h"
@@ -14,7 +14,7 @@
 //- @note: Source
 #include "base/include.c"
 #include "os/include.c"
-#include "json/json.c"
+#include "file/json.c"
 
 #include "map.c"
 #include "renderer.c"
@@ -25,12 +25,12 @@
 
 /*
 @todo
--Make another window using win ui for like dev tweaking n stuff
 -Microui
 -Level editor
 -Hot Reloading
 -Lighting
 -Wall texture mapping
+-Collisions
 -SIMD???? -> compile renderer code into ISPC
 -Multithreading?? (Like how Ryan Fleury does it)
 -Optimize / profile render functions
@@ -38,6 +38,7 @@
 -sin/cos/tan table lookup: https://namoseley.wordpress.com/2015/07/26/sincos-generation-using-table-lookup-and-iterpolation/
 -Asan / Libfuzzer
 -Aspect ratio correction
+-OH I FORGOT ABOUT AUDIO
 */
 
 typedef struct Game_State {

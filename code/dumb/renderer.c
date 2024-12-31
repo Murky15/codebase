@@ -143,10 +143,12 @@ r_draw_rect (Vec2 p, Vec2 sz, Color c) {
         r_draw_vert(x, p.y, p.y + sz.y, c);
 }
 
+#define MAX_ITERATIONS 64
 function void
 r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) {
     Bitmap *canvas = r_get_framebuffer();
     
+    local_persist u64 num_iterations = 0;
     local_persist read_only f32 forward = M_PI32 / 2.f;
     local_persist read_only f32 near_plane = 0.001f;
     f32 canvas_width = (f32)canvas->width;
@@ -154,112 +156,119 @@ r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) 
     f32 width_middle = canvas->width/2.f;
     f32 height_middle = canvas->height/2.f;
     
-    for (u64 wall_idx = 0; wall_idx < sector->num_walls; ++wall_idx) {
-        //- Transform wall relative to player
-        Wall *wall = &sector->walls[wall_idx];
-        if (wall->next_sector >= 0 && wall->next_sector == last_sector)
-            continue;
-        
-        Vec2 t0 = v2sub(wall->p0, cam->pos);
-        Vec2 t1 = v2sub(wall->p1, cam->pos);
-        
-        f32 t = -cam->rotation_angle + forward;
-        Vec2 d0, d1;
-        d0.x = t0.x * cosf(t) - t0.y * sinf(t);
-        d0.y = t0.x * sinf(t) + t0.y * cosf(t);
-        d1.x = t1.x * cosf(t) - t1.y * sinf(t);
-        d1.y = t1.x * sinf(t) + t1.y * cosf(t);
-        
-        //- Clip walls behind camera
-        if (d0.y < near_plane && d1.y < near_plane)
-            continue;
-        
-        f32 clipped_x = d0.x + (((d1.x - d0.x) * (near_plane - d0.y)) / (d1.y - d0.y));
-        if (d0.y <= near_plane)
-            d0 = v2(clipped_x, near_plane);
-        else if (d1.y <= near_plane)
-            d1 = v2(clipped_x, near_plane);
-        
-        //- Perspective projection
-        f32 z0 = d0.y;
-        f32 z1 = d1.y;
-        f32 cam_dist = 0.89f * ASPECT_H; // 90 Degree horizontal FOV
-        
-        s32 ceil_diff = 0, floor_diff = 0;
-        if (wall->next_sector >= 0) {
-            Sector *next = &map->sectors[wall->next_sector];
-            ceil_diff = next->ceiling - sector->ceiling;
-            floor_diff = next->floor - sector->floor;
-        }
-        
-        f32 actual_height = cam->height + (f32)sector->floor;
-        f32 full_height = (f32)sector->ceiling - actual_height;
-        f32 full_depth  = (f32)sector->floor - actual_height;
-        f32 ceiling = full_height + ceil_diff;
-        f32 floor = full_depth + floor_diff;
-        
+    if (last_sector == -1)
+        num_iterations = 0;
+    else
+        num_iterations++;
+    
+    if (num_iterations < MAX_ITERATIONS) {
+        for (u64 wall_idx = 0; wall_idx < sector->num_walls; ++wall_idx) {
+            //- Transform wall relative to player
+            Wall *wall = &sector->walls[wall_idx];
+            if (wall->next_sector >= 0 && wall->next_sector == last_sector)
+                continue;
+            
+            Vec2 t0 = v2sub(wall->p0, cam->pos);
+            Vec2 t1 = v2sub(wall->p1, cam->pos);
+            
+            f32 t = -cam->rotation_angle + forward;
+            Vec2 d0, d1;
+            d0.x = t0.x * cosf(t) - t0.y * sinf(t);
+            d0.y = t0.x * sinf(t) + t0.y * cosf(t);
+            d1.x = t1.x * cosf(t) - t1.y * sinf(t);
+            d1.y = t1.x * sinf(t) + t1.y * cosf(t);
+            
+            //- Clip walls behind camera
+            if (d0.y < near_plane && d1.y < near_plane)
+                continue;
+            
+            f32 clipped_x = d0.x + (((d1.x - d0.x) * (near_plane - d0.y)) / (d1.y - d0.y));
+            if (d0.y <= near_plane)
+                d0 = v2(clipped_x, near_plane);
+            else if (d1.y <= near_plane)
+                d1 = v2(clipped_x, near_plane);
+            
+            //- Perspective projection
+            f32 z0 = d0.y;
+            f32 z1 = d1.y;
+            f32 cam_dist = 0.89f * ASPECT_H; // 90 Degree horizontal FOV
+            
+            s32 ceil_diff = 0, floor_diff = 0;
+            if (wall->next_sector >= 0) {
+                Sector *next = &map->sectors[wall->next_sector];
+                ceil_diff = next->ceiling - sector->ceiling;
+                floor_diff = next->floor - sector->floor;
+            }
+            
+            f32 actual_height = cam->height + (f32)sector->floor;
+            f32 full_height = (f32)sector->ceiling - actual_height;
+            f32 full_depth  = (f32)sector->floor - actual_height;
+            f32 ceiling = full_height + ceil_diff;
+            f32 floor = full_depth + floor_diff;
+            
 #define proj_x(x,z) (((x*canvas_width)/(z*ASPECT_W))*cam_dist)+width_middle
 #define proj_y(y,z) (((y*canvas_height)/(z*ASPECT_H))*cam_dist)+height_middle
-        
-        f32 x0      = proj_x(d0.x,z0);
-        f32 floor0  = proj_y(floor,z0);
-        f32 ceil0   = proj_y(ceiling,z0);
-        f32 depth0  = proj_y(full_depth,z0);
-        f32 height0 = proj_y(full_height,z0);
-        f32 x1      = proj_x(d1.x,z1);
-        f32 floor1  = proj_y(floor,z1);
-        f32 ceil1   = proj_y(ceiling,z1);
-        f32 depth1  = proj_y(full_depth,z1);
-        f32 height1 = proj_y(full_height,z1);
-        
+            
+            f32 x0      = proj_x(d0.x,z0);
+            f32 floor0  = proj_y(floor,z0);
+            f32 ceil0   = proj_y(ceiling,z0);
+            f32 depth0  = proj_y(full_depth,z0);
+            f32 height0 = proj_y(full_height,z0);
+            f32 x1      = proj_x(d1.x,z1);
+            f32 floor1  = proj_y(floor,z1);
+            f32 ceil1   = proj_y(ceiling,z1);
+            f32 depth1  = proj_y(full_depth,z1);
+            f32 height1 = proj_y(full_height,z1);
+            
 #undef proj_x
 #undef proj_y
-        
-        struct { f32 x,floor,ceil,depth,height; } temp, minp, maxp;
-        minp.x = x0;
-        minp.floor = floor0;
-        minp.ceil = ceil0;  
-        minp.depth = depth0;
-        minp.height = height0;
-        maxp.x = x1;
-        maxp.floor = floor1;
-        maxp.ceil = ceil1;
-        maxp.depth = depth1;
-        maxp.height = height1;
-        
-        if (x0 > x1) {
-            temp = minp;
-            minp = maxp;
-            maxp = temp; 
-        }
-        
-        // Render into next scene (if applicable)
-        if (wall->next_sector >= 0) {
-            Sector *next_sector = &map->sectors[wall->next_sector];
-            Range bounds;
-            bounds.first = max(minp.x, window.first);
-            bounds.last  = min(maxp.x, window.last);
-            Entity modified_cam = *cam;
-            modified_cam.height = actual_height - next_sector->floor;
-            r_sector(map, next_sector, &modified_cam, sector->id, bounds);
-        }
-        
-        f32 start_x = max(minp.x, -1.f);
-        f32 end_x = min(maxp.x, canvas_width);
-        for (f32 x = start_x; x <= end_x; ++x) {
-            if (x >= window.first && x <= window.last) {
-                f32 xnorm  = norm(x, minp.x, maxp.x);
-                f32 depth  = max(lerp(minp.depth, maxp.depth, xnorm), -1);
-                f32 height = min(lerp(minp.height, maxp.height, xnorm), canvas_height);
-                f32 floor  = clamp(lerp(minp.floor, maxp.floor, xnorm), depth-1, height);
-                f32 ceil   = clamp(lerp(minp.ceil, maxp.ceil, xnorm), depth, height);
-                
-                Color wall_color = (x == start_x || x == end_x) ? Color_Black : Color_Maroon; 
-                r_draw_vert(x, -1.f, depth, Color_Blue); // floor
-                r_draw_vert(x, depth, floor, Color_Maroon); // ledge
-                if (wall->next_sector == -1) r_draw_vert(x, floor, ceil, wall_color); // wall
-                r_draw_vert(x, ceil, height, Color_Maroon); // ledge
-                r_draw_vert(x, height, canvas_height, Color_Gray); // Cielling
+            
+            struct { f32 x,floor,ceil,depth,height; } temp, minp, maxp;
+            minp.x = x0;
+            minp.floor = floor0;
+            minp.ceil = ceil0;  
+            minp.depth = depth0;
+            minp.height = height0;
+            maxp.x = x1;
+            maxp.floor = floor1;
+            maxp.ceil = ceil1;
+            maxp.depth = depth1;
+            maxp.height = height1;
+            
+            if (x0 > x1) {
+                temp = minp;
+                minp = maxp;
+                maxp = temp; 
+            }
+            
+            // Render into next scene (if applicable)
+            if (wall->next_sector >= 0) {
+                Sector *next_sector = &map->sectors[wall->next_sector];
+                Range bounds;
+                bounds.first = max(minp.x, window.first);
+                bounds.last  = min(maxp.x, window.last);
+                Entity modified_cam = *cam;
+                modified_cam.height = actual_height - next_sector->floor;
+                r_sector(map, next_sector, &modified_cam, sector->id, bounds);
+            }
+            
+            f32 start_x = max(minp.x, -1.f);
+            f32 end_x = min(maxp.x, canvas_width);
+            for (f32 x = start_x; x <= end_x; ++x) {
+                if (x >= window.first && x <= window.last) {
+                    f32 xnorm  = norm(x, minp.x, maxp.x);
+                    f32 depth  = max(lerp(minp.depth, maxp.depth, xnorm), -1);
+                    f32 height = min(lerp(minp.height, maxp.height, xnorm), canvas_height);
+                    f32 floor  = clamp(lerp(minp.floor, maxp.floor, xnorm), depth-1, height);
+                    f32 ceil   = clamp(lerp(minp.ceil, maxp.ceil, xnorm), depth, height);
+                    
+                    Color wall_color = (x == start_x || x == end_x) ? Color_Black : Color_Maroon; 
+                    r_draw_vert(x, -1.f, depth, Color_Blue); // floor
+                    r_draw_vert(x, depth, floor, Color_Maroon); // ledge
+                    if (wall->next_sector == -1) r_draw_vert(x, floor, ceil, wall_color); // wall
+                    r_draw_vert(x, ceil, height, Color_Maroon); // ledge
+                    r_draw_vert(x, height, canvas_height, Color_Gray); // Cielling
+                }
             }
         }
     }

@@ -1,12 +1,15 @@
 #include "game.c"
 
-#include "third_party/microui/microui.h"
+// Gonna try using bitmap fonts instead because they are much easier to manage than TrueType.
+// Making a TTF parser would quickly become time consuming, it's not worth it. However, this means
+// I need to get started on my png parser.
 
 #include <Windows.h>
-#include <GL/gl.h>
+//#include "file/png.c"
+//#include "dev.c"
 
-#define RESOLUTION_W 320
-#define RESOLUTION_H 180
+#define RESOLUTION_W 640
+#define RESOLUTION_H 360
 
 #define GAME_MEMORY_SIZE Kilobytes(4)
 
@@ -27,7 +30,6 @@ typedef struct Win32_Data {
     HDC dev_dc;
     HGLRC dev_gl_ctx;
 } Win32_Data;
-
 global Win32_Data platform;
 
 global int window_width = 1280;
@@ -141,7 +143,12 @@ win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                         win32_capture_mouse(hwnd);
                     }
                 }
-                
+                return 0;
+            }
+        }
+    } else if (hwnd == platform.tool_window) {
+        switch (uMsg) {
+            case WM_SIZE: {
                 return 0;
             }
         }
@@ -231,10 +238,12 @@ win32_create_dev_window (Win32_Data *win32) {
             SetPixelFormat(win32->dev_dc, fid, &pfd);
             win32->dev_gl_ctx = wglCreateContext(win32->dev_dc);
             wglMakeCurrent(win32->dev_dc, win32->dev_gl_ctx);
-            glClearColor(0, 0, 0, 0);
-            glClear(GL_COLOR_BUFFER_BIT);
-            SwapBuffers(win32->dev_dc);
         }
+        
+        RECT dim;
+        GetClientRect(dev_window, &dim);
+        //dev_renderer_calibrate(dim.right, dim.bottom);
+        
     } else {
         OutputDebugString("Failure to create developer window!\n");
     }
@@ -291,8 +300,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     Range view_bounds = v2(0, (f32)bitmap->width);
     platform.bitmap = win32_create_bitmap(bitmap);
     
-    //- @note: Create dev UI
-    //mu_Context *mu_ctx = arena_pushn(platform.perm_arena, );
+    //- @note: Initialize developer tools
+    
+    //- @note: Initialize game
     void *buff = arena_pushn(platform.perm_arena, u8, GAME_MEMORY_SIZE);
     Game_Memory_Package game_memory = {buff, GAME_MEMORY_SIZE};
     game_init(game_memory, view_bounds);
@@ -311,14 +321,16 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
             }
         }
         
+        
         QueryPerformanceCounter(&end_time);
         elapsed_microseconds.QuadPart = end_time.QuadPart - start_time.QuadPart;
         f32 dt = (f32)((f32)elapsed_microseconds.QuadPart / (f32)frequency.QuadPart);
         start_time = end_time;
         
+        SwapBuffers(platform.dev_dc);
+        
         game_tick(game_memory, game_input, dt);
         game_render(game_memory);
-        
         // @todo: Preserve aspect ratio
         StretchDIBits(
                       platform.win_dc,
@@ -333,10 +345,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
                       DIB_RGB_COLORS,
                       SRCCOPY
                       );
-        SwapBuffers(platform.dev_dc);
         
         
-        game_input.turn_amount = 0; // @fix: Mad jank
+        game_input.turn_amount = 0;
 #if 0
         f32 fps = 1.f / dt;
         OutputDebugString((LPCSTR)str8_pushf(frame_arena, "FPS: %f\n", fps).str);
