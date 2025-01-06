@@ -9,7 +9,6 @@
 #define BIT_DEPTH_COUNT 16
 
 // 2 ^ Max code length  
-#define HUFFMAN_CODE_LENGTH_TABLE_SIZE 128 // 7 bits
 #define HUFFMAN_PRIMARY_TABLE_SIZE 512     // 9 bits
 #define HUFFMAN_SECONDARY_TABLE_SIZE 64    // 6 bits
 
@@ -147,6 +146,8 @@ consume_bits (Bit_Stream *stream, u32 count) {
 // https://datatracker.ietf.org/doc/html/rfc1950
 core_function String8
 png_zlib_inflate (Arena *arena, String8 deflated) {
+    Temp_Arena scratch = get_scratch(&arena, 1);
+    
     String8 inflated = zero_struct;
     inflated.str = arena_pushn(arena, u8, 0);
     
@@ -173,21 +174,45 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 u8 hdist  = consume_bits(&compression_stream, 5) + 1;
                 u8 hclen  = consume_bits(&compression_stream, 4) + 4;
                 
-                local_persist u8 huffman_code_length_order = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
-                u8 huffman_code_lengths[array_count(huffman_code_length_order)] = zero_struct;
+                local_persist u8 huffman_code_length_sequences = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
+                u32 num_code_lengths = array_count(huffman_code_length_sequences);
+                u8 huffman_code_lengths[num_code_lengths] = zero_struct;
                 for (u8 i = 0; i < hclen; ++i) {
                     huffman_code_lengths[i] = consume_bits(&compression_stream, 3);
                 }
                 
-                // Compressed data begins immediately after first bit of cursor
-                
+                // Build code length table
+                Huffman_Table code_length_table = zero_struct;
+                code_length_table.count = 128; // Could probably make this smaller
+                code_length_table.array = arena_pushn(scratch.arena, Huffman_Table_Entry, 128);
+                for (u64 i = 0; i < code_length_table.count; ++i) {
+                    u32 bit_cnt = 0;
+                    u64 n = i;
+                    while (n) {
+                        n <<= 1;
+                        bit_cnt++;
+                    }
+                    code_length_table.array[i].length = bit_cnt;
+                }
+                u8 *bl_count = arena_pushn(scratch.arena, u8, 8);
+                u32 *next_code = arena_pushn(scratch.arena, u32, 8);
+                for (u32 i = 0; i < num_code_lengths; ++i) {
+                    u8 idx = huffman_code_lengths[i];
+                    bl_count[idx]++;
+                }
+                bl_count[0] = 0;
+                for (u32 code = 0, bits = 1; bits <= 7; ++bits) {
+                    code = (code + bl_count[bits-1]) << 1;
+                    next_code[bits] = code;
+                }
+                for (u32 n = 0; n <= 128; ++n) {
+                    
+                }
                 
             } else {
                 fputs("I have yet to come across a png with static huffman codes. If you come across this message, you've got some work to do!\n", stderr);
-                return str8_zero();
+                goto exit;
             }
-            
-            // Index fully processed huffman code into array to find resulting value
             
             // decoding...
 #if 0
@@ -211,6 +236,8 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
         fputs("Invalid compression configuration!\n", stderr);
     }
     
+    exit:
+    release_scratch(scratch);
     return inflated;
 }
 

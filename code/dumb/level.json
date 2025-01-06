@@ -4,7 +4,7 @@
                 {
                     "id": 0,
                     "floor": 15,
-                    "ceiling": 40,
+                    "ceiling": 60,
                     "ceiling_texture": null,
                     "floor_texture": null,
                     "wall_texture": null,

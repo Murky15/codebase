@@ -51,6 +51,8 @@ namespace eval butler {
     }
     
     proc project_builder {args} {
+        if {![file exists build]} {file mkdir build}
+        
         if {[llength $args] > 0} {
 # Supported configs
             global butler::compilers butler::linkers butler::assemblers butler::pinfo
