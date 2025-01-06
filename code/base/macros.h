@@ -98,6 +98,7 @@ u32: be_to_le32(x), \
 s32: be_to_le32(x)
 
 #define check_bit(x,b) ((x)&(1<<(b)))
+#define fourcc(x) *((u32*)x) 
 
 #define int_from_ptr(p) (u64)((void*)p)
 #define ptr_from_int(i) (void*)(i)

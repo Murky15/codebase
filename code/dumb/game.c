@@ -41,6 +41,20 @@
 -OH I FORGOT ABOUT AUDIO
 */
 
+/*
+What if instead of header files we just had source files and the metaprogram 
+would travel to every source file in a dir/project and generate
+forward declarations for structs and functions into one huge "project.inc"
+that you would include. That way you don't need to fret about ordering, you could write
+all your structs like
+
+struct name {
+
+};
+
+ The file would be comment seperated to indicate the source file boundaries it was generated from.
+*/
+
 typedef struct Game_State {
     Entity player;
     Map test_level;

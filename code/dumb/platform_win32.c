@@ -1,9 +1,5 @@
 #include "game.c"
 
-// Gonna try using bitmap fonts instead because they are much easier to manage than TrueType.
-// Making a TTF parser would quickly become time consuming, it's not worth it. However, this means
-// I need to get started on my png parser.
-
 #include <Windows.h>
 //#include "file/png.c"
 //#include "dev.c"

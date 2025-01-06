@@ -1,9 +1,18 @@
+#include <stdio.h>
+
 #include "base/include.h"
 #include "os/include.h"
 #include "base/include.c"
 #include "os/include.c"
 
-// PNG Bitmap *always* outputs to RGBA format
+#define COLOR_TYPE_COUNT 6
+#define BIT_DEPTH_COUNT 16
+
+// 2 ^ Max code length  
+#define HUFFMAN_CODE_LENGTH_TABLE_SIZE 128 // 7 bits
+#define HUFFMAN_PRIMARY_TABLE_SIZE 512     // 9 bits
+#define HUFFMAN_SECONDARY_TABLE_SIZE 64    // 6 bits
+
 typedef struct PNG_Bitmap_RGBA {
     u64 width;
     u64 height;
@@ -51,6 +60,17 @@ enum {
     PNG_Interlace_Adam7 = 1
 };
 
+enum {
+    Zlib_No_Compression = 0,
+    Zlib_Static_Compression = 1,
+    Zlib_Dynamic_Compression = 2,
+};
+
+typedef struct Zlib_Header {
+    u8 cmf;
+    u8 flg;
+} Zlib_Header;
+
 typedef struct PNG_Critical_Data {
     u32 width;
     u32 height;
@@ -64,19 +84,135 @@ typedef struct PNG_Critical_Data {
     u32 palette_entry_count;
     PNG_Palette_Entry *palette_entries;
     
-    u8 *raw_processed_data;
+    u8 *compressed_data;
+    u32 compressed_data_size;
+    
+    b8 end_chunk_processed;
 } PNG_Critical_Data;
 
-// [color type][bit depth] @todo: Can we make this more efficient?
-global read_only png_valid_color_config[7][17] = {
-    [0,1,1,0,1,0,0,0,1,0,0,0,0,0,0,0,1],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
-    [0,1,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1]
+typedef struct Bit_Stream {
+    u64 count;
+    u64 buffer;
+    u8 *cursor;
+} Bit_Stream;
+
+// https://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art007
+typedef struct Huffman_Table Huffman_Table;
+typedef struct Huffman_Table_Entry Huffman_Table_Entry;
+
+struct Huffman_Table {
+    Huffman_Table_Entry *array;
+    u64 count;
 };
+
+struct Huffman_Table_Entry {
+    u16 code;
+    u16 length;
+    Huffman_Table *ptr;
+};
+
+global read_only u8 png_valid_color_config[COLOR_TYPE_COUNT+1][BIT_DEPTH_COUNT+1] = {
+    {0,1,1,0,1,0,0,0,1,0,0,0,0,0,0,0,1},
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1},
+    {0,1,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1},
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1}
+};
+
+// phil (0x8000) On discord pointed me in the right direction here (https://fgiesen.wordpress.com/2018/02/20/reading-bits-in-far-too-many-ways-part-2/)
+core_function u32
+peek_bits (Bit_Stream *stream, u32 count) {
+    while (stream->count < count) {
+        stream->buffer |= (u32)*stream->cursor++ << stream->count;
+        stream->count += 8;
+    }
+    
+    return stream->buffer & ((1u << count)-1);
+}
+
+core_function u32
+consume_bits (Bit_Stream *stream, u32 count) {
+    // @slow
+    u32 result = peek_bits(stream, count);
+    stream->buffer >>= count;
+    stream->count -= count;
+    
+    return result;
+}
+
+// https://www.zlib.net/feldspar.html
+// https://datatracker.ietf.org/doc/html/rfc1951
+// https://datatracker.ietf.org/doc/html/rfc1950
+core_function String8
+png_zlib_inflate (Arena *arena, String8 deflated) {
+    String8 inflated = zero_struct;
+    inflated.str = arena_pushn(arena, u8, 0);
+    
+    Zlib_Header zlib = *(Zlib_Header*)deflated.str;
+    u8 method = (zlib.cmf & 0xF);
+    u8 info = ((zlib.cmf & 0xF0) >> 4); // base-2 logarithm of the LZ77 window size, minus eight
+    if (method == 8 && info <= 7 && !check_bit(zlib.flg, 5)) {
+        Bit_Stream compression_stream = zero_struct;
+        compression_stream.cursor = deflated.str + sizeof(Zlib_Header);
+        u8 final = 0, type = 0;
+        while (!final) {
+            final = consume_bits(&compression_stream, 1);
+            type = consume_bits(&compression_stream, 2);
+            if (type == Zlib_No_Compression) {
+                u16 len = consume_bits(&compression_stream, 16);
+                u16 nlen = consume_bits(&compression_stream, 16); unused(nlen);
+                u8 *dst = arena_pushn(arena, u8, len);
+                memory_copy(dst, compression_stream.cursor, len);
+                compression_stream.cursor += len;
+                continue;
+            } else if (type == Zlib_Dynamic_Compression) {
+                // Read huffman code trees 
+                u16 hlit  = consume_bits(&compression_stream, 5) + 257;
+                u8 hdist  = consume_bits(&compression_stream, 5) + 1;
+                u8 hclen  = consume_bits(&compression_stream, 4) + 4;
+                
+                local_persist u8 huffman_code_length_order = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
+                u8 huffman_code_lengths[array_count(huffman_code_length_order)] = zero_struct;
+                for (u8 i = 0; i < hclen; ++i) {
+                    huffman_code_lengths[i] = consume_bits(&compression_stream, 3);
+                }
+                
+                // Compressed data begins immediately after first bit of cursor
+                
+                
+            } else {
+                fputs("I have yet to come across a png with static huffman codes. If you come across this message, you've got some work to do!\n", stderr);
+                return str8_zero();
+            }
+            
+            // Index fully processed huffman code into array to find resulting value
+            
+            // decoding...
+#if 0
+            while (!end_of_block) {
+                int value = ;// decode literal/length value from input stream
+                if (value < 256) {
+                    // Copy value (literal byte) to output stream
+                } else if (value == 256) {
+                    // end of block, break from loop
+                } else if (value > 256) {
+                    // Decode distance from input stream
+                    // Move backwards distance bytes in output stream
+                    // Copy length bytes from this position to output stream
+                }
+            }
+#endif
+        }
+        
+        // Blah blah blah then process Adler32
+    } else {
+        fputs("Invalid compression configuration!\n", stderr);
+    }
+    
+    return inflated;
+}
 
 core_function void
 png_chunk_list_push (Arena *arena, PNG_Chunk_List *list, PNG_Chunk chunk) {
@@ -117,15 +253,17 @@ png_decode (Arena *arena, String8 png_data) {
         }
 #endif
         
-        // Read chunks
+        // Process chunks
         PNG_Critical_Data critical_data = zero_struct;
-        critical_data.raw_processed_data = arena_pushn(scratch.arena, u8, 0);
+        critical_data.compressed_data = arena_pushn(scratch.arena, u8, 0);
+        
+        // @todo: Is all of this error checking unnecessary? What are the odds we get fed an invalid PNG file anyway?
         for (PNG_Chunk_Node *n = chunks.first; n; n = n->next) {
             PNG_Chunk chunk = n->chunk;
             if (!chunk.ancillary) {
-                if (memory_match(chunk.type.c, "IHDR")) { // Always comes first
+                if (chunk.type.code == fourcc("IHDR")) {
                     if (n != chunks.first) {
-                        fprintf(stderr, "PNG decode error! IHDR is not first!\n");
+                        fputs("PNG decode error! IHDR is not first!\n", stderr);
                         goto exit;
                     }
                     
@@ -138,52 +276,59 @@ png_decode (Arena *arena, String8 png_data) {
                     critical_data.filter      = *c++;
                     critical_data.interlace   = *c;
                     
-                    if (!png_valid_color_config[ctritical_data.color_type][critical_data.bit_depth]) {
-                        fprintf(stderr, "PNG decode error! Invalid color configuration!\n");
+                    if (!png_valid_color_config[critical_data.color_type][critical_data.bit_depth]) {
+                        fputs("PNG decode error! Invalid color configuration!\n", stderr);
                         goto exit;
                     }
-                    if (critical_data.compression != 0 || critical_data.filter != 0) {
-                        fprintf(stderr, "PNG decode error! Unrecognized compression/filter mode\n");
-                        goto exit;
-                    }
-                    
-                } else if (memory_match(chunk.type.c, "PLTE")) {
+                } else if (chunk.type.code == fourcc("PLTE")) {
                     critical_data.palette_entry_count = chunk.length / 3;
                     critical_data.palette_entries = (PNG_Palette_Entry*)chunk.data;
                     
-                    if (critical_data.bit_depth == 0 || *critical_data.raw_processed_data != 0) {
-                        fprintf(stderr, "PNG decode error! Incorrect ordering of palette chunk!\n");
+                    if (critical_data.bit_depth == 0 || critical_data.compressed_data_size != 0) {
+                        fputs("PNG decode error! Incorrect ordering of palette chunk!\n", stderr);
                         goto exit;
                     }
                     
                     if (critical_data.color_type == PNG_Grayscale || critical_data.color_type == PNG_Grayscale_Alpha || critical_data.palette_present) {
-                        fprintf(stderr, "PNG decode error! Unnecessary palette chunk!\n");
+                        fputs("PNG decode error! Unnecessary palette chunk!\n", stderr);
                         goto exit;
                     }
                     if (chunk.length % 3 != 0) {
-                        fprintf(stderr, "PNG decode error! Invalid palette depth!\n");
+                        fputs("PNG decode error! Invalid palette depth!\n", stderr);
                         goto exit;
                     }
                     if (critical_data.palette_entry_count > (1 << critical_data.bit_depth)) {
-                        fprintf(stderr, "PNG decode error! palette entries exceed bit depth!\n");
+                        fputs("PNG decode error! palette entries exceed bit depth!\n", stderr);
                         goto exit;
                     }
                     critical_data.palette_present = true;
-                    
-                } else if (memory_match(chunk.type.c, "IDAT")) {
-                    
-                    
-                    
-                } else if (memory_match(chunk.type.c, "IEND")) {
-                    
+                } else if (chunk.type.code == fourcc("IDAT")) {
+                    if (critical_data.compression != 0 || critical_data.filter != 0) {
+                        fputs("PNG decode error! Unrecognized compression/filter mode\n", stderr);
+                        goto exit;
+                    }
+                    u8 *c = arena_pushn(scratch.arena, u8, chunk.length);
+                    memory_copy(c, chunk.data, chunk.length);
+                    critical_data.compressed_data_size += chunk.length;
+                } else if (chunk.type.code == fourcc("IEND")) {
+                    if (n != chunks.last) {
+                        fputs("PNG decode error! IEND is not last!\n", stderr);
+                        goto exit;
+                    }
+                    critical_data.end_chunk_processed = true;
                 } else {
-                    fprintf(stderr, "PNG decode error! Unrecognized critical chunk!\n");
+                    fputs("PNG decode error! Unrecognized critical chunk!\n", stderr);
                     goto exit;
-                }
+                };
+                
             } else {
                 
             }
         }
+        
+        String8 inflated_pixel_data = png_zlib_inflate(scratch.arena, str8(critical_data.compressed_data, critical_data.compressed_data_size));
+        
+        // Do we even need to care about filtering
         
     } else {
         fprintf(stderr, "Supplied data is not a valid PNG!\n");
@@ -198,7 +343,7 @@ int
 main (void) {
     Temp_Arena scratch = get_scratch(0,0);
     String8 png_data = os_read_file(scratch.arena, str8_lit("W:/assets/dumb/art/tileset/0x72_DungeonTilesetII_v1.7.png"), false);
-    PNG_Bitmap parsed_data = png_decode(scratch.arena, png_data);
+    PNG_Bitmap_RGBA parsed_data = png_decode(scratch.arena, png_data);
     
     release_scratch(scratch);
     return 0;
