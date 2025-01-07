@@ -141,6 +141,25 @@ consume_bits (Bit_Stream *stream, u32 count) {
     return result;
 }
 
+core_function Huffman_Table
+huffman_make (Arena *arena, u32 max_code_length, u32 num_codes, u32 *code_lengths, u32 *alphabet) {
+    Temp_Arena scratch = get_scratch();
+    Huffman_Table result = zero_struct;
+    
+    u32 *num_symbols = arena_pushn(scratch.arena, u32, max_code_length+1);
+    u32 *tdcl = arena_pushn(scratch.arena, u32, max_code_length+1);
+    for (u32 i = 0; i < num_codes; ++i) { num_symbols[code_lengths[i]]++; }
+    for (u32 i = 0; i < max_code_length; ++i) { 
+        
+        tdcl[i] = ; 
+    }
+    
+    
+    
+    release_scratch(scratch);
+    return result;
+}
+
 // https://www.zlib.net/feldspar.html
 // https://datatracker.ietf.org/doc/html/rfc1951
 // https://datatracker.ietf.org/doc/html/rfc1950
@@ -182,6 +201,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 }
                 
                 // Build code length table
+#if 0
                 Huffman_Table code_length_table = zero_struct;
                 code_length_table.count = 128; // Could probably make this smaller
                 code_length_table.array = arena_pushn(scratch.arena, Huffman_Table_Entry, 128);
@@ -206,8 +226,14 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                     next_code[bits] = code;
                 }
                 for (u32 n = 0; n <= 128; ++n) {
-                    
+                    u16 length = code_length_table.array[n].length;
+                    if (length != 0) {
+                        code_length_table.array[n].code = next_code[length];
+                        next_code[length]++;
+                    }
                 }
+#endif
+                
                 
             } else {
                 fputs("I have yet to come across a png with static huffman codes. If you come across this message, you've got some work to do!\n", stderr);
