@@ -131,6 +131,7 @@ s32: be_to_le32(x)
 
 #include <string.h>
 #define memory_zero(p,s) memset((p), 0, (s))
+#define memory_init(p,s,v) memset((p), v, (s))
 #define memory_zero_struct(p) memory_zero((p), sizeof(*(p)))
 #define memory_zero_array(a) memory_zero((a), sizeof(a))
 #define memory_zero_typed(p,c) memory_zero((p), sizeof(*(p)*(c)))
