@@ -39,6 +39,7 @@ window:
     {
       0.692982:
       {
+        code: {selected project:{"root.raddbg_project"} "../code/file/a.exe" cursor:1:1}
       }
       0.307018:
       {
@@ -123,16 +124,16 @@ keybindings:
   {"new_panel_down"                          ctrl minus          }
   {"new_panel_right"                         ctrl p              }
   {"next_panel"                              ctrl comma          }
-  {"next_tab"                                ctrl tab            }
   {"next_tab"                                ctrl page_down      }
+  {"next_tab"                                ctrl tab            }
   {"open_project"                            ctrl alt o          }
   {"open"                                    ctrl o              }
   {"open_user"                               ctrl shift alt o    }
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
-  {"prev_tab"                                ctrl shift tab      }
   {"prev_tab"                                ctrl page_up        }
+  {"prev_tab"                                ctrl shift tab      }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
   {"run"                                     f5                  }
