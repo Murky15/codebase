@@ -152,76 +152,35 @@ consume_bits (Bit_Stream *stream, u32 count) {
     return result;
 }
 
-// @slow This function is literally loop haven
+// @slow This function is literally loop haven. I feel like this could be greatly optimized. This code is very complex & hard to read.
 core_function Compact_Huffman_Table
 huffman_make (Arena *arena, u32 max_code_length, u32 num_codes, Huffman_Data *data) {
     Temp_Arena scratch = get_scratch(&arena, 1);
     Compact_Huffman_Table result = zero_struct;
     
-    // Generate keys
+    u32 max_code = (1 << max_code_length)-1;
     u32 *num_symbols = arena_pushn(scratch.arena, u32, max_code_length+1);
-    u32 unique_length_count = 0;
-    for (u32 i = 0; i < num_codes; ++i) { 
-        if (data[i].length != 0) { 
-            unique_length_count += num_symbols[data[i].length]++ == 0 ? 1 : 0;
-        } 
+    u32 *next_code = arena_pushn(scratch.arena, u32, max_code_length+1);
+    u32 *codes = arena_pushn(scratch.arena, u32, num_codes);
+    for (u32 i = 0; i < num_codes; ++i) { num_symbols[data[i].length]++; }
+    num_symbols[0] = 0;
+    u32 code = 0;
+    for (u32 bits = 1; bits <= max_code_length; ++bits) {
+        code = (code + num_symbols[bits-1]) << 1;
+        next_code[bits] = code;
     }
-    u32 *unique_lengths_ordered = arena_pushn(scratch.arena, u32, unique_length_count);
-    u32 *tdcl = arena_pushn(scratch.arena, u32, unique_length_count);
-    u32 unique_idx = 0;
-    u32 code_sum = 0;
-    for (u32 i = 1; i <= max_code_length; ++i) { 
-        if (num_symbols[i] > 0) {
-            unique_lengths_ordered[unique_idx] = i;
-            tdcl[unique_idx] = i - code_sum;
-            code_sum += tdcl[unique_idx];
-            ++unique_idx;
+    for (u32 n = 0; n <= num_codes; ++n) {
+        u32 length = data[n].length;
+        if (length != 0) {
+            codes[n] = next_code[length];
+            next_code[length]++;
         }
-    }
-    
-    // The tricky thing about sorting here, is not only do we need to sort the alphabet
-    // by each symbol's code length, but we also need to ensure that numbers with the same
-    // code length are in the same order
-    u32 alphabet_size = (max_code_length+1)*num_codes;
-    s32 *alphabet = arena_pushn(scratch.arena, s32, alphabet_size);
-    u32 *entries_logged = arena_pushn(scratch.arena, u32, max_code_length+1);
-    u32 used_codes = num_codes;
-    memory_init(alphabet, alphabet_size * sizeof(s32), -1);
-    for (u32 i = 0; i < num_codes; ++i) {
-        if (data[i].length > 0) {
-            u32 j = entries_logged[data[i].length]++;
-            alphabet[data[i].length * num_codes + j] = data[i].symbol;
-        } else {
-            used_codes--;
-        }
-    }
-    u32 *sorted_alphabet = arena_pushn(scratch.arena, u32, used_codes);
-    u32 sorted_idx = 0;
-    for (u32 i = 0; i < alphabet_size; ++i) {
-        if (alphabet[i] > -1) sorted_alphabet[sorted_idx++] = alphabet[i];
-    }
-    
-    u32 *codes = arena_pushn(scratch.arena, u32, used_codes);
-    u32 k = 0, j = 0;
-    for (u32 i = 0; i < unique_length_count; ++i) {
-        k <<= tdcl[i];
-        codes[j] = k;
-        j++;
-        u32 symbol_count = num_symbols[unique_lengths_ordered[i]];
-        if (symbol_count > 1) {
-            for (u32 m = 1; m < symbol_count; ++m) {
-                k++;
-                codes[j] = k;
-                j++;
-            }
-        }
-        k++;
     }
     
     //-- dump
     printf("I hope this works\n");
-    for (u32 i = 0; i < used_codes; ++i) {
-        printf("Symbol: %d, mapped to: "BYTE_TO_BINARY_PATTERN"\n", sorted_alphabet[i], byte_to_binary(codes[i]));
+    for (u32 i = 0; i < num_codes; ++i) {
+        printf("Symbol: %d, length: %d, mapped to: "BYTE_TO_BINARY_PATTERN"\n", data[i].symbol, data[i].length, byte_to_binary(codes[i]));
     }
     
     // Create huffman structure
@@ -313,6 +272,8 @@ png_chunk_list_push (Arena *arena, PNG_Chunk_List *list, PNG_Chunk chunk) {
     sll_queue_push(list->first, list->last, node);
     list->count++;
 }
+
+
 
 core_function PNG_Bitmap_RGBA
 png_decode (Arena *arena, String8 png_data) {
