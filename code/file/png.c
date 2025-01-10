@@ -95,7 +95,6 @@ typedef struct Bit_Stream {
     u8 *cursor;
 } Bit_Stream;
 
-#if 0
 // https://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art007
 typedef struct Huffman_Table Huffman_Table;
 typedef struct Huffman_Table_Entry Huffman_Table_Entry;
@@ -106,16 +105,10 @@ struct Huffman_Table {
 };
 
 struct Huffman_Table_Entry {
-    u16 code;
+    u16 symbol;
     u16 length;
     Huffman_Table *ptr;
 };
-#endif
-
-// https://www.researchgate.net/publication/4014140_Direct_Huffman_coding_and_decoding_using_the_table_of_code-lengths
-typedef struct Compact_Huffman_Table {
-    int placeholder;
-} Compact_Huffman_Table;
 
 typedef struct Huffman_Data {
     u32 length;
@@ -152,13 +145,18 @@ consume_bits (Bit_Stream *stream, u32 count) {
     return result;
 }
 
+core_function void
+discard_bits (Bit_Stream *stream, u32 count) {
+    stream->buffer >>= count;
+    stream->count -= count;
+}
+
 // @slow This function is literally loop haven. I feel like this could be greatly optimized. This code is very complex & hard to read.
-core_function Compact_Huffman_Table
+core_function Huffman_Table
 huffman_make (Arena *arena, u32 max_code_length, u32 num_codes, Huffman_Data *data) {
     Temp_Arena scratch = get_scratch(&arena, 1);
-    Compact_Huffman_Table result = zero_struct;
+    Huffman_Table result = zero_struct;
     
-    u32 max_code = (1 << max_code_length)-1;
     u32 *num_symbols = arena_pushn(scratch.arena, u32, max_code_length+1);
     u32 *next_code = arena_pushn(scratch.arena, u32, max_code_length+1);
     u32 *codes = arena_pushn(scratch.arena, u32, num_codes);
@@ -177,13 +175,35 @@ huffman_make (Arena *arena, u32 max_code_length, u32 num_codes, Huffman_Data *da
         }
     }
     
+#if 0
     //-- dump
     printf("I hope this works\n");
     for (u32 i = 0; i < num_codes; ++i) {
         printf("Symbol: %d, length: %d, mapped to: "BYTE_TO_BINARY_PATTERN"\n", data[i].symbol, data[i].length, byte_to_binary(codes[i]));
     }
+#endif
     
     // Create huffman structure
+    if (max_code_length <= 9) {
+        u32 max_possible_code = (1 << max_code_length);
+        result.count = max_possible_code;
+        result.array = arena_pushn(arena, Huffman_Table_Entry, max_possible_code);
+        for (u32 i = 0; i < num_codes; ++i) {
+            if (data[i].length > 0) {
+                Huffman_Table_Entry to_add = comp_lit(Huffman_Table_Entry, .symbol = data[i].symbol, .length = data[i].length, .ptr=0);
+                result.array[codes[i]] = to_add;
+            }
+        }
+        
+        Huffman_Table_Entry last_entry = zero_struct;
+        for (u32 i = 0; i < max_possible_code; ++i) {
+            Huffman_Table_Entry *curr_entry = result.array + i;
+            if (curr_entry->symbol != 0) 
+                last_entry = *curr_entry;
+            else
+                *curr_entry = last_entry;
+        }
+    }
     
     release_scratch(scratch);
     return result;
@@ -212,7 +232,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
             type = consume_bits(&compression_stream, 2);
             if (type == Zlib_No_Compression) {
                 u16 len = consume_bits(&compression_stream, 16);
-                u16 nlen = consume_bits(&compression_stream, 16); unused(nlen);
+                discard_bits(&compression_stream, 16);
                 u8 *dst = arena_pushn(arena, u8, len);
                 memory_copy(dst, compression_stream.cursor, len);
                 compression_stream.cursor += len;
@@ -226,13 +246,23 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 local_persist u32 huffman_code_length_sequences[] = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
                 u32 num_code_lengths = array_count(huffman_code_length_sequences);
                 Huffman_Data *code_length_data = arena_pushn(scratch.arena, Huffman_Data, num_code_lengths);
-                for (u8 i = 0; i < num_code_lengths; ++i) {
-                    if (i < hclen)
-                        code_length_data[i].length = consume_bits(&compression_stream, 3);
+                for (u8 i = 0; i < hclen; ++i) {
+                    code_length_data[i].length = consume_bits(&compression_stream, 3);
                     code_length_data[i].symbol = huffman_code_length_sequences[i];
                 }
-                // @todo: Make this take an array of Huffman_Datas instead
-                Compact_Huffman_Table code_length_table = huffman_make(scratch.arena, 7, hclen, code_length_data);
+                Huffman_Table code_length_table = huffman_make(scratch.arena, 7, hclen, code_length_data);
+#if 0
+                for (int i = 0; i < code_length_table.count; ++i) {
+                    printf("Table["BYTE_TO_BINARY_PATTERN"] = {sym: %d, len: %d}\n", byte_to_binary(i), code_length_table.array[i].symbol, code_length_table.array[i].length);
+                }
+#endif
+                u32 *litlen_codes = arena_pushn(scratch.arena, u32, 0);
+                for (u32 i = 0; i < hlit; ++i) {
+                    u32 code = peek_bits(&compression_stream, 7);
+                    Huffman_Table_Entry entry = code_length_table.array[code];
+                    consume_bits(&compression_stream, entry.length);
+                }
+                
             } else {
                 fputs("I have yet to come across a png with static huffman codes. If you come across this message, you've got some work to do!\n", stderr);
                 goto exit;
@@ -272,8 +302,6 @@ png_chunk_list_push (Arena *arena, PNG_Chunk_List *list, PNG_Chunk chunk) {
     sll_queue_push(list->first, list->last, node);
     list->count++;
 }
-
-
 
 core_function PNG_Bitmap_RGBA
 png_decode (Arena *arena, String8 png_data) {
