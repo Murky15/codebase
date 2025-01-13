@@ -1,5 +1,7 @@
 #include <stdio.h>
 
+#define ENABLE_ASSERT 1
+#define DEBUG 1
 #include "base/include.h"
 #include "os/include.h"
 #include "base/include.c"
@@ -96,6 +98,10 @@ typedef struct Bit_Stream {
 } Bit_Stream;
 
 // https://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art007
+// Ok so I know that by only having a single level huffman table we become memory hogs and whatnot,
+// but at the end of the day, while it is a lot of memory we reserve a ton on the scratch arena
+// so it shouldn't be a problem. Besides, it'll all be cleared at the end of the function anyway.
+// It's time to get piggy
 typedef struct Huffman_Table Huffman_Table;
 typedef struct Huffman_Table_Entry Huffman_Table_Entry;
 
@@ -107,12 +113,12 @@ struct Huffman_Table {
 struct Huffman_Table_Entry {
     u16 symbol;
     u16 length;
-    Huffman_Table *ptr;
+    // Huffman_Table *ptr;
 };
 
 typedef struct Huffman_Data {
-    u32 length;
-    u32 symbol;
+    u16 symbol;
+    u16 length;
 } Huffman_Data;
 
 global read_only u8 png_valid_color_config[COLOR_TYPE_COUNT+1][BIT_DEPTH_COUNT+1] = {
@@ -151,7 +157,6 @@ discard_bits (Bit_Stream *stream, u32 count) {
     stream->count -= count;
 }
 
-// @slow This function is literally loop haven. I feel like this could be greatly optimized. This code is very complex & hard to read.
 core_function Huffman_Table
 huffman_make (Arena *arena, u32 max_code_length, u32 num_codes, Huffman_Data *data) {
     Temp_Arena scratch = get_scratch(&arena, 1);
@@ -164,7 +169,9 @@ huffman_make (Arena *arena, u32 max_code_length, u32 num_codes, Huffman_Data *da
     num_symbols[0] = 0;
     u32 code = 0;
     for (u32 bits = 1; bits <= max_code_length; ++bits) {
-        code = (code + num_symbols[bits-1]) << 1;
+        code = (code + (num_symbols[bits-1])) << 1;
+        if (code >= (1 << bits)) // Correcting a paper from 1996, no biggie
+            code >>= 1;
         next_code[bits] = code;
     }
     for (u32 n = 0; n <= num_codes; ++n) {
@@ -175,40 +182,31 @@ huffman_make (Arena *arena, u32 max_code_length, u32 num_codes, Huffman_Data *da
         }
     }
     
-#if 0
-    //-- dump
-    printf("I hope this works\n");
+    // Create huffman structure (yikes... we can do better prob)
+    u32 max_possible_code = (1 << max_code_length);
+    result.count = max_possible_code;
+    result.array = arena_pushn(arena, Huffman_Table_Entry, max_possible_code);
     for (u32 i = 0; i < num_codes; ++i) {
-        printf("Symbol: %d, length: %d, mapped to: "BYTE_TO_BINARY_PATTERN"\n", data[i].symbol, data[i].length, byte_to_binary(codes[i]));
+        if (data[i].length > 0) {
+            Huffman_Table_Entry to_add = comp_lit(Huffman_Table_Entry, .symbol = data[i].symbol, .length = data[i].length);
+            u32 len_diff = max_code_length - to_add.length;
+            u32 shifted_code = codes[i] << len_diff;
+            result.array[shifted_code] = to_add;
+        }
     }
-#endif
     
-    // Create huffman structure
-    if (max_code_length <= 9) {
-        u32 max_possible_code = (1 << max_code_length);
-        result.count = max_possible_code;
-        result.array = arena_pushn(arena, Huffman_Table_Entry, max_possible_code);
-        for (u32 i = 0; i < num_codes; ++i) {
-            if (data[i].length > 0) {
-                Huffman_Table_Entry to_add = comp_lit(Huffman_Table_Entry, .symbol = data[i].symbol, .length = data[i].length, .ptr=0);
-                result.array[codes[i]] = to_add;
-            }
-        }
-        
-        Huffman_Table_Entry last_entry = zero_struct;
-        for (u32 i = 0; i < max_possible_code; ++i) {
-            Huffman_Table_Entry *curr_entry = result.array + i;
-            if (curr_entry->symbol != 0) 
-                last_entry = *curr_entry;
-            else
-                *curr_entry = last_entry;
-        }
+    Huffman_Table_Entry last_entry = zero_struct;
+    for (u32 i = 0; i < max_possible_code; ++i) {
+        Huffman_Table_Entry *curr_entry = &result.array[i];
+        if (curr_entry->length == 0)
+            *curr_entry = last_entry;
+        else
+            last_entry = *curr_entry;
     }
     
     release_scratch(scratch);
     return result;
 }
-// Code dump
 
 // https://www.zlib.net/feldspar.html
 // https://datatracker.ietf.org/doc/html/rfc1951
@@ -243,25 +241,68 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 u8 hdist  = consume_bits(&compression_stream, 5) + 1;
                 u8 hclen  = consume_bits(&compression_stream, 4) + 4;
                 
+                //- @note Code length huffman table
                 local_persist u32 huffman_code_length_sequences[] = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
                 u32 num_code_lengths = array_count(huffman_code_length_sequences);
                 Huffman_Data *code_length_data = arena_pushn(scratch.arena, Huffman_Data, num_code_lengths);
-                for (u8 i = 0; i < hclen; ++i) {
+                for (u32 i = 0; i < hclen; ++i) {
                     code_length_data[i].length = consume_bits(&compression_stream, 3);
                     code_length_data[i].symbol = huffman_code_length_sequences[i];
                 }
                 Huffman_Table code_length_table = huffman_make(scratch.arena, 7, hclen, code_length_data);
-#if 0
-                for (int i = 0; i < code_length_table.count; ++i) {
-                    printf("Table["BYTE_TO_BINARY_PATTERN"] = {sym: %d, len: %d}\n", byte_to_binary(i), code_length_table.array[i].symbol, code_length_table.array[i].length);
-                }
-#endif
-                u32 *litlen_codes = arena_pushn(scratch.arena, u32, 0);
-                for (u32 i = 0; i < hlit; ++i) {
-                    u32 code = peek_bits(&compression_stream, 7);
-                    Huffman_Table_Entry entry = code_length_table.array[code];
+                
+                //- @note: Litlen codes
+                u32 *litlen_code_lengths = arena_pushn(scratch.arena, u32, 0);
+                u32 current_sym = 0;
+                u32 i = 0;
+                for (;i < hlit;) {
+                    u8 code = peek_bits(&compression_stream, 7);
+                    u8 reversed = reverse_byte(code) >> 1;
+                    Huffman_Table_Entry entry = code_length_table.array[reversed];
                     consume_bits(&compression_stream, entry.length);
+                    switch (entry.symbol) {
+                        case 16: {
+                            u8 rep_count = consume_bits(&compression_stream, 2) + 3;
+                            u32 *e = arena_pushn(scratch.arena, u32, rep_count);
+                            for (u8 j = 0; j < rep_count; ++j) {
+                                e[j] = current_sym;
+                            }
+                            i += rep_count;
+                        } break;
+                        
+                        case 17: {
+                            u8 rep_count = consume_bits(&compression_stream, 3) + 3;
+                            u32 *e = arena_pushn(scratch.arena, u32, rep_count);
+                            for (u8 j = 0; j < rep_count; ++j) {
+                                e[j] = 0;
+                            }
+                            i += rep_count;
+                        } break;
+                        
+                        case 18: {
+                            u8 rep_count = consume_bits(&compression_stream, 7) + 11;
+                            u32 *e = arena_pushn(scratch.arena, u32, rep_count);
+                            for (u8 j = 0; j < rep_count; ++j) {
+                                e[j] = 0;
+                            }
+                            i += rep_count;
+                        } break;
+                        
+                        default: {
+                            assert(entry.symbol >= 0 && entry.symbol <= 15);
+                            u32 *e = arena_pushn(scratch.arena, u32, 1);
+                            current_sym = *e = entry.symbol;
+                            i++;
+                        } break;
+                    }
                 }
+                assert(i == hlit);
+                Huffman_Data *litlen_code_data = arena_pushn(scratch.arena, Huffman_Data, hlit);
+                for (u32 i = 0; i < hlit; ++i) {
+                    litlen_code_data[i].length = litlen_code_lengths[i];
+                    litlen_code_data[i].symbol = i;
+                }
+                Huffman_Table litlen_table = huffman_make(scratch.arena, 15, hlit, litlen_code_data);
                 
             } else {
                 fputs("I have yet to come across a png with static huffman codes. If you come across this message, you've got some work to do!\n", stderr);
@@ -269,6 +310,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
             }
             
             // decoding...
+            break;
 #if 0
             while (!end_of_block) {
                 int value = ;// decode literal/length value from input stream
@@ -325,14 +367,6 @@ png_decode (Arena *arena, String8 png_data) {
             c += chunk.length;
             c += sizeof(u32); // Because this decoder is local, we can skip the CRC
         }
-        
-#if 0
-        // Chunk dump
-        for (PNG_Chunk_Node *n = chunks.first; n; n = n->next) {
-            PNG_Chunk chunk = n->chunk;
-            printf("Type: %.*s\tSize: %d\tAncillary: %d\n", 4, chunk.type.c, chunk.length, chunk.ancillary);
-        }
-#endif
         
         // Process chunks
         PNG_Critical_Data critical_data = zero_struct;
@@ -424,6 +458,7 @@ int
 main (void) {
     Temp_Arena scratch = get_scratch(0,0);
     String8 png_data = os_read_file(scratch.arena, str8_lit("W:/assets/dumb/art/tileset/0x72_DungeonTilesetII_v1.7.png"), false);
+    //String8 png_data = os_read_file(scratch.arena, str8_lit("W:/code/file/png_tests/guy.png"), false);
     PNG_Bitmap_RGBA parsed_data = png_decode(scratch.arena, png_data);
     
     release_scratch(scratch);
