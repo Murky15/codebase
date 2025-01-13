@@ -1,26 +1,73 @@
 // raddbg project file
 
-/// targets ///////////////////////////////////////////////////////////////////
+/// watches ///////////////////////////////////////////////////////////////////
 
-target:
+watch: "i"
+watch:
 {
-  exe:               "../misc"
-  arguments:         ""
-  working_directory: "../build"
-  active:            1
+  name: "code"
+  view_rule: "bin"
+}
+
+watch:
+{
+  name: "reversed"
+  view_rule: "bin"
+}
+
+watch: "entry"
+watch: "code_length_table"
+watch: "current_sym"
+watch:
+{
+  name: "data"
+  view_rule: "array:num_codes"
+}
+
+watch: "len_diff"
+watch:
+{
+  name: "shifted_code"
+  view_rule: "bin"
+}
+
+watch:
+{
+  name: "codes[i]"
+  view_rule: "bin"
 }
 
 /// breakpoints ///////////////////////////////////////////////////////////////
 
 breakpoint:
 {
-  enabled: 1
+  location: ("../code/file/png.c":184)
 }
 
 breakpoint:
 {
-  enabled: 1
+  location: ("../code/file/png.c":169)
 }
+
+/// targets ///////////////////////////////////////////////////////////////////
+
+target:
+{
+  disabled: 1
+  executable: "../misc"
+  working_directory: "../build"
+}
+
+target:
+{
+  executable: "../code/file/a.exe"
+  working_directory: "../code/file"
+}
+
+/// recent_files //////////////////////////////////////////////////////////////
+
+recent_file: "../code/base/memory.c"
+recent_file: "../code/file/png.c"
 
 /// exception code filters ////////////////////////////////////////////////////
 

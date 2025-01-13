@@ -1,8 +1,11 @@
 // raddbg user file
 
-/// recent projects ///////////////////////////////////////////////////////////
+/// windows ///////////////////////////////////////////////////////////////////
 
-recent_project: {"root.raddbg_project"}
+
+/// recent_projects ///////////////////////////////////////////////////////////
+
+recent_project: "root.raddbg_project"
 
 /// windows ///////////////////////////////////////////////////////////////////
 
@@ -20,31 +23,39 @@ window:
   hint_code_text: 1
   panels:
   {
-    0.412803:
+    0.433555:
     {
-      0.563567:
+      0.817222:
       {
-        watch: {project:{"root.raddbg_project"} }
-        locals: {selected project:{"root.raddbg_project"} }
-        breakpoints: {project:{"root.raddbg_project"} }
+        0.522078:
+        {
+          locals: {selected project:{"root.raddbg_project"} }
+          breakpoints: {project:{"root.raddbg_project"} }
+        }
+        0.477922:
+        {
+          watch: {selected project:{"root.raddbg_project"} }
+        }
       }
-      0.436431:
+      0.182776:
       {
         call_stack: {selected project:{"root.raddbg_project"} }
         modules: {project:{"root.raddbg_project"} }
         scheduler: {project:{"root.raddbg_project"} }
       }
     }
-    0.587197:
+    0.566445:
     {
       0.692982:
       {
-        code: {selected project:{"root.raddbg_project"} "../code/file/a.exe" cursor:1:1}
+        targets: {project:{"root.raddbg_project"} }
+        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/file/png.c\""} cursor_line:{ 194} cursor_column:{ 1} mark_line:{ 194} mark_column:{1} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/memory.c\""} cursor_line:{ 83} cursor_column:{ 1} mark_line:{ 83} mark_column:{1} }
       }
       0.307018:
       {
-        output: {selected project:{"root.raddbg_project"} }
-        memory: {project:{"root.raddbg_project"} }
+        output: {selected project:{"root.raddbg_project"} cursor_line:{ 2} cursor_column:{ 1} mark_line:{ 2} mark_column:{1} }
+        memory: {project:{"root.raddbg_project"} cursor_vaddr:{ 0x0} mark_vaddr:{ 0x0} bytes_per_cell:{ 0x1} num_columns:{0x10} }
       }
     }
   }

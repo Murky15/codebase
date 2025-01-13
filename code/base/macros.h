@@ -51,7 +51,7 @@
 #define glue(a,b) glue_(a,b)
 
 #ifndef assert_break
-# if OS_WINDOWS
+# if COMPILER_CL
 #  define assert_break() __debugbreak()
 # else
 #  define assert_break() (*(volatile int*)0 = 0)
@@ -97,7 +97,14 @@ s16: be_to_le16(x), \
 u32: be_to_le32(x), \
 s32: be_to_le32(x)
 
+#if ARCH_X64
+# define reverse_byte(x) (((x) * 0x0202020202ULL & 0x010884422010ULL) % 1023)
+#else 
+# error "No 32 bit support for bit reversal!"
+#endif
+
 #define check_bit(x,b) ((x)&(1<<(b)))
+#define bit_mask(c,l) (((1<<((c)+1))-1)<<(l))
 #define fourcc(x) *((u32*)x) 
 
 #define int_from_ptr(p) (u64)((void*)p)
