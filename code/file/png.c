@@ -14,6 +14,13 @@
 #define HUFFMAN_PRIMARY_TABLE_SIZE 512     // 9 bits
 #define HUFFMAN_SECONDARY_TABLE_SIZE 64    // 6 bits
 
+#define HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE  7
+#define HUFFMAN_LITLEN_MAX_CODE_SIZE      15
+#define HUFFMAN_DIST_MAX_CODE_SIZE         5
+
+#define LZ77_NUM_LEN_CODES  29
+#define LZ77_NUM_DIST_CODES 30
+
 typedef struct PNG_Bitmap_RGBA {
     u64 width;
     u64 height;
@@ -131,6 +138,14 @@ global read_only u8 png_valid_color_config[COLOR_TYPE_COUNT+1][BIT_DEPTH_COUNT+1
     {0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1}
 };
 
+global read_only u8 extra_length_bits[LZ77_NUM_LEN_CODES] = {
+    0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0
+};
+
+global read_only u8 extra_distance_bits[LZ77_NUM_DIST_CODES] = {
+    0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13
+};
+
 core_function u32
 peek_bits (Bit_Stream *stream, u32 count) {
     while (stream->count < count) {
@@ -158,7 +173,7 @@ discard_bits (Bit_Stream *stream, u32 count) {
 }
 
 core_function Huffman_Table
-huffman_make (Arena *arena, u32 max_code_length, u32 num_codes, Huffman_Data *data) {
+huffman_make_very_big (Arena *arena, u32 max_code_length, u32 num_codes, Huffman_Data *data) {
     Temp_Arena scratch = get_scratch(&arena, 1);
     Huffman_Table result = zero_struct;
     
@@ -234,6 +249,10 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
         while (!final) {
             final = consume_bits(&compression_stream, 1);
             type = consume_bits(&compression_stream, 2);
+            
+            Huffman_Table litlen_table = zero_struct;
+            Huffman_Table dist_table = zero_struct;
+            
             if (type == Zlib_No_Compression) {
                 u16 len = consume_bits(&compression_stream, 16);
                 discard_bits(&compression_stream, 16);
@@ -255,13 +274,13 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                     code_length_data[i].length = consume_bits(&compression_stream, 3);
                     code_length_data[i].symbol = huffman_code_length_sequences[i];
                 }
-                Huffman_Table code_length_table = huffman_make(scratch.arena, 7, hclen, code_length_data);
+                Huffman_Table code_length_table = huffman_make_very_big(scratch.arena, HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE, hclen, code_length_data);
                 
                 //- @note: Litlen codes
-                u32 *litlen_code_lengths = arena_pushn(scratch.arena, u32, 0);
+                u32 *code_lengths = arena_pushn(scratch.arena, u32, 0);
                 u32 current_sym = 0;
-                for (u32 i = 0; i < hlit;) {
-                    u8 code = peek_bits(&compression_stream, 7);
+                for (u32 i = 0; i < hlit + hdist;) {
+                    u8 code = peek_bits(&compression_stream, HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE);
                     Huffman_Table_Entry entry = code_length_table.array[code];
                     consume_bits(&compression_stream, entry.length);
                     switch (entry.symbol) {
@@ -302,32 +321,55 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 }
                 Huffman_Data *litlen_code_data = arena_pushn(scratch.arena, Huffman_Data, hlit);
                 for (u32 i = 0; i < hlit; ++i) {
-                    litlen_code_data[i].length = litlen_code_lengths[i];
+                    litlen_code_data[i].length = code_lengths[i];
                     litlen_code_data[i].symbol = i;
                 }
-                Huffman_Table litlen_table = huffman_make(scratch.arena, 15, hlit, litlen_code_data);
+                litlen_table = huffman_make_very_big(scratch.arena, HUFFMAN_LITLEN_MAX_CODE_SIZE, hlit, litlen_code_data);
                 
+                Huffman_Data *dist_code_data = arena_pushn(scratch.arena, Huffman_Data, hdist);
+                for (u32 i = 0; i < hdist; ++i) {
+                    dist_code_data[i].length = code_lengths[hlit + i];
+                    dist_code_data[i].symbol = i;
+                }
+                dist_table = huffman_make_very_big(scratch.arena, HUFFMAN_DIST_MAX_CODE_SIZE, hdist, dist_code_data);
             } else {
                 fputs("I have yet to come across a png with static huffman codes. If you come across this message, you've got some work to do!\n", stderr);
                 goto exit;
             }
             
-            // decoding...
-            break;
-#if 0
-            while (!end_of_block) {
-                int value = ;// decode literal/length value from input stream
+            while (true) {
+                u32 code = peek_bits(&compression_stream, HUFFMAN_LITLEN_MAX_CODE_SIZE);
+                Huffman_Table_Entry entry = litlen_table.array[code];
+                consume_bits(&compression_stream, entry.length);
+                u32 value = entry.symbol;
                 if (value < 256) {
                     // Copy value (literal byte) to output stream
-                } else if (value == 256) {
-                    // end of block, break from loop
+                    u8 *head = arena_pushn(arena, u8, 1);
+                    *head = (u8)value;
+                    inflated.len++;
                 } else if (value > 256) {
-                    // Decode distance from input stream
-                    // Move backwards distance bytes in output stream
+                    u32 dist_code = peek_bits(&compression_stream, HUFFMAN_DIST_MAX_CODE_SIZE);
+                    Huffman_Table_Entry dist_entry = dist_table.array[dist_code];
+                    consume_bits(&compression_stream, dist_entry.length);
+                    
+                    u32 dist = dist_entry.symbol;
+                    dist += consume_bits(&compression_stream, extra_distance_bits[dist]);
+                    u64 length = (value - 254);
+                    length += consume_bits(&compression_stream, extra_length_bits[length]);
+                    
+                    u64 range_start = inflated.len - dist;
+                    String8 data = str8_sub(inflated, range_start, min(length, inflated.len));
                     // Copy length bytes from this position to output stream
+                    u8 *dest = arena_pushn(arena, u8, length);
+                    for (u64 i = 0; i < length; ++i) {
+                        u64 wrapped_idx = i % dist;
+                        dest[i] = data.str[wrapped_idx];
+                    }
+                    inflated.len += length;
+                } else if (value == 256) {
+                    break;
                 }
             }
-#endif
         }
         
         // Blah blah blah then process Adler32
@@ -440,7 +482,7 @@ png_decode (Arena *arena, String8 png_data) {
                 };
                 
             } else {
-                
+                printf("PNG: No ancillary chunks are supported yet!\n");
             }
         }
         
