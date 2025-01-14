@@ -170,8 +170,6 @@ huffman_make (Arena *arena, u32 max_code_length, u32 num_codes, Huffman_Data *da
     u32 code = 0;
     for (u32 bits = 1; bits <= max_code_length; ++bits) {
         code = (code + (num_symbols[bits-1])) << 1;
-        if (code >= (1 << bits)) // Correcting a paper from 1996, no biggie
-            code >>= 1;
         next_code[bits] = code;
     }
     for (u32 n = 0; n <= num_codes; ++n) {
@@ -182,16 +180,24 @@ huffman_make (Arena *arena, u32 max_code_length, u32 num_codes, Huffman_Data *da
         }
     }
     
-    // Create huffman structure (yikes... we can do better prob)
     u32 max_possible_code = (1 << max_code_length);
+    u32 max_code_length_byte_boundary = round_up_pow2(max_code_length, 8);
+    u32 bytes_per_code_length = max_code_length_byte_boundary / 8;
+    u32 shift_amount = max_code_length_byte_boundary % max_code_length;
     result.count = max_possible_code;
     result.array = arena_pushn(arena, Huffman_Table_Entry, max_possible_code);
     for (u32 i = 0; i < num_codes; ++i) {
         if (data[i].length > 0) {
             Huffman_Table_Entry to_add = comp_lit(Huffman_Table_Entry, .symbol = data[i].symbol, .length = data[i].length);
-            u32 len_diff = max_code_length - to_add.length;
-            u32 shifted_code = codes[i] << len_diff;
-            result.array[shifted_code] = to_add;
+            u8 *code = (u8*)&codes[i];
+            u32 code_idx = 0;
+            for (u32 i = 0; i < bytes_per_code_length; ++i) {
+                u32 append = reverse_byte(code[i]) << (i * 8);
+                if (i == bytes_per_code_length-1) 
+                    append >>= shift_amount;
+                code_idx |= append;
+            }
+            result.array[code_idx] = to_add;
         }
     }
     
@@ -254,11 +260,9 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 //- @note: Litlen codes
                 u32 *litlen_code_lengths = arena_pushn(scratch.arena, u32, 0);
                 u32 current_sym = 0;
-                u32 i = 0;
-                for (;i < hlit;) {
+                for (u32 i = 0; i < hlit;) {
                     u8 code = peek_bits(&compression_stream, 7);
-                    u8 reversed = reverse_byte(code) >> 1;
-                    Huffman_Table_Entry entry = code_length_table.array[reversed];
+                    Huffman_Table_Entry entry = code_length_table.array[code];
                     consume_bits(&compression_stream, entry.length);
                     switch (entry.symbol) {
                         case 16: {
@@ -296,7 +300,6 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                         } break;
                     }
                 }
-                assert(i == hlit);
                 Huffman_Data *litlen_code_data = arena_pushn(scratch.arena, Huffman_Data, hlit);
                 for (u32 i = 0; i < hlit; ++i) {
                     litlen_code_data[i].length = litlen_code_lengths[i];

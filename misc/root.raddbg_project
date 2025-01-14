@@ -37,16 +37,51 @@ watch:
   view_rule: "bin"
 }
 
+watch:
+{
+  name: "reversed"
+  view_rule: "bin"
+}
+
+watch: "shift_amt"
+watch: "result"
+watch:
+{
+  name: "num_symbols"
+  view_rule: "array:max_code_length+1"
+}
+
+watch:
+{
+  name: "next_code"
+  view_rule: "array:max_code_length+1,bin"
+}
+
+watch:
+{
+  name: "codes"
+  view_rule: "array:num_codes,bin"
+}
+
+watch:
+{
+  name: "data"
+  view_rule: "array:num_codes"
+}
+
+watch: "result"
+watch:
+{
+  name: "code_idx"
+  view_rule: "bin"
+}
+
 /// breakpoints ///////////////////////////////////////////////////////////////
 
 breakpoint:
 {
-  location: ("../code/file/png.c":184)
-}
-
-breakpoint:
-{
-  location: ("../code/file/png.c":169)
+  disabled: 1
+  location: ("../code/file/png.c":217)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////
