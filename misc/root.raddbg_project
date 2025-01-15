@@ -2,86 +2,51 @@
 
 /// watches ///////////////////////////////////////////////////////////////////
 
-watch: "i"
-watch:
-{
-  name: "code"
-  view_rule: "bin"
-}
-
-watch:
-{
-  name: "reversed"
-  view_rule: "bin"
-}
-
-watch: "entry"
-watch: "code_length_table"
-watch: "current_sym"
-watch:
-{
-  name: "data"
-  view_rule: "array:num_codes"
-}
-
-watch: "len_diff"
-watch:
-{
-  name: "shifted_code"
-  view_rule: "bin"
-}
-
 watch:
 {
   name: "codes[i]"
   view_rule: "bin"
 }
 
+watch: "bytes_per_code_length"
 watch:
 {
-  name: "reversed"
+  name: "append"
   view_rule: "bin"
 }
 
-watch: "shift_amt"
-watch: "result"
-watch:
-{
-  name: "num_symbols"
-  view_rule: "array:max_code_length+1"
-}
-
-watch:
-{
-  name: "next_code"
-  view_rule: "array:max_code_length+1,bin"
-}
-
-watch:
-{
-  name: "codes"
-  view_rule: "array:num_codes,bin"
-}
-
-watch:
-{
-  name: "data"
-  view_rule: "array:num_codes"
-}
-
-watch: "result"
 watch:
 {
   name: "code_idx"
   view_rule: "bin"
 }
 
+watch:
+{
+  name: "code"
+  view_rule: "array:bytes_per_code_length,bin"
+}
+
+watch:
+{
+  name: "flipped"
+  view_rule: "bin"
+}
+
+watch: "len_diff"
+watch: "to_add"
+
 /// breakpoints ///////////////////////////////////////////////////////////////
 
 breakpoint:
 {
   disabled: 1
-  location: ("../code/file/png.c":217)
+  location: ("../code/file/png.c":202)
+}
+
+breakpoint:
+{
+  location: ("../code/file/png.c":341)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////

@@ -23,19 +23,13 @@ window:
   hint_code_text: 1
   panels:
   {
-    0.405755:
+    0.344283:
     {
       0.817222:
       {
-        0.208618:
-        {
-          locals: {project:{"root.raddbg_project"} }
-          breakpoints: {selected project:{"root.raddbg_project"} }
-        }
-        0.791382:
-        {
-          watch: {selected project:{"root.raddbg_project"} }
-        }
+        locals: {selected project:{"root.raddbg_project"} }
+        watch: {project:{"root.raddbg_project"} }
+        breakpoints: {project:{"root.raddbg_project"} }
       }
       0.182776:
       {
@@ -44,12 +38,12 @@ window:
         scheduler: {project:{"root.raddbg_project"} }
       }
     }
-    0.594245:
+    0.655717:
     {
       0.692982:
       {
         targets: {project:{"root.raddbg_project"} }
-        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/file/png.c\""} cursor_line:{ 200} cursor_column:{ 52} mark_line:{ 200} mark_column:{52} }
+        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/file/png.c\""} cursor_line:{ 344} cursor_column:{ 95} mark_line:{ 344} mark_column:{95} }
         text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/memory.c\""} cursor_line:{ 83} cursor_column:{ 1} mark_line:{ 83} mark_column:{1} }
       }
       0.307018:
@@ -135,16 +129,16 @@ keybindings:
   {"new_panel_down"                          ctrl minus          }
   {"new_panel_right"                         ctrl p              }
   {"next_panel"                              ctrl comma          }
-  {"next_tab"                                ctrl tab            }
   {"next_tab"                                ctrl page_down      }
+  {"next_tab"                                ctrl tab            }
   {"open_project"                            ctrl alt o          }
   {"open"                                    ctrl o              }
   {"open_user"                               ctrl shift alt o    }
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
-  {"prev_tab"                                ctrl shift tab      }
   {"prev_tab"                                ctrl page_up        }
+  {"prev_tab"                                ctrl shift tab      }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
   {"run"                                     f5                  }

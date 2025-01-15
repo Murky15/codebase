@@ -15,8 +15,7 @@
 #define HUFFMAN_SECONDARY_TABLE_SIZE 64    // 6 bits
 
 #define HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE  7
-#define HUFFMAN_LITLEN_MAX_CODE_SIZE      15
-#define HUFFMAN_DIST_MAX_CODE_SIZE         5
+#define HUFFMAN_MAX_CODE_SIZE 15
 
 #define LZ77_NUM_LEN_CODES  29
 #define LZ77_NUM_DIST_CODES 30
@@ -184,10 +183,10 @@ huffman_make_very_big (Arena *arena, u32 max_code_length, u32 num_codes, Huffman
     num_symbols[0] = 0;
     u32 code = 0;
     for (u32 bits = 1; bits <= max_code_length; ++bits) {
-        code = (code + (num_symbols[bits-1])) << 1;
+        code = (code + num_symbols[bits-1]) << 1;
         next_code[bits] = code;
     }
-    for (u32 n = 0; n <= num_codes; ++n) {
+    for (u32 n = 0; n < num_codes; ++n) {
         u32 length = data[n].length;
         if (length != 0) {
             codes[n] = next_code[length];
@@ -196,23 +195,22 @@ huffman_make_very_big (Arena *arena, u32 max_code_length, u32 num_codes, Huffman
     }
     
     u32 max_possible_code = (1 << max_code_length);
-    u32 max_code_length_byte_boundary = round_up_pow2(max_code_length, 8);
-    u32 bytes_per_code_length = max_code_length_byte_boundary / 8;
-    u32 shift_amount = max_code_length_byte_boundary % max_code_length;
     result.count = max_possible_code;
     result.array = arena_pushn(arena, Huffman_Table_Entry, max_possible_code);
     for (u32 i = 0; i < num_codes; ++i) {
         if (data[i].length > 0) {
             Huffman_Table_Entry to_add = comp_lit(Huffman_Table_Entry, .symbol = data[i].symbol, .length = data[i].length);
-            u8 *code = (u8*)&codes[i];
-            u32 code_idx = 0;
-            for (u32 i = 0; i < bytes_per_code_length; ++i) {
-                u32 append = reverse_byte(code[i]) << (i * 8);
-                if (i == bytes_per_code_length-1) 
-                    append >>= shift_amount;
-                code_idx |= append;
+            u32 len_diff = max_code_length - to_add.length;
+            u32 code = codes[i];
+            u32 flipped = 0;
+            u32 bit_idx = to_add.length;
+            while (code > 0) {
+                flipped |= (code & 0x1) << --bit_idx;
+                code >>= 1;
             }
-            result.array[code_idx] = to_add;
+            flipped <<= len_diff;
+            printf("%d, %d, "BYTE_TO_BINARY_PATTERN", flipped: "BYTE_TO_BINARY_PATTERN"\n", data[i].symbol, data[i].length, byte_to_binary(codes[i]), byte_to_binary(flipped));
+            result.array[flipped] = to_add;
         }
     }
     
@@ -223,6 +221,7 @@ huffman_make_very_big (Arena *arena, u32 max_code_length, u32 num_codes, Huffman
             *curr_entry = last_entry;
         else
             last_entry = *curr_entry;
+        //printf("Table["BYTE_TO_BINARY_PATTERN"] = S: %d, L: %d\n", byte_to_binary(i), curr_entry->symbol, curr_entry->length);
     }
     
     release_scratch(scratch);
@@ -276,45 +275,42 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 }
                 Huffman_Table code_length_table = huffman_make_very_big(scratch.arena, HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE, hclen, code_length_data);
                 
-                //- @note: Litlen codes
-                u32 *code_lengths = arena_pushn(scratch.arena, u32, 0);
+                //- @note: codes
+                u32 *code_lengths = arena_pushn(scratch.arena, u32, hlit + hdist);
                 u32 current_sym = 0;
                 for (u32 i = 0; i < hlit + hdist;) {
                     u8 code = peek_bits(&compression_stream, HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE);
+                    printf("Code: "BYTE_TO_BINARY_PATTERN"\n", byte_to_binary(code));
                     Huffman_Table_Entry entry = code_length_table.array[code];
-                    consume_bits(&compression_stream, entry.length);
+                    consume_bits(&compression_stream, 7);
                     switch (entry.symbol) {
                         case 16: {
                             u8 rep_count = consume_bits(&compression_stream, 2) + 3;
-                            u32 *e = arena_pushn(scratch.arena, u32, rep_count);
-                            for (u8 j = 0; j < rep_count; ++j) {
-                                e[j] = current_sym;
+                            for (u8 j = i; j < rep_count; ++j) {
+                                code_lengths[j] = current_sym;
                             }
                             i += rep_count;
                         } break;
                         
                         case 17: {
                             u8 rep_count = consume_bits(&compression_stream, 3) + 3;
-                            u32 *e = arena_pushn(scratch.arena, u32, rep_count);
-                            for (u8 j = 0; j < rep_count; ++j) {
-                                e[j] = 0;
+                            for (u8 j = i; j < rep_count; ++j) {
+                                code_lengths[j] = 0;
                             }
                             i += rep_count;
                         } break;
                         
                         case 18: {
                             u8 rep_count = consume_bits(&compression_stream, 7) + 11;
-                            u32 *e = arena_pushn(scratch.arena, u32, rep_count);
-                            for (u8 j = 0; j < rep_count; ++j) {
-                                e[j] = 0;
+                            for (u8 j = i; j < rep_count; ++j) {
+                                code_lengths[j] = 0;
                             }
                             i += rep_count;
                         } break;
                         
                         default: {
                             assert(entry.symbol >= 0 && entry.symbol <= 15);
-                            u32 *e = arena_pushn(scratch.arena, u32, 1);
-                            current_sym = *e = entry.symbol;
+                            current_sym = code_lengths[i] = entry.symbol;
                             i++;
                         } break;
                     }
@@ -324,21 +320,21 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                     litlen_code_data[i].length = code_lengths[i];
                     litlen_code_data[i].symbol = i;
                 }
-                litlen_table = huffman_make_very_big(scratch.arena, HUFFMAN_LITLEN_MAX_CODE_SIZE, hlit, litlen_code_data);
+                litlen_table = huffman_make_very_big(scratch.arena, HUFFMAN_MAX_CODE_SIZE, hlit, litlen_code_data);
                 
                 Huffman_Data *dist_code_data = arena_pushn(scratch.arena, Huffman_Data, hdist);
                 for (u32 i = 0; i < hdist; ++i) {
                     dist_code_data[i].length = code_lengths[hlit + i];
                     dist_code_data[i].symbol = i;
                 }
-                dist_table = huffman_make_very_big(scratch.arena, HUFFMAN_DIST_MAX_CODE_SIZE, hdist, dist_code_data);
+                dist_table = huffman_make_very_big(scratch.arena, HUFFMAN_MAX_CODE_SIZE, hdist, dist_code_data);
             } else {
                 fputs("I have yet to come across a png with static huffman codes. If you come across this message, you've got some work to do!\n", stderr);
                 goto exit;
             }
             
             while (true) {
-                u32 code = peek_bits(&compression_stream, HUFFMAN_LITLEN_MAX_CODE_SIZE);
+                u32 code = peek_bits(&compression_stream, HUFFMAN_MAX_CODE_SIZE);
                 Huffman_Table_Entry entry = litlen_table.array[code];
                 consume_bits(&compression_stream, entry.length);
                 u32 value = entry.symbol;
@@ -348,7 +344,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                     *head = (u8)value;
                     inflated.len++;
                 } else if (value > 256) {
-                    u32 dist_code = peek_bits(&compression_stream, HUFFMAN_DIST_MAX_CODE_SIZE);
+                    u32 dist_code = peek_bits(&compression_stream, HUFFMAN_MAX_CODE_SIZE);
                     Huffman_Table_Entry dist_entry = dist_table.array[dist_code];
                     consume_bits(&compression_stream, dist_entry.length);
                     
