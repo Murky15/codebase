@@ -1,0 +1,2 @@
+.ggb files are renamed zip files.
+I will need to find/make a zip file extractor as well as a xml parser for external libraries

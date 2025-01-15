@@ -35,18 +35,24 @@ watch:
 
 watch: "len_diff"
 watch: "to_add"
+watch:
+{
+  name: "num_symbols"
+  view_rule: "array:max_code_length+1"
+}
+
+watch: "bit_idx"
 
 /// breakpoints ///////////////////////////////////////////////////////////////
 
 breakpoint:
 {
-  disabled: 1
-  location: ("../code/file/png.c":202)
+  location: ("../code/file/png.c":197)
 }
 
 breakpoint:
 {
-  location: ("../code/file/png.c":341)
+  location: ("../code/file/png.c":227)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////
@@ -60,7 +66,7 @@ target:
 
 target:
 {
-  executable: "../code/file/a.exe"
+  executable: "../code/file/png.exe"
   working_directory: "../code/file"
 }
 
