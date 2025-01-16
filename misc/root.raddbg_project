@@ -2,57 +2,41 @@
 
 /// watches ///////////////////////////////////////////////////////////////////
 
+watch: "rep_count"
+watch: "code_lengths[i+j]"
 watch:
 {
-  name: "codes[i]"
-  view_rule: "bin"
+  name: "code_lengths"
+  view_rule: "array:hlit+hdist"
 }
 
-watch: "bytes_per_code_length"
-watch:
-{
-  name: "append"
-  view_rule: "bin"
-}
-
-watch:
-{
-  name: "code_idx"
-  view_rule: "bin"
-}
-
-watch:
-{
-  name: "code"
-  view_rule: "array:bytes_per_code_length,bin"
-}
-
-watch:
-{
-  name: "flipped"
-  view_rule: "bin"
-}
-
-watch: "len_diff"
-watch: "to_add"
-watch:
-{
-  name: "num_symbols"
-  view_rule: "array:max_code_length+1"
-}
-
-watch: "bit_idx"
+watch: "code_length_table"
 
 /// breakpoints ///////////////////////////////////////////////////////////////
 
 breakpoint:
 {
-  location: ("../code/file/png.c":197)
+  location: ("../code/file/png.c":193)
 }
 
 breakpoint:
 {
-  location: ("../code/file/png.c":227)
+  location: ("../code/file/png.c":214)
+}
+
+breakpoint:
+{
+  location: ("../code/file/png.c":274)
+}
+
+breakpoint:
+{
+  location: ("../code/file/png.c":282)
+}
+
+breakpoint:
+{
+  location: ("../code/file/png.c":290)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////
@@ -66,7 +50,7 @@ target:
 
 target:
 {
-  executable: "../code/file/png.exe"
+  executable: "../code/file/a.exe"
   working_directory: "../code/file"
 }
 

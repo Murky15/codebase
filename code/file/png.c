@@ -176,6 +176,10 @@ huffman_make_very_big (Arena *arena, u32 max_code_length, u32 num_codes, Huffman
     Temp_Arena scratch = get_scratch(&arena, 1);
     Huffman_Table result = zero_struct;
     
+    u32 max_possible_code = (1 << max_code_length);
+    result.count = max_possible_code;
+    result.array = arena_pushn(arena, Huffman_Table_Entry, max_possible_code);
+    
     u32 *num_symbols = arena_pushn(scratch.arena, u32, max_code_length+1);
     u32 *next_code = arena_pushn(scratch.arena, u32, max_code_length+1);
     u32 *codes = arena_pushn(scratch.arena, u32, num_codes);
@@ -189,39 +193,21 @@ huffman_make_very_big (Arena *arena, u32 max_code_length, u32 num_codes, Huffman
     for (u32 n = 0; n < num_codes; ++n) {
         u32 length = data[n].length;
         if (length != 0) {
-            codes[n] = next_code[length];
-            next_code[length]++;
-        }
-    }
-    
-    u32 max_possible_code = (1 << max_code_length);
-    result.count = max_possible_code;
-    result.array = arena_pushn(arena, Huffman_Table_Entry, max_possible_code);
-    for (u32 i = 0; i < num_codes; ++i) {
-        if (data[i].length > 0) {
-            Huffman_Table_Entry to_add = comp_lit(Huffman_Table_Entry, .symbol = data[i].symbol, .length = data[i].length);
-            u32 len_diff = max_code_length - to_add.length;
-            u32 code = codes[i];
-            u32 flipped = 0;
-            u32 bit_idx = to_add.length;
-            while (code > 0) {
-                flipped |= (code & 0x1) << --bit_idx;
-                code >>= 1;
+            u32 c = next_code[length]++;
+            u32 len_diff = max_code_length - length;
+            u32 num_entries = (1 << len_diff);
+            Huffman_Table_Entry to_add = comp_lit(Huffman_Table_Entry, .symbol = data[n].symbol, .length = length);
+            for (u32 e = 0; e < num_entries; ++e) {
+                u32 bit_idx = length + len_diff;
+                u32 index = (c << len_diff) | e;
+                u32 flipped = 0;
+                while (index > 0) {
+                    flipped |= (index & 0x1) << --bit_idx;
+                    index >>= 1;
+                }
+                result.array[flipped] = to_add;
             }
-            flipped <<= len_diff;
-            printf("%d, %d, "BYTE_TO_BINARY_PATTERN", flipped: "BYTE_TO_BINARY_PATTERN"\n", data[i].symbol, data[i].length, byte_to_binary(codes[i]), byte_to_binary(flipped));
-            result.array[flipped] = to_add;
         }
-    }
-    
-    Huffman_Table_Entry last_entry = zero_struct;
-    for (u32 i = 0; i < max_possible_code; ++i) {
-        Huffman_Table_Entry *curr_entry = &result.array[i];
-        if (curr_entry->length == 0)
-            *curr_entry = last_entry;
-        else
-            last_entry = *curr_entry;
-        //printf("Table["BYTE_TO_BINARY_PATTERN"] = S: %d, L: %d\n", byte_to_binary(i), curr_entry->symbol, curr_entry->length);
     }
     
     release_scratch(scratch);
@@ -279,31 +265,31 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 u32 *code_lengths = arena_pushn(scratch.arena, u32, hlit + hdist);
                 u32 current_sym = 0;
                 for (u32 i = 0; i < hlit + hdist;) {
-                    u8 code = peek_bits(&compression_stream, HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE);
-                    printf("Code: "BYTE_TO_BINARY_PATTERN"\n", byte_to_binary(code));
+                    u32 code = peek_bits(&compression_stream, HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE);
+                    //printf("Code: "BYTE_TO_BINARY_PATTERN"\n", byte_to_binary(code));
                     Huffman_Table_Entry entry = code_length_table.array[code];
-                    consume_bits(&compression_stream, 7);
+                    consume_bits(&compression_stream, entry.length);
                     switch (entry.symbol) {
                         case 16: {
-                            u8 rep_count = consume_bits(&compression_stream, 2) + 3;
-                            for (u8 j = i; j < rep_count; ++j) {
-                                code_lengths[j] = current_sym;
+                            u32 rep_count = consume_bits(&compression_stream, 2) + 3;
+                            for (u32 j = 0; j < rep_count; ++j) {
+                                code_lengths[i+j] = current_sym;
                             }
                             i += rep_count;
                         } break;
                         
                         case 17: {
-                            u8 rep_count = consume_bits(&compression_stream, 3) + 3;
-                            for (u8 j = i; j < rep_count; ++j) {
-                                code_lengths[j] = 0;
+                            u32 rep_count = consume_bits(&compression_stream, 3) + 3;
+                            for (u32 j = 0; j < rep_count; ++j) {
+                                code_lengths[i+j] = 0;
                             }
                             i += rep_count;
                         } break;
                         
                         case 18: {
-                            u8 rep_count = consume_bits(&compression_stream, 7) + 11;
-                            for (u8 j = i; j < rep_count; ++j) {
-                                code_lengths[j] = 0;
+                            u32 rep_count = consume_bits(&compression_stream, 7) + 11;
+                            for (u32 j = 0; j < rep_count; ++j) {
+                                code_lengths[i+j] = 0;
                             }
                             i += rep_count;
                         } break;
