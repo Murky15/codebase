@@ -11,32 +11,47 @@ watch:
 }
 
 watch: "code_length_table"
+watch:
+{
+  name: "flipped"
+  view_rule: "bin"
+}
+
+watch:
+{
+  name: "flipped2"
+  view_rule: "bin"
+}
+
+watch:
+{
+  name: "val"
+  view_rule: "bin"
+}
 
 /// breakpoints ///////////////////////////////////////////////////////////////
 
 breakpoint:
 {
-  location: ("../code/file/png.c":193)
+  disabled: 1
+  location: ("../code/file/png.c":358)
 }
 
 breakpoint:
 {
-  location: ("../code/file/png.c":214)
+  disabled: 1
+  location: ("../code/file/png.c":204)
 }
 
 breakpoint:
 {
-  location: ("../code/file/png.c":274)
+  disabled: 1
+  location: ("../code/file/png.c":221)
 }
 
 breakpoint:
 {
-  location: ("../code/file/png.c":282)
-}
-
-breakpoint:
-{
-  location: ("../code/file/png.c":290)
+  location: ("../code/file/png.c":176)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////
@@ -50,7 +65,14 @@ target:
 
 target:
 {
+  disabled: 1
   executable: "../code/file/a.exe"
+  working_directory: "../code/file"
+}
+
+target:
+{
+  executable: "../code/file/png.exe"
   working_directory: "../code/file"
 }
 

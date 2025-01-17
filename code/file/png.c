@@ -10,10 +10,6 @@
 #define COLOR_TYPE_COUNT 6
 #define BIT_DEPTH_COUNT 16
 
-// 2 ^ Max code length  
-#define HUFFMAN_PRIMARY_TABLE_SIZE 512     // 9 bits
-#define HUFFMAN_SECONDARY_TABLE_SIZE 64    // 6 bits
-
 #define HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE  7
 #define HUFFMAN_MAX_CODE_SIZE 15
 
@@ -171,6 +167,18 @@ discard_bits (Bit_Stream *stream, u32 count) {
     stream->count -= count;
 }
 
+core_function u32
+reverse_bits (u32 val, u32 count) {
+    u32 bit_idx = count;
+    u32 flipped = 0;
+    while (val > 0) {
+        flipped |= (val & 0x1) << --bit_idx;
+        val >>= 1;
+    }
+    
+    return flipped;
+}
+
 core_function Huffman_Table
 huffman_make_very_big (Arena *arena, u32 max_code_length, u32 num_codes, Huffman_Data *data) {
     Temp_Arena scratch = get_scratch(&arena, 1);
@@ -182,7 +190,6 @@ huffman_make_very_big (Arena *arena, u32 max_code_length, u32 num_codes, Huffman
     
     u32 *num_symbols = arena_pushn(scratch.arena, u32, max_code_length+1);
     u32 *next_code = arena_pushn(scratch.arena, u32, max_code_length+1);
-    u32 *codes = arena_pushn(scratch.arena, u32, num_codes);
     for (u32 i = 0; i < num_codes; ++i) { num_symbols[data[i].length]++; }
     num_symbols[0] = 0;
     u32 code = 0;
@@ -198,13 +205,9 @@ huffman_make_very_big (Arena *arena, u32 max_code_length, u32 num_codes, Huffman
             u32 num_entries = (1 << len_diff);
             Huffman_Table_Entry to_add = comp_lit(Huffman_Table_Entry, .symbol = data[n].symbol, .length = length);
             for (u32 e = 0; e < num_entries; ++e) {
-                u32 bit_idx = length + len_diff;
-                u32 index = (c << len_diff) | e;
-                u32 flipped = 0;
-                while (index > 0) {
-                    flipped |= (index & 0x1) << --bit_idx;
-                    index >>= 1;
-                }
+                u32 flipped = reverse_bits(c, length);
+                //u32 flipped = c;
+                flipped |= (e << length);
                 result.array[flipped] = to_add;
             }
         }
@@ -252,7 +255,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 u8 hclen  = consume_bits(&compression_stream, 4) + 4;
                 
                 //- @note Code length huffman table
-                local_persist u32 huffman_code_length_sequences[] = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
+                local_persist read_only u32 huffman_code_length_sequences[] = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
                 u32 num_code_lengths = array_count(huffman_code_length_sequences);
                 Huffman_Data *code_length_data = arena_pushn(scratch.arena, Huffman_Data, num_code_lengths);
                 for (u32 i = 0; i < hclen; ++i) {
@@ -263,23 +266,23 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 
                 //- @note: codes
                 u32 *code_lengths = arena_pushn(scratch.arena, u32, hlit + hdist);
-                u32 current_sym = 0;
+                u32 prev_code = 0;
+                u32 rep_count = 0;
                 for (u32 i = 0; i < hlit + hdist;) {
                     u32 code = peek_bits(&compression_stream, HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE);
-                    //printf("Code: "BYTE_TO_BINARY_PATTERN"\n", byte_to_binary(code));
                     Huffman_Table_Entry entry = code_length_table.array[code];
                     consume_bits(&compression_stream, entry.length);
                     switch (entry.symbol) {
                         case 16: {
-                            u32 rep_count = consume_bits(&compression_stream, 2) + 3;
+                            rep_count = 3 + consume_bits(&compression_stream, 2);
                             for (u32 j = 0; j < rep_count; ++j) {
-                                code_lengths[i+j] = current_sym;
+                                code_lengths[i+j] = prev_code;
                             }
                             i += rep_count;
                         } break;
                         
                         case 17: {
-                            u32 rep_count = consume_bits(&compression_stream, 3) + 3;
+                            rep_count = 3 + consume_bits(&compression_stream, 3);
                             for (u32 j = 0; j < rep_count; ++j) {
                                 code_lengths[i+j] = 0;
                             }
@@ -287,7 +290,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                         } break;
                         
                         case 18: {
-                            u32 rep_count = consume_bits(&compression_stream, 7) + 11;
+                            rep_count = 11 + consume_bits(&compression_stream, 7);
                             for (u32 j = 0; j < rep_count; ++j) {
                                 code_lengths[i+j] = 0;
                             }
@@ -296,11 +299,12 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                         
                         default: {
                             assert(entry.symbol >= 0 && entry.symbol <= 15);
-                            current_sym = code_lengths[i] = entry.symbol;
+                            prev_code = code_lengths[i] = entry.symbol;
                             i++;
                         } break;
                     }
                 }
+                
                 Huffman_Data *litlen_code_data = arena_pushn(scratch.arena, Huffman_Data, hlit);
                 for (u32 i = 0; i < hlit; ++i) {
                     litlen_code_data[i].length = code_lengths[i];
