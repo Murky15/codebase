@@ -33,25 +33,7 @@ watch:
 
 breakpoint:
 {
-  disabled: 1
-  location: ("../code/file/png.c":358)
-}
-
-breakpoint:
-{
-  disabled: 1
-  location: ("../code/file/png.c":204)
-}
-
-breakpoint:
-{
-  disabled: 1
-  location: ("../code/file/png.c":221)
-}
-
-breakpoint:
-{
-  location: ("../code/file/png.c":176)
+  location: ("../code/file/png.c":188)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////
@@ -65,13 +47,13 @@ target:
 
 target:
 {
-  disabled: 1
   executable: "../code/file/a.exe"
   working_directory: "../code/file"
 }
 
 target:
 {
+  disabled: 1
   executable: "../code/file/png.exe"
   working_directory: "../code/file"
 }
