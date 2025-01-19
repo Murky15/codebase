@@ -15,7 +15,7 @@ window:
   monitor: "\\.\DISPLAY1"
   size: (2560 1440)
   dpi: 96.000000
-  main_font_size: 12
+  main_font_size: 14
   code_font_size: 12
   smooth_ui_text: 1
   smooth_code_text: 0
@@ -31,6 +31,7 @@ window:
         watch: {project:{"root.raddbg_project"} }
         breakpoints: {project:{"root.raddbg_project"} }
         targets: {project:{"root.raddbg_project"} }
+        bitmap: {project:{"root.raddbg_project"} query:{"inflated_pixel_data"} w:{ critical_data . width} h:{ critical_data . height} fmt:{ rgba32} zoom:{ 30.560003f} x:{ 0.000000f} y:{0.000000f} }
       }
       0.182776:
       {
@@ -43,7 +44,7 @@ window:
     {
       0.692982:
       {
-        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/file/png.c\""} cursor_line:{ 198} cursor_column:{ 54} mark_line:{ 198} mark_column:{54} }
+        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/file/png.c\""} cursor_line:{ 84} cursor_column:{ 18} mark_line:{ 83} mark_column:{15} }
         text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/memory.c\""} cursor_line:{ 83} cursor_column:{ 1} mark_line:{ 83} mark_column:{1} }
       }
       0.307018:
@@ -129,16 +130,16 @@ keybindings:
   {"new_panel_down"                          ctrl minus          }
   {"new_panel_right"                         ctrl p              }
   {"next_panel"                              ctrl comma          }
-  {"next_tab"                                ctrl tab            }
   {"next_tab"                                ctrl page_down      }
+  {"next_tab"                                ctrl tab            }
   {"open_project"                            ctrl alt o          }
   {"open"                                    ctrl o              }
   {"open_user"                               ctrl shift alt o    }
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
-  {"prev_tab"                                ctrl shift tab      }
   {"prev_tab"                                ctrl page_up        }
+  {"prev_tab"                                ctrl shift tab      }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
   {"run"                                     f5                  }

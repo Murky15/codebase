@@ -33,7 +33,7 @@ watch:
 
 breakpoint:
 {
-  location: ("../code/file/png.c":188)
+  location: ("../code/file/png.c":454)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////

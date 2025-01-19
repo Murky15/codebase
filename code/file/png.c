@@ -177,12 +177,14 @@ huffman_compare (const void* a, const void *b) {
 
 core_function Huffman_Codex
 huffman_make (Arena *arena, Huffman_Data_Array data, u32 max_code_length) {
+    u32 num_codes = 0;
     Huffman_Codex result;
-    qsort(data.array, data.count, sizeof(data.array[0]), huffman_compare); // @todo: Break dependency on stdlib
+    qsort(data.array, data.count, sizeof(data.array[0]), huffman_compare); 
     result.max_code_length = max_code_length;
-    result.sorted_symbols = data;
     result.codes_per_length = arena_pushn(arena, u32, max_code_length+1);
-    for (u32 i = 0; i < data.count; ++i) { result.codes_per_length[data.array[i].length]++; }
+    for (u32 i = 0; i < data.count; ++i) { result.codes_per_length[data.array[i].length]++; if (data.array[i].length != 0) num_codes++; }
+    result.sorted_symbols.count = num_codes;
+    result.sorted_symbols.array = data.array + result.codes_per_length[0];
     result.codes_per_length[0] = 0;
     
     return result;
@@ -205,78 +207,6 @@ huffman_decode_next (Bit_Stream *stream, Huffman_Codex codex) {
     
     return -1;
 }
-
-#if 0
-// https://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art007
-// Ok so I know that by only having a single level huffman table we become memory hogs and whatnot,
-// but at the end of the day, while it is a lot of memory we reserve a ton on the scratch arena
-// so it shouldn't be a problem. Besides, it'll all be cleared at the end of the function anyway.
-// It's time to get piggy
-typedef struct Huffman_Table Huffman_Table;
-typedef struct Huffman_Table_Entry Huffman_Table_Entry;
-
-struct Huffman_Table {
-    Huffman_Table_Entry *array;
-    u64 count;
-    u64 max_code_length;
-};
-
-struct Huffman_Table_Entry {
-    u16 symbol;
-    u16 length;
-    // Huffman_Table *ptr;
-};
-
-
-core_function Huffman_Table
-huffman_make_very_big (Arena *arena, u32 max_code_length, u32 num_codes, Huffman_Data *data) {
-    Temp_Arena scratch = get_scratch(&arena, 1);
-    Huffman_Table result = zero_struct;
-    
-    u32 max_possible_code = (1 << max_code_length);
-    result.max_code_length = max_code_length;
-    result.count = max_possible_code;
-    result.array = arena_pushn(arena, Huffman_Table_Entry, result.count);
-    
-    u32 *num_symbols = arena_pushn(scratch.arena, u32, max_code_length+1);
-    u32 *next_code = arena_pushn(scratch.arena, u32, max_code_length+1);
-    for (u32 i = 0; i < num_codes; ++i) { num_symbols[data[i].length]++; }
-    num_symbols[0] = 0;
-    u32 code = 0;
-    for (u32 bits = 1; bits <= max_code_length; ++bits) {
-        code = (code + num_symbols[bits-1]) << 1;
-        next_code[bits] = code;
-    }
-    for (u32 n = 0; n < num_codes; ++n) {
-        u32 length = data[n].length;
-        if (length != 0) {
-            u32 c = next_code[length]++;
-            u32 len_diff = max_code_length - length;
-            u32 num_entries = (1 << len_diff);
-            Huffman_Table_Entry to_add = comp_lit(Huffman_Table_Entry, .symbol = data[n].symbol, .length = length);
-            for (u32 e = 0; e < num_entries; ++e) {
-                u32 idx = (c << len_diff) | e;
-                //u32 flipped = reverse_bits(idx, max_code_length);
-                result.array[idx] = to_add;
-            }
-        }
-    }
-    
-    release_scratch(scratch);
-    return result;
-}
-
-core_function u32
-huffman_decode_next (Bit_Stream *compression_stream, Huffman_Table huffman) {
-    u32 code = peek_bits(compression_stream, huffman.max_code_length);
-    assert(code < huffman.count);
-    Huffman_Table_Entry entry = huffman.array[reverse_bits(code,huffman.max_code_length)];
-    consume_bits(compression_stream, entry.length);
-    
-    return entry.symbol;
-}
-
-#endif
 
 // https://www.zlib.net/feldspar.html
 // https://datatracker.ietf.org/doc/html/rfc1951
@@ -329,7 +259,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 u32 next_sym = 0;
                 u32 rep_count = 0;
                 for (u32 i = 0; i < hlit + hdist;) {
-                    u32 sym = huffman_decode_next(&compression_stream, code_length_codex);
+                    s32 sym = huffman_decode_next(&compression_stream, code_length_codex);
                     switch (sym) {
                         case 16: {
                             rep_count = 3 + consume_bits(&compression_stream, 2);
@@ -378,23 +308,15 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 goto exit;
             }
             
-            /*
-            while (false) {
-                u32 code = peek_bits(&compression_stream, HUFFMAN_MAX_CODE_SIZE);
-                Huffman_Table_Entry entry = litlen_table.array[code];
-                consume_bits(&compression_stream, entry.length);
-                u32 value = entry.symbol;
+            while (true) {
+                s32 value = huffman_decode_next(&compression_stream, litlen_codex);
                 if (value < 256) {
                     // Copy value (literal byte) to output stream
                     u8 *head = arena_pushn(arena, u8, 1);
                     *head = (u8)value;
                     inflated.len++;
                 } else if (value > 256) {
-                    u32 dist_code = peek_bits(&compression_stream, HUFFMAN_MAX_CODE_SIZE);
-                    Huffman_Table_Entry dist_entry = dist_table.array[dist_code];
-                    consume_bits(&compression_stream, dist_entry.length);
-                    
-                    u32 dist = dist_entry.symbol;
+                    s32 dist = huffman_decode_next(&compression_stream, dist_codex);
                     dist += consume_bits(&compression_stream, extra_distance_bits[dist]);
                     u64 length = (value - 254);
                     length += consume_bits(&compression_stream, extra_length_bits[length]);
@@ -412,7 +334,6 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                     break;
                 }
             }
-            */
         }
         
         // Blah blah blah then process Adler32
@@ -545,8 +466,8 @@ png_decode (Arena *arena, String8 png_data) {
 int
 main (void) {
     Temp_Arena scratch = get_scratch(0,0);
-    String8 png_data = os_read_file(scratch.arena, str8_lit("W:/assets/dumb/art/tileset/0x72_DungeonTilesetII_v1.7.png"), false);
-    //String8 png_data = os_read_file(scratch.arena, str8_lit("W:/code/file/png_tests/guy.png"), false);
+    //String8 png_data = os_read_file(scratch.arena, str8_lit("W:/assets/dumb/art/tileset/0x72_DungeonTilesetII_v1.7.png"), false);
+    String8 png_data = os_read_file(scratch.arena, str8_lit("W:/code/file/png_tests/guy.png"), false);
     PNG_Bitmap_RGBA parsed_data = png_decode(scratch.arena, png_data);
     
     release_scratch(scratch);
