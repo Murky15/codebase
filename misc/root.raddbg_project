@@ -2,13 +2,10 @@
 
 /// watches ///////////////////////////////////////////////////////////////////
 
-watch:
-{
-  name: "length"
-  view_rule: "array:n"
-}
-
-watch: "h"
+watch: "value"
+watch: "dist_code"
+watch: "dist"
+watch: "length"
 
 /// breakpoints ///////////////////////////////////////////////////////////////
 
@@ -30,12 +27,6 @@ breakpoint:
   location: ("../code/file/puff.c":378)
 }
 
-breakpoint:
-{
-  disabled: 1
-  location: ("../code/file/png.c":189)
-}
-
 /// targets ///////////////////////////////////////////////////////////////////
 
 target:
@@ -47,23 +38,24 @@ target:
 
 target:
 {
+  disabled: 1
   executable: "../code/file/a.exe"
   working_directory: "../code/file"
 }
 
 target:
 {
-  disabled: 1
   executable: "../code/file/png.exe"
   working_directory: "../code/file"
 }
 
 /// recent_files //////////////////////////////////////////////////////////////
 
-recent_file: "../code/base/memory.c"
 recent_file: "../code/base/strings.c"
 recent_file: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/eh/amd64/setjmp.asm"
 recent_file: "../code/file/puff.c"
+recent_file: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm"
+recent_file: "../code/base/memory.c"
 recent_file: "../code/file/png.c"
 
 /// exception code filters ////////////////////////////////////////////////////

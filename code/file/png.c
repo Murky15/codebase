@@ -118,11 +118,19 @@ global read_only u8 png_valid_color_config[COLOR_TYPE_COUNT+1][BIT_DEPTH_COUNT+1
     {0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1}
 };
 
-global read_only u8 extra_length_bits[LZ77_NUM_LEN_CODES] = {
+global read_only u32 lz77_length_map[LZ77_NUM_LEN_CODES] = {
+    3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258
+};
+
+global read_only u8 lz77_extra_length_bits[LZ77_NUM_LEN_CODES] = {
     0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0
 };
 
-global read_only u8 extra_distance_bits[LZ77_NUM_DIST_CODES] = {
+global read_only u32 lz77_dist_map[LZ77_NUM_DIST_CODES] = {
+    1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577
+};
+
+global read_only u8 lz77_extra_distance_bits[LZ77_NUM_DIST_CODES] = {
     0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13
 };
 
@@ -318,22 +326,22 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                     *head = (u8)value;
                     inflated.len++;
                 } else if (value > 256) {
-                    s32 dist = huffman_decode_next(&compression_stream, dist_codex);
-                    assert(dist != -1);
-                    dist += consume_bits(&compression_stream, extra_distance_bits[dist]);
-                    u64 length = (value - 254);
-                    length += consume_bits(&compression_stream, extra_length_bits[length]);
+                    s32 dist_code = huffman_decode_next(&compression_stream, dist_codex);
+                    assert(dist_code != -1);
+                    
+                    u64 dist = lz77_dist_map[dist_code];
+                    u64 extra_dist_bits = lz77_extra_distance_bits[dist_code];
+                    dist += consume_bits(&compression_stream, extra_dist_bits);
+                    
+                    u64 length_code = value-257;
+                    u64 length = lz77_length_map[length_code];
+                    u64 extra_length_bits = lz77_extra_length_bits[length_code];
+                    length += consume_bits(&compression_stream, extra_length_bits);
                     
                     u64 range_start = inflated.len - dist;
                     String8 data = str8_sub(inflated, range_start, min(length, inflated.len));
                     // Copy length bytes from this position to output stream
-                    u8 *dest = arena_pushn(arena, u8, length);
-                    for (u64 i = 0; i < length; ++i) {
-                        u64 wrapped_idx = i % dist;
-                        dest[i] = data.str[wrapped_idx];
-                    }
-                    inflated.len += length;
-                } else if (value == 256) {
+                } else {
                     break;
                 }
             }
