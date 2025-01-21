@@ -51,7 +51,7 @@
 #define glue(a,b) glue_(a,b)
 
 #ifndef assert_break
-# if COMPILER_CL
+# if OS_WINDOWS
 #  define assert_break() __debugbreak()
 # else
 #  define assert_break() (*(volatile int*)0 = 0)

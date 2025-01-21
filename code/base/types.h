@@ -39,7 +39,26 @@ read_only s64 s64_max = 0x7fffffffffffffff;
 
 // @todo: Fixed-point implementation
 
-//- @note Tangible types
+//- @note: Array Types
+
+#define make_array_type(T) typedef struct {T *array; u64 count;} glue(T,Array)
+
+make_array_type(s8);
+make_array_type(s16);
+make_array_type(s32);
+make_array_type(s64);
+
+make_array_type(u8);
+make_array_type(u16);
+make_array_type(u32);
+make_array_type(u64);
+
+make_array_type(f32);
+make_array_type(f64);
+
+// @todo: Make array type constructors
+
+//- @note: Tangible types
 typedef struct Color {
     u8 r, g, b, a;
 } Color;
@@ -161,4 +180,5 @@ core_function Vec3 v3cross(Vec3 a, Vec3 b);
 core_function f32 fmod_cycling(f32 x, f32 y); // Ripped this straight from Jai
 core_function f32 lerp (f32 v0, f32 v1, f32 t);
 
+#undef make_array_type
 #endif // BASE_TYPES_H

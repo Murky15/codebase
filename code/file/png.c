@@ -101,20 +101,11 @@ typedef struct Bit_Stream {
     u8 *cursor;
 } Bit_Stream;
 
-typedef struct Huffman_Data {
-    u16 symbol;
-    u16 length;
-} Huffman_Data;
-
-typedef struct Huffman_Data_Array {
-    Huffman_Data *array;
-    u64 count;
-} Huffman_Data_Array;
-
 typedef struct Huffman_Codex {
-    Huffman_Data_Array sorted_symbols;
-    u32 *codes_per_length;
+    u32Array sorted_symbols;
+    
     u32 max_code_length;
+    u32 *codes_per_length;
 } Huffman_Codex;
 
 global read_only u8 png_valid_color_config[COLOR_TYPE_COUNT+1][BIT_DEPTH_COUNT+1] = {
@@ -165,58 +156,34 @@ reverse_bits (u32 val, u32 count) {
     
     return flipped;
 }
-/*
-core_function Huffman_Codex
-huffman_make (Arena *arena, Huffman_Data_Array data, u32 max_code_length) {
-    Temp_Arena scratch = get_scratch(&arena, 1);
-    
-    u32 num_codes = 0;
-    Huffman_Codex result = zero_struct;
-    result.max_code_length = max_code_length;
-    u32 bucket_array_size = (max_code_length+1)*data.count;
-    Huffman_Data *buckets = arena_pushn(scratch.arena, Huffman_Data, bucket_array_size);
-    result.codes_per_length = arena_pushn(arena, u32, max_code_length+1);
-    for (u32 i = 0; i < data.count; ++i) { 
-        u32 length = data.array[i].length;
-        u32 curr_amt = result.codes_per_length[length]++; 
-        buckets[length*data.count+curr_amt] = data.array[i];
-        if (length != 0) num_codes++; 
-    }
-    
-    result.sorted_symbols.count = num_codes;
-    result.sorted_symbols.array = arena_pushn(arena, Huffman_Data, result.sorted_symbols.count);
-    for (u32 i = 0, j = 0; i < bucket_array_size; ++i) {
-        if (buckets[i].length != 0)
-            result.sorted_symbols.array[j++] = buckets[i];
-    }
-    
-    release_scratch(scratch);
-    return result;
-}
-*/
+
+// puff.c was helpful for this, but is very slow. For our purposes should work fine but will need
+// fine tuning for anything more complex. 
+// When the time comes, look here: https://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art007
 
 core_function Huffman_Codex
-huffman_make (Arena *arena, Huffman_Data_Array data, u32 max_code_length) {
+huffman_make (Arena *arena, u32Array lengths, u32 max_code_length) {
     Temp_Arena scratch = get_scratch(&arena, 1);
     Huffman_Codex result = zero_struct;
-    result.max_code_length = max_code_length;
-    result.sorted_symbols.count = data.count;
-    result.sorted_symbols.array = arena_pushn(arena, Huffman_Data, data.count);
-    result.codes_per_length = arena_pushn(arena, u32, max_code_length+1);
-    u32 *offsets = arena_pushn(scratch.arena, u32, max_code_length+1);
     
-    for (u32 i = 0; i < data.count; ++i) {
-        u32 len = data.array[i].length; 
-        result.codes_per_length[len]++;
-    }
-    assert(result.codes_per_length[0] < data.count);
+    result.max_code_length = max_code_length;
+    u32 *offsets = arena_pushn(scratch.arena, u32, max_code_length+1);
+    result.codes_per_length = arena_pushn(arena, u32, max_code_length+1);
+    
+    result.sorted_symbols.count = lengths.count;
+    result.sorted_symbols.array = arena_pushn(arena, u32, lengths.count);
+    
+    for (u32 sym = 0; sym < lengths.count; ++sym)
+        result.codes_per_length[lengths.array[sym]]++;
+    assert(result.codes_per_length[0] < lengths.count);
     
     offsets[1] = 0;
-    for (u32 i = 1; i < max_code_length; ++i) {offsets[i+1]=offsets[i]+result.codes_per_length[i];}
-    for (u32 i = 0; i < data.count; ++i) {
-        if (data.array[i].length != 0) {
-            result.sorted_symbols.array[offsets[data.array[i].length]++] = data.array[i];
-        }
+    for (u32 len = 1; len < max_code_length; ++len)
+        offsets[len+1] = offsets[len] + result.codes_per_length[len];
+    
+    for (u32 sym = 0; sym < lengths.count; ++sym) {
+        if (lengths.array[sym] != 0)
+            result.sorted_symbols.array[offsets[lengths.array[sym]]++] = sym;
     }
     
     release_scratch(scratch);
@@ -229,8 +196,8 @@ huffman_decode_next (Bit_Stream *stream, Huffman_Codex codex) {
     for (s32 len = 1; len <= codex.max_code_length; ++len) {
         s32 count = codex.codes_per_length[len];
         code |= consume_bits(stream, 1);
-        if (code - count < first) 
-            return codex.sorted_symbols.array[index + (code - first)].symbol;
+        if (code - count < first)
+            return codex.sorted_symbols.array[index + (code - first)];
         
         index += count;
         first += count;
@@ -283,22 +250,22 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 
                 //- @note Code length huffman table
                 local_persist read_only u32 huffman_code_length_sequences[] = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
-                Huffman_Data_Array code_length_data = zero_struct;
-                code_length_data.count = 19;
-                code_length_data.array = arena_pushn(scratch.arena, Huffman_Data, code_length_data.count);
+                
+                u32Array code_lengths_swizzled;
+                code_lengths_swizzled.count = array_count(huffman_code_length_sequences);
+                code_lengths_swizzled.array = arena_pushn(scratch.arena, u32, code_lengths_swizzled.count);
                 for (u32 i = 0; i < hclen; ++i) {
-                    code_length_data.array[i].symbol = huffman_code_length_sequences[i];
-                    code_length_data.array[i].length = consume_bits(&compression_stream, 3);
+                    code_lengths_swizzled.array[huffman_code_length_sequences[i]] = consume_bits(&compression_stream, 3);
                 }
-                Huffman_Codex code_length_codex = huffman_make(scratch.arena, code_length_data, HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE);
+                Huffman_Codex code_length_codex = huffman_make(scratch.arena, code_lengths_swizzled, HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE);
                 
                 //- @note: codes
                 u32 num_code_lengths = hlit + hdist;
                 u32 *code_lengths = arena_pushn(scratch.arena, u32, num_code_lengths);
                 
+                u32 rep_count;
                 for (u32 i = 0; i < num_code_lengths;) {
                     s32 sym = huffman_decode_next(&compression_stream, code_length_codex);
-                    u32 rep_count = 0;
                     
                     assert(sym != -1);
                     switch (sym) {
@@ -324,7 +291,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                         } break;
                     }
                     
-                    assert(i + rep_count < num_code_lengths);
+                    assert(i + rep_count <= num_code_lengths);
                     for (u32 j = 0; j < rep_count; ++j) {
                         if (i + j < num_code_lengths)
                             code_lengths[i+j] = sym;
@@ -333,22 +300,10 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 }
                 assert (code_lengths[256] != 0);
                 
-                Huffman_Data_Array litlen_code_data;
-                litlen_code_data.count = hlit;
-                litlen_code_data.array = arena_pushn(scratch.arena, Huffman_Data, litlen_code_data.count);
-                for (u32 i = 0; i < litlen_code_data.count; ++i) {
-                    litlen_code_data.array[i].symbol = i;
-                    litlen_code_data.array[i].length = code_lengths[i];
-                }
-                Huffman_Data_Array dist_code_data;
-                dist_code_data.count = hdist;
-                dist_code_data.array = arena_pushn(scratch.arena, Huffman_Data, dist_code_data.count);
-                for (u32 i = 0; i < dist_code_data.count; ++i) {
-                    dist_code_data.array[i].symbol = i;
-                    dist_code_data.array[i].length = code_lengths[hlit+i];
-                }
-                litlen_codex = huffman_make(scratch.arena, litlen_code_data, HUFFMAN_MAX_CODE_SIZE);
-                dist_codex = huffman_make(scratch.arena, dist_code_data, HUFFMAN_MAX_CODE_SIZE);
+                u32Array litlen_data = comp_lit(u32Array, .count = hlit, .array = code_lengths);
+                u32Array dist_data = comp_lit(u32Array, .count = hdist, .array = code_lengths + hlit);
+                litlen_codex = huffman_make(scratch.arena, litlen_data, HUFFMAN_MAX_CODE_SIZE);
+                dist_codex = huffman_make(scratch.arena, dist_data, HUFFMAN_MAX_CODE_SIZE);
             } else {
                 fputs("I have yet to come across a png with static huffman codes. If you come across this message, you've got some work to do!\n", stderr);
                 goto exit;

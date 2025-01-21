@@ -2,38 +2,38 @@
 
 /// watches ///////////////////////////////////////////////////////////////////
 
-watch: "rep_count"
-watch: "code_lengths[i+j]"
 watch:
 {
-  name: "code_lengths"
-  view_rule: "array:hlit+hdist"
+  name: "length"
+  view_rule: "array:n"
 }
 
-watch: "code_length_table"
-watch:
-{
-  name: "flipped"
-  view_rule: "bin"
-}
-
-watch:
-{
-  name: "flipped2"
-  view_rule: "bin"
-}
-
-watch:
-{
-  name: "val"
-  view_rule: "bin"
-}
+watch: "h"
 
 /// breakpoints ///////////////////////////////////////////////////////////////
 
 breakpoint:
 {
-  location: ("../code/file/png.c":454)
+  disabled: 1
+  location: ("../code/file/puff.c":827)
+}
+
+breakpoint:
+{
+  disabled: 1
+  location: ("../code/file/puff.c":684)
+}
+
+breakpoint:
+{
+  disabled: 1
+  location: ("../code/file/puff.c":378)
+}
+
+breakpoint:
+{
+  disabled: 1
+  location: ("../code/file/png.c":189)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////
@@ -61,6 +61,9 @@ target:
 /// recent_files //////////////////////////////////////////////////////////////
 
 recent_file: "../code/base/memory.c"
+recent_file: "../code/base/strings.c"
+recent_file: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/eh/amd64/setjmp.asm"
+recent_file: "../code/file/puff.c"
 recent_file: "../code/file/png.c"
 
 /// exception code filters ////////////////////////////////////////////////////
