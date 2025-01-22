@@ -91,11 +91,6 @@
 
 #define be_to_le16(x) ((((u8*)(x))[0] << 8) | (((u8*)(x))[1]))
 #define be_to_le32(x) ((((u8*)(x))[0] << 24) | (((u8*)(x))[1] << 16) | (((u8*)(x))[2] << 8) | (((u8*)(x))[3]))
-#define be_to_le(x) _Generic((x), \
-u16: be_to_le16(x), \
-s16: be_to_le16(x), \
-u32: be_to_le32(x), \
-s32: be_to_le32(x)
 
 #if ARCH_X64
 # define reverse_byte(x) (((x) * 0x0202020202ULL & 0x010884422010ULL) % 1023)

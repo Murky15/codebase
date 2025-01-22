@@ -6,25 +6,34 @@ watch: "value"
 watch: "dist_code"
 watch: "dist"
 watch: "length"
+watch: "data"
+watch: "i"
+watch: "wrapped_idx"
+watch: "dest[i]"
+watch: "data.str[wrapped_idx]"
+watch: "inflated"
+watch:
+{
+  name: "adler"
+  view_rule: "hex"
+}
+
+watch:
+{
+  name: "original_adler"
+  view_rule: "hex"
+}
 
 /// breakpoints ///////////////////////////////////////////////////////////////
 
 breakpoint:
 {
-  disabled: 1
-  location: ("../code/file/puff.c":827)
+  location: ("../code/file/png.c":374)
 }
 
 breakpoint:
 {
-  disabled: 1
-  location: ("../code/file/puff.c":684)
-}
-
-breakpoint:
-{
-  disabled: 1
-  location: ("../code/file/puff.c":378)
+  location: ("../code/file/png.c":179)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////
@@ -38,13 +47,13 @@ target:
 
 target:
 {
+  disabled: 1
   executable: "../code/file/a.exe"
   working_directory: "../code/file"
 }
 
 target:
 {
-  disabled: 1
   executable: "../code/file/png.exe"
   working_directory: "../code/file"
 }
@@ -53,9 +62,9 @@ target:
 
 recent_file: "../code/base/strings.c"
 recent_file: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/eh/amd64/setjmp.asm"
-recent_file: "../code/file/puff.c"
 recent_file: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm"
 recent_file: "../code/base/memory.c"
+recent_file: "../code/file/puff.c"
 recent_file: "../code/file/png.c"
 
 /// exception code filters ////////////////////////////////////////////////////
