@@ -248,13 +248,10 @@ json_process_token (Arena *arena, Json_Token_Node **token_stream) {
         
         case JSON_TOKEN_KEYWORD: {
             value.type = JSON_KEYWORD;
-            // @todo: We already make this comparison in the tokenizer, why are we doing this twice.
             if (token.value.str[0] == 't') {
                 value.keyword = JSON_KEYWORD_TRUE;
-            } else if (token.value.str[0] == 'f') {
+            } else {
                 value.keyword = JSON_KEYWORD_FALSE;
-            } else if (token.value.str[0] == 'n') {
-                value.keyword = JSON_KEYWORD_NULL;
             }
         } break;
         

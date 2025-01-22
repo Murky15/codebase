@@ -165,8 +165,9 @@ reverse_bits (u32 val, u32 count) {
     return flipped;
 }
 
+// @todo:
 // puff.c was helpful for this, but is very slow. For our purposes should work fine but will need
-// fine tuning for anything more complex. 
+// fine tuning in the future. 
 // When the time comes, look here: https://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art007
 
 core_function Huffman_Codex
@@ -245,9 +246,11 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
             Huffman_Codex litlen_codex, dist_codex;
             if (type == Zlib_No_Compression) {
                 u16 len = consume_bits(&compression_stream, 16);
-                consume_bits(&compression_stream, 16);
+                u16 nlen = consume_bits(&compression_stream, 16);
+                assert(len == ~nlen);
                 u8 *dst = arena_pushn(arena, u8, len);
                 memory_copy(dst, compression_stream.cursor, len);
+                inflated.len += len;
                 compression_stream.cursor += len;
                 continue;
             } else if (type == Zlib_Dynamic_Compression) {
@@ -326,21 +329,27 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                     *head = (u8)value;
                     inflated.len++;
                 } else if (value > 256) {
-                    s32 dist_code = huffman_decode_next(&compression_stream, dist_codex);
-                    assert(dist_code != -1);
-                    
-                    u64 dist = lz77_dist_map[dist_code];
-                    u64 extra_dist_bits = lz77_extra_distance_bits[dist_code];
-                    dist += consume_bits(&compression_stream, extra_dist_bits);
-                    
                     u64 length_code = value-257;
                     u64 length = lz77_length_map[length_code];
                     u64 extra_length_bits = lz77_extra_length_bits[length_code];
                     length += consume_bits(&compression_stream, extra_length_bits);
                     
+                    s32 dist_code = huffman_decode_next(&compression_stream, dist_codex);
+                    assert(dist_code != -1);
+                    u64 dist = lz77_dist_map[dist_code];
+                    u64 extra_dist_bits = lz77_extra_distance_bits[dist_code];
+                    dist += consume_bits(&compression_stream, extra_dist_bits);
+                    
                     u64 range_start = inflated.len - dist;
                     String8 data = str8_sub(inflated, range_start, min(length, inflated.len));
                     // Copy length bytes from this position to output stream
+                    u8 *dest = arena_pushn(arena, u8, length);
+                    for (u64 i = 0; i < length; ++i) {
+                        u64 wrapped_idx = i % dist;
+                        dest[i] = data.str[wrapped_idx];
+                    }
+                    inflated.len += length;
+                    
                 } else {
                     break;
                 }
