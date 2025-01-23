@@ -92,7 +92,7 @@ str8_sub (String8 string, u64 first, u64 opl) {
     String8 result = zero_struct;
     first = min(string.len, first);
     opl = min(string.len, opl);
-    if (first > opl) swap(u64, first, opl);
+    if (first > opl) return str8_zero();
     result.str = string.str + first;
     result.len = opl - first;
     

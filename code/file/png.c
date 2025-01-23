@@ -16,8 +16,6 @@
 #define LZ77_NUM_DIST_CODES 30
 #define ADLER32_BASE 65521 // Largest prime smaller than 65536
 
-#include "puff.c"
-
 typedef struct PNG_Bitmap_RGBA {
     u64 width;
     u64 height;
@@ -165,18 +163,16 @@ reverse_bits (u32 val, u32 count) {
     return flipped;
 }
 
-
 core_function b32
-validate_adler32 (u32 original_adler, String8 inflated) {
-    u32 adler = 1L;
-    u32 s1 = adler & 0xFFFF;
-    u32 s2 = (adler >> 16) & 0xFFFF;
-    for (u32 i = 0; i < inflated.len; ++i) {
-        s1 = (s1 + inflated.str[i]) % ADLER32_BASE;
-        s2 = (s2 + s1) % ADLER32_BASE;
+validate_adler32 (u32 adler, String8 inflated) {
+    u32 a = 1, b = 0;
+    for (u64 i = 0; i < inflated.len; ++i) {
+        a = (a + inflated.str[i]) % ADLER32_BASE;
+        b = (b + a) % ADLER32_BASE;
     }
-    adler = (s2 << 16) + s1;
-    return adler == original_adler;
+    u32 computed_adler = (b << 16) | a;
+    
+    return computed_adler == adler;
 }
 
 // @todo:
@@ -247,10 +243,6 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
         Bit_Stream compression_stream = zero_struct;
         compression_stream.cursor = deflated.str + sizeof(Zlib_Header);
         
-        /* DEBUG PROCESS */
-        int thing = puff(0, (unsigned long*)&deflated.len, deflated.str + sizeof(Zlib_Header), (unsigned long*)&deflated.len);
-        assert(thing == 0);
-        
         u8 final = 0, type = 0;
         while (!final) {
             final = consume_bits(&compression_stream, 1);
@@ -267,14 +259,11 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 compression_stream.cursor += len;
                 continue;
             } else if (type == Zlib_Dynamic_Compression) {
-                // Read huffman code trees 
                 u32 hlit  = consume_bits(&compression_stream, 5) + 257;
                 u32 hdist = consume_bits(&compression_stream, 5) + 1;
                 u32 hclen = consume_bits(&compression_stream, 4) + 4;
                 
-                //- @note Code length huffman table
                 local_persist read_only u32 huffman_code_length_sequences[] = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
-                
                 u32Array code_lengths_swizzled;
                 code_lengths_swizzled.count = array_count(huffman_code_length_sequences);
                 code_lengths_swizzled.array = arena_pushn(scratch.arena, u32, code_lengths_swizzled.count);
@@ -283,10 +272,8 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 }
                 Huffman_Codex code_length_codex = huffman_make(scratch.arena, code_lengths_swizzled, HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE);
                 
-                //- @note: codes
                 u32 num_code_lengths = hlit + hdist;
                 u32 *code_lengths = arena_pushn(scratch.arena, u32, num_code_lengths);
-                
                 u32 rep_count;
                 for (u32 i = 0; i < num_code_lengths;) {
                     s32 sym = huffman_decode_next(&compression_stream, code_length_codex);
@@ -353,12 +340,12 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                     u64 extra_dist_bits = lz77_extra_distance_bits[dist_code];
                     dist += consume_bits(&compression_stream, extra_dist_bits);
                     
-                    u64 range_start = inflated.len - dist - 1;
-                    String8 data = str8_sub(inflated, range_start, length);
                     // Copy length bytes from this position to output stream
+                    u64 range_start = inflated.len - dist;
+                    String8 data = str8_sub(inflated, range_start, range_start + length);
                     u8 *dest = arena_pushn(arena, u8, length);
                     for (u64 i = 0; i < length; ++i) {
-                        u64 wrapped_idx = i % dist;
+                        u64 wrapped_idx = i % data.len;
                         dest[i] = data.str[wrapped_idx];
                     }
                     inflated.len += length;
@@ -368,8 +355,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
             }
         }
         
-        // Blah blah blah then process Adler32
-        u8 *adler_addr = deflated.str + (deflated.len - 5);
+        u8 *adler_addr = deflated.str + (deflated.len - 4);
         u32 adler = be_to_le32(adler_addr);
         assert(validate_adler32(adler, inflated));
     } else {
@@ -500,8 +486,8 @@ png_decode (Arena *arena, String8 png_data) {
 int
 main (void) {
     Temp_Arena scratch = get_scratch(0,0);
-    String8 png_data = os_read_file(scratch.arena, str8_lit("W:/assets/dumb/art/tileset/0x72_DungeonTilesetII_v1.7.png"), false);
-    //String8 png_data = os_read_file(scratch.arena, str8_lit("W:/code/file/png_tests/guy.png"), false);
+    //String8 png_data = os_read_file(scratch.arena, str8_lit("W:/assets/dumb/art/tileset/0x72_DungeonTilesetII_v1.7.png"), false);
+    String8 png_data = os_read_file(scratch.arena, str8_lit("W:/code/file/png_tests/guy.png"), false);
     PNG_Bitmap_RGBA parsed_data = png_decode(scratch.arena, png_data);
     
     release_scratch(scratch);

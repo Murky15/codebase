@@ -13,23 +13,23 @@ window:
 {
   split_x maximized
   monitor: "\\.\DISPLAY1"
-  size: (1938 1038)
-  dpi: 120.000000
-  main_font_size: 16
-  code_font_size: 15
+  size: (2514 1456)
+  dpi: 96.000000
+  main_font_size: 12
+  code_font_size: 12
   smooth_ui_text: 1
   smooth_code_text: 0
   hint_ui_text: 1
   hint_code_text: 1
   panels:
   {
-    0.465869:
+    0.418192:
     {
       0.817222:
       {
         locals: {project:{"root.raddbg_project"} }
-        watch: {selected project:{"root.raddbg_project"} }
-        breakpoints: {project:{"root.raddbg_project"} }
+        watch: {project:{"root.raddbg_project"} }
+        breakpoints: {selected project:{"root.raddbg_project"} }
         targets: {project:{"root.raddbg_project"} }
       }
       0.182776:
@@ -39,16 +39,14 @@ window:
         scheduler: {project:{"root.raddbg_project"} }
       }
     }
-    0.534131:
+    0.581808:
     {
       0.692982:
       {
-        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/file/png.c\""} cursor_line:{ 374} cursor_column:{ 1} mark_line:{ 374} mark_column:{1} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/file/puff.c\""} cursor_line:{ 488} cursor_column:{ 13} mark_line:{ 488} mark_column:{13} }
+        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/file/png.c\""} cursor_line:{ 352} cursor_column:{ 49} mark_line:{ 352} mark_column:{49} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/file/puff.c\""} cursor_line:{ 497} cursor_column:{ 28} mark_line:{ 497} mark_column:{28} }
         text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/memory.c\""} cursor_line:{ 84} cursor_column:{ 1} mark_line:{ 84} mark_column:{1} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/strings.c\""} cursor_line:{ 97} cursor_column:{ 1} mark_line:{ 97} mark_column:{1} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"D:/a/_work/1/s/src/vctools/crt/vcruntime/src/eh/amd64/setjmp.asm\""} cursor_line:{ 1} cursor_column:{ 1} mark_line:{ 1} mark_column:{1} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm\""} cursor_line:{ 1} cursor_column:{ 1} mark_line:{ 1} mark_column:{1} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/strings.c\""} cursor_line:{ 97} cursor_column:{ 30} mark_line:{ 97} mark_column:{30} }
       }
       0.307018:
       {
