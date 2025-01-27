@@ -43,10 +43,10 @@ window:
     {
       0.692982:
       {
-        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/file/png.c\""} cursor_line:{ 352} cursor_column:{ 49} mark_line:{ 352} mark_column:{49} }
+        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/file/png.c\""} cursor_line:{ 188} cursor_column:{ 6} mark_line:{ 188} mark_column:{6} }
         text: {project:{"root.raddbg_project"} query:{"file:\"../code/file/puff.c\""} cursor_line:{ 497} cursor_column:{ 28} mark_line:{ 497} mark_column:{28} }
         text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/memory.c\""} cursor_line:{ 84} cursor_column:{ 1} mark_line:{ 84} mark_column:{1} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/strings.c\""} cursor_line:{ 97} cursor_column:{ 30} mark_line:{ 97} mark_column:{30} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/strings.c\""} cursor_line:{ 87} cursor_column:{ 2} mark_line:{ 87} mark_column:{2} }
       }
       0.307018:
       {
@@ -131,16 +131,16 @@ keybindings:
   {"new_panel_down"                          ctrl minus          }
   {"new_panel_right"                         ctrl p              }
   {"next_panel"                              ctrl comma          }
-  {"next_tab"                                ctrl tab            }
   {"next_tab"                                ctrl page_down      }
+  {"next_tab"                                ctrl tab            }
   {"open_project"                            ctrl alt o          }
   {"open"                                    ctrl o              }
   {"open_user"                               ctrl shift alt o    }
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
-  {"prev_tab"                                ctrl shift tab      }
   {"prev_tab"                                ctrl page_up        }
+  {"prev_tab"                                ctrl shift tab      }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
   {"run"                                     f5                  }

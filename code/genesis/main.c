@@ -1,6 +1,5 @@
 //- @note: Headers
 #include <stdio.h>
-#include "third_party/xml/src/xml.h"
 #include "third_party/zip/src/zip.h"
 #include <base/include.h>
 #include <os/include.h>
@@ -25,12 +24,6 @@ main (int argc, char **argv) {
         zip_entry_read(ggb_zip, &(void*)ggb_xml_raw.str, &ggb_xml_raw.len);
         printf("%.*s", str8_expand(ggb_xml_raw));
         
-        struct xml_document *ggb_xml = xml_parse_document(ggb_xml_raw.str, ggb_xml_raw.len);
-        //struct xml_node *root = xml_document_root(ggb_xml);
-        //fprintf(stderr, "%s\n", xml_easy_content(root));
-        
-        
-        xml_document_free(ggb_xml, false);
         zip_entry_close(ggb_zip);
     }
     zip_close(ggb_zip);

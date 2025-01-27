@@ -99,7 +99,7 @@
 #endif
 
 #define check_bit(x,b) ((x)&(1<<(b)))
-#define bit_mask(c,l) (((1<<((c)+1))-1)<<(l))
+#define bit_mask(c) ((1<<(c))-1)
 #define fourcc(x) *((u32*)x) 
 
 #define int_from_ptr(p) (u64)((void*)p)

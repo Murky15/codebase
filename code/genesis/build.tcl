@@ -6,7 +6,7 @@ namespace eval genesis {
 # this is ugly, project dir should be passed to the build scripts by butler;
         set {project dir} {./code/genesis/}
         if {$tconfig(compiler) == "tcc"} {
-            set {compiler opts} "-Icode ${project dir}main.c ${project dir}third_party/xml/src/xml.c ${project dir}third_party/zip/src/zip.c -o build/genesis.exe";
+            set {compiler opts} "-Icode ${project dir}main.c ${project dir}third_party/zip/src/zip.c -o build/genesis.exe";
         } else {
             puts "This compiler is not supported";
             return 1;

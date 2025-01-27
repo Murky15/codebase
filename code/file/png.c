@@ -24,6 +24,10 @@
 # define VALIDATE_ADLER32 0
 #endif
 
+#ifndef HUFFMAN_DEBUG
+# define HUFFMAN_DEBUG 0
+#endif
+
 typedef struct PNG_Bitmap_RGBA {
     u64 width;
     u64 height;
@@ -110,9 +114,7 @@ typedef struct Bit_Stream {
 typedef struct Huffman_Dict {
     u32Array sorted_symbols;
     u32Array lengths;
-    
     s32Array table;
-    s32Array table2;
     
     u32 max_code_length;
     u32 *codes_per_length;
@@ -191,11 +193,11 @@ validate_adler32 (u32 adler, String8 inflated) {
     return computed_adler == adler;
 }
 
-// @todo: MAKE THIS FASTER!!!
-// puff.c was helpful for this, but is very slow. For our purposes it should work fine but will need fine tuning in the future. 
-// When the time comes, look here: https://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art007
+// https://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art007
 core_function Huffman_Dict
 huffman_make (Arena *arena, u32Array lengths, u32 max_code_length) {
+    assert (max_code_length <= HUFFMAN_PRIMARY_TABLE_SIZE_THRESHOLD + HUFFMAN_SECONDARY_TABLE_SIZE_THRESHOLD);
+    
     Temp_Arena scratch = get_scratch(&arena, 1);
     Huffman_Dict result = zero_struct;
     
@@ -203,12 +205,8 @@ huffman_make (Arena *arena, u32Array lengths, u32 max_code_length) {
     result.lengths = lengths;
     result.max_code_length = max_code_length;
     result.codes_per_length = arena_pushn(arena, u32, max_code_length+1);
-    result.table.count = (1 << HUFFMAN_PRIMARY_TABLE_SIZE_THRESHOLD);
-    result.table.array = arena_pushn(arena, u32, result.table.count);
-    if (max_code_length > HUFFMAN_PRIMARY_TABLE_SIZE_THRESHOLD) {
-        result.table2.count = (1 << HUFFMAN_SECONDARY_TABLE_SIZE_THRESHOLD);
-        result.table2.array = arena_pushn(arena, u32, result.table2.count);
-    }
+    result.table.count = (1 << max_code_length);
+    result.table.array = arena_pushn(arena, s32, result.table.count);
     
     for (u32 sym = 0; sym < lengths.count; ++sym)
         result.codes_per_length[lengths.array[sym]]++;
@@ -226,6 +224,17 @@ huffman_make (Arena *arena, u32Array lengths, u32 max_code_length) {
             result.sorted_symbols.array[offsets[lengths.array[sym]]++] = sym;
     }
     
+    // @todo: Fine for a first pass, but is an unreal memory hog.
+    // I need to switch to multi-level huffman tables, and I would except I have a ton
+    // of homework this weekend and I need to get the ball rolling.
+    
+    // Quick psuedocode:
+    // x = Take current bit length - primary threshold
+    // create a second-level lookup table with 2^x entries
+    // populate it
+    // code += x
+    // repeat!
+    
     u32 code = 0;
     for (u32 i = 0; i < result.sorted_symbols.count; ++i) {
         u32 sym = result.sorted_symbols.array[i];
@@ -233,17 +242,11 @@ huffman_make (Arena *arena, u32Array lengths, u32 max_code_length) {
         u32 length = lengths.array[sym];
         u32 next_length = lengths.array[next_sym];
         
-        if (length <= HUFFMAN_PRIMARY_TABLE_SIZE_THRESHOLD) {
-            u32 len_diff = HUFFMAN_PRIMARY_TABLE_SIZE_THRESHOLD - length;
-            u32 entry_count = (1 << len_diff);
-            for (u32 e = 0; e < entry_count; ++e) {
-                u32 index = (code << len_diff) | e;
-                index = reverse_bits(index, HUFFMAN_PRIMARY_TABLE_SIZE_THRESHOLD);
-                result.table.array[index] = sym;
-            }
-        } else {
-            u32 reversed = reverse_bits(index, max_code_length);
-            
+        u32 len_diff = max_code_length - length;
+        u32 entry_count = (1 << len_diff);
+        for (u32 e = 0; e < entry_count; ++e) {
+            u32 index = (code << len_diff) | e;
+            result.table.array[index] = sym;
         }
         code = (code + 1) << (next_length - length);
     }
@@ -251,7 +254,8 @@ huffman_make (Arena *arena, u32Array lengths, u32 max_code_length) {
     return result;
 }
 
-#if 1
+#if HUFFMAN_DEBUG
+// @note: puff.c method
 core_function s32
 huffman_decode_next (Bit_Stream *stream, Huffman_Dict huff) {
     s32 code = 0, first = 0, index = 0;
@@ -274,10 +278,9 @@ core_function s32
 huffman_decode_next (Bit_Stream *stream, Huffman_Dict huff) {
     s32 sym = -1;
     u32 index = peek_bits(stream, huff.max_code_length);
-    if (index < huff.table.count) {
-        sym = huff.table.array[index];
-        consume_bits(stream, huff.lengths.array[sym]);
-    }
+    index = reverse_bits(index, huff.max_code_length);
+    sym = huff.table.array[index];
+    consume_bits(stream, huff.lengths.array[sym]);
     
     return sym;
 }

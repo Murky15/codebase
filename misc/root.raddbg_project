@@ -2,20 +2,10 @@
 
 /// watches ///////////////////////////////////////////////////////////////////
 
-watch: "inflated"
-watch: "value"
-watch: "length"
-watch: "dist"
-watch: "range_start"
-watch: "data"
-
-/// breakpoints ///////////////////////////////////////////////////////////////
-
-breakpoint:
+watch:
 {
-  disabled: 1
-  location: ("../code/file/png.c":353)
-  condition: "inflated.len==373"
+  name: "huff.lengths.array"
+  view_rule: "array:huff.lengths.count"
 }
 
 /// targets ///////////////////////////////////////////////////////////////////
@@ -47,6 +37,7 @@ recent_file: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.a
 recent_file: "../code/base/memory.c"
 recent_file: "../code/file/puff.c"
 recent_file: "../code/base/strings.c"
+recent_file: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memcpy.asm"
 recent_file: "../code/file/png.c"
 
 /// exception code filters ////////////////////////////////////////////////////
