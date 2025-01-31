@@ -284,7 +284,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     //win32_capture_mouse(platform.hwnd);
     //ShowCursor(false);
     
-    //- @note: Timing
+    //- @note: Threading, Timing, & Scheduling setup
+    assert(SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS) != 0);
     LARGE_INTEGER frequency, start_time, end_time, elapsed_microseconds = {0};
     QueryPerformanceFrequency(&frequency);
     

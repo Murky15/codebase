@@ -440,7 +440,8 @@ png_dirty (Arena *arena, PNG_Critical_Data *png, String8 filtered) {
     
     u8 *filter_method = filtered.str;
     while (filter_method - filtered.str < filtered.len) {
-        printf("Filter byte: %d\n", *filter_method);
+        u8 filter_byte = *filter_method;
+        
         filter_method += scanline_step+1;
     }
     

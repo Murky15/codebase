@@ -1,6 +1,8 @@
 //- @note: Headers
 #include <stdio.h>
-#include "third_party/zip/src/zip.h"
+#include <zip/src/zip.h>
+#include <libxml/parser.h>
+#include <libxml/tree.h>
 #include <base/include.h>
 #include <os/include.h>
 
@@ -22,7 +24,8 @@ main (int argc, char **argv) {
     int xml_found = zip_entry_open(ggb_zip, "geogebra.xml");
     if (xml_found == 0)  {
         zip_entry_read(ggb_zip, &(void*)ggb_xml_raw.str, &ggb_xml_raw.len);
-        printf("%.*s", str8_expand(ggb_xml_raw));
+        //printf("%.*s", str8_expand(ggb_xml_raw));
+        xmlDocPtr doc;
         
         zip_entry_close(ggb_zip);
     }
