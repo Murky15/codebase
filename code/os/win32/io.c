@@ -68,15 +68,6 @@ os_write_file (String8 path, String8 to_write, b32 create_if_not_exist) {
     return success;
 }
 
-#if 0
-core_function void
-os_debug_print (String8 string) {
-    char buff[string.len];
-    snprintf(buff, string.len, "%.*s", str8_expand(string));
-    OutputDebugString(buff);
-}
-#endif
-
 /*
 Okay, how are we going to do console IO. Any Input/Output operations require a handle. These are windows resources
 so we can't just be handing them out like candy, we can make one handle and put it in static memory. That would allow us to redirect 
