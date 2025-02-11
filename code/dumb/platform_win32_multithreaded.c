@@ -11,6 +11,10 @@
 
 #define GAME_MEMORY_SIZE Kilobytes(4)
 
+typedef struct Platform_Timing_Info {
+    f32 tick_hz, render_hz;
+} Platform_Timing_Info;
+
 global struct {
     Arena *arena;
     
@@ -34,6 +38,13 @@ global Game_Memory_Package game_memory;
 global HANDLE platform_mutex;
 global HANDLE game_input_mutex;
 global HANDLE game_memory_mutex;
+global HANDLE game_tick_timing_mutex;
+global HANDLE *muticies[] = {
+    &platform_mutex, &game_input_mutex, &game_memory_mutex
+};
+
+// @todo: Technically while this is still protected by the game_memory mutex, it's sloppy keeping this loose
+global u64 last_game_tick;
 
 function void
 win32_capture_mouse (void) {
@@ -45,9 +56,43 @@ win32_capture_mouse (void) {
     SetCursorPos(middle.x, middle.y);
 }
 
+function u64
+win32_get_perf_frequency (void) {
+    local_persist threadvar LARGE_INTEGER freq;
+    if (freq.QuadPart == 0)
+        QueryPerformanceFrequency(&freq);
+        
+    return freq.QuadPart;
+}
+
+function u64 
+win32_query_clock (void) {
+    LARGE_INTEGER tick;
+    QueryPerformanceCounter(&tick);
+    
+    return tick.QuadPart;
+}
+
+function f32
+win32_get_elapsed_ms (u64 t1, u64 t2) {
+    u64 freq = win32_get_perf_frequency();
+    u64 elapsed_ms = (t2 - t1) * 1000;
+    
+    return (f32)elapsed_ms / (f32)freq;    
+}
+
+function u64
+win32_ms_to_tick_interval (f32 ms) {
+    u64 freq = win32_get_perf_frequency();
+    u64 ticks = ms * freq;
+    ticks /= 1000;
+    
+    return ticks; 
+}
+
 function LRESULT
 win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    if (hwnd == platform.hwnd) { // @todo: Be careful here...
+    if (hwnd == platform.hwnd) { // @todo: Preserve aspect ratio
         switch (uMsg) {
             case WM_CLOSE: PostQuitMessage(0); return 0;
             
@@ -117,7 +162,7 @@ win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                     }
                 }
                 free(buff);
-                ReleaseMutex(game_input_mutex);
+                assert(ReleaseMutex(game_input_mutex));
                 return 0;
             }
         }
@@ -134,82 +179,84 @@ win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 
 function DWORD WINAPI
 win32_game_tick (LPVOID param) {
-    LARGE_INTEGER freq;
-    LARGE_INTEGER start, end, elapsed;
-    QueryPerformanceFrequency(&freq);
     f32 tick_hz = *(f32*)param;
     f32 seconds_per_tick = (1.f / tick_hz);
     f32 ms_per_tick = seconds_per_tick * 1000.f;
     
     HANDLE needed_objects[] = {game_input_mutex, game_memory_mutex}; 
     while (1) {
-        QueryPerformanceCounter(&start);
         WaitForMultipleObjects(array_count(needed_objects), needed_objects, true, INFINITE);
-        {
-            game_tick(game_memory, game_input, seconds_per_tick);
-            game_input.turn_amount = 0; // @megahack
-        }
+        
+        u64 start = win32_query_clock();
+        last_game_tick = start; // @megahack
+        game_tick(game_memory, game_input, seconds_per_tick);
+        game_input.turn_amount = 0; // @megahack 2
+        
         for (u32 i = 0; i < array_count(needed_objects); ++i) {
-            ReleaseMutex(needed_objects[i]);
+            assert(ReleaseMutex(needed_objects[i]));
         }
         
-        QueryPerformanceCounter(&end);
-        elapsed.QuadPart = end.QuadPart - start.QuadPart;
-        elapsed.QuadPart *= 1000;
-        f32 elapsed_ms = (f32)elapsed.QuadPart / (f32)freq.QuadPart;
-        f32 time_diff = ms_per_tick - elapsed_ms;
+        u64 end = win32_query_clock();
+        f32 elapsed = win32_get_elapsed_ms(start, end);
+        f32 time_diff = ms_per_tick - elapsed;
         if (time_diff > 0) {
             Sleep(time_diff);
         } else {
             // @todo: Log frame miss
         }
+        u64 super_end = win32_query_clock();
+        //fprintf(stderr, "Time to tick (ms): %f\n", win32_get_elapsed_ms(start, super_end));  
     }
 }
 
 function DWORD WINAPI
 win32_game_render (LPVOID param) {
-    LARGE_INTEGER freq;
-    LARGE_INTEGER start, end, elapsed;
-    QueryPerformanceFrequency(&freq);
-    f32 render_hz = *(f32*)param;
+    Platform_Timing_Info *timing = (Platform_Timing_Info*)param;
+    f32 render_hz = timing->render_hz;
+    f32 tick_hz = timing->tick_hz;
     f32 ms_per_frame = (1.f / render_hz) * 1000.f;
+    f32 ms_per_tick = (1.f / tick_hz) * 1000.f;
     
+    u64 game_tick_duration = win32_ms_to_tick_interval(ms_per_tick);
     HANDLE needed_objects[] = {platform_mutex, game_memory_mutex}; 
     while (1) {
-        QueryPerformanceCounter(&start);
         WaitForMultipleObjects(array_count(needed_objects), needed_objects, true, INFINITE);
-        {
-            game_render(game_memory);
-            Bitmap *bitmap = r_get_framebuffer();
-            // @todo: Preserve aspect ratio
-            StretchDIBits(
-                          platform.win_dc,
-                          0, 0,
-                          platform.window_width,
-                          platform.window_height,
-                          0, 0,
-                          bitmap->width,
-                          bitmap->height,
-                          bitmap->pixels,
-                          &platform.bitmap,
-                          DIB_RGB_COLORS,
-                          SRCCOPY
-                          );
-        }
+        
+        u64 start = win32_query_clock();
+        u64 predicted_end_game_tick = last_game_tick + game_tick_duration;
+        assert(last_game_tick < start < predicted_end_game_tick);
+        f32 t = norm((f64)start, (f64)last_game_tick, (f64)predicted_end_game_tick);
+        game_render(game_memory, t);
+        
+        Bitmap *bitmap = r_get_framebuffer();
+        StretchDIBits(
+                      platform.win_dc,
+                      0, 0,
+                      platform.window_width,
+                      platform.window_height,
+                      0, 0,
+                      bitmap->width,
+                      bitmap->height,
+                      bitmap->pixels,
+                      &platform.bitmap,
+                      DIB_RGB_COLORS,
+                      SRCCOPY
+                      );
+    
         for (u32 i = 0; i < array_count(needed_objects); ++i) {
-            ReleaseMutex(needed_objects[i]);
+            assert(ReleaseMutex(needed_objects[i]));
         }
         
-        QueryPerformanceCounter(&end);
-        elapsed.QuadPart = end.QuadPart - start.QuadPart;
-        elapsed.QuadPart *= 1000;
-        f32 elapsed_ms = (f32)elapsed.QuadPart / (f32)freq.QuadPart;
-        f32 time_diff = ms_per_frame - elapsed_ms;
+        u64 end = win32_query_clock();
+        f32 elapsed = win32_get_elapsed_ms(start, end);
+        f32 time_diff = ms_per_frame - elapsed;
         if (time_diff > 0) {
             Sleep(time_diff);
         } else {
             // @todo: Log frame miss
-        }        
+        }
+        u64 super_end = win32_query_clock();
+        //fprintf(stderr, "Time to render (ms): %f\n", win32_get_elapsed_ms(start, super_end));   
     }
 }
 
@@ -249,6 +296,11 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         return 1;
     }
     platform.win_dc = GetDC(platform.hwnd);
+    
+    //- @note: Query monitor info (@todo: We will need to call this again if the game swaps monitors)
+    DEVMODE monitor_info = {0};
+    monitor_info.dmSize = sizeof(monitor_info);
+    assert(EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &monitor_info));
     
     //- @note: Register for input
     RAWINPUTDEVICE input_devices[2];
@@ -297,17 +349,21 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     //- @note: Threading, Timing, & Scheduling setup
     assert(SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS) != 0);
     timeBeginPeriod(1);
-    f32 game_tick_hz = 50;
-    f32 game_render_hz = 72; // @todo: How can we determine the refresh rate of the monitor 
+    for (u32 i = 0; i < array_count(muticies); ++i)
+        *muticies[i] = CreateMutex(NULL, false, NULL);
+    
+    f32 game_tick_hz = 30.f;
+    f32 game_render_hz = monitor_info.dmDisplayFrequency / 2.f; 
+    Platform_Timing_Info timing = {.tick_hz = game_tick_hz, .render_hz = game_render_hz};
     assert(CreateThread(NULL, 0, win32_game_tick, &game_tick_hz, 0, 0));
-    assert(CreateThread(NULL, 0, win32_game_render, &game_render_hz, 0, 0));
+    assert(CreateThread(NULL, 0, win32_game_render, &timing, 0, 0));
     
     //- @note: Input loop
     for (MSG msg; GetMessage(&msg, 0, 0, 0);) {
         WaitForSingleObject(platform_mutex, INFINITE);
         TranslateMessage(&msg);
         DispatchMessage(&msg);
-        ReleaseMutex(platform_mutex);
+        assert(ReleaseMutex(platform_mutex));
     }       
     
     ExitProcess(0);

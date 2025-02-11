@@ -95,7 +95,7 @@
 #if ARCH_X64
 # define reverse_byte(x) (((x) * 0x0202020202ULL & 0x010884422010ULL) % 1023)
 #else 
-# error "No 32 bit support for bit reversal!"
+# error "No 32 bit support for byte reversal!"
 #endif
 
 #define check_bit(x,b) ((x)&(1<<(b)))

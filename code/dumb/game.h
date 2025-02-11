@@ -22,7 +22,7 @@ typedef struct Game_Input_Package {
 
 function void game_init(Game_Memory_Package memory, Range view_bounds);
 function void game_tick(Game_Memory_Package memory, Game_Input_Package input, f32 dt);
-function void game_render(Game_Memory_Package memory);
+function void game_render(Game_Memory_Package memory, f32 lerp_amount);
 
 //- @note: Game specific
 
@@ -30,8 +30,11 @@ typedef struct Entity {
     Vec2 pos;
     f32 height;
     f32 rotation_angle;
+    f32 rotation_diff;
     f32 radius;
     s32 curr_sector;
 } Entity;
+
+function Entity entity_lerp(Entity a, Entity b, f32 amount);
 
 #endif //GAME_H

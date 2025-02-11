@@ -6,7 +6,7 @@ namespace eval genesis {
 # this is ugly, project dir should be passed to the build scripts by butler;
         set {project dir} {./code/genesis/}
         if {$tconfig(compiler) == "tcc"} {
-            set {compiler opts} "-Icode -I${project dir}/third_party ${project dir}main.c ${project dir}third_party/zip/src/zip.c ${project dir}third_party/libxml2d.lib -o build/genesis.exe";
+            set {compiler opts} "-Icode -I${project dir}/third_party ${project dir}main.c ${project dir}third_party/zip/src/zip.c ${project dir}third_party/libxml2d.dll -o build/genesis.exe";
         } else {
             puts "This compiler is not supported";
             return 1;

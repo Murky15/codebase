@@ -32,7 +32,6 @@
 -Wall texture mapping
 -Collisions
 -SIMD???? -> compile renderer code into ISPC
--Multithreading?? (Like how Ryan Fleury does it)
 -Optimize / profile render functions
 -Parse c file and pass #run directive to stdin of compiler, link with result
 -sin/cos/tan table lookup: https://namoseley.wordpress.com/2015/07/26/sincos-generation-using-table-lookup-and-iterpolation/
@@ -56,13 +55,27 @@ struct name {
 */
 
 typedef struct Game_State {
-    Entity player;
     Map test_level;
     Range view_bounds;
+    
+    // @todo: Can start to see how we will have a list of "old" entities and new ones...
+    Entity player;
+    Entity old_player;
     
     Arena *frame_arena;
     Arena *level_arena;
 } Game_State;
+
+function Entity 
+entity_lerp (Entity a, Entity b, f32 amount) {
+    Entity l = b;
+    l.pos.x = lerp(a.pos.x, b.pos.x, amount);
+    l.pos.y = lerp(a.pos.y, b.pos.y, amount);
+    l.height = lerp(a.height, b.height, amount);
+    l.rotation_angle = lerp(a.rotation_angle, a.rotation_angle - b.rotation_diff, amount);
+    
+    return l;
+}
 
 function void
 game_init (Game_Memory_Package memory, Range view_bounds) {
@@ -90,11 +103,13 @@ game_tick (Game_Memory_Package memory, Game_Input_Package input, f32 dt) {
     assert(memory.memory);
     Game_State *gs = (Game_State*)memory.memory;
     
-    // @note: Responsibility of platform or game to clear this?
     arena_clear(gs->frame_arena);
     
+    gs->old_player = gs->player;
     Entity *player = &gs->player;
-    player->rotation_angle -= input.turn_amount;
+    
+    player->rotation_diff = input.turn_amount;
+    player->rotation_angle -= player->rotation_diff;
     player->rotation_angle = fmod_cycling(player->rotation_angle, 2 * M_PI32);
     
     Vec2 dir;
@@ -109,13 +124,14 @@ game_tick (Game_Memory_Package memory, Game_Input_Package input, f32 dt) {
         dir = v2norm(dir);
     player->pos = v2add(player->pos, v2muls(dir, PLAYER_MOVE_SPEED * dt));
     
-    // @todo: Can we avoid polling every frame?
     update_current_sector(player, &gs->test_level);
 }
 
 function void
-game_render (Game_Memory_Package memory) {
+game_render (Game_Memory_Package memory, f32 lerp_amount) {
     Game_State *gs = (Game_State*)memory.memory;
     Sector *player_sector = &gs->test_level.sectors[gs->player.curr_sector];
-    r_sector(&gs->test_level, player_sector, &gs->player, -1, gs->view_bounds);
+    
+    Entity lerped_player = entity_lerp(gs->old_player, gs->player, lerp_amount);
+    r_sector(&gs->test_level, player_sector, &lerped_player, -1, gs->view_bounds);
 }
