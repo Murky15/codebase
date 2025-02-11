@@ -108,7 +108,7 @@ game_tick (Game_Memory_Package memory, Game_Input_Package input, f32 dt) {
     gs->old_player = gs->player;
     Entity *player = &gs->player;
     
-    player->rotation_diff = input.turn_amount;
+    player->rotation_diff = input.turn_amount * dt;
     player->rotation_angle -= player->rotation_diff;
     player->rotation_angle = fmod_cycling(player->rotation_angle, 2 * M_PI32);
     
