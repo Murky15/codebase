@@ -35,14 +35,6 @@ global struct {
 global Game_Input_Package game_input;
 global Game_Memory_Package game_memory;
 
-global HANDLE platform_mutex;
-global HANDLE game_input_mutex;
-global HANDLE game_memory_mutex;
-global HANDLE game_tick_timing_mutex;
-global HANDLE *muticies[] = {
-    &platform_mutex, &game_input_mutex, &game_memory_mutex
-};
-
 // @todo: Technically while this is still protected by the game_memory mutex, it's sloppy keeping this loose
 global u64 last_game_tick;
 
@@ -97,7 +89,6 @@ win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
             case WM_CLOSE: PostQuitMessage(0); return 0;
             
             case WM_INPUT: {
-                WaitForSingleObject(game_input_mutex, INFINITE);
                 u32 size;
                 GetRawInputData((HRAWINPUT)lParam, RID_INPUT, 0, &size, sizeof(RAWINPUTHEADER));
                 LPBYTE buff = malloc(size);
@@ -162,7 +153,7 @@ win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                     }
                 }
                 free(buff);
-                assert(ReleaseMutex(game_input_mutex));
+                ReleaseMutex(game_input_mutex);
                 return 0;
             }
         }
@@ -183,7 +174,7 @@ win32_game_tick (LPVOID param) {
     f32 seconds_per_tick = (1.f / tick_hz);
     f32 ms_per_tick = seconds_per_tick * 1000.f;
     
-    HANDLE needed_objects[] = {game_input_mutex, game_memory_mutex}; 
+    HANDLE needed_objects[] = {game_input_mutex}; 
     while (1) {
         WaitForMultipleObjects(array_count(needed_objects), needed_objects, true, INFINITE);
         
@@ -193,7 +184,7 @@ win32_game_tick (LPVOID param) {
         game_input.turn_amount = 0; // @megahack 2
         
         for (u32 i = 0; i < array_count(needed_objects); ++i) {
-            assert(ReleaseMutex(needed_objects[i]));
+            ReleaseMutex(needed_objects[i]);
         }
         
         u64 end = win32_query_clock();
@@ -209,6 +200,11 @@ win32_game_tick (LPVOID param) {
     }
 }
 
+// @note/todo: These loops run so fast that having the render wait for the platform and memory mutexes 
+// Cause it to hitch and stall the other threads. Because the render thread ONLY READS from the data 
+// and passes a COPY of the game state to the game render function that it can no longer affect than
+// this is PROBABLY safe to do. The only problem would be if one of the platform values changes so we will
+// need to revisit this.
 function DWORD WINAPI
 win32_game_render (LPVOID param) {
     Platform_Timing_Info *timing = (Platform_Timing_Info*)param;
@@ -218,10 +214,7 @@ win32_game_render (LPVOID param) {
     f32 ms_per_tick = (1.f / tick_hz) * 1000.f;
     
     u64 game_tick_duration = win32_ms_to_tick_interval(ms_per_tick);
-    HANDLE needed_objects[] = {platform_mutex, game_memory_mutex}; 
     while (1) {
-        WaitForMultipleObjects(array_count(needed_objects), needed_objects, true, INFINITE);
-        
         u64 start = win32_query_clock();
         u64 predicted_end_game_tick = last_game_tick + game_tick_duration;
         assert(last_game_tick < start < predicted_end_game_tick);
@@ -242,10 +235,6 @@ win32_game_render (LPVOID param) {
                       DIB_RGB_COLORS,
                       SRCCOPY
                       );
-    
-        for (u32 i = 0; i < array_count(needed_objects); ++i) {
-            assert(ReleaseMutex(needed_objects[i]));
-        }
         
         u64 end = win32_query_clock();
         f32 elapsed = win32_get_elapsed_ms(start, end);
@@ -349,21 +338,17 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     //- @note: Threading, Timing, & Scheduling setup
     assert(SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS) != 0);
     timeBeginPeriod(1);
-    for (u32 i = 0; i < array_count(muticies); ++i)
-        *muticies[i] = CreateMutex(NULL, false, NULL);
-    
-    f32 game_tick_hz = 30.f;
+
+    f32 game_tick_hz = 25.f;
     f32 game_render_hz = monitor_info.dmDisplayFrequency / 2.f; 
     Platform_Timing_Info timing = {.tick_hz = game_tick_hz, .render_hz = game_render_hz};
-    assert(CreateThread(NULL, 0, win32_game_tick, &game_tick_hz, 0, 0));
-    assert(CreateThread(NULL, 0, win32_game_render, &timing, 0, 0));
+    CreateThread(NULL, 0, win32_game_tick, &game_tick_hz, 0, 0);
+    CreateThread(NULL, 0, win32_game_render, &timing, 0, 0);
     
     //- @note: Input loop
     for (MSG msg; GetMessage(&msg, 0, 0, 0);) {
-        WaitForSingleObject(platform_mutex, INFINITE);
         TranslateMessage(&msg);
         DispatchMessage(&msg);
-        assert(ReleaseMutex(platform_mutex));
     }       
     
     ExitProcess(0);

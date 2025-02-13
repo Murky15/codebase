@@ -13,10 +13,10 @@ window:
 {
   split_x maximized
   monitor: "\\.\DISPLAY1"
-  size: (2514 1456)
-  dpi: 96.000000
-  main_font_size: 12
-  code_font_size: 12
+  size: (1938 1038)
+  dpi: 120.000000
+  main_font_size: 15
+  code_font_size: 15
   smooth_ui_text: 1
   smooth_code_text: 0
   hint_ui_text: 1
@@ -29,8 +29,8 @@ window:
       {
         locals: {project:{"root.raddbg_project"} }
         watch: {project:{"root.raddbg_project"} }
-        breakpoints: {selected project:{"root.raddbg_project"} }
-        targets: {project:{"root.raddbg_project"} }
+        breakpoints: {project:{"root.raddbg_project"} }
+        targets: {selected project:{"root.raddbg_project"} }
       }
       0.182776:
       {
@@ -43,10 +43,8 @@ window:
     {
       0.692982:
       {
-        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/file/png.c\""} cursor_line:{ 188} cursor_column:{ 6} mark_line:{ 188} mark_column:{6} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/file/puff.c\""} cursor_line:{ 497} cursor_column:{ 28} mark_line:{ 497} mark_column:{28} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/memory.c\""} cursor_line:{ 84} cursor_column:{ 1} mark_line:{ 84} mark_column:{1} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/strings.c\""} cursor_line:{ 87} cursor_column:{ 2} mark_line:{ 87} mark_column:{2} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/strings.c\""} cursor_line:{ 83} cursor_column:{ 1} mark_line:{ 83} mark_column:{1} }
+        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/dumb/platform_win32_multithreaded.c\""} cursor_line:{ 327} cursor_column:{ 42} mark_line:{ 327} mark_column:{42} }
       }
       0.307018:
       {
@@ -131,16 +129,16 @@ keybindings:
   {"new_panel_down"                          ctrl minus          }
   {"new_panel_right"                         ctrl p              }
   {"next_panel"                              ctrl comma          }
-  {"next_tab"                                ctrl page_down      }
   {"next_tab"                                ctrl tab            }
+  {"next_tab"                                ctrl page_down      }
   {"open_project"                            ctrl alt o          }
   {"open"                                    ctrl o              }
   {"open_user"                               ctrl shift alt o    }
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
-  {"prev_tab"                                ctrl page_up        }
   {"prev_tab"                                ctrl shift tab      }
+  {"prev_tab"                                ctrl page_up        }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
   {"run"                                     f5                  }
