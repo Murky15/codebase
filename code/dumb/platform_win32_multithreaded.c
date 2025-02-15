@@ -5,7 +5,7 @@
 #define RESOLUTION_W 640
 #define RESOLUTION_H 360
 
-#define MOUSE_SENSITIVITY 0.75f
+#define MOUSE_SENSITIVITY 0.70f
 #define MOUSE_SCROLL_SENSITIVITY 0.8f
 #define CAM_MOVE_SPEED 200.f
 
@@ -153,7 +153,6 @@ win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                     }
                 }
                 free(buff);
-                ReleaseMutex(game_input_mutex);
                 return 0;
             }
         }
@@ -168,24 +167,24 @@ win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
+// @note/todo: These loops run so fast that having the render wait for the platform and memory mutexes 
+// Cause it to hitch and stall the other threads. Because the render thread ONLY READS from the data 
+// this is PROBABLY safe to do. The only problem would be if one of the platform values changes so we will
+// need to revisit this. Same concept applies to the Game_Input and Platform structures. Each structure is 
+// only written to by one thread and only read by another (somtimes through a copy) so we may be able to get away with 
+// this without the need for mutexes.
+
 function DWORD WINAPI
 win32_game_tick (LPVOID param) {
     f32 tick_hz = *(f32*)param;
     f32 seconds_per_tick = (1.f / tick_hz);
     f32 ms_per_tick = seconds_per_tick * 1000.f;
-    
-    HANDLE needed_objects[] = {game_input_mutex}; 
-    while (1) {
-        WaitForMultipleObjects(array_count(needed_objects), needed_objects, true, INFINITE);
-        
+     
+    while (1) {        
         u64 start = win32_query_clock();
         last_game_tick = start; // @megahack
         game_tick(game_memory, game_input, seconds_per_tick);
         game_input.turn_amount = 0; // @megahack 2
-        
-        for (u32 i = 0; i < array_count(needed_objects); ++i) {
-            ReleaseMutex(needed_objects[i]);
-        }
         
         u64 end = win32_query_clock();
         f32 elapsed = win32_get_elapsed_ms(start, end);
@@ -200,11 +199,6 @@ win32_game_tick (LPVOID param) {
     }
 }
 
-// @note/todo: These loops run so fast that having the render wait for the platform and memory mutexes 
-// Cause it to hitch and stall the other threads. Because the render thread ONLY READS from the data 
-// and passes a COPY of the game state to the game render function that it can no longer affect than
-// this is PROBABLY safe to do. The only problem would be if one of the platform values changes so we will
-// need to revisit this.
 function DWORD WINAPI
 win32_game_render (LPVOID param) {
     Platform_Timing_Info *timing = (Platform_Timing_Info*)param;
@@ -339,7 +333,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     assert(SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS) != 0);
     timeBeginPeriod(1);
 
-    f32 game_tick_hz = 25.f;
+    f32 game_tick_hz = 30.f;
     f32 game_render_hz = monitor_info.dmDisplayFrequency / 2.f; 
     Platform_Timing_Info timing = {.tick_hz = game_tick_hz, .render_hz = game_render_hz};
     CreateThread(NULL, 0, win32_game_tick, &game_tick_hz, 0, 0);

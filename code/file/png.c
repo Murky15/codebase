@@ -430,9 +430,9 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
 }
 
 core_function String8
-png_dirty (Arena *arena, PNG_Critical_Data *png, String8 filtered) {
+png_reverse_filters (Arena *arena, PNG_Critical_Data *png, String8 filtered) {
     String8 result = zero_struct;
-    assert (png->filter == 0);
+    assert (png->filter == 0 && png->bit_depth >= 8); // Only support pngs with pixels at least a byte long
     
     u64 bytes_per_sample = (png->bit_depth / 8);
     u64 bytes_per_pixel = bytes_per_sample * png_sample_count[png->color_type];
@@ -441,7 +441,13 @@ png_dirty (Arena *arena, PNG_Critical_Data *png, String8 filtered) {
     u8 *filter_method = filtered.str;
     while (filter_method - filtered.str < filtered.len) {
         u8 filter_byte = *filter_method;
-        
+        switch (filter_byte) {
+          case 0: break;
+          case 1: /*sub*/ break;
+          case 2: /*up*/ break;
+          case 3: /*avg*/ break;
+          case 4: /*paeth*/ break;
+        }
         filter_method += scanline_step+1;
     }
     
@@ -506,6 +512,11 @@ png_decode (Arena *arena, String8 png_data) {
                         fputs("PNG decode error! Invalid color configuration!\n", stderr);
                         goto exit;
                     }
+                    
+                    if (critical_data.interlace != PNG_Interlace_Null) {
+                      fputs("It's 2024, who is still using interlace in a png!\n", stderr);
+                      goto exit;
+                    }
                 } else if (chunk.type.code == fourcc("PLTE")) {
                     critical_data.palette_entry_count = chunk.length / 3;
                     critical_data.palette_entries = (PNG_Palette_Entry*)chunk.data;
@@ -553,7 +564,7 @@ png_decode (Arena *arena, String8 png_data) {
         }
         
         String8 inflated_pixel_data = png_zlib_inflate(scratch.arena, str8(critical_data.compressed_data, critical_data.compressed_data_size));
-        String8 unfiltered_pixel_data = png_dirty(scratch.arena, &critical_data, inflated_pixel_data);
+        String8 unfiltered_pixel_data = png_reverse_filters(scratch.arena, &critical_data, inflated_pixel_data);
         
     } else {
         fprintf(stderr, "Supplied data is not a valid PNG!\n");
