@@ -1,25 +1,3 @@
-#include <stdio.h>
-
-#define ENABLE_ASSERT 1
-#define DEBUG 1
-#include "base/include.h"
-#include "os/include.h"
-#include "base/include.c"
-#include "os/include.c"
-
-#define COLOR_TYPE_COUNT 6
-#define BIT_DEPTH_COUNT 16
-
-#define HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE  7
-#define HUFFMAN_MAX_CODE_SIZE 15
-#define HUFFMAN_PRIMARY_TABLE_SIZE_THRESHOLD 9
-#define HUFFMAN_SECONDARY_TABLE_SIZE_THRESHOLD 6
-#define LZ77_NUM_LEN_CODES  29
-#define LZ77_NUM_DIST_CODES 30
-#define ADLER32_BASE 65521 // Largest prime smaller than 65536
-
-#define VALIDATE_ADLER32 1 
-
 #ifndef VALIDATE_ADLER32
 # define VALIDATE_ADLER32 0
 #endif
@@ -27,98 +5,6 @@
 #ifndef HUFFMAN_DEBUG
 # define HUFFMAN_DEBUG 0
 #endif
-
-typedef struct PNG_Bitmap_RGBA {
-    u64 width;
-    u64 height;
-    u32 *pixels;
-} PNG_Bitmap_RGBA;
-
-typedef struct PNG_Chunk {
-    u32 length;
-    union {
-        u32 code;
-        u8 c[4];
-    } type;
-    b32 ancillary;
-    u8* data;
-} PNG_Chunk;
-
-typedef struct PNG_Chunk_Node {
-    struct PNG_Chunk_Node *next;
-    PNG_Chunk chunk;
-} PNG_Chunk_Node;
-
-typedef struct PNG_Chunk_List {
-    PNG_Chunk_Node *first;
-    PNG_Chunk_Node *last;
-    u64 count;
-} PNG_Chunk_List;
-
-typedef union PNG_Palette_Entry {
-    struct {
-        u8 r,g,b;
-    };
-    u8 e[3];
-} PNG_Palette_Entry;
-
-enum {
-    PNG_Grayscale = 0,
-    PNG_RGB = 2,
-    PNG_Palette = 3,
-    PNG_Grayscale_Alpha = 4,
-    PNG_RGBA = 6
-};
-
-enum {
-    PNG_Interlace_Null = 0,
-    PNG_Interlace_Adam7 = 1
-};
-
-enum {
-    Zlib_No_Compression = 0,
-    Zlib_Static_Compression = 1,
-    Zlib_Dynamic_Compression = 2,
-};
-
-typedef struct Zlib_Header {
-    u8 cmf;
-    u8 flg;
-} Zlib_Header;
-
-typedef struct PNG_Critical_Data {
-    u32 width;
-    u32 height;
-    u8 color_type;
-    u8 bit_depth;
-    u8 compression;
-    u8 filter;
-    u8 interlace;
-    
-    b8 palette_present;
-    u32 palette_entry_count;
-    PNG_Palette_Entry *palette_entries;
-    
-    u8 *compressed_data;
-    u32 compressed_data_size;
-    
-    b8 end_chunk_processed;
-} PNG_Critical_Data;
-
-typedef struct Bit_Stream {
-    u64 count;
-    u64 buffer;
-    u8 *cursor;
-} Bit_Stream;
-
-typedef struct Huffman_Dict {
-    u32Array sorted_symbols;
-    u32Array lengths;
-    s32Array table;
-    
-    u32 max_code_length;
-    u32 *codes_per_length;
-} Huffman_Dict;
 
 global read_only u8 png_valid_color_config[COLOR_TYPE_COUNT+1][BIT_DEPTH_COUNT+1] = {
     {0,1,1,0,1,0,0,0,1,0,0,0,0,0,0,0,1},
@@ -429,24 +315,84 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
     return inflated;
 }
 
+core_function s32
+png_paeth_predictor (s32 a, s32 b, s32 c) {
+    s32 p = a + b - c;
+    s32 pa = abs(p - a);
+    s32 pb = abs(p - b);
+    s32 pc = abs(p - c);
+    if (pa <= pb && pa <= pc)
+        return a;
+    else if (pb <= pc)
+        return b;
+    else 
+        return c;
+}
+
+// @slow
 core_function String8
 png_reverse_filters (Arena *arena, PNG_Critical_Data *png, String8 filtered) {
-    String8 result = zero_struct;
-    assert (png->filter == 0 && png->bit_depth >= 8); // Only support pngs with pixels at least a byte long
-    
+    String8 result = zero_struct;    
     u64 bytes_per_sample = (png->bit_depth / 8);
     u64 bytes_per_pixel = bytes_per_sample * png_sample_count[png->color_type];
     u64 scanline_step = png->width * bytes_per_pixel;
+    result.str = arena_pushn(arena, u8, scanline_step*png->height);
+    result.len = scanline_step*png->height;
     
+    u8 *scanline = result.str;
     u8 *filter_method = filtered.str;
     while (filter_method - filtered.str < filtered.len) {
         u8 filter_byte = *filter_method;
+        
+        // @todo: Lot of repetition here, definitely a way to make this cleaner.
         switch (filter_byte) {
-          case 0: break;
-          case 1: /*sub*/ break;
-          case 2: /*up*/ break;
-          case 3: /*avg*/ break;
-          case 4: /*paeth*/ break;
+            case 0: /*none*/ memory_copy(scanline, filter_method+1, scanline_step); scanline+=scanline_step; break;
+            case 1: /*sub*/ { 
+                for (s32 x = 0; x < scanline_step; ++x) {
+                    u8 prev = (x - (s32)bytes_per_pixel < 0) ? 0 : scanline[x - bytes_per_pixel];
+                    u8 reversed = filter_method[x+1] + prev;
+                    scanline[x] = reversed;
+                }
+                scanline += scanline_step;
+            } break;
+            
+            case 2: /*up*/ { 
+                u32 scanidx = scanline - result.str;
+                b32 first = scanidx < scanline_step;
+                for (s32 x = 0; x < scanline_step; ++x) {
+                    u8 above = first ? 0 : result.str[(scanidx+x)-scanline_step];
+                    u8 reversed = filter_method[x+1] + above;
+                    scanline[x] = reversed;
+                }
+                scanline += scanline_step;
+            } break;
+            
+            case 3: /*avg*/ {
+                u32 scanidx = scanline - result.str;
+                b32 first = scanidx < scanline_step;
+                for (s32 x = 0; x < scanline_step; ++x) {
+                    u8 prev = (x - (s32)bytes_per_pixel < 0) ? 0 : scanline[x - bytes_per_pixel];
+                    u8 above = first ? 0 : result.str[(scanidx+x)-scanline_step];
+                    u32 sum = prev + above;
+                    u8 reversed = filter_method[x+1] + (sum / 2);
+                    scanline[x] = reversed;
+                }
+                scanline += scanline_step;
+            } break;
+            
+            case 4: /*paeth*/ {
+                u32 scanidx = scanline - result.str;
+                b32 first = scanidx < scanline_step;
+                for (s32 x = 0; x < scanline_step; ++x) {
+                    u8 prev = (x - (s32)bytes_per_pixel < 0) ? 0 : scanline[x - bytes_per_pixel];
+                    u8 above = first ? 0 : result.str[(scanidx+x)-scanline_step];
+                    u8 above_left = (x - (s32)bytes_per_pixel < 0) ? 0 : first ? 0 : result.str[((scanidx+x)-bytes_per_pixel)-scanline_step];
+                    s32 paeth = png_paeth_predictor(prev, above, above_left);
+                    u8 reversed = filter_method[x+1] + paeth;
+                    scanline[x] = reversed;
+                }
+                scanline += scanline_step;
+            } break;
         }
         filter_method += scanline_step+1;
     }
@@ -564,7 +510,11 @@ png_decode (Arena *arena, String8 png_data) {
         }
         
         String8 inflated_pixel_data = png_zlib_inflate(scratch.arena, str8(critical_data.compressed_data, critical_data.compressed_data_size));
-        String8 unfiltered_pixel_data = png_reverse_filters(scratch.arena, &critical_data, inflated_pixel_data);
+        String8 unfiltered_pixel_data = png_reverse_filters(arena, &critical_data, inflated_pixel_data);
+        
+        result.width = critical_data.width;
+        result.height = critical_data.height;
+        result.pixels = (u32*)unfiltered_pixel_data.str;
         
     } else {
         fprintf(stderr, "Supplied data is not a valid PNG!\n");
@@ -575,13 +525,14 @@ png_decode (Arena *arena, String8 png_data) {
     return result;
 }
 
+#if 0
 int
 main (void) {
     Temp_Arena scratch = get_scratch(0,0);
-    String8 png_data = os_read_file(scratch.arena, str8_lit("W:/assets/dumb/art/tileset/0x72_DungeonTilesetII_v1.7.png"), false);
-    //String8 png_data = os_read_file(scratch.arena, str8_lit("W:/code/file/png_tests/guy.png"), false);
+    String8 png_data = os_read_file(scratch.arena, str8_lit("W:/code/file/png_tests/guy.png"), false);
     PNG_Bitmap_RGBA parsed_data = png_decode(scratch.arena, png_data);
     
     release_scratch(scratch);
     return 0;
 }
+#endif

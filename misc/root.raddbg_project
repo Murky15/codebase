@@ -8,6 +8,8 @@ watch:
   view_rule: "array:huff.lengths.count"
 }
 
+watch: "c-result.str"
+
 /// targets ///////////////////////////////////////////////////////////////////
 
 target:
@@ -19,7 +21,6 @@ target:
 
 target:
 {
-  disabled: 1
   executable: "../code/file/a.exe"
   working_directory: "../code/file"
 }
@@ -33,6 +34,7 @@ target:
 
 target:
 {
+  disabled: 1
   executable: "../build/dumb.exe"
   working_directory: "../build"
 }
@@ -45,9 +47,9 @@ recent_file: "../code/base/memory.c"
 recent_file: "../code/file/puff.c"
 recent_file: "../code/base/strings.c"
 recent_file: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memcpy.asm"
-recent_file: "../code/file/png.c"
 recent_file: "../build/dumb.exe"
 recent_file: "../code/dumb/platform_win32_multithreaded.c"
+recent_file: "../code/file/png.c"
 
 /// exception code filters ////////////////////////////////////////////////////
 
