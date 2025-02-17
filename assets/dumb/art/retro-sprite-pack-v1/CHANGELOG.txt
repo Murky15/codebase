@@ -1,0 +1,5 @@
+# Changelog
+
+## v1 (8th October, 2022)
+
+- An initial collection of 22 sprites, consisting of: grass x 2, brambles x 3, monstera x 2, vines x 2, rock x 2, bricks x 2, barrel x 5, cables x 1.

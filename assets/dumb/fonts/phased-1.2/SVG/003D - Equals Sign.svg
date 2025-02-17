@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="20px" height="40px" viewBox="0 0 20 40" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>003D - Equals Sign</title>
+    <g id="Original-/-Overview" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Original" transform="translate(-500.000000, -110.000000)" fill="#59FFF8">
+            <path d="M504,125 L516,125 C516.552285,125 517,125.447715 517,126 L517,128 C517,128.552285 516.552285,129 516,129 L504,129 C503.447715,129 503,128.552285 503,128 L503,126 C503,125.447715 503.447715,125 504,125 Z M504,131 L516,131 C516.552285,131 517,131.447715 517,132 L517,134 C517,134.552285 516.552285,135 516,135 L504,135 C503.447715,135 503,134.552285 503,134 L503,132 C503,131.447715 503.447715,131 504,131 Z" id="Shape"></path>
+        </g>
+    </g>
+</svg>

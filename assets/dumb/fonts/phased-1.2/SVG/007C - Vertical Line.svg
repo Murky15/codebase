@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="20px" height="40px" viewBox="0 0 20 40" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>007C - Vertical Line</title>
+    <g id="Original-/-Overview" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Original" transform="translate(-440.000000, -70.000000)" fill="#59FFF8">
+            <path d="M449,82 L451,82 C451.552285,82 452,82.4477153 452,83 L452,97 C452,97.5522847 451.552285,98 451,98 L449,98 C448.447715,98 448,97.5522847 448,97 L448,83 C448,82.4477153 448.447715,82 449,82 Z" id="Rectangle"></path>
+        </g>
+    </g>
+</svg>

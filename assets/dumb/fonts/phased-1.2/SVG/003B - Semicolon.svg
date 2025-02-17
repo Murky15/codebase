@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="20px" height="40px" viewBox="0 0 20 40" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>003B - Semicolon</title>
+    <g id="Original-/-Overview" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Original" transform="translate(-100.000000, -110.000000)" fill="#59FFF8">
+            <path d="M111,130 L109,130 C108.447715,130 108,129.552285 108,129 L108,127 C108,126.447715 108.447715,126 109,126 L111,126 C111.552285,126 112,126.447715 112,127 L112,129 C112,129.552285 111.552285,130 111,130 Z M106,137 L106,135 C106,134.447715 106.447715,134 107,134 L108,134 L108,133 C108,132.447715 108.447715,132 109,132 L111,132 C111.552285,132 112,132.447715 112,133 L112,135 C112,136.656854 110.656854,138 109,138 L107,138 C106.447715,138 106,137.552285 106,137 Z" id="Shape"></path>
+        </g>
+    </g>
+</svg>

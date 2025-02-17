@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="20px" height="40px" viewBox="0 0 20 40" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>00D8 - O with Stroke</title>
+    <g id="Original-/-Overview" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Original" transform="translate(-500.000000, -150.000000)" fill="#59FFF8">
+            <path d="M517,162 C517.552285,162 518,162.447715 518,163 L518,174 C518,176.209139 516.209139,178 514,178 L503,178 C502.447715,178 502,177.552285 502,177 L502,166 C502,163.790861 503.790861,162 506,162 L517,162 Z M514,168.75 L508.75,174 L513,174 C513.512836,174 513.935507,173.61396 513.993272,173.116621 L514,173 L514,168.75 Z M511.25,166 L507,166 C506.487164,166 506.064493,166.38604 506.006728,166.883379 L506,167 L506,171.25 L511.25,166 Z" id="Shape"></path>
+        </g>
+    </g>
+</svg>
