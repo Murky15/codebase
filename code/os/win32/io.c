@@ -68,9 +68,46 @@ os_write_file (String8 path, String8 to_write, b32 create_if_not_exist) {
     return success;
 }
 
-/*
-Okay, how are we going to do console IO. Any Input/Output operations require a handle. These are windows resources
-so we can't just be handing them out like candy, we can make one handle and put it in static memory. That would allow us to redirect 
-and stuff while also minimizing resource fragmentation. That means that we should destinguish between an input, output, and error handle. 
+core_function void 
+os_push_directory_search_result (Arena *arena, Directory_Search_Results *results, Directory_Search_Result result) {
+    Directory_Search_Result_Node *node = arena_pushn(arena, Directory_Search_Result_Node, 1);
+    node->result = result;
+    sll_queue_push(results->first, results->last, node);
+    results->count++; 
+}
 
-*/
+core_function Directory_Search_Results
+os_search_directory_and_read_files (Arena *arena, String8 path, String8 query) {
+    Temp_Arena scratch = get_scratch(&arena, 1);
+    
+    Directory_Search_Results results = zero_struct;
+    
+    String8List query_str_list = zero_struct;
+    str8_list_push(scratch.arena, &query_str_list, path);
+    str8_list_push(scratch.arena, &query_str_list, query);
+    String8Join join_opts = comp_lit(String8Join, .sep=str8_lit("/"));
+    String8 query_str = str8_list_join(scratch.arena, query_str_list, &join_opts);
+    
+    WIN32_FIND_DATA data;
+    HANDLE cursor = FindFirstFile(query_str.str, &data);
+    if (cursor != INVALID_HANDLE_VALUE) {
+        do {
+            String8 file_name = str8_push_copy(arena, str8_cstring(data.cFileName));
+            
+            String8List file_path_list = zero_struct;
+            str8_list_push(scratch.arena, &file_path_list, path);
+            str8_list_push(scratch.arena, &file_path_list, file_name);
+            String8Join join_opts = comp_lit(String8Join, .sep=str8_lit("/"));
+            String8 file_path = str8_list_join(scratch.arena, file_path_list, &join_opts);
+            
+            // Pass dir and query as seperate parameters for easy join
+            String8 file_data = os_read_file(arena, file_path, false);
+            Directory_Search_Result result = comp_lit(Directory_Search_Result, file_name, file_data);
+            os_push_directory_search_result(arena, &results, result);
+        } while (FindNextFile(cursor, &data));        
+        FindClose(cursor);
+    }
+    
+    release_scratch(scratch);
+    return results;
+}

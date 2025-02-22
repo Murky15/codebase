@@ -9,7 +9,7 @@
 #define MOUSE_SCROLL_SENSITIVITY 0.8f
 #define CAM_MOVE_SPEED 200.f
 
-#define GAME_MEMORY_SIZE Kilobytes(4)
+#define GAME_MEMORY_SIZE Gigabytes(1)
 
 typedef struct Platform_Timing_Info {
     f32 tick_hz, render_hz;

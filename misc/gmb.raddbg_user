@@ -15,7 +15,7 @@ window:
   monitor: "\\.\DISPLAY1"
   size: (2520 1456)
   dpi: 96.000000
-  main_font_size: 11
+  main_font_size: 14
   code_font_size: 12
   smooth_ui_text: 1
   smooth_code_text: 0
@@ -28,10 +28,9 @@ window:
       0.817222:
       {
         locals: {project:{"root.raddbg_project"} }
-        breakpoints: {project:{"root.raddbg_project"} }
+        breakpoints: {selected project:{"root.raddbg_project"} }
         targets: {project:{"root.raddbg_project"} }
-        bitmap: {project:{"root.raddbg_project"} query:{"unfiltered_pixel_data.str"} w:{ critical_data . width} h:{ critical_data . height} fmt:{ rgba8} zoom:{ 1.089077f} x:{ -5.539063f} y:{44.663769f} }
-        bitmap: {selected project:{"root.raddbg_project"} query:{"parsed_data.pixels"} w:{ parsed_data . width} h:{ parsed_data . height} fmt:{ rgba8} zoom:{ 1.771259f} x:{ -15.725842f} y:{-56.681774f} }
+        watch: {project:{"root.raddbg_project"} }
       }
       0.182776:
       {
@@ -44,9 +43,13 @@ window:
     {
       0.692982:
       {
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/strings.c\""} cursor_line:{ 83} cursor_column:{ 1} mark_line:{ 83} mark_column:{1} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/dumb/platform_win32_multithreaded.c\""} cursor_line:{ 333} cursor_column:{ 77} mark_line:{ 333} mark_column:{77} }
-        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/file/png.c\""} cursor_line:{ 647} cursor_column:{ 1} mark_line:{ 647} mark_column:{1} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/strings.c\""} cursor_line:{ 72} cursor_column:{ 1} mark_line:{ 72} mark_column:{1} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/dumb/platform_win32_multithreaded.c\""} cursor_line:{ 273} cursor_column:{ 35} mark_line:{ 273} mark_column:{35} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/dumb/game.c\""} cursor_line:{ 155} cursor_column:{ 5} mark_line:{ 155} mark_column:{5} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/memory.c\""} cursor_line:{ 67} cursor_column:{ 46} mark_line:{ 67} mark_column:{46} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/os/win32/io.c\""} cursor_line:{ 76} cursor_column:{ 23} mark_line:{ 76} mark_column:{23} }
+        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/dumb/renderer.c\""} cursor_line:{ 287} cursor_column:{ 45} mark_line:{ 287} mark_column:{45} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/types.c\""} cursor_line:{ 134} cursor_column:{ 1} mark_line:{ 134} mark_column:{1} }
       }
       0.307018:
       {

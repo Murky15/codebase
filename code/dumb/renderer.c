@@ -117,8 +117,25 @@ r_draw_line (Vec2 p0, Vec2 p1, Color c) {
 
 function void
 r_draw_vert (f32 x, f32 y0, f32 y1, Color c) {
-    for (f32 y = y0; y <= y1; ++y)
+    Bitmap *canvas = r_get_framebuffer();
+    f32 start_y = max(-1.f, y0);
+    f32 end_y = min(y1, canvas->height);
+    for (f32 y = start_y; y <= end_y; ++y)
         r_put_pixel_at(v2(x,y), c);
+}
+
+function void
+r_draw_vert_textured (f32 x, f32 y0, f32 y1, PNG_Bitmap_RGBA texture, s32 texx) {
+    Color c;
+    Bitmap *canvas = r_get_framebuffer();
+    f32 start_y = max(-1.f, y0);
+    f32 end_y = min(y1, canvas->height);
+    for (f32 y = start_y; y <= end_y; ++y) {
+        f32 ynorm = norm(y, y0, y1);
+        s32 texy = lerp(0, texture.height, ynorm);
+        c.packed = texture.pixels[texy * texture.width + texx];
+        r_put_pixel_at(v2(x,y), c);
+    }
 }
 
 function void
@@ -145,7 +162,7 @@ r_draw_rect (Vec2 p, Vec2 sz, Color c) {
 
 #define MAX_ITERATIONS 64
 function void
-r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) {
+r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, Range window) {
     Bitmap *canvas = r_get_framebuffer();
     
     local_persist u64 num_iterations = 0;
@@ -187,7 +204,7 @@ r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) 
                 d0 = v2(clipped_x, near_plane);
             else if (d1.y <= near_plane)
                 d1 = v2(clipped_x, near_plane);
-            
+             
             //- Perspective projection
             f32 z0 = d0.y;
             f32 z1 = d1.y;
@@ -223,13 +240,15 @@ r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) 
 #undef proj_x
 #undef proj_y
             
-            struct { f32 x,floor,ceil,depth,height; } temp, minp, maxp;
+            struct { f32 x,z,floor,ceil,depth,height; } temp, minp, maxp;
             minp.x = x0;
+            minp.z = z0;
             minp.floor = floor0;
             minp.ceil = ceil0;  
             minp.depth = depth0;
             minp.height = height0;
             maxp.x = x1;
+            maxp.z = z1;
             maxp.floor = floor1;
             maxp.ceil = ceil1;
             maxp.depth = depth1;
@@ -249,25 +268,49 @@ r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) 
                 bounds.last  = min(maxp.x, window.last);
                 Entity modified_cam = *cam;
                 modified_cam.height = actual_height - next_sector->floor;
-                r_sector(map, next_sector, &modified_cam, sector->id, bounds);
+                r_sector(map, next_sector, environment_textures, &modified_cam, sector->id, bounds);
             }
             
+            f32 zstart, zend, zstep;
+            Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_1A.PNG"));
+            f32 img_width = test_wall_texture.img.width;
             f32 start_x = max(minp.x, -1.f);
             f32 end_x = min(maxp.x, canvas_width);
+            
+            f32 d = sqrtf(sqr(maxp.x-minp.x) + sqr(maxp.z-minp.z));
+            f32 dt = img_width / d;
+            zstep = lerp(minp.z, maxp.z, clamp(dt,0,1));
+            
+            u64 i = 0;
             for (f32 x = start_x; x <= end_x; ++x) {
                 if (x >= window.first && x <= window.last) {
                     f32 xnorm  = norm(x, minp.x, maxp.x);
-                    f32 depth  = max(lerp(minp.depth, maxp.depth, xnorm), -1);
-                    f32 height = min(lerp(minp.height, maxp.height, xnorm), canvas_height);
-                    f32 floor  = clamp(lerp(minp.floor, maxp.floor, xnorm), depth-1, height);
-                    f32 ceil   = clamp(lerp(minp.ceil, maxp.ceil, xnorm), depth, height);
                     
-                    Color wall_color = (x == start_x || x == end_x) ? Color_Black : Color_Maroon; 
+                    f32 tex_idx = fmod_cycling(x, img_width-1);
+                    f32 texnorm = norm(tex_idx, 1.f, (f32)img_width-1);
+                    if (i == 0) { // New texture page
+                        zstart = lerp(minp.z, maxp.z, xnorm);
+                        zend = zstep;
+                    } else if (i % (u32)img_width == 0) {
+                        zstart += zstep;
+                        zend += zstep;
+                    }
+                    
+                    s32 texx   = lerp(1.f/zstart, img_width/zend, texnorm) / lerp(1.f/zstart, 1.f/zend, texnorm);
+
+                    f32 depth  = lerp(minp.depth, maxp.depth, xnorm);
+                    f32 height = lerp(minp.height, maxp.height, xnorm);
+                    f32 floor  = lerp(minp.floor, maxp.floor, xnorm);
+                    f32 ceil   = lerp(minp.ceil, maxp.ceil, xnorm);
+                   
                     r_draw_vert(x, -1.f, depth, Color_Blue); // floor
                     r_draw_vert(x, depth, floor, Color_Maroon); // ledge
-                    if (wall->next_sector == -1) r_draw_vert(x, floor, ceil, wall_color); // wall
+                    //if (wall->next_sector == -1) r_draw_vert(x, floor, ceil, wall_color); // wall
+                    if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, test_wall_texture.img, texx); // wall
                     r_draw_vert(x, ceil, height, Color_Maroon); // ledge
                     r_draw_vert(x, height, canvas_height, Color_Gray); // Cielling
+                    
+                    ++i;
                 }
             }
         }

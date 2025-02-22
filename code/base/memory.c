@@ -1,6 +1,5 @@
 // @note: Arena functions
 
-// @todo: Move this to an "os" codebase layer
 #if OS_WINDOWS
 # undef function
 # include <windows.h>

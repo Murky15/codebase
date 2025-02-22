@@ -91,7 +91,7 @@ huffman_make (Arena *arena, u32Array lengths, u32 max_code_length) {
     result.lengths = lengths;
     result.max_code_length = max_code_length;
     result.codes_per_length = arena_pushn(arena, u32, max_code_length+1);
-    result.table.count = (1 << max_code_length);
+    result.table.count = (1ull << (u64)max_code_length);
     result.table.array = arena_pushn(arena, s32, result.table.count);
     
     for (u32 sym = 0; sym < lengths.count; ++sym)
@@ -341,7 +341,7 @@ png_reverse_filters (Arena *arena, PNG_Critical_Data *png, String8 filtered) {
     
     u8 *scanline = result.str;
     u8 *filter_method = filtered.str;
-    while (filter_method - filtered.str < filtered.len) {
+    while ((u64)(filter_method - filtered.str) < (u64)filtered.len) {
         u8 filter_byte = *filter_method;
         
         // @todo: Lot of repetition here, definitely a way to make this cleaner.
@@ -480,7 +480,7 @@ png_decode (Arena *arena, String8 png_data) {
                         fputs("PNG decode error! Invalid palette depth!\n", stderr);
                         goto exit;
                     }
-                    if (critical_data.palette_entry_count > (1 << critical_data.bit_depth)) {
+                    if (critical_data.palette_entry_count > (u32)(1 << critical_data.bit_depth)) {
                         fputs("PNG decode error! palette entries exceed bit depth!\n", stderr);
                         goto exit;
                     }

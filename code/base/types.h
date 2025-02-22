@@ -59,8 +59,9 @@ make_array_type(f64);
 // @todo: Make array type constructors
 
 //- @note: Tangible types
-typedef struct Color {
-    u8 r, g, b, a;
+typedef union Color {
+    struct {u8 r, g, b, a;};
+    u32 packed;
 } Color;
 
 // @todo: Maybe add functionality for defining per-project "color-pallettes"?

@@ -6,6 +6,7 @@
 #include "base/include.h"
 #include "os/include.h"
 #include "file/json.h"
+#include "file/png.h"
 
 #include "game.h"
 #include "map.h"
@@ -15,6 +16,7 @@
 #include "base/include.c"
 #include "os/include.c"
 #include "file/json.c"
+#include "file/png.c"
 
 #include "map.c"
 #include "renderer.c"
@@ -25,6 +27,7 @@
 
 /*
 @todo
+-Bake asset path
 -Microui
 -Level editor
 -Hot Reloading
@@ -35,6 +38,7 @@
 -Optimize / profile render functions
 -Parse c file and pass #run directive to stdin of compiler, link with result
 -sin/cos/tan table lookup: https://namoseley.wordpress.com/2015/07/26/sincos-generation-using-table-lookup-and-iterpolation/
+-Better Asset structure
 -Asan / Libfuzzer
 -Aspect ratio correction
 -OH I FORGOT ABOUT AUDIO
@@ -58,13 +62,59 @@ typedef struct Game_State {
     Map test_level;
     Range view_bounds;
     
+    Asset_Group level_textures;
+    
     // @todo: Can start to see how we will have a list of "old" entities and new ones...
     Entity player;
     Entity old_player;
     
-    Arena *frame_arena;
-    Arena *level_arena;
+    Arena *permanent;
+    Arena *frame;
+    Arena *level;
 } Game_State;
+
+function Asset
+asset_group_fetch (Asset_Group *assets, String8 name) {
+    u64 hash = str8_hash(name) % assets->count;
+    b32 found = true;
+    for (u64 start_hash = hash, i = 0; !str8_match(assets->table[hash].name, name, 0); ++i) {
+        if (i > 0 && start_hash == hash) {
+            found = false;
+            break;
+        }
+        hash++;
+        hash %= assets->count;
+    }
+    
+    return found == true ? assets->table[hash] : comp_zero(Asset);
+}
+
+function Asset_Group
+create_asset_group_from_directory (Arena *arena, Asset_Group_Type type, Directory_Search_Results dir) {
+    Asset_Group result = {0};
+    result.count = dir.count;
+    result.type = type;
+    result.table = arena_pushn(arena, Asset, result.count);
+    
+    for (Directory_Search_Result_Node *node = dir.first; node; node = node->next) {
+        Directory_Search_Result raw_asset = node->result;
+        Asset to_add = {0};
+        to_add.name = str8_push_copy(arena, raw_asset.name);
+        switch (type) {
+            case ASSET_GROUP_IMAGES: {
+                to_add.img = png_decode(arena, raw_asset.data);
+            } break;
+        }
+        u64 hash = str8_hash(to_add.name) % result.count;
+        while (result.table[hash].name.str != 0) {
+            hash++;
+            hash %= result.count;
+        }
+        result.table[hash] = to_add;
+    }
+    
+    return result;
+}
 
 function Entity 
 entity_lerp (Entity a, Entity b, f32 amount) {
@@ -81,29 +131,36 @@ function void
 game_init (Game_Memory_Package memory, Range view_bounds) {
     assert(memory.size >= sizeof(Game_State));
     u64 remaining_size = memory.size - sizeof(Game_State);
-    if (remaining_size >= MIN_EXCESS_MEMORY) {
-        // @todo: Need to revisit and come up with a better memory partitioning scheme
-        Game_State *gs = (Game_State*)memory.memory;
-        u64 arena_size = remaining_size / 2;
-        u8 *frame_addr = (u8*)memory.memory + sizeof(Game_State);
-        u8 *level_addr = frame_addr + arena_size;
-        gs->frame_arena = arena_alloc_fixed(frame_addr, arena_size);
-        gs->level_arena = arena_alloc_fixed(level_addr, arena_size);
-        gs->player.height = 15;
-        gs->player.radius = 20.f;
-        gs->view_bounds = view_bounds;
-        gs->test_level = map_load(gs->level_arena, str8_lit("w:/code/dumb/level.json"));
-    } else {
-        fprintf(stderr, "Insufficient memory!\n");
-    }
+    assert (remaining_size >= MIN_EXCESS_MEMORY);
+    
+    Temp_Arena scratch = get_scratch(0,0);
+    
+    // @todo: Need to revisit and come up with a better memory partitioning scheme
+    Game_State *gs = (Game_State*)memory.memory;
+    u64 arena_size = remaining_size / 3;
+    u8 *perm_addr = (u8*)memory.memory + sizeof(Game_State);
+    u8 *frame_addr = perm_addr + arena_size;
+    u8 *level_addr = frame_addr + arena_size;
+    gs->permanent = arena_alloc_fixed(perm_addr, arena_size);
+    gs->frame = arena_alloc_fixed(frame_addr, arena_size);
+    gs->level = arena_alloc_fixed(level_addr, arena_size);
+    gs->player.height = 15;
+    gs->player.radius = 20.f;
+    gs->view_bounds = view_bounds;
+    gs->test_level = map_load(gs->level, str8_lit("w:/code/dumb/level.json"));
+    
+    // Load textures
+    Directory_Search_Results raw_textures = os_search_directory_and_read_files(scratch.arena, str8_lit("W:/assets/dumb/art/RETRO_TEXTURE_PACK_V17/TEXTURES"), str8_lit("*.PNG"));
+    gs->level_textures = create_asset_group_from_directory(gs->permanent, ASSET_GROUP_IMAGES, raw_textures);
+    
+    release_scratch(scratch);
 }
 
 function void
 game_tick (Game_Memory_Package memory, Game_Input_Package input, f32 dt) {
-    assert(memory.memory);
     Game_State *gs = (Game_State*)memory.memory;
     
-    arena_clear(gs->frame_arena);
+    arena_clear(gs->frame);
     
     gs->old_player = gs->player;
     Entity *player = &gs->player;
@@ -133,5 +190,5 @@ game_render (Game_Memory_Package memory, f32 lerp_amount) {
     Sector *player_sector = &gs->test_level.sectors[gs->player.curr_sector];
     
     Entity lerped_player = entity_lerp(gs->old_player, gs->player, lerp_amount);
-    r_sector(&gs->test_level, player_sector, &lerped_player, -1, gs->view_bounds);
+    r_sector(&gs->test_level, player_sector, gs->level_textures, &lerped_player, -1, gs->view_bounds);
 }

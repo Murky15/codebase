@@ -35,6 +35,30 @@ typedef struct Entity {
     s32 curr_sector;
 } Entity;
 
+typedef u32 Asset_Group_Type;
+enum {
+    ASSET_GROUP_IMAGES,
+    ASSET_GROUP_MUSIC,
+    ASSET_GROUP_FONTS,
+    ASSET_GROUP_DATA,
+};
+
+typedef struct Asset {
+    String8 name;
+    union { // Put other asset types here
+        PNG_Bitmap_RGBA img;
+    };
+} Asset;
+
+typedef struct Asset_Group {
+    Asset_Group_Type type;
+    Asset *table;
+    u64 count;
+} Asset_Group;
+
+function Asset asset_group_fetch(Asset_Group *assets, String8 name);
+function Asset_Group create_asset_group_from_directory(Arena *arena, Asset_Group_Type type, Directory_Search_Results dir);
+
 function Entity entity_lerp(Entity a, Entity b, f32 amount);
 
 #endif //GAME_H

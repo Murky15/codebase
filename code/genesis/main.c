@@ -30,16 +30,13 @@ main (int argc, char **argv) {
         int xml_found = zip_entry_open(ggb_zip, "geogebra.xml");
         if (xml_found == 0)  {
             zip_entry_read(ggb_zip, &(void*)ggb_xml_raw.str, &ggb_xml_raw.len);
-            //printf("%.*s", str8_expand(ggb_xml_raw));
             xmlDocPtr doc = xmlReadMemory(ggb_xml_raw.str, ggb_xml_raw.len, "noname.xml", NULL, 0);
             if (doc) {
                 xmlNodePtr cursor, backup;
                 cursor = xmlDocGetRootElement(doc);
-                assert(cursor); // Document cannot be NULL
+                assert(cursor);
             
                 loop_element_children(cursor,xmlChildrenNode) {
-                  //printf("%s\n", cursor->name);
-                  
                   /*
                   Should grab 
                   Kernel: angleUnit
@@ -48,10 +45,12 @@ main (int argc, char **argv) {
                   Commands hold element outputs, elements have a type and coords
                   
                   Can elements be created without commands in Geogebra and the XML?
+                  Do we even need to keep track of elements? ie if the element coordinates were unspecified in the constructor
+                  (maybe a point is created with Point(xAxis) instead of Point(5, 0)) is it even worth querying the element data
+                  for it?
                   */
                   if (!xmlStrcmp(cursor->name, (const xmlChar*)"construction")) {
                     printf("Parsing project: %s\n", xmlGetProp(cursor, "title"));
-                    // @todo: Pull this for loop out into macro
                     loop_element_children(cursor,xmlChildrenNode) {
                       if (!xmlStrcmp(cursor->name, (const xmlChar*)"command")) {
                         printf("Command: %s, ", xmlGetProp(cursor, "name"));
@@ -60,21 +59,29 @@ main (int argc, char **argv) {
                         char *input = 0, *output = 0;
                         loop_element_children(cursor,xmlChildrenNode) {
                           if (!xmlStrcmp(cursor->name, (const xmlChar*)"input")) {
-                            //input = xmlGetProp(cursor, "a0");
                             xmlAttr *prop = cursor->properties;
+                            printf("in: ");
                             while (prop) {
                               xmlChar *value = xmlNodeListGetString(doc, prop->children, true);
-                              printf("idk: %s: %s\n", prop->name, value);
+                              printf("%s", value);
                               xmlFree(value);
+                              if (prop->next) printf(", "); else printf(" | ");
                               prop = prop->next;
                             }  
                           } else if (!xmlStrcmp(cursor->name, (const xmlChar*)"output")) {
-                            //output = xmlGetProp(cursor, "a0");
+                            xmlAttr *prop = cursor->properties;
+                            printf("out: ");
+                            while (prop) {
+                              xmlChar *value = xmlNodeListGetString(doc, prop->children, true);
+                              printf("%s, ", value);
+                              xmlFree(value);
+                              prop = prop->next;
+                            }  
                           } else {
                             continue;
                           }
                         }
-                        //printf("input(s): %s, output: %s\n", input, output);
+                        printf("\n");
                         cursor = backup;         
                       }
                     }                    
