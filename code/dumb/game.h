@@ -37,16 +37,29 @@ typedef struct Entity {
 
 typedef u32 Asset_Group_Type;
 enum {
+    ASSET_GROUP_NULL,
+
     ASSET_GROUP_IMAGES,
     ASSET_GROUP_MUSIC,
     ASSET_GROUP_FONTS,
     ASSET_GROUP_DATA,
 };
 
+typedef u32 Texture_Map_Type;
+enum {
+    TEXTURE_MAP_NULL,
+    
+    TEXTURE_MAP_FIT,
+    TEXTURE_MAP_REPEAT,
+    TEXTURE_MAP_MIRROR,
+};
+
 typedef struct Asset {
     String8 name;
     union { // Put other asset types here
-        PNG_Bitmap_RGBA img;
+        struct {
+            PNG_Bitmap_RGBA img;
+        };
     };
 } Asset;
 

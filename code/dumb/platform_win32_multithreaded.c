@@ -334,7 +334,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     timeBeginPeriod(1);
 
     f32 game_tick_hz = 30.f;
-    f32 game_render_hz = monitor_info.dmDisplayFrequency / 2.f; 
+    //f32 game_render_hz = monitor_info.dmDisplayFrequency / 2.f; 
+    f32 game_render_hz = 60.f;
     Platform_Timing_Info timing = {.tick_hz = game_tick_hz, .render_hz = game_render_hz};
     CreateThread(NULL, 0, win32_game_tick, &game_tick_hz, 0, 0);
     CreateThread(NULL, 0, win32_game_render, &timing, 0, 0);

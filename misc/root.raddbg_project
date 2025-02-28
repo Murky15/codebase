@@ -6,13 +6,16 @@ watch: "maxp"
 watch: "minp"
 watch: "zstart"
 watch: "zend"
+watch: "d0"
+watch: "d0_preclip"
+watch: "d1"
+watch: "d1_preclip"
 
 /// breakpoints ///////////////////////////////////////////////////////////////
 
 breakpoint:
 {
-  disabled: 1
-  location: ("../code/dumb/renderer.c":287)
+  location: ("../code/dumb/renderer.c":248)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////

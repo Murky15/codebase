@@ -24,7 +24,7 @@ function void
 r_put_pixel_at (Vec2 p, Color c) {
     Bitmap *canvas = r_get_framebuffer();
     
-    Vec2i pi = v2i_from_v2(p);
+    Vec2i pi = v2i_from_v2(p); // @todo: Unnecessary slowness
     if (pi.x >= 0 && pi.y >= 0 && pi.x < canvas->width && pi.y < canvas->height)
         canvas->pixels[pi.y * canvas->width + pi.x] = (c.r << 16 | c.g << 8 | c.b);
 }
@@ -199,6 +199,8 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             if (d0.y < near_plane && d1.y < near_plane)
                 continue;
             
+            Vec2 d0_preclip = d0;
+            Vec2 d1_preclip = d1;
             f32 clipped_x = d0.x + (((d1.x - d0.x) * (near_plane - d0.y)) / (d1.y - d0.y));
             if (d0.y <= near_plane)
                 d0 = v2(clipped_x, near_plane);
@@ -226,11 +228,13 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
 #define proj_x(x,z) (((x*canvas_width)/(z*ASPECT_W))*cam_dist)+width_middle
 #define proj_y(y,z) (((y*canvas_height)/(z*ASPECT_H))*cam_dist)+height_middle
             
+            f32 x0_preclip = proj_x(d0_preclip.x, d0_preclip.y);
             f32 x0      = proj_x(d0.x,z0);
             f32 floor0  = proj_y(floor,z0);
             f32 ceil0   = proj_y(ceiling,z0);
             f32 depth0  = proj_y(full_depth,z0);
             f32 height0 = proj_y(full_height,z0);
+            f32 x1_preclip = proj_x(d1_preclip.x, d1_preclip.y);
             f32 x1      = proj_x(d1.x,z1);
             f32 floor1  = proj_y(floor,z1);
             f32 ceil1   = proj_y(ceiling,z1);
@@ -240,15 +244,21 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
 #undef proj_x
 #undef proj_y
             
-            struct { f32 x,z,floor,ceil,depth,height; } temp, minp, maxp;
+            struct { f32 x,z,x_preclip,z_preclip,floor,ceil,depth,height; } temp, minp, maxp;
+            
             minp.x = x0;
             minp.z = z0;
+            minp.x_preclip = x0_preclip;
+            minp.z_preclip = d0_preclip.y;
             minp.floor = floor0;
             minp.ceil = ceil0;  
             minp.depth = depth0;
             minp.height = height0;
+            
             maxp.x = x1;
             maxp.z = z1;
+            maxp.x_preclip = x1_preclip;
+            maxp.z_preclip = d1_preclip.y;
             maxp.floor = floor1;
             maxp.ceil = ceil1;
             maxp.depth = depth1;
@@ -271,32 +281,18 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 r_sector(map, next_sector, environment_textures, &modified_cam, sector->id, bounds);
             }
             
-            f32 zstart, zend, zstep;
-            Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_1A.PNG"));
+            Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_5A.PNG"));
             f32 img_width = test_wall_texture.img.width;
             f32 start_x = max(minp.x, -1.f);
             f32 end_x = min(maxp.x, canvas_width);
             
-            f32 d = sqrtf(sqr(maxp.x-minp.x) + sqr(maxp.z-minp.z));
-            f32 dt = img_width / d;
-            zstep = lerp(minp.z, maxp.z, clamp(dt,0,1));
-            
-            u64 i = 0;
             for (f32 x = start_x; x <= end_x; ++x) {
                 if (x >= window.first && x <= window.last) {
                     f32 xnorm  = norm(x, minp.x, maxp.x);
+                    f32 texnorm = norm(x, minp.x_preclip, maxp.x_preclip);
                     
-                    f32 tex_idx = fmod_cycling(x, img_width-1);
-                    f32 texnorm = norm(tex_idx, 1.f, (f32)img_width-1);
-                    if (i == 0) { // New texture page
-                        zstart = lerp(minp.z, maxp.z, xnorm);
-                        zend = zstep;
-                    } else if (i % (u32)img_width == 0) {
-                        zstart += zstep;
-                        zend += zstep;
-                    }
-                    
-                    s32 texx   = lerp(1.f/zstart, img_width/zend, texnorm) / lerp(1.f/zstart, 1.f/zend, texnorm);
+                    // Texture mapping                                        
+                    s64 texx = lerp(1.f/minp.z_preclip, img_width/maxp.z_preclip, texnorm) / lerp(1.f/minp.z_preclip, 1.f/maxp.z_preclip, texnorm);
 
                     f32 depth  = lerp(minp.depth, maxp.depth, xnorm);
                     f32 height = lerp(minp.height, maxp.height, xnorm);
@@ -310,7 +306,6 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                     r_draw_vert(x, ceil, height, Color_Maroon); // ledge
                     r_draw_vert(x, height, canvas_height, Color_Gray); // Cielling
                     
-                    ++i;
                 }
             }
         }

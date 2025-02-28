@@ -28,9 +28,9 @@ window:
       0.817222:
       {
         locals: {project:{"root.raddbg_project"} }
-        breakpoints: {selected project:{"root.raddbg_project"} }
+        breakpoints: {project:{"root.raddbg_project"} }
         targets: {project:{"root.raddbg_project"} }
-        watch: {project:{"root.raddbg_project"} }
+        watch: {selected project:{"root.raddbg_project"} }
       }
       0.182776:
       {
@@ -48,7 +48,7 @@ window:
         text: {project:{"root.raddbg_project"} query:{"file:\"../code/dumb/game.c\""} cursor_line:{ 155} cursor_column:{ 5} mark_line:{ 155} mark_column:{5} }
         text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/memory.c\""} cursor_line:{ 67} cursor_column:{ 46} mark_line:{ 67} mark_column:{46} }
         text: {project:{"root.raddbg_project"} query:{"file:\"../code/os/win32/io.c\""} cursor_line:{ 76} cursor_column:{ 23} mark_line:{ 76} mark_column:{23} }
-        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/dumb/renderer.c\""} cursor_line:{ 287} cursor_column:{ 45} mark_line:{ 287} mark_column:{45} }
+        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/dumb/renderer.c\""} cursor_line:{ 250} cursor_column:{ 41} mark_line:{ 250} mark_column:{41} }
         text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/types.c\""} cursor_line:{ 134} cursor_column:{ 1} mark_line:{ 134} mark_column:{1} }
       }
       0.307018:
@@ -134,16 +134,16 @@ keybindings:
   {"new_panel_down"                          ctrl minus          }
   {"new_panel_right"                         ctrl p              }
   {"next_panel"                              ctrl comma          }
-  {"next_tab"                                ctrl page_down      }
   {"next_tab"                                ctrl tab            }
+  {"next_tab"                                ctrl page_down      }
   {"open_project"                            ctrl alt o          }
   {"open"                                    ctrl o              }
   {"open_user"                               ctrl shift alt o    }
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
-  {"prev_tab"                                ctrl page_up        }
   {"prev_tab"                                ctrl shift tab      }
+  {"prev_tab"                                ctrl page_up        }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
   {"run"                                     f5                  }
