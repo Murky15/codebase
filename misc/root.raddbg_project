@@ -2,20 +2,15 @@
 
 /// watches ///////////////////////////////////////////////////////////////////
 
-watch: "maxp"
-watch: "minp"
-watch: "zstart"
-watch: "zend"
-watch: "d0"
-watch: "d0_preclip"
-watch: "d1"
-watch: "d1_preclip"
+watch: "img_height"
+watch: "actual_height"
+watch: "pages_per_wall"
 
 /// breakpoints ///////////////////////////////////////////////////////////////
 
 breakpoint:
 {
-  location: ("../code/dumb/renderer.c":248)
+  location: ("../code/dumb/renderer.c":323)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////

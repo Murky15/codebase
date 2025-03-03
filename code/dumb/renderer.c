@@ -124,15 +124,24 @@ r_draw_vert (f32 x, f32 y0, f32 y1, Color c) {
         r_put_pixel_at(v2(x,y), c);
 }
 
+#define TEXTURE_VERT_REPEAT_SCALE 1.5
 function void
-r_draw_vert_textured (f32 x, f32 y0, f32 y1, PNG_Bitmap_RGBA texture, s32 texx) {
+r_draw_vert_textured (f32 x, f32 y0, f32 y1, f32 actual_height, PNG_Bitmap_RGBA texture, Texture_Map_Type map_type, s32 texx) {
     Color c;
     Bitmap *canvas = r_get_framebuffer();
     f32 start_y = max(-1.f, y0);
     f32 end_y = min(y1, canvas->height);
+    f32 img_height = texture.height;
+    f32 pages_per_wall = (actual_height * TEXTURE_VERT_REPEAT_SCALE) / img_height;
     for (f32 y = start_y; y <= end_y; ++y) {
         f32 ynorm = norm(y, y0, y1);
-        s32 texy = lerp(0, texture.height, ynorm);
+        s32 texy;
+        if (map_type == TEXTURE_MAP_FIT) {
+            texy = lerp(0, texture.height, ynorm);
+        } else if (map_type == TEXTURE_MAP_REPEAT) {
+            texy = lerp(0, texture.height*pages_per_wall, ynorm);
+            texy %= (u32)img_height;
+        }
         c.packed = texture.pixels[texy * texture.width + texx];
         r_put_pixel_at(v2(x,y), c);
     }
@@ -206,7 +215,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 d0 = v2(clipped_x, near_plane);
             else if (d1.y <= near_plane)
                 d1 = v2(clipped_x, near_plane);
-             
+            
             //- Perspective projection
             f32 z0 = d0.y;
             f32 z1 = d1.y;
@@ -281,18 +290,29 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 r_sector(map, next_sector, environment_textures, &modified_cam, sector->id, bounds);
             }
             
-            Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_5A.PNG"));
+            Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_4A.PNG"));
+            Texture_Map_Type test_texture_map_type = TEXTURE_MAP_REPEAT;
+            
             f32 img_width = test_wall_texture.img.width;
             f32 start_x = max(minp.x, -1.f);
             f32 end_x = min(maxp.x, canvas_width);
+            
+            f32 wall_length = sqrtf(sqr(d0_preclip.x-d1_preclip.x) + sqr(d0_preclip.y-d1_preclip.y)); // @note: Probably a way to cache this
+            f32 pages_per_wall = wall_length / img_width;
             
             for (f32 x = start_x; x <= end_x; ++x) {
                 if (x >= window.first && x <= window.last) {
                     f32 xnorm  = norm(x, minp.x, maxp.x);
                     f32 texnorm = norm(x, minp.x_preclip, maxp.x_preclip);
                     
-                    // Texture mapping                                        
-                    s64 texx = lerp(1.f/minp.z_preclip, img_width/maxp.z_preclip, texnorm) / lerp(1.f/minp.z_preclip, 1.f/maxp.z_preclip, texnorm);
+                    // Wall Texture mapping
+                    s32 texx;
+                    if (test_texture_map_type == TEXTURE_MAP_FIT) {                                          
+                        texx = lerp(0, img_width/maxp.z_preclip, texnorm) / lerp(1.f/minp.z_preclip, 1.f/maxp.z_preclip, texnorm);
+                    } else if (test_texture_map_type == TEXTURE_MAP_REPEAT) {
+                        texx = lerp(0, (img_width*pages_per_wall)/maxp.z_preclip, texnorm) / lerp(1.f/minp.z_preclip, 1.f/maxp.z_preclip, texnorm);
+                        texx %= (u32)img_width;
+                    }
 
                     f32 depth  = lerp(minp.depth, maxp.depth, xnorm);
                     f32 height = lerp(minp.height, maxp.height, xnorm);
@@ -301,8 +321,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                    
                     r_draw_vert(x, -1.f, depth, Color_Blue); // floor
                     r_draw_vert(x, depth, floor, Color_Maroon); // ledge
-                    //if (wall->next_sector == -1) r_draw_vert(x, floor, ceil, wall_color); // wall
-                    if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, test_wall_texture.img, texx); // wall
+                    if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, sector->ceiling-sector->floor, test_wall_texture.img, test_texture_map_type, texx); // wall
                     r_draw_vert(x, ceil, height, Color_Maroon); // ledge
                     r_draw_vert(x, height, canvas_height, Color_Gray); // Cielling
                     

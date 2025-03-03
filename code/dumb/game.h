@@ -45,6 +45,7 @@ enum {
     ASSET_GROUP_DATA,
 };
 
+// @todo: Where to store this? (With texture or with wall data?)
 typedef u32 Texture_Map_Type;
 enum {
     TEXTURE_MAP_NULL,
