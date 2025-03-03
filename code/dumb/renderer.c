@@ -142,6 +142,7 @@ r_draw_vert_textured (f32 x, f32 y0, f32 y1, f32 actual_height, PNG_Bitmap_RGBA 
             texy = lerp(0, texture.height*pages_per_wall, ynorm);
             texy %= (u32)img_height;
         }
+        texy = img_height - texy - 1;
         c.packed = texture.pixels[texy * texture.width + texx];
         r_put_pixel_at(v2(x,y), c);
     }
@@ -215,6 +216,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 d0 = v2(clipped_x, near_plane);
             else if (d1.y <= near_plane)
                 d1 = v2(clipped_x, near_plane);
+          
             
             //- Perspective projection
             f32 z0 = d0.y;
@@ -290,7 +292,8 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 r_sector(map, next_sector, environment_textures, &modified_cam, sector->id, bounds);
             }
             
-            Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_4A.PNG"));
+            Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_1A.PNG"));
+            Asset test_floor_texture = asset_group_fetch(&environment_textures, str8_lit("COBBLES_1B.PNG"));
             Texture_Map_Type test_texture_map_type = TEXTURE_MAP_REPEAT;
             
             f32 img_width = test_wall_texture.img.width;
@@ -319,11 +322,11 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                     f32 floor  = lerp(minp.floor, maxp.floor, xnorm);
                     f32 ceil   = lerp(minp.ceil, maxp.ceil, xnorm);
                    
-                    r_draw_vert(x, -1.f, depth, Color_Blue); // floor
+                    //r_draw_vert(x, -1.f, depth, Color_Blue); // floor
                     r_draw_vert(x, depth, floor, Color_Maroon); // ledge
                     if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, sector->ceiling-sector->floor, test_wall_texture.img, test_texture_map_type, texx); // wall
                     r_draw_vert(x, ceil, height, Color_Maroon); // ledge
-                    r_draw_vert(x, height, canvas_height, Color_Gray); // Cielling
+                    //r_draw_vert(x, height, canvas_height, Color_Gray); // Cielling
                     
                 }
             }

@@ -186,9 +186,9 @@ game_tick (Game_Memory_Package memory, Game_Input_Package input, f32 dt) {
 
 function void
 game_render (Game_Memory_Package memory, f32 lerp_amount) {
+    r_clear();
     Game_State *gs = (Game_State*)memory.memory;
     Sector *player_sector = &gs->test_level.sectors[gs->player.curr_sector];
-    
     Entity lerped_player = entity_lerp(gs->old_player, gs->player, lerp_amount);
     r_sector(&gs->test_level, player_sector, gs->level_textures, &lerped_player, -1, gs->view_bounds);
 }

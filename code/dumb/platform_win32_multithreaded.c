@@ -214,7 +214,6 @@ win32_game_render (LPVOID param) {
         assert(last_game_tick < start < predicted_end_game_tick);
         f32 t = norm((f64)start, (f64)last_game_tick, (f64)predicted_end_game_tick);
         game_render(game_memory, t);
-        
         Bitmap *bitmap = r_get_framebuffer();
         StretchDIBits(
                       platform.win_dc,
