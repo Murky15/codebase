@@ -1,0 +1,3 @@
+[submodule "code/geometry_compiler"]
+	path = code/geometry_compiler
+	url = https://git.mr4th.com/mr4th/geometry_compiler
