@@ -24,7 +24,7 @@ function void
 r_put_pixel_at (Vec2 p, Color c) {
     Bitmap *canvas = r_get_framebuffer();
     
-    Vec2i pi = v2i_from_v2(p);
+    Vec2i pi = v2i_from_v2(p); // @todo: Unnecessary slowness
     if (pi.x >= 0 && pi.y >= 0 && pi.x < canvas->width && pi.y < canvas->height)
         canvas->pixels[pi.y * canvas->width + pi.x] = (c.r << 16 | c.g << 8 | c.b);
 }
@@ -117,8 +117,34 @@ r_draw_line (Vec2 p0, Vec2 p1, Color c) {
 
 function void
 r_draw_vert (f32 x, f32 y0, f32 y1, Color c) {
-    for (f32 y = y0; y <= y1; ++y)
+    Bitmap *canvas = r_get_framebuffer();
+    f32 start_y = max(-1.f, y0);
+    f32 end_y = min(y1, canvas->height);
+    for (f32 y = start_y; y <= end_y; ++y)
         r_put_pixel_at(v2(x,y), c);
+}
+
+#define TEXTURE_VERT_REPEAT_SCALE 1.5
+function void
+r_draw_vert_textured (f32 x, f32 y0, f32 y1, f32 actual_height, PNG_Bitmap_RGBA texture, Texture_Map_Type map_type, s32 texx) {
+    Color c;
+    Bitmap *canvas = r_get_framebuffer();
+    f32 start_y = max(-1.f, y0);
+    f32 end_y = min(y1, canvas->height);
+    f32 img_height = texture.height;
+    f32 pages_per_wall = (actual_height * TEXTURE_VERT_REPEAT_SCALE) / img_height;
+    for (f32 y = start_y; y <= end_y; ++y) {
+        f32 ynorm = norm(y, y0, y1);
+        s32 texy;
+        if (map_type == TEXTURE_MAP_FIT) {
+            texy = lerp(0, texture.height, ynorm);
+        } else if (map_type == TEXTURE_MAP_REPEAT) {
+            texy = lerp(0, texture.height*pages_per_wall, ynorm);
+            texy %= (u32)img_height;
+        }
+        c.packed = texture.pixels[texy * texture.width + texx];
+        r_put_pixel_at(v2(x,y), c);
+    }
 }
 
 function void
@@ -145,7 +171,7 @@ r_draw_rect (Vec2 p, Vec2 sz, Color c) {
 
 #define MAX_ITERATIONS 64
 function void
-r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) {
+r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, Range window) {
     Bitmap *canvas = r_get_framebuffer();
     
     local_persist u64 num_iterations = 0;
@@ -182,6 +208,8 @@ r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) 
             if (d0.y < near_plane && d1.y < near_plane)
                 continue;
             
+            Vec2 d0_preclip = d0;
+            Vec2 d1_preclip = d1;
             f32 clipped_x = d0.x + (((d1.x - d0.x) * (near_plane - d0.y)) / (d1.y - d0.y));
             if (d0.y <= near_plane)
                 d0 = v2(clipped_x, near_plane);
@@ -209,11 +237,13 @@ r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) 
 #define proj_x(x,z) (((x*canvas_width)/(z*ASPECT_W))*cam_dist)+width_middle
 #define proj_y(y,z) (((y*canvas_height)/(z*ASPECT_H))*cam_dist)+height_middle
             
+            f32 x0_preclip = proj_x(d0_preclip.x, d0_preclip.y);
             f32 x0      = proj_x(d0.x,z0);
             f32 floor0  = proj_y(floor,z0);
             f32 ceil0   = proj_y(ceiling,z0);
             f32 depth0  = proj_y(full_depth,z0);
             f32 height0 = proj_y(full_height,z0);
+            f32 x1_preclip = proj_x(d1_preclip.x, d1_preclip.y);
             f32 x1      = proj_x(d1.x,z1);
             f32 floor1  = proj_y(floor,z1);
             f32 ceil1   = proj_y(ceiling,z1);
@@ -223,13 +253,21 @@ r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) 
 #undef proj_x
 #undef proj_y
             
-            struct { f32 x,floor,ceil,depth,height; } temp, minp, maxp;
+            struct { f32 x,z,x_preclip,z_preclip,floor,ceil,depth,height; } temp, minp, maxp;
+            
             minp.x = x0;
+            minp.z = z0;
+            minp.x_preclip = x0_preclip;
+            minp.z_preclip = d0_preclip.y;
             minp.floor = floor0;
             minp.ceil = ceil0;  
             minp.depth = depth0;
             minp.height = height0;
+            
             maxp.x = x1;
+            maxp.z = z1;
+            maxp.x_preclip = x1_preclip;
+            maxp.z_preclip = d1_preclip.y;
             maxp.floor = floor1;
             maxp.ceil = ceil1;
             maxp.depth = depth1;
@@ -249,25 +287,44 @@ r_sector (Map *map, Sector *sector, Entity *cam, s32 last_sector, Range window) 
                 bounds.last  = min(maxp.x, window.last);
                 Entity modified_cam = *cam;
                 modified_cam.height = actual_height - next_sector->floor;
-                r_sector(map, next_sector, &modified_cam, sector->id, bounds);
+                r_sector(map, next_sector, environment_textures, &modified_cam, sector->id, bounds);
             }
             
+            Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_4A.PNG"));
+            Texture_Map_Type test_texture_map_type = TEXTURE_MAP_REPEAT;
+            
+            f32 img_width = test_wall_texture.img.width;
             f32 start_x = max(minp.x, -1.f);
             f32 end_x = min(maxp.x, canvas_width);
+            
+            f32 wall_length = sqrtf(sqr(d0_preclip.x-d1_preclip.x) + sqr(d0_preclip.y-d1_preclip.y)); // @note: Probably a way to cache this
+            f32 pages_per_wall = wall_length / img_width;
+            
             for (f32 x = start_x; x <= end_x; ++x) {
                 if (x >= window.first && x <= window.last) {
                     f32 xnorm  = norm(x, minp.x, maxp.x);
-                    f32 depth  = max(lerp(minp.depth, maxp.depth, xnorm), -1);
-                    f32 height = min(lerp(minp.height, maxp.height, xnorm), canvas_height);
-                    f32 floor  = clamp(lerp(minp.floor, maxp.floor, xnorm), depth-1, height);
-                    f32 ceil   = clamp(lerp(minp.ceil, maxp.ceil, xnorm), depth, height);
+                    f32 texnorm = norm(x, minp.x_preclip, maxp.x_preclip);
                     
-                    Color wall_color = (x == start_x || x == end_x) ? Color_Black : Color_Maroon; 
+                    // Wall Texture mapping
+                    s32 texx;
+                    if (test_texture_map_type == TEXTURE_MAP_FIT) {                                          
+                        texx = lerp(0, img_width/maxp.z_preclip, texnorm) / lerp(1.f/minp.z_preclip, 1.f/maxp.z_preclip, texnorm);
+                    } else if (test_texture_map_type == TEXTURE_MAP_REPEAT) {
+                        texx = lerp(0, (img_width*pages_per_wall)/maxp.z_preclip, texnorm) / lerp(1.f/minp.z_preclip, 1.f/maxp.z_preclip, texnorm);
+                        texx %= (u32)img_width;
+                    }
+
+                    f32 depth  = lerp(minp.depth, maxp.depth, xnorm);
+                    f32 height = lerp(minp.height, maxp.height, xnorm);
+                    f32 floor  = lerp(minp.floor, maxp.floor, xnorm);
+                    f32 ceil   = lerp(minp.ceil, maxp.ceil, xnorm);
+                   
                     r_draw_vert(x, -1.f, depth, Color_Blue); // floor
                     r_draw_vert(x, depth, floor, Color_Maroon); // ledge
-                    if (wall->next_sector == -1) r_draw_vert(x, floor, ceil, wall_color); // wall
+                    if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, sector->ceiling-sector->floor, test_wall_texture.img, test_texture_map_type, texx); // wall
                     r_draw_vert(x, ceil, height, Color_Maroon); // ledge
                     r_draw_vert(x, height, canvas_height, Color_Gray); // Cielling
+                    
                 }
             }
         }

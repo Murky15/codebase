@@ -2,34 +2,18 @@
 
 /// watches ///////////////////////////////////////////////////////////////////
 
-watch:
+watch: "img_height"
+watch: "actual_height"
+watch: "pages_per_wall"
+
+/// breakpoints ///////////////////////////////////////////////////////////////
+
+breakpoint:
 {
-  name: "huff.lengths.array"
-  view_rule: "array:huff.lengths.count"
+  location: ("../code/dumb/renderer.c":323)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////
-
-target:
-{
-  disabled: 1
-  executable: "../misc"
-  working_directory: "../build"
-}
-
-target:
-{
-  disabled: 1
-  executable: "../code/file/a.exe"
-  working_directory: "../code/file"
-}
-
-target:
-{
-  disabled: 1
-  executable: "../code/file/png.exe"
-  working_directory: "../code/file"
-}
 
 target:
 {
@@ -41,13 +25,17 @@ target:
 
 recent_file: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/eh/amd64/setjmp.asm"
 recent_file: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm"
-recent_file: "../code/base/memory.c"
 recent_file: "../code/file/puff.c"
-recent_file: "../code/base/strings.c"
 recent_file: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memcpy.asm"
-recent_file: "../code/file/png.c"
 recent_file: "../build/dumb.exe"
+recent_file: "../code/file/png.c"
 recent_file: "../code/dumb/platform_win32_multithreaded.c"
+recent_file: "../code/base/memory.c"
+recent_file: "../code/base/strings.c"
+recent_file: "../code/os/win32/io.c"
+recent_file: "../code/dumb/game.c"
+recent_file: "../code/base/types.c"
+recent_file: "../code/dumb/renderer.c"
 
 /// exception code filters ////////////////////////////////////////////////////
 

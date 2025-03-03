@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="20px" height="40px" viewBox="0 0 20 40" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>002B - Plus Sign</title>
+    <g id="Original-/-Overview" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Original" transform="translate(-420.000000, -110.000000)" fill="#59FFF8">
+            <path d="M431,123 C431.552285,123 432,123.447715 432,124 L432,128 L436,128 C436.552285,128 437,128.447715 437,129 L437,131 C437,131.552285 436.552285,132 436,132 L432,132 L432,136 C432,136.552285 431.552285,137 431,137 L429,137 C428.447715,137 428,136.552285 428,136 L428,132 L424,132 C423.447715,132 423,131.552285 423,131 L423,129 C423,128.447715 423.447715,128 424,128 L428,128 L428,124 C428,123.447715 428.447715,123 429,123 L431,123 Z" id="Path"></path>
+        </g>
+    </g>
+</svg>
