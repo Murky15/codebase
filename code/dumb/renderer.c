@@ -177,7 +177,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
     
     local_persist u64 num_iterations = 0;
     local_persist read_only f32 forward = M_PI32 / 2.f;
-    local_persist read_only f32 near_plane = 0.001f;
+    local_persist read_only f32 near_plane = 5.f;
     f32 canvas_width = (f32)canvas->width;
     f32 canvas_height = (f32)canvas->height;
     f32 width_middle = canvas->width/2.f;
