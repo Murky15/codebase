@@ -46,7 +46,7 @@ enum {
 
 typedef struct Json_Object     Json_Object;
 typedef struct Json_Array      Json_Array;
-typedef union  Json_Value      Json_Value;
+typedef struct Json_Value      Json_Value;
 typedef struct Json_Value_Node Json_Value_Node;
 typedef struct Json_Value_List Json_Value_List;
 typedef struct Json_Set        Json_Set;

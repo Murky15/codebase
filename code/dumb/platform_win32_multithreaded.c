@@ -32,11 +32,13 @@ global struct {
     b32 mouse_captured;
 } platform;
 
-global Game_Input_Package game_input;
-global Game_Memory_Package game_memory;
+global struct {
+    HANDLE mutex;
+    u64 last_game_tick;
+    Game_Memory_Package game_memory;
+} shared_game_data;
 
-// @todo: Technically while this is still protected by the game_memory mutex, it's sloppy keeping this loose
-global u64 last_game_tick;
+Game_Input_Package game_input;
 
 function void
 win32_capture_mouse (void) {
@@ -182,9 +184,12 @@ win32_game_tick (LPVOID param) {
      
     while (1) {        
         u64 start = win32_query_clock();
-        last_game_tick = start; // @megahack
-        game_tick(game_memory, game_input, seconds_per_tick);
-        game_input.turn_amount = 0; // @megahack 2
+        
+        WaitForSingleObject(shared_game_data.mutex, INFINITE);
+        shared_game_data.last_game_tick = start;
+        game_tick(shared_game_data.game_memory, game_input, seconds_per_tick);
+        game_input.turn_amount = 0;
+        ReleaseMutex(shared_game_data.mutex);
         
         u64 end = win32_query_clock();
         f32 elapsed = win32_get_elapsed_ms(start, end);
@@ -210,10 +215,12 @@ win32_game_render (LPVOID param) {
     u64 game_tick_duration = win32_ms_to_tick_interval(ms_per_tick);
     while (1) {
         u64 start = win32_query_clock();
-        u64 predicted_end_game_tick = last_game_tick + game_tick_duration;
-        assert(last_game_tick < start < predicted_end_game_tick);
-        f32 t = norm((f64)start, (f64)last_game_tick, (f64)predicted_end_game_tick);
-        game_render(game_memory, t);
+        
+        WaitForSingleObject(shared_game_data.mutex, INFINITE);
+        u64 predicted_end_game_tick = shared_game_data.last_game_tick + game_tick_duration;
+        assert(shared_game_data.last_game_tick < start < predicted_end_game_tick);
+        f32 t = norm((f64)start, (f64)shared_game_data.last_game_tick, (f64)predicted_end_game_tick);
+        game_render(shared_game_data.game_memory, t);
         Bitmap *bitmap = r_get_framebuffer();
         StretchDIBits(
                       platform.win_dc,
@@ -228,6 +235,8 @@ win32_game_render (LPVOID param) {
                       DIB_RGB_COLORS,
                       SRCCOPY
                       );
+        
+        ReleaseMutex(shared_game_data.mutex);
         
         u64 end = win32_query_clock();
         f32 elapsed = win32_get_elapsed_ms(start, end);
@@ -325,17 +334,15 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     
     //- @note: Initialize game
     void *buff = arena_pushn(platform.arena, u8, GAME_MEMORY_SIZE);
-    game_memory = (Game_Memory_Package){buff, GAME_MEMORY_SIZE};
-    game_init(game_memory, view_bounds);    
+    shared_game_data.game_memory = (Game_Memory_Package){buff, GAME_MEMORY_SIZE};
+    game_init(shared_game_data.game_memory, view_bounds);    
 
     //- @note: Threading, Timing, & Scheduling setup
-    assert(SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS) != 0);
-    timeBeginPeriod(1);
-
-    f32 game_tick_hz = 30.f;
-    //f32 game_render_hz = monitor_info.dmDisplayFrequency / 2.f; 
-    f32 game_render_hz = 60.f;
+    f32 game_tick_hz = 25.f;
+    f32 game_render_hz = monitor_info.dmDisplayFrequency / 2.f; 
     Platform_Timing_Info timing = {.tick_hz = game_tick_hz, .render_hz = game_render_hz};
+    timeBeginPeriod(1);
+    shared_game_data.mutex = CreateMutex(NULL, false, NULL);
     CreateThread(NULL, 0, win32_game_tick, &game_tick_hz, 0, 0);
     CreateThread(NULL, 0, win32_game_render, &timing, 0, 0);
     

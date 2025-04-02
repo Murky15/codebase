@@ -8,8 +8,6 @@ json_token_list_push (Arena *arena, Json_Token_List *list, Json_Token token) {
 
 core_function Json_Token_List
 json_lex (Arena *arena, String8 json) {
-    // @todo: This lexer is evaluationless, merely including tokens which fit the basic regex. MUST FIX!!!!
-    // Also all these "continue"'s are mad annoying
     Json_Token_List tokens = zero_struct;
     
     Json_Token_Type active_token_type = JSON_TOKEN_NULL;
@@ -38,7 +36,6 @@ json_lex (Arena *arena, String8 json) {
                     Json_Token new_token = {JSON_TOKEN_PUNCTUATOR, str8_sub(json, i, j)};
                     json_token_list_push(arena, &tokens, new_token);
                 } else {
-                    // @todo: Atrocious error handling
                     fprintf(stderr, "Json lex failed! Unrecognized Symbol.\n");
                     return comp_zero(Json_Token_List);
                 }
@@ -51,7 +48,6 @@ json_lex (Arena *arena, String8 json) {
             if (c == 34) { // (")
                 // @todo: Handle escaped-string processing
                 token_ready = true;
-                goto make_new_token;
             }
         }
         
@@ -64,7 +60,6 @@ json_lex (Arena *arena, String8 json) {
                 nc == '-';
             if (!cond) {
                 token_ready = true;
-                goto make_new_token;
             }
         }
         
@@ -75,7 +70,6 @@ json_lex (Arena *arena, String8 json) {
                     str8_match(keyword, str8_lit("false"),0) ||
                     str8_match(keyword, str8_lit("null"),0)) {
                     token_ready = true;
-                    goto make_new_token;
                 } else {
                     fprintf(stderr, "Json lex failed! Unrecognized Keyword: %.*s\n", str8_expand(keyword));
                     return comp_zero(Json_Token_List);
@@ -83,7 +77,6 @@ json_lex (Arena *arena, String8 json) {
             }
         } 
         
-        make_new_token:
         if (active_token_type != JSON_TOKEN_NULL && token_ready) {
             u64 end_idx = active_token_type == JSON_TOKEN_STRING ? i : j;
             Json_Token new_token = {active_token_type, str8_sub(json, word_idx, end_idx)};
@@ -110,7 +103,6 @@ json_dump_lex (Json_Token_List *tokens, String8 json) {
     }
 }
 
-// @todo: Probably a smarter way to do this
 core_function Json_Value
 json_object_fetch (Json_Object *object, String8 key) {
     u64 hash = str8_hash(key) % object->total_slots;
@@ -146,11 +138,12 @@ json_process_object (Arena *arena, Json_Token_Node **token) {
         Json_Token_Node *next = (*token);
         for (Json_Token_Node *key = (*token)->next; next->token.value.str[0] != '}'; key = next) {
             
-            // Parse set
             if (key->token.type == JSON_TOKEN_STRING) {
                 Json_Set *new_set = arena_pushn(scratch.arena, Json_Set, 1);
                 num_sets++;
-                object_sets = object_sets == 0 ? new_set : object_sets;
+                if (object_sets == 0)
+                  object_sets = new_set;
+
                 new_set->key = key->token.value;
                 Json_Token_Node *seperator = key->next;
                 if (seperator->token.value.str[0] == ':') {
@@ -258,10 +251,12 @@ json_process_token (Arena *arena, Json_Token_Node **token_stream) {
         case JSON_TOKEN_PUNCTUATOR: {
             if (token.value.str[0] == '{') {
                 Json_Object obj = json_process_object(arena, token_stream);
-                value = *(Json_Value*)&obj;
+                value.type = JSON_OBJECT;
+                value.object = obj;
             } else if (token.value.str[0] == '[') {
                 Json_Array arr = json_process_array(arena, token_stream);
-                value = *(Json_Value*)&arr;
+                value.type = JSON_ARRAY;
+                value.array = arr;
             } else {
                 fprintf(stderr, "Json parse error: Unexpected symbol: %.*s\n", str8_expand(token.value));
             }
@@ -274,7 +269,6 @@ json_process_token (Arena *arena, Json_Token_Node **token_stream) {
     return value;
 }
 
-// I hate formatting so much
 core_function void
 json_print (Json_Value value) {
     local_persist int depth=-1;
@@ -287,7 +281,7 @@ printf("  "); \
     
     switch (value.type) {
         case JSON_OBJECT: {
-            Json_Object *object = (Json_Object*)&value;
+            Json_Object *object = &value.object;
             printf("\n");
             print_depth();
             printf("Object:\n");
@@ -303,7 +297,7 @@ printf("  "); \
         } break;
         
         case JSON_ARRAY: {
-            Json_Array *array = (Json_Array*)&value;
+            Json_Array *array = &value.array;
             printf("[");
             u64 i = 1;
             for (Json_Value_Node *value_node = array->values.first; 
@@ -348,9 +342,16 @@ json_parse (Arena *arena, String8 json) {
 
 //- Example
 #if 0
+
+#include "base/include.h"
+#include "os/include.h"
+#include "base/include.c"
+#include "os/include.c"
+#include "file/json.h"
+
 int main (void) {
     Temp_Arena scratch = get_scratch(0,0);
-    String8 file = os_read_file(scratch.arena, str8_lit("test3.json"), false);
+    String8 file = os_read_file(scratch.arena, str8_lit("json_tests/test3.json"), false);
     Json_Value value = json_parse(scratch.arena, file);
     json_print(value);
     release_scratch(scratch);
