@@ -224,15 +224,12 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             if (d0.y < near_plane && d1.y < near_plane)
                 continue;
             
-            b32 d0_clipped = false, d1_clipped = false;
             Vec2 d0_preclip = d0;
             Vec2 d1_preclip = d1;
             f32 clipped_x = d0.x + (((d1.x - d0.x) * (near_plane - d0.y)) / (d1.y - d0.y));
             if (d0.y <= near_plane) {
-                d0_clipped = true;
                 d0 = v2(clipped_x, near_plane);
             } else if (d1.y <= near_plane) {
-                d1_clipped = true;
                 d1 = v2(clipped_x, near_plane);
             }
             
@@ -260,29 +257,23 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
 #undef proj_x
 #undef proj_y
             
-            struct { f32 xorig,x,z,x_preclip,z_preclip,floor,ceil,depth,height; b32 was_clipped; } temp, minp, maxp;
+            struct { f32 x,z,x_preclip,floor,ceil,depth,height; } temp, minp, maxp;
             
-            minp.xorig = d0.x;
             minp.x = x0;
-            minp.z = z0;
             minp.x_preclip = x0_preclip;
-            minp.z_preclip = d0_preclip.y;
+            minp.z = d0_preclip.y;
             minp.floor = floor0;
             minp.ceil = ceil0;  
             minp.depth = depth0;
             minp.height = height0;
-            minp.was_clipped = d0_clipped;
             
-            maxp.xorig = d1.x;
             maxp.x = x1;
-            maxp.z = z1;
             maxp.x_preclip = x1_preclip;
-            maxp.z_preclip = d1_preclip.y;
+            maxp.z = d1_preclip.y;
             maxp.floor = floor1;
             maxp.ceil = ceil1;
             maxp.depth = depth1;
             maxp.height = height1;
-            maxp.was_clipped = d1_clipped;
 
             f32 start_x = clamp(minp.x, window.first, window.last);
             f32 end_x = clamp(maxp.x, window.first, window.last);            
@@ -297,7 +288,6 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             if (wall->next_sector >= 0) {
                 Sector *next_sector = &map->sectors[wall->next_sector];
                 Range bounds;
-                // Flicker goes away if we just use window values?
                 bounds.first = start_x;
                 bounds.last  = end_x;
                 Entity modified_cam = *cam;
@@ -320,9 +310,9 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 // Wall Texture mapping
                 s32 texx;
                 if (test_texture_map_type == TEXTURE_MAP_FIT) {                                          
-                    texx = lerp(0, img_width/maxp.z_preclip, texnorm) / lerp(1.f/minp.z_preclip, 1.f/maxp.z_preclip, texnorm);
+                    texx = lerp(0, img_width/maxp.z, texnorm) / lerp(1.f/minp.z, 1.f/maxp.z, texnorm);
                 } else if (test_texture_map_type == TEXTURE_MAP_REPEAT) {
-                    texx = lerp(0, (img_width*pages_per_wall)/maxp.z_preclip, texnorm) / lerp(1.f/minp.z_preclip, 1.f/maxp.z_preclip, texnorm);
+                    texx = lerp(0, (img_width*pages_per_wall)/maxp.z, texnorm) / lerp(1.f/minp.z, 1.f/maxp.z, texnorm);
                     texx %= (u32)img_width;
                 }
 
