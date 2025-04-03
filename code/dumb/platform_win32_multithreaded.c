@@ -208,11 +208,18 @@ win32_game_render (LPVOID param) {
     u64 game_tick_duration = win32_ms_to_tick_interval(ms_per_tick);
     while (1) {
         u64 start = win32_query_clock();
+<<<<<<< HEAD
         
         WaitForSingleObject(shared_game_data.mutex, INFINITE);
         u64 predicted_end_game_tick = shared_game_data.last_game_tick + game_tick_duration;
         f32 t = norm((f64)start, (f64)shared_game_data.last_game_tick, (f64)predicted_end_game_tick);
         game_render(shared_game_data.game_memory, t);
+=======
+        u64 predicted_end_game_tick = last_game_tick + game_tick_duration;
+        assert(last_game_tick < start < predicted_end_game_tick);
+        f64 t = norm((f64)start, (f64)last_game_tick, (f64)predicted_end_game_tick);
+        game_render(game_memory, t);
+>>>>>>> 28242c039b50f17bafa214cc9b7a91abb4eb16c9
         Bitmap *bitmap = r_get_framebuffer();
         StretchDIBits(
                       platform.win_dc,
@@ -311,7 +318,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     bitmap->width = RESOLUTION_W;
     bitmap->height = RESOLUTION_H;
     bitmap->pixels = arena_pushn(platform.arena, u32, bitmap->width * bitmap->height);
-    Range view_bounds = v2(0, (f32)bitmap->width);
+    Range view_bounds = v2(-1, (f32)bitmap->width);
     
     BITMAPINFOHEADER header = {0};
     header.biSize = sizeof(header);
@@ -329,9 +336,19 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     shared_game_data.game_memory = (Game_Memory_Package){buff, GAME_MEMORY_SIZE};
     game_init(shared_game_data.game_memory, view_bounds);    
 
+<<<<<<< HEAD
     //- @note: THREADING INIT
     f32 game_tick_hz = 25.f;
     f32 game_render_hz = monitor_info.dmDisplayFrequency / 2.f; 
+=======
+    //- @note: Threading, Timing, & Scheduling setup
+    assert(SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS) != 0);
+    timeBeginPeriod(1);
+
+    f32 game_tick_hz = 45.f;
+    f32 game_render_hz = monitor_info.dmDisplayFrequency / 2.f; 
+    //f32 game_render_hz = 60.f;
+>>>>>>> 28242c039b50f17bafa214cc9b7a91abb4eb16c9
     Platform_Timing_Info timing = {.tick_hz = game_tick_hz, .render_hz = game_render_hz};
     timeBeginPeriod(1);
     shared_game_data.mutex = CreateMutex(NULL, false, NULL);

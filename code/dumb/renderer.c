@@ -177,7 +177,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
     
     local_persist u64 num_iterations = 0;
     local_persist read_only f32 forward = M_PI32 / 2.f;
-    local_persist read_only f32 near_plane = 5.f;
+    local_persist read_only f32 near_plane = 0.001f;
     f32 canvas_width = (f32)canvas->width;
     f32 canvas_height = (f32)canvas->height;
     f32 width_middle = canvas->width/2.f;
@@ -188,10 +188,25 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
     else
         num_iterations++;
     
+    f32 actual_height = cam->height + (f32)sector->floor;
+    f32 full_height = (f32)sector->ceiling - actual_height;
+    f32 full_depth  = (f32)sector->floor - actual_height;
+    
     if (num_iterations < MAX_ITERATIONS) {
         for (u64 wall_idx = 0; wall_idx < sector->num_walls; ++wall_idx) {
-            //- Transform wall relative to player
             Wall *wall = &sector->walls[wall_idx];
+            
+            s32 ceil_diff = 0, floor_diff = 0;
+            if (wall->next_sector >= 0) {
+                Sector *next = &map->sectors[wall->next_sector];
+                ceil_diff = next->ceiling - sector->ceiling;
+                floor_diff = next->floor - sector->floor;
+            }
+            
+            f32 ceiling = full_height + ceil_diff;
+            f32 floor = full_depth + floor_diff;
+            
+            //- Transform wall relative to player
             if (wall->next_sector >= 0 && wall->next_sector == last_sector)
                 continue;
             
@@ -209,32 +224,22 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             if (d0.y < near_plane && d1.y < near_plane)
                 continue;
             
+            b32 d0_clipped = false, d1_clipped = false;
             Vec2 d0_preclip = d0;
             Vec2 d1_preclip = d1;
             f32 clipped_x = d0.x + (((d1.x - d0.x) * (near_plane - d0.y)) / (d1.y - d0.y));
-            if (d0.y <= near_plane)
+            if (d0.y <= near_plane) {
+                d0_clipped = true;
                 d0 = v2(clipped_x, near_plane);
-            else if (d1.y <= near_plane)
+            } else if (d1.y <= near_plane) {
+                d1_clipped = true;
                 d1 = v2(clipped_x, near_plane);
-          
+            }
             
             //- Perspective projection
             f32 z0 = d0.y;
             f32 z1 = d1.y;
             f32 cam_dist = 0.89f * ASPECT_H; // 90 Degree horizontal FOV
-            
-            s32 ceil_diff = 0, floor_diff = 0;
-            if (wall->next_sector >= 0) {
-                Sector *next = &map->sectors[wall->next_sector];
-                ceil_diff = next->ceiling - sector->ceiling;
-                floor_diff = next->floor - sector->floor;
-            }
-            
-            f32 actual_height = cam->height + (f32)sector->floor;
-            f32 full_height = (f32)sector->ceiling - actual_height;
-            f32 full_depth  = (f32)sector->floor - actual_height;
-            f32 ceiling = full_height + ceil_diff;
-            f32 floor = full_depth + floor_diff;
             
 #define proj_x(x,z) (((x*canvas_width)/(z*ASPECT_W))*cam_dist)+width_middle
 #define proj_y(y,z) (((y*canvas_height)/(z*ASPECT_H))*cam_dist)+height_middle
@@ -255,8 +260,9 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
 #undef proj_x
 #undef proj_y
             
-            struct { f32 x,z,x_preclip,z_preclip,floor,ceil,depth,height; } temp, minp, maxp;
+            struct { f32 xorig,x,z,x_preclip,z_preclip,floor,ceil,depth,height; b32 was_clipped; } temp, minp, maxp;
             
+            minp.xorig = d0.x;
             minp.x = x0;
             minp.z = z0;
             minp.x_preclip = x0_preclip;
@@ -265,7 +271,9 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             minp.ceil = ceil0;  
             minp.depth = depth0;
             minp.height = height0;
+            minp.was_clipped = d0_clipped;
             
+            maxp.xorig = d1.x;
             maxp.x = x1;
             maxp.z = z1;
             maxp.x_preclip = x1_preclip;
@@ -274,19 +282,24 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             maxp.ceil = ceil1;
             maxp.depth = depth1;
             maxp.height = height1;
-            
-            if (x0 > x1) {
+            maxp.was_clipped = d1_clipped;
+
+            f32 start_x = clamp(minp.x, window.first, window.last);
+            f32 end_x = clamp(maxp.x, window.first, window.last);            
+            if (end_x < start_x) {
                 temp = minp;
                 minp = maxp;
                 maxp = temp; 
+                swap(f32, start_x, end_x);
             }
             
             // Render into next scene (if applicable)
             if (wall->next_sector >= 0) {
                 Sector *next_sector = &map->sectors[wall->next_sector];
                 Range bounds;
-                bounds.first = max(minp.x, window.first);
-                bounds.last  = min(maxp.x, window.last);
+                // Flicker goes away if we just use window values?
+                bounds.first = start_x;
+                bounds.last  = end_x;
                 Entity modified_cam = *cam;
                 modified_cam.height = actual_height - next_sector->floor;
                 r_sector(map, next_sector, environment_textures, &modified_cam, sector->id, bounds);
@@ -297,38 +310,32 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             Texture_Map_Type test_texture_map_type = TEXTURE_MAP_REPEAT;
             
             f32 img_width = test_wall_texture.img.width;
-            f32 start_x = max(minp.x, -1.f);
-            f32 end_x = min(maxp.x, canvas_width);
-            
             f32 wall_length = sqrtf(sqr(d0_preclip.x-d1_preclip.x) + sqr(d0_preclip.y-d1_preclip.y)); // @note: Probably a way to cache this
             f32 pages_per_wall = wall_length / img_width;
             
             for (f32 x = start_x; x <= end_x; ++x) {
-                if (x >= window.first && x <= window.last) {
-                    f32 xnorm  = norm(x, minp.x, maxp.x);
-                    f32 texnorm = norm(x, minp.x_preclip, maxp.x_preclip);
-                    
-                    // Wall Texture mapping
-                    s32 texx;
-                    if (test_texture_map_type == TEXTURE_MAP_FIT) {                                          
-                        texx = lerp(0, img_width/maxp.z_preclip, texnorm) / lerp(1.f/minp.z_preclip, 1.f/maxp.z_preclip, texnorm);
-                    } else if (test_texture_map_type == TEXTURE_MAP_REPEAT) {
-                        texx = lerp(0, (img_width*pages_per_wall)/maxp.z_preclip, texnorm) / lerp(1.f/minp.z_preclip, 1.f/maxp.z_preclip, texnorm);
-                        texx %= (u32)img_width;
-                    }
-
-                    f32 depth  = lerp(minp.depth, maxp.depth, xnorm);
-                    f32 height = lerp(minp.height, maxp.height, xnorm);
-                    f32 floor  = lerp(minp.floor, maxp.floor, xnorm);
-                    f32 ceil   = lerp(minp.ceil, maxp.ceil, xnorm);
-                   
-                    //r_draw_vert(x, -1.f, depth, Color_Blue); // floor
-                    r_draw_vert(x, depth, floor, Color_Maroon); // ledge
-                    if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, sector->ceiling-sector->floor, test_wall_texture.img, test_texture_map_type, texx); // wall
-                    r_draw_vert(x, ceil, height, Color_Maroon); // ledge
-                    //r_draw_vert(x, height, canvas_height, Color_Gray); // Cielling
-                    
+                f32 xnorm  = norm(x, minp.x, maxp.x);
+                f32 texnorm = norm(x, minp.x_preclip, maxp.x_preclip);
+                
+                // Wall Texture mapping
+                s32 texx;
+                if (test_texture_map_type == TEXTURE_MAP_FIT) {                                          
+                    texx = lerp(0, img_width/maxp.z_preclip, texnorm) / lerp(1.f/minp.z_preclip, 1.f/maxp.z_preclip, texnorm);
+                } else if (test_texture_map_type == TEXTURE_MAP_REPEAT) {
+                    texx = lerp(0, (img_width*pages_per_wall)/maxp.z_preclip, texnorm) / lerp(1.f/minp.z_preclip, 1.f/maxp.z_preclip, texnorm);
+                    texx %= (u32)img_width;
                 }
+
+                f32 depth  = lerp(minp.depth, maxp.depth, xnorm);
+                f32 height = lerp(minp.height, maxp.height, xnorm);
+                f32 floor  = lerp(minp.floor, maxp.floor, xnorm);
+                f32 ceil   = lerp(minp.ceil, maxp.ceil, xnorm);
+               
+                r_draw_vert(x, -1.f, depth, Color_Teal); // floor
+                r_draw_vert(x, depth, floor, Color_Maroon); // ledge
+                if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, sector->ceiling-sector->floor, test_wall_texture.img, test_texture_map_type, texx); // wall
+                r_draw_vert(x, ceil, height, Color_Maroon); // ledge
+                r_draw_vert(x, height, canvas_height, Color_Teal); // Cielling
             }
         }
     }
