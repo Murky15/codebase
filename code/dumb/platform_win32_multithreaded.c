@@ -212,7 +212,7 @@ win32_game_render (LPVOID param) {
         u64 start = win32_query_clock();
         u64 predicted_end_game_tick = last_game_tick + game_tick_duration;
         assert(last_game_tick < start < predicted_end_game_tick);
-        f32 t = norm((f64)start, (f64)last_game_tick, (f64)predicted_end_game_tick);
+        f64 t = norm((f64)start, (f64)last_game_tick, (f64)predicted_end_game_tick);
         game_render(game_memory, t);
         Bitmap *bitmap = r_get_framebuffer();
         StretchDIBits(
@@ -310,7 +310,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     bitmap->width = RESOLUTION_W;
     bitmap->height = RESOLUTION_H;
     bitmap->pixels = arena_pushn(platform.arena, u32, bitmap->width * bitmap->height);
-    Range view_bounds = v2(0, (f32)bitmap->width);
+    Range view_bounds = v2(-1, (f32)bitmap->width);
     
     BITMAPINFOHEADER header = {0};
     header.biSize = sizeof(header);
@@ -332,9 +332,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     assert(SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS) != 0);
     timeBeginPeriod(1);
 
-    f32 game_tick_hz = 30.f;
-    //f32 game_render_hz = monitor_info.dmDisplayFrequency / 2.f; 
-    f32 game_render_hz = 60.f;
+    f32 game_tick_hz = 45.f;
+    f32 game_render_hz = monitor_info.dmDisplayFrequency / 2.f; 
+    //f32 game_render_hz = 60.f;
     Platform_Timing_Info timing = {.tick_hz = game_tick_hz, .render_hz = game_render_hz};
     CreateThread(NULL, 0, win32_game_tick, &game_tick_hz, 0, 0);
     CreateThread(NULL, 0, win32_game_render, &timing, 0, 0);
