@@ -38,7 +38,7 @@ global struct {
     Game_Memory_Package game_memory;
 } shared_game_data;
 
-Game_Input_Package game_input;
+global Game_Input_Package game_input;
 
 function void
 win32_capture_mouse (void) {
@@ -169,13 +169,6 @@ win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-// @note/todo: These loops run so fast that having the render wait for the platform and memory mutexes 
-// Cause it to hitch and stall the other threads. Because the render thread ONLY READS from the data 
-// this is PROBABLY safe to do. The only problem would be if one of the platform values changes so we will
-// need to revisit this. Same concept applies to the Game_Input and Platform structures. Each structure is 
-// only written to by one thread and only read by another (somtimes through a copy) so we may be able to get away with 
-// this without the need for mutexes.
-
 function DWORD WINAPI
 win32_game_tick (LPVOID param) {
     f32 tick_hz = *(f32*)param;
@@ -218,7 +211,6 @@ win32_game_render (LPVOID param) {
         
         WaitForSingleObject(shared_game_data.mutex, INFINITE);
         u64 predicted_end_game_tick = shared_game_data.last_game_tick + game_tick_duration;
-        assert(shared_game_data.last_game_tick < start < predicted_end_game_tick);
         f32 t = norm((f64)start, (f64)shared_game_data.last_game_tick, (f64)predicted_end_game_tick);
         game_render(shared_game_data.game_memory, t);
         Bitmap *bitmap = r_get_framebuffer();
@@ -253,7 +245,7 @@ win32_game_render (LPVOID param) {
 
 int
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
-    //- @note: Init
+    //- @note: PLATFORM INIT
     platform.arena = arena_alloc();
     platform.hInstance = hInstance;
     platform.window_width = 1280;
@@ -293,7 +285,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     monitor_info.dmSize = sizeof(monitor_info);
     assert(EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &monitor_info));
     
-    //- @note: Register for input
+    //- @note: INPUT
     RAWINPUTDEVICE input_devices[2];
     
     // Keyboard
@@ -314,7 +306,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     //win32_capture_mouse(platform.hwnd);
     //ShowCursor(false);
     
-    //- @note: Create bitmap
+    //- @note: BITMAP
     Bitmap *bitmap = r_get_framebuffer();
     bitmap->width = RESOLUTION_W;
     bitmap->height = RESOLUTION_H;
@@ -330,14 +322,14 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     header.biCompression = BI_RGB;
     platform.bitmap = (BITMAPINFO){header};
     
-    //- @note: Initialize developer tools
+    //- @note: DEV INIT
     
-    //- @note: Initialize game
+    //- @note: GAME INIT
     void *buff = arena_pushn(platform.arena, u8, GAME_MEMORY_SIZE);
     shared_game_data.game_memory = (Game_Memory_Package){buff, GAME_MEMORY_SIZE};
     game_init(shared_game_data.game_memory, view_bounds);    
 
-    //- @note: Threading, Timing, & Scheduling setup
+    //- @note: THREADING INIT
     f32 game_tick_hz = 25.f;
     f32 game_render_hz = monitor_info.dmDisplayFrequency / 2.f; 
     Platform_Timing_Info timing = {.tick_hz = game_tick_hz, .render_hz = game_render_hz};
@@ -346,7 +338,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     CreateThread(NULL, 0, win32_game_tick, &game_tick_hz, 0, 0);
     CreateThread(NULL, 0, win32_game_render, &timing, 0, 0);
     
-    //- @note: Input loop
+    //- @note: INPUT LOOP
     for (MSG msg; GetMessage(&msg, 0, 0, 0);) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
