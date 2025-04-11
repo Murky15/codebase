@@ -124,7 +124,6 @@ r_draw_vert (f32 x, f32 y0, f32 y1, Color c) {
         r_put_pixel_at(v2(x,y), c);
 }
 
-#define TEXTURE_VERT_REPEAT_SCALE 1.5
 function void
 r_draw_vert_textured (f32 x, f32 y0, f32 y1, f32 actual_height, PNG_Bitmap_RGBA texture, Texture_Map_Type map_type, s32 texx) {
     Color c;
@@ -170,7 +169,6 @@ r_draw_rect (Vec2 p, Vec2 sz, Color c) {
         r_draw_vert(x, p.y, p.y + sz.y, c);
 }
 
-#define MAX_ITERATIONS 64
 function void
 r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, Range window) {
     Bitmap *canvas = r_get_framebuffer();
@@ -193,6 +191,9 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
     f32 full_depth  = (f32)sector->floor - actual_height;
     
     if (num_iterations < MAX_ITERATIONS) {
+        Edge_2D floor_edges[MAX_WALLS_IN_VIEW];
+        Edge_2D ceil_edges[MAX_WALLS_IN_VIEW];
+        
         for (u64 wall_idx = 0; wall_idx < sector->num_walls; ++wall_idx) {
             Wall *wall = &sector->walls[wall_idx];
             
@@ -318,17 +319,27 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
 
                 f32 depth  = lerp(minp.depth, maxp.depth, xnorm);
                 f32 height = lerp(minp.height, maxp.height, xnorm);
-                f32 floor  = lerp(minp.floor, maxp.floor, xnorm);
+                f32 floor  = lerp(minp.floor, maxp.floor, xnorm); 
                 f32 ceil   = lerp(minp.ceil, maxp.ceil, xnorm);
                
-                r_draw_vert(x, -1.f, depth, Color_Teal); // floor
                 r_draw_vert(x, depth, floor, Color_Maroon); // ledge
                 if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, sector->ceiling-sector->floor, test_wall_texture.img, test_texture_map_type, texx); // wall
                 r_draw_vert(x, ceil, height, Color_Maroon); // ledge
-                r_draw_vert(x, height, canvas_height, Color_Teal); // Cielling
+                
+                r_draw_vert(x, -1.f, depth, Color_Black); // floor
+                r_draw_vert(x, height, canvas_height, Color_Black); // Cielling
             }
         }
+        
+        // Render floor and ceiling
+        
     }
+}
+
+function void
+r_plane (Edge_2D *e, u64 num_edges) {
+    // Launch scout to get bearings
+    // https://www.cs.rit.edu/~icss571/filling/how_to.html
 }
 
 function void

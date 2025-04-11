@@ -64,7 +64,7 @@ wall_intersect (Vec2 p, Vec2 dir, Wall w) {
     f32 d = v2dot(b, c);
     f32 t1 = v2cross(b, a) / d;
     f32 t2 = v2dot(a, c) / d;
-    result = (t1 >= 0 && t2 >= 0 && t2 <= 1);
+    result = (t1 >= 0.f && t2 >= 0.f && t2 <= 1.f);
     
     return result;
 }

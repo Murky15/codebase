@@ -1,9 +1,7 @@
 #include "game.c"
+#include "dev.c"
 
 #include <Windows.h>
-
-#define RESOLUTION_W 640
-#define RESOLUTION_H 360
 
 #define MOUSE_SENSITIVITY 0.70f
 #define MOUSE_SCROLL_SENSITIVITY 0.8f
@@ -23,13 +21,11 @@ global struct {
     HDC win_dc;
     BITMAPINFO bitmap;
     
-    HWND tool_window;
-    HDC dev_dc;
-    HGLRC dev_gl_ctx;
-    
     u32 window_width;
     u32 window_height;
     b32 mouse_captured;
+    
+    HWND tool_window;
 } platform;
 
 global struct {
@@ -85,7 +81,7 @@ win32_ms_to_tick_interval (f32 ms) {
 }
 
 function LRESULT
-win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+win32_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     if (hwnd == platform.hwnd) { // @todo: Preserve aspect ratio
         switch (uMsg) {
             case WM_CLOSE: PostQuitMessage(0); return 0;
@@ -160,9 +156,7 @@ win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
         }
     } else if (hwnd == platform.tool_window) {
         switch (uMsg) {
-            case WM_SIZE: {
-                return 0;
-            }
+            
         }
     }
     
@@ -213,7 +207,6 @@ win32_game_render (LPVOID param) {
         u64 predicted_end_game_tick = shared_game_data.last_game_tick + game_tick_duration;
         f32 t = norm((f64)start, (f64)shared_game_data.last_game_tick, (f64)predicted_end_game_tick);
         game_render(shared_game_data.game_memory, t);
-        
         Bitmap *bitmap = r_get_framebuffer();
         StretchDIBits(
                       platform.win_dc,
@@ -228,7 +221,6 @@ win32_game_render (LPVOID param) {
                       DIB_RGB_COLORS,
                       SRCCOPY
                       );
-        
         ReleaseMutex(shared_game_data.mutex);
         
         u64 end = win32_query_clock();
@@ -244,6 +236,72 @@ win32_game_render (LPVOID param) {
     }
 }
 
+function DWORD WINAPI
+win32_dev_tools (LPVOID param) {
+    HDC dev_dc;
+    HGLRC dev_gl_ctx;
+
+    HWND dev_window = CreateWindow("default window class",
+                                   "VOODOO: DEVELOPER TOOLS",
+                                   WS_OVERLAPPED | WS_VISIBLE | WS_THICKFRAME,
+                                   CW_USEDEFAULT,
+                                   CW_USEDEFAULT,
+                                   800,
+                                   600,
+                                   0,0,
+                                   platform.hInstance,
+                                   0
+                                   );
+    if (dev_window) {
+        platform.tool_window = dev_window;
+        dev_dc = GetDC(dev_window);
+        
+        PIXELFORMATDESCRIPTOR pfd =
+        {
+            sizeof(PIXELFORMATDESCRIPTOR),
+            1,
+            PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+            PFD_TYPE_RGBA,
+            32,
+            0, 0, 0, 0, 0, 0,
+            0,
+            0,
+            0,
+            0, 0, 0, 0,
+            24,
+            8,
+            0,
+            PFD_MAIN_PLANE,
+            0, 
+            0, 0, 0
+        };
+        
+        int fid = ChoosePixelFormat(dev_dc, &pfd);
+        if (fid != 0) {
+            SetPixelFormat(dev_dc, fid, &pfd);
+            dev_gl_ctx = wglCreateContext(dev_dc);
+            assert(wglMakeCurrent(dev_dc, dev_gl_ctx));
+        }
+        
+    } else {
+        OutputDebugString("Failure to create developer window!\n");
+        return 1;
+    }
+    
+    while (1) {
+        for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        
+        dev_main_loop();
+        
+        SwapBuffers(dev_dc);
+    }
+       
+    return 0;
+}
+
 int
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
     //- @note: PLATFORM INIT
@@ -254,7 +312,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     
     WNDCLASS wc = {0};
     wc.style = CS_OWNDC;
-    wc.lpfnWndProc = win32_game_window_proc;
+    wc.lpfnWndProc = win32_window_proc;
     wc.hInstance = hInstance;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = GetStockObject(WHITE_BRUSH);
@@ -323,8 +381,6 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     header.biCompression = BI_RGB;
     platform.bitmap = (BITMAPINFO){header};
     
-    //- @note: DEV INIT
-    
     //- @note: GAME INIT
     void *buff = arena_pushn(platform.arena, u8, GAME_MEMORY_SIZE);
     shared_game_data.game_memory = (Game_Memory_Package){buff, GAME_MEMORY_SIZE};
@@ -338,6 +394,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     shared_game_data.mutex = CreateMutex(NULL, false, NULL);
     CreateThread(NULL, 0, win32_game_tick, &game_tick_hz, 0, 0);
     CreateThread(NULL, 0, win32_game_render, &timing, 0, 0);
+    CreateThread(NULL, 0, win32_dev_tools, 0, 0, 0);
     
     //- @note: INPUT LOOP
     for (MSG msg; GetMessage(&msg, 0, 0, 0);) {
