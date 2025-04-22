@@ -54,6 +54,7 @@ map_load (Arena *arena, String8 path) {
     return map;
 }
 
+/*
 function b32
 wall_intersect (Vec2 p, Vec2 dir, Wall w) {
     b32 result = 0;
@@ -70,29 +71,62 @@ wall_intersect (Vec2 p, Vec2 dir, Wall w) {
 }
 
 function b32 
-point_in_sector (Vec2 p, Sector *sector) {
+point_in_sector (Vec2 p, Sector *s) {
     u64 num_intersections = 0;
     for (u64 widx = 0; widx < sector->num_walls; ++widx) {
-        Wall *w = &sector->walls[widx];
-        if (wall_intersect(p, V2_Up, *w)) num_intersections++;
+        Wall w = sector->walls[widx];
+        if (wall_intersect(p, V2_Up, w)) num_intersections++;
     }
     
     return ((num_intersections % 2) != 0);
+}
+
+function b32
+point_on_wall (Vec2 p, Wall w) {
+    if (w.p0.x <= p.x && p.x <= w.p1.x && w.p0.y <= p.y && p.y <= w.p1.y) {
+        f32 m1 = (p.y-w.p0.y) / (p.x-w.p0.x);
+        f32 m2 = (w.p1.y-w.p0.y) / (w.p1.x-w.p0.x);
+        if (almost_equal(m1, m2, 0.1f))
+            return true;
+    }
+    
+    return false;
+}
+
+*/
+
+// Faster method: https://wrfranklin.org/Research/Short_Notes/pnpoly.html
+function b32
+entity_in_sector (Entity *e, Sector *s) {
+    b32 result = false;
+    Vec2 p = e->pos;
+    u64 num_vert = s->num_walls;
+    for (u64 i=0; i<num_vert; i++) {
+        Vec2 p0 = s->walls[i].p0;
+        Vec2 p1 = s->walls[i].p1;
+        if (((p0.y > p.y) != (p1.y > p.y)) && (p.x < (p1.x-p0.x) * (p.y-p0.y) / (p1.y-p0.y) + p0.x))
+            result = !result;   
+    }
+    
+    return result;
 }
 
 function void
 update_current_sector (Entity *entity, Map *map) {
     // First check if we haven't moved
     Sector *curr_sector = &map->sectors[entity->curr_sector];
-    if (point_in_sector(entity->pos, curr_sector)) return;
+    if (entity_in_sector(entity, curr_sector)) return;
     
     // Check adjacent sectors
     for (Sector_Ref *adj = curr_sector->adjacent.first; adj; adj = adj->next) {
-        if (point_in_sector(entity->pos, adj->sector)) {
+        if (entity_in_sector(entity, adj->sector)) {
             entity->curr_sector = adj->sector->id;
             return;
         }
     }
+    
+    // Unreachable
+    assert(0);
     
 #if 0
     // Linearly search (where did our entity go??)

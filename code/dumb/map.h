@@ -38,8 +38,7 @@ typedef struct Map {
 
 function void sector_list_push_ref(Arena *arena, Sector_List *list,  Sector *ref);
 function Map map_load(Arena *arena, String8 path);
-function b32 wall_intersect(Vec2 p, Vec2 dir, Wall w);
-function b32 point_in_sector(Vec2 p, Sector *sector);
+function b32 entity_in_sector(Entity *e, Sector *s);
 function void update_current_sector(Entity *entity, Map *map);
 
 #endif //MAP_H

@@ -170,21 +170,15 @@ r_draw_rect (Vec2 p, Vec2 sz, Color c) {
 }
 
 function void
-r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, Range window) {
+r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, s32 num_iterations, Range window) {
     Bitmap *canvas = r_get_framebuffer();
     
-    local_persist u64 num_iterations = 0;
     local_persist read_only f32 forward = M_PI32 / 2.f;
     local_persist read_only f32 near_plane = 0.001f;
     f32 canvas_width = (f32)canvas->width;
     f32 canvas_height = (f32)canvas->height;
     f32 width_middle = canvas->width/2.f;
     f32 height_middle = canvas->height/2.f;
-    
-    if (last_sector == -1)
-        num_iterations = 0;
-    else
-        num_iterations++;
     
     f32 actual_height = cam->height + (f32)sector->floor;
     f32 full_height = (f32)sector->ceiling - actual_height;
@@ -208,7 +202,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             f32 floor = full_depth + floor_diff;
             
             //- Transform wall relative to player
-            if (wall->next_sector >= 0 && wall->next_sector == last_sector)
+            if (last_sector > -1 && wall->next_sector == last_sector)
                 continue;
             
             Vec2 t0 = v2sub(wall->p0, cam->pos);
@@ -216,7 +210,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             
             f32 t = -cam->rotation_angle + forward;
             Vec2 d0, d1;
-            d0.x = t0.x * cosf(t) - t0.y * sinf(t);
+            d0.x = t0.x * cosf(t) - t0.y * sinf(t); 
             d0.y = t0.x * sinf(t) + t0.y * cosf(t);
             d1.x = t1.x * cosf(t) - t1.y * sinf(t);
             d1.y = t1.x * sinf(t) + t1.y * cosf(t);
@@ -258,10 +252,11 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
 #undef proj_x
 #undef proj_y
             
-            struct { f32 x,z,x_preclip,floor,ceil,depth,height; } temp, minp, maxp;
+            struct { f32 x,z, x_preclip,x_orig, floor,ceil, depth,height; } temp, minp, maxp;
             
             minp.x = x0;
             minp.x_preclip = x0_preclip;
+            minp.x_orig = d0.x;
             minp.z = d0_preclip.y;
             minp.floor = floor0;
             minp.ceil = ceil0;  
@@ -270,30 +265,37 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             
             maxp.x = x1;
             maxp.x_preclip = x1_preclip;
+            maxp.x_orig = d1.x;
             maxp.z = d1_preclip.y;
             maxp.floor = floor1;
             maxp.ceil = ceil1;
             maxp.depth = depth1;
             maxp.height = height1;
-
-            f32 start_x = clamp(minp.x, window.first, window.last);
-            f32 end_x = clamp(maxp.x, window.first, window.last);            
-            if (end_x < start_x) {
+         
+            if (maxp.x < minp.x) {
                 temp = minp;
                 minp = maxp;
                 maxp = temp; 
-                swap(f32, start_x, end_x);
             }
             
+            f32 start_x = clamp(minp.x, window.first, window.last);
+            f32 end_x = clamp(maxp.x, window.first, window.last);   
+            
             // Render into next scene (if applicable)
-            if (wall->next_sector >= 0) {
+            if (wall->next_sector >= 0) { // @todo: This will result in an infinite loop for "circular" sectors
                 Sector *next_sector = &map->sectors[wall->next_sector];
                 Range bounds;
+                /*
+                    Due to floating point rounding error, update_current_sector does not always correctly
+                    map to the projected wall positions when traveling between sectors. This leads to 
+                    the player technically being "outside" its current sector and this portal wall is rendered
+                    on the opposite side which causes the flicker.
+                */
                 bounds.first = start_x;
                 bounds.last  = end_x;
                 Entity modified_cam = *cam;
                 modified_cam.height = actual_height - next_sector->floor;
-                r_sector(map, next_sector, environment_textures, &modified_cam, sector->id, bounds);
+                r_sector(map, next_sector, environment_textures, &modified_cam, sector->id, num_iterations + 1, bounds);
             }
             
             Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_1A.PNG"));
@@ -301,10 +303,10 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             Texture_Map_Type test_texture_map_type = TEXTURE_MAP_REPEAT;
             
             f32 img_width = test_wall_texture.img.width;
-            f32 wall_length = sqrtf(sqr(d0_preclip.x-d1_preclip.x) + sqr(d0_preclip.y-d1_preclip.y)); // @note: Probably a way to cache this
+            f32 wall_length = sqrtf(sqr(d0_preclip.x-d1_preclip.x) + sqr(d0_preclip.y-d1_preclip.y)); // @todo: Probably a way to cache this
             f32 pages_per_wall = wall_length / img_width;
             
-            for (f32 x = start_x; x <= end_x; ++x) {
+            for (f32 x = start_x; x <= end_x; ++x) { // @todo: Is this correct?
                 f32 xnorm  = norm(x, minp.x, maxp.x);
                 f32 texnorm = norm(x, minp.x_preclip, maxp.x_preclip);
                 
@@ -317,7 +319,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                     texx %= (u32)img_width;
                 }
 
-                f32 depth  = lerp(minp.depth, maxp.depth, xnorm);
+                f32 depth  = lerp(minp.depth, maxp.depth, xnorm); 
                 f32 height = lerp(minp.height, maxp.height, xnorm);
                 f32 floor  = lerp(minp.floor, maxp.floor, xnorm); 
                 f32 ceil   = lerp(minp.ceil, maxp.ceil, xnorm);
@@ -328,7 +330,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 
                 r_draw_vert(x, -1.f, depth, Color_Black); // floor
                 r_draw_vert(x, height, canvas_height, Color_Black); // Cielling
-            }
+            } 
         }
         
         // Render floor and ceiling

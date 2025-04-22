@@ -23,7 +23,7 @@
 
 #define MIN_EXCESS_MEMORY Kilobytes(2)
 
-#define PLAYER_MOVE_SPEED 150.f
+#define PLAYER_MOVE_SPEED 150.f // 150.f
 
 /*
 @todo
@@ -121,7 +121,6 @@ entity_lerp (Entity a, Entity b, f32 amount) {
     Entity l = b;
     l.pos.x = lerp(a.pos.x, b.pos.x, amount);
     l.pos.y = lerp(a.pos.y, b.pos.y, amount);
-    l.height = lerp(a.height, b.height, amount);
     l.rotation_angle = lerp(a.rotation_angle, a.rotation_angle - b.rotation_diff, amount);
     
     return l;
@@ -146,6 +145,8 @@ game_init (Game_Memory_Package memory, Range view_bounds) {
     gs->level = arena_alloc_fixed(level_addr, arena_size);
     gs->player.height = 15;
     gs->player.radius = 20.f;
+    gs->player.rotation_angle = M_PI32/2.f-.0001f;
+    gs->old_player = gs->player;
     gs->view_bounds = view_bounds;
     gs->test_level = map_load(gs->level, str8_lit("w:/code/dumb/level.json"));
     
@@ -181,13 +182,14 @@ game_tick (Game_Memory_Package memory, Game_Input_Package input, f32 dt) {
         dir = v2norm(dir);
     player->pos = v2add(player->pos, v2muls(dir, PLAYER_MOVE_SPEED * dt));
     
-    update_current_sector(player, &gs->test_level);
+    update_current_sector(&gs->player, &gs->test_level);
 }
 
 function void
 game_render (Game_Memory_Package memory, f32 lerp_amount) {
     Game_State *gs = (Game_State*)memory.memory;
-    Sector *player_sector = &gs->test_level.sectors[gs->player.curr_sector];
     Entity lerped_player = entity_lerp(gs->old_player, gs->player, lerp_amount);
-    r_sector(&gs->test_level, player_sector, gs->level_textures, &lerped_player, -1, gs->view_bounds);
+    Sector *player_sector = &gs->test_level.sectors[gs->player.curr_sector];
+    r_clear(); // @todo: Just in case I forget, I don't need this
+    r_sector(&gs->test_level, player_sector, gs->level_textures, &lerped_player, -1, 0, gs->view_bounds);
 }

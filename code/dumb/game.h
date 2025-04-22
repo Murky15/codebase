@@ -9,9 +9,6 @@ typedef struct Game_Memory_Package {
 } Game_Memory_Package;
 
 typedef struct Game_Input_Package {
-    // @note: Do we put "camera controlls" here? 
-    // If it is a dev tool it should probably be handled by the
-    // platform layer no?
     b32 move_forward;
     b32 move_back;
     b32 strafe_left;
@@ -28,6 +25,7 @@ function void game_render(Game_Memory_Package memory, f32 lerp_amount);
 
 typedef struct Entity {
     Vec2 pos;
+    Vec2 move_dir;
     f32 height;
     f32 rotation_angle;
     f32 rotation_diff;
@@ -58,9 +56,7 @@ enum {
 typedef struct Asset {
     String8 name;
     union { // Put other asset types here
-        struct {
-            PNG_Bitmap_RGBA img;
-        };
+        PNG_Bitmap_RGBA img;
     };
 } Asset;
 

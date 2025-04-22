@@ -388,7 +388,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
 
     //- @note: THREADING INIT
     f32 game_tick_hz = 25.f;
-    f32 game_render_hz = monitor_info.dmDisplayFrequency / 2.f; 
+    f32 game_render_hz = 60.f; 
     Platform_Timing_Info timing = {.tick_hz = game_tick_hz, .render_hz = game_render_hz};
     timeBeginPeriod(1);
     shared_game_data.mutex = CreateMutex(NULL, false, NULL);

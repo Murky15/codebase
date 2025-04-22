@@ -132,3 +132,8 @@ core_function f32
 lerp (f32 v0, f32 v1, f32 t) {
     return (1.f - t) * v0 + t * v1;
 }
+
+core_function b32 
+almost_equal (f32 a, f32 b, f32 e) {
+    return fabs(a - b) <= e;
+}

@@ -23,7 +23,7 @@ window:
   hint_code_text: 1
   panels:
   {
-    0.418192:
+    0.436049:
     {
       0.817222:
       {
@@ -34,22 +34,19 @@ window:
       }
       0.182776:
       {
-        call_stack: {selected project:{"root.raddbg_project"} }
+        call_stack: {project:{"root.raddbg_project"} }
         modules: {project:{"root.raddbg_project"} }
-        scheduler: {project:{"root.raddbg_project"} }
+        scheduler: {selected project:{"root.raddbg_project"} }
       }
     }
-    0.581808:
+    0.563951:
     {
       0.692982:
       {
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/strings.c\""} cursor_line:{ 72} cursor_column:{ 1} mark_line:{ 72} mark_column:{1} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/dumb/platform_win32_multithreaded.c\""} cursor_line:{ 273} cursor_column:{ 35} mark_line:{ 273} mark_column:{35} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/dumb/game.c\""} cursor_line:{ 155} cursor_column:{ 5} mark_line:{ 155} mark_column:{5} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/memory.c\""} cursor_line:{ 67} cursor_column:{ 46} mark_line:{ 67} mark_column:{46} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/os/win32/io.c\""} cursor_line:{ 76} cursor_column:{ 23} mark_line:{ 76} mark_column:{23} }
-        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/dumb/renderer.c\""} cursor_line:{ 190} cursor_column:{ 5} mark_line:{ 190} mark_column:{5} }
-        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/types.c\""} cursor_line:{ 134} cursor_column:{ 1} mark_line:{ 134} mark_column:{1} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/dumb/renderer.c\""} cursor_line:{ 272} cursor_column:{ 33} mark_line:{ 272} mark_column:{33} }
+        text: {selected project:{"root.raddbg_project"} query:{"file:\"../code/dumb/map.c\""} cursor_line:{ 111} cursor_column:{ 19} mark_line:{ 111} mark_column:{19} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/dumb/game.c\""} cursor_line:{ 196} cursor_column:{ 1} mark_line:{ 196} mark_column:{1} }
+        text: {project:{"root.raddbg_project"} query:{"file:\"../code/base/memory.c\""} cursor_line:{ 72} cursor_column:{ 6} mark_line:{ 72} mark_column:{6} }
       }
       0.307018:
       {
@@ -134,16 +131,16 @@ keybindings:
   {"new_panel_down"                          ctrl minus          }
   {"new_panel_right"                         ctrl p              }
   {"next_panel"                              ctrl comma          }
-  {"next_tab"                                ctrl tab            }
   {"next_tab"                                ctrl page_down      }
+  {"next_tab"                                ctrl tab            }
   {"open_project"                            ctrl alt o          }
   {"open"                                    ctrl o              }
   {"open_user"                               ctrl shift alt o    }
   {"paste"                                   ctrl v              }
   {"paste"                                   shift insert        }
   {"prev_panel"                              ctrl shift comma    }
-  {"prev_tab"                                ctrl shift tab      }
   {"prev_tab"                                ctrl page_up        }
+  {"prev_tab"                                ctrl shift tab      }
   {"restart"                                 ctrl shift f5       }
   {"rotate_panel_columns"                    ctrl 2              }
   {"run"                                     f5                  }

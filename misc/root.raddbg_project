@@ -2,11 +2,28 @@
 
 /// watches ///////////////////////////////////////////////////////////////////
 
-watch: "minp.x"
-watch: "maxp.x"
-watch: "d0.y"
-watch: "d1.y"
+watch: "start_x"
+watch: "end_x"
 watch: "wall"
+watch: "minp"
+watch: "maxp"
+watch: "num_iterations"
+watch: "t0"
+watch: "t1"
+watch: "d0"
+watch: "d1"
+watch: "cam"
+watch: "sector"
+watch: "last_sector"
+watch: "entity"
+
+/// breakpoints ///////////////////////////////////////////////////////////////
+
+breakpoint:
+{
+  disabled: 1
+  location: ("../code/dumb/renderer.c":196)
+}
 
 /// targets ///////////////////////////////////////////////////////////////////
 
@@ -24,13 +41,14 @@ recent_file: "../code/file/puff.c"
 recent_file: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memcpy.asm"
 recent_file: "../build/dumb.exe"
 recent_file: "../code/file/png.c"
-recent_file: "../code/dumb/platform_win32_multithreaded.c"
-recent_file: "../code/base/memory.c"
 recent_file: "../code/base/strings.c"
 recent_file: "../code/os/win32/io.c"
-recent_file: "../code/dumb/game.c"
 recent_file: "../code/base/types.c"
+recent_file: "../code/base/memory.c"
+recent_file: "../code/dumb/platform_win32_multithreaded.c"
+recent_file: "../code/dumb/game.c"
 recent_file: "../code/dumb/renderer.c"
+recent_file: "../code/dumb/map.c"
 
 /// exception code filters ////////////////////////////////////////////////////
 

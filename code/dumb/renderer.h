@@ -11,7 +11,7 @@
 #define MAX_COLUMNS RESOLUTION_W
 #define MAX_SPANS   RESOLUTION_H
 
-#define MAX_ITERATIONS 64
+#define MAX_ITERATIONS (s32_max - 1)
 #define MAX_WALLS_IN_VIEW 64
 
 typedef struct Bitmap {
@@ -23,6 +23,11 @@ typedef union Edge_2D {
     struct { Vec2 p0, p1; };
     Vec2 p[2];
 } Edge_2D;
+
+typedef struct Edge_Table_Entry {
+    Vec2 minp, maxp;
+    f32 recslope;
+} Edge_Table_Entry;
 
 //- @note: Fundementals
 function Bitmap* r_get_framebuffer(void);
@@ -42,6 +47,6 @@ function void r_draw_rect(Vec2 p, Vec2 sz, Color c);
 
 //- @note: Game specific
 function void r_map(Map map, Vec3 map_cam, Entity player, b32 show_player);
-function void r_sector(Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, Range window);
+function void r_sector(Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, s32 num_iterations, Range window);
 
 #endif //RENDERER_H

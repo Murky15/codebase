@@ -7,9 +7,9 @@
 #define RESOLUTION_W 640
 #define RESOLUTION_H 360
 
-#define GAME_MEMORY_SIZE Kilobytes(4)
+#define GAME_MEMORY_SIZE Gigabytes(1)
 
-#define MOUSE_SENSITIVITY 0.01f
+#define MOUSE_SENSITIVITY 0.1f
 #define MOUSE_SCROLL_SENSITIVITY 0.8f
 #define CAM_MOVE_SPEED 200.f
 
@@ -327,7 +327,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         SwapBuffers(platform.dev_dc);
         
         game_tick(game_memory, game_input, dt);
-        game_render(game_memory);
+        game_render(game_memory, 0);
         // @todo: Preserve aspect ratio
         StretchDIBits(
                       platform.win_dc,
