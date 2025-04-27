@@ -1,4 +1,4 @@
-O// @note: Unity build
+// @note: Unity build
 
 #include <stdio.h>
 

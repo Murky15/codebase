@@ -34,7 +34,7 @@ typedef struct Temp_Arena {
 
 // @note: Arena functions
 
-core_function Arena*     arena_alloc_fixed(void* buff, u64 size);
+core_function Arena*     arena_alloc_fixed(void *buff, u64 size);
 core_function Arena*     arena_alloc(void);
 core_function void       arena_release(Arena *arena);
 core_function void*      arena_push_no_zero(Arena *arena, u64 size, u64 align);

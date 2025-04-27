@@ -54,48 +54,7 @@ map_load (Arena *arena, String8 path) {
     return map;
 }
 
-/*
-function b32
-wall_intersect (Vec2 p, Vec2 dir, Wall w) {
-    b32 result = 0;
-    Vec2 a = v2sub(p, w.p0);
-    Vec2 b = v2sub(w.p1, w.p0);
-    Vec2 c = v2(-dir.y, dir.x);
-    
-    f32 d = v2dot(b, c);
-    f32 t1 = v2cross(b, a) / d;
-    f32 t2 = v2dot(a, c) / d;
-    result = (t1 >= 0.f && t2 >= 0.f && t2 <= 1.f);
-    
-    return result;
-}
-
-function b32 
-point_in_sector (Vec2 p, Sector *s) {
-    u64 num_intersections = 0;
-    for (u64 widx = 0; widx < sector->num_walls; ++widx) {
-        Wall w = sector->walls[widx];
-        if (wall_intersect(p, V2_Up, w)) num_intersections++;
-    }
-    
-    return ((num_intersections % 2) != 0);
-}
-
-function b32
-point_on_wall (Vec2 p, Wall w) {
-    if (w.p0.x <= p.x && p.x <= w.p1.x && w.p0.y <= p.y && p.y <= w.p1.y) {
-        f32 m1 = (p.y-w.p0.y) / (p.x-w.p0.x);
-        f32 m2 = (w.p1.y-w.p0.y) / (w.p1.x-w.p0.x);
-        if (almost_equal(m1, m2, 0.1f))
-            return true;
-    }
-    
-    return false;
-}
-
-*/
-
-// Faster method: https://wrfranklin.org/Research/Short_Notes/pnpoly.html
+// https://wrfranklin.org/Research/Short_Notes/pnpoly.html
 function b32
 entity_in_sector (Entity *e, Sector *s) {
     b32 result = false;
@@ -121,6 +80,7 @@ update_current_sector (Entity *entity, Map *map) {
     for (Sector_Ref *adj = curr_sector->adjacent.first; adj; adj = adj->next) {
         if (entity_in_sector(entity, adj->sector)) {
             entity->curr_sector = adj->sector->id;
+            entity->in_transition = true;
             return;
         }
     }

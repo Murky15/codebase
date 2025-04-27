@@ -23,14 +23,18 @@ function void game_render(Game_Memory_Package memory, f32 lerp_amount);
 
 //- @note: Game specific
 
+typedef u32 Entity_Flags;
+
 typedef struct Entity {
     Vec2 pos;
-    Vec2 move_dir;
     f32 height;
+    f32 radius;
+    
     f32 rotation_angle;
     f32 rotation_diff;
-    f32 radius;
+    
     s32 curr_sector;
+    b32 in_transition;
 } Entity;
 
 typedef u32 Asset_Group_Type;

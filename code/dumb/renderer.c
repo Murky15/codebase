@@ -222,9 +222,9 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             Vec2 d0_preclip = d0;
             Vec2 d1_preclip = d1;
             f32 clipped_x = d0.x + (((d1.x - d0.x) * (near_plane - d0.y)) / (d1.y - d0.y));
-            if (d0.y <= near_plane) {
+            if (d0.y < near_plane) {
                 d0 = v2(clipped_x, near_plane);
-            } else if (d1.y <= near_plane) {
+            } else if (d1.y < near_plane) {
                 d1 = v2(clipped_x, near_plane);
             }
             
@@ -290,7 +290,12 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                     map to the projected wall positions when traveling between sectors. This leads to 
                     the player technically being "outside" its current sector and this portal wall is rendered
                     on the opposite side which causes the flicker.
+                    
+                    When the player changes sectors, we can check which side of the border the player SHOULD be on 
+                    (based on actual map coordinates) and which side of the border the player is PROJECTED on 
+                    (using the projected wall points tested with (0,0)) to determine whether we should actually change sectors
                 */
+                
                 bounds.first = start_x;
                 bounds.last  = end_x;
                 Entity modified_cam = *cam;
