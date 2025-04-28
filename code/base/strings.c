@@ -296,7 +296,7 @@ str8_list_join (Arena *arena, String8List list, String8Join *opt_join_params) {
     u64 size = join.pre.len + join.post.len + join.sep.len * (list.num_nodes - 1) + list.total_len;
     u8 *buffer = arena_pushn(arena, u8, size + 1);
     u8 *ptr = buffer;
-    String8 result = {buffer, size};
+    String8 result = comp_lit(String8, buffer, size);
     
     memory_copy(ptr, join.pre.str, join.pre.len);
     ptr += join.pre.len;
