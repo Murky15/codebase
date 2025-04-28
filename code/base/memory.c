@@ -90,11 +90,13 @@ arena_pop_to (Arena *arena, u64 pos) {
     pos = clamp(pos, min_pos, max_pos);
     
     arena->pos = pos;
-    if (arena->type == Arena_Type_MMU && nearest_commit + ARENA_DECOMMIT_THRESHOLD <= arena->commit_pos) {
+    if (arena->type == Arena_Type_MMU) {
         u64 nearest_commit = round_up_pow2(pos, PAGE_TABLE_SIZE);
-        u64 commit_diff = arena->commit_pos - nearest_commit;
-        mem_decommit((u8*)arena + nearest_commit, commit_diff);
-        arena->commit_pos = nearest_commit;
+        if (nearest_commit + ARENA_DECOMMIT_THRESHOLD <= arena->commit_pos) {
+            u64 commit_diff = arena->commit_pos - nearest_commit;
+            mem_decommit((u8*)arena + nearest_commit, commit_diff);
+            arena->commit_pos = nearest_commit;
+        }
     }
 }
 
