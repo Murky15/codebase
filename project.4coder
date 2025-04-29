@@ -36,11 +36,11 @@ commands = {
     //- Build commands
     .build_dumb = {.win="tclsh butler.tcl build msvc mslink dumb", .out="*output*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false},
     
-	.build_genesis = {.win="tclsh butler.tcl build tcc genesis", .out="*output*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false},
+	.build_geoc = {.win="tclsh butler.tcl build tcc geometry_compiler", .out="*output*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false},
 
     //- Run commands
     .run_dumb = {.win="build\dumb.exe", .out="*output*"},
-	.run_genesis = {.win="build\genesis.exe text_selector.ggb", .out="*output*"},    
+	.run_geoc = {.win="build\geoc.exe text_selector.ggb", .out="*output*"},    
 
     //- Misc commands
     .open_debugger = {.win="call misc\open_debugger.bat"},
@@ -50,8 +50,8 @@ fkey_command = {
     .F1 = "build_dumb",
     .F2 = "run_dumb",
 
-	.F3 = "build_genesis",
-	.F4 = "run_genesis",
+	.F3 = "build_geoc",
+	.F4 = "run_geocs",
     
     .F9 = "open_debugger",
 };
