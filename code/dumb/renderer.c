@@ -169,6 +169,18 @@ r_draw_rect (Vec2 p, Vec2 sz, Color c) {
         r_draw_vert(x, p.y, p.y + sz.y, c);
 }
 
+function Edge
+r_make_edge (Vec2 minp, Vec2 maxp) {
+    Edge result = {0};
+    result.minp = minp;
+    result.maxp = maxp;
+    
+    f32 slope = (maxp.y-minp.y)/(maxp.x-minp.x);
+    result.recslope = 1.f/slope;
+    
+    return result;
+}
+
 function void
 r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, s32 num_iterations, Range window) {
     Bitmap *canvas = r_get_framebuffer();
@@ -185,8 +197,9 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
     f32 full_depth  = (f32)sector->floor - actual_height;
     
     if (num_iterations < MAX_ITERATIONS) {
-        Edge_2D floor_edges[MAX_WALLS_IN_VIEW];
-        Edge_2D ceil_edges[MAX_WALLS_IN_VIEW];
+        Vec2 floor_verticies[MAX_SURFACE_VERTICIES];
+        Vec2 ceil_verticies[MAX_SURFACE_VERTICIES];
+        u64 fvi = 0, cvi = 0;
         
         for (u64 wall_idx = 0; wall_idx < sector->num_walls; ++wall_idx) {
             Wall *wall = &sector->walls[wall_idx];
@@ -328,13 +341,11 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
         }
         
         // Render floor and ceiling
-        
     }
 }
 
 function void
-r_plane (Edge_2D *e, u64 num_edges) {
-    // Launch scout to get bearings
+r_plane (Edge *e, u64 num_edges) {
     // https://www.cs.rit.edu/~icss571/filling/how_to.html
 }
 

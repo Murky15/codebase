@@ -21,7 +21,7 @@
 
 #define MIN_EXCESS_MEMORY Kilobytes(2)
 
-#define PLAYER_MOVE_SPEED 150.f // 150.f
+#define PLAYER_MOVE_SPEED 150.f
 
 /*
 @todo
@@ -182,6 +182,7 @@ game_tick (Game_Memory_Package memory, Game_Input_Package input, f32 dt) {
     
     // @note: Player sector is updated in game_render! (Otherwise we get a nasty flicker which we can't solve through approximation)
     // We just reuse the "lerped player's" current sector to avoid calling the `update_current_sector` function more than we need to
+    // This is a good thing to share for my MIT portfolio, how I mastered the debugger to try and find this thing.
 }
 
 function void
