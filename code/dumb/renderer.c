@@ -24,7 +24,7 @@ function void
 r_put_pixel_at (Vec2 p, Color c) {
     Bitmap *canvas = r_get_framebuffer();
     
-    Vec2i pi = v2i_from_v2(p); // @todo: Unnecessary slowness
+    Vec2i pi = v2i_from_v2(p);
     if (pi.x >= 0 && pi.y >= 0 && pi.x < canvas->width && pi.y < canvas->height)
         canvas->pixels[pi.y * canvas->width + pi.x] = (c.r << 16 | c.g << 8 | c.b);
 }
@@ -271,7 +271,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             maxp.ceil = ceil1;
             maxp.depth = depth1;
             maxp.height = height1;
-         
+            
             if (maxp.x < minp.x) {
                 temp = minp;
                 minp = maxp;
@@ -285,17 +285,6 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             if (wall->next_sector >= 0) { // @todo: This will result in an infinite loop for "circular" sectors
                 Sector *next_sector = &map->sectors[wall->next_sector];
                 Range bounds;
-                /*
-                    Due to floating point rounding error, update_current_sector does not always correctly
-                    map to the projected wall positions when traveling between sectors. This leads to 
-                    the player technically being "outside" its current sector and this portal wall is rendered
-                    on the opposite side which causes the flicker.
-                    
-                    When the player changes sectors, we can check which side of the border the player SHOULD be on 
-                    (based on actual map coordinates) and which side of the border the player is PROJECTED on 
-                    (using the projected wall points tested with (0,0)) to determine whether we should actually change sectors
-                */
-                
                 bounds.first = start_x;
                 bounds.last  = end_x;
                 Entity modified_cam = *cam;
@@ -308,10 +297,10 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             Texture_Map_Type test_texture_map_type = TEXTURE_MAP_REPEAT;
             
             f32 img_width = test_wall_texture.img.width;
-            f32 wall_length = sqrtf(sqr(d0_preclip.x-d1_preclip.x) + sqr(d0_preclip.y-d1_preclip.y)); // @todo: Probably a way to cache this
+            f32 wall_length = sqrtf(sqr(d0_preclip.x-d1_preclip.x) + sqr(d0_preclip.y-d1_preclip.y)); // @todo: Cache this when loading level json
             f32 pages_per_wall = wall_length / img_width;
             
-            for (f32 x = start_x; x <= end_x; ++x) { // @todo: Is this correct?
+            for (f32 x = start_x; x <= end_x; ++x) {
                 f32 xnorm  = norm(x, minp.x, maxp.x);
                 f32 texnorm = norm(x, minp.x_preclip, maxp.x_preclip);
                 
@@ -323,12 +312,12 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                     texx = lerp(0, (img_width*pages_per_wall)/maxp.z, texnorm) / lerp(1.f/minp.z, 1.f/maxp.z, texnorm);
                     texx %= (u32)img_width;
                 }
-
+                
                 f32 depth  = lerp(minp.depth, maxp.depth, xnorm); 
                 f32 height = lerp(minp.height, maxp.height, xnorm);
                 f32 floor  = lerp(minp.floor, maxp.floor, xnorm); 
                 f32 ceil   = lerp(minp.ceil, maxp.ceil, xnorm);
-               
+                
                 r_draw_vert(x, depth, floor, Color_Maroon); // ledge
                 if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, sector->ceiling-sector->floor, test_wall_texture.img, test_texture_map_type, texx); // wall
                 r_draw_vert(x, ceil, height, Color_Maroon); // ledge

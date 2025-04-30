@@ -15,14 +15,28 @@ watch: "d1"
 watch: "cam"
 watch: "sector"
 watch: "last_sector"
-watch: "entity"
+watch: "cam"
 
 /// breakpoints ///////////////////////////////////////////////////////////////
 
 breakpoint:
 {
   disabled: 1
-  location: ("../code/dumb/renderer.c":196)
+  location: ("../code/dumb/map.c":80)
+}
+
+breakpoint:
+{
+  disabled: 1
+  location: ("../code/dumb/renderer.c":281)
+  condition: "wall->next_sector == 1 && sector->id == 0"
+}
+
+breakpoint:
+{
+  disabled: 1
+  location: ("../code/dumb/game.c":126)
+  condition: "a.curr_sector != b.curr_sector"
 }
 
 /// targets ///////////////////////////////////////////////////////////////////
@@ -47,8 +61,8 @@ recent_file: "../code/base/types.c"
 recent_file: "../code/base/memory.c"
 recent_file: "../code/dumb/platform_win32_multithreaded.c"
 recent_file: "../code/dumb/game.c"
-recent_file: "../code/dumb/renderer.c"
 recent_file: "../code/dumb/map.c"
+recent_file: "../code/dumb/renderer.c"
 
 /// exception code filters ////////////////////////////////////////////////////
 

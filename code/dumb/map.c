@@ -80,7 +80,6 @@ update_current_sector (Entity *entity, Map *map) {
     for (Sector_Ref *adj = curr_sector->adjacent.first; adj; adj = adj->next) {
         if (entity_in_sector(entity, adj->sector)) {
             entity->curr_sector = adj->sector->id;
-            entity->in_transition = true;
             return;
         }
     }

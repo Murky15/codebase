@@ -51,7 +51,7 @@ win32_get_perf_frequency (void) {
     local_persist threadvar LARGE_INTEGER freq;
     if (freq.QuadPart == 0)
         QueryPerformanceFrequency(&freq);
-        
+    
     return freq.QuadPart;
 }
 
@@ -103,19 +103,19 @@ win32_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                         
                         switch (scan_code) {
                             case 0x0011: {      // W
-                                    game_input.move_forward = key_down;
+                                game_input.move_forward = key_down;
                             } break;
                             
                             case 0x001F: {      // S
-                                    game_input.move_back = key_down;
+                                game_input.move_back = key_down;
                             } break;
                             
                             case 0x001E: {      // A
-                                    game_input.strafe_left = key_down;
+                                game_input.strafe_left = key_down;
                             } break;
                             
                             case 0x0020: {      // D
-                                    game_input.strafe_right = key_down;
+                                game_input.strafe_right = key_down;
                             } break;
                             
                             case 0x0001: {      // Escape
@@ -168,7 +168,7 @@ win32_game_tick (LPVOID param) {
     f32 tick_hz = *(f32*)param;
     f32 seconds_per_tick = (1.f / tick_hz);
     f32 ms_per_tick = seconds_per_tick * 1000.f;
-     
+    
     while (1) {        
         u64 start = win32_query_clock();
         
@@ -206,7 +206,7 @@ win32_game_render (LPVOID param) {
         WaitForSingleObject(shared_game_data.mutex, INFINITE);
         u64 predicted_end_game_tick = shared_game_data.last_game_tick + game_tick_duration;
         f32 t = norm((f64)start, (f64)shared_game_data.last_game_tick, (f64)predicted_end_game_tick);
-        game_render(shared_game_data.game_memory, t);
+        game_render(shared_game_data.game_memory, clamp(t, 0.f, 1.f));
         Bitmap *bitmap = r_get_framebuffer();
         StretchDIBits(
                       platform.win_dc,
@@ -240,7 +240,7 @@ function DWORD WINAPI
 win32_dev_tools (LPVOID param) {
     HDC dev_dc;
     HGLRC dev_gl_ctx;
-
+    
     HWND dev_window = CreateWindow("default window class",
                                    "VOODOO: DEVELOPER TOOLS",
                                    WS_OVERLAPPED | WS_VISIBLE | WS_THICKFRAME,
@@ -298,7 +298,7 @@ win32_dev_tools (LPVOID param) {
         
         SwapBuffers(dev_dc);
     }
-       
+    
     return 0;
 }
 
@@ -322,17 +322,17 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     RECT dim = {0, 0, platform.window_width, platform.window_height};
     AdjustWindowRect(&dim, WS_OVERLAPPEDWINDOW, 0);
     platform.hwnd = CreateWindow(
-                             wc.lpszClassName,
-                             "Voodoo (Working title), codename: \"Dumb\" | dev build",
-                             (WS_OVERLAPPEDWINDOW | WS_VISIBLE) ^ WS_THICKFRAME, // @todo: Handle window resizes
-                             CW_USEDEFAULT,
-                             CW_USEDEFAULT,
-                             dim.right - dim.left,
-                             dim.bottom - dim.top,
-                             0, 0,
-                             hInstance,
-                             0
-                             );
+                                 wc.lpszClassName,
+                                 "Voodoo (Working title), codename: \"Dumb\" | dev build",
+                                 (WS_OVERLAPPEDWINDOW | WS_VISIBLE) ^ WS_THICKFRAME, // @todo: Handle window resizes
+                                 CW_USEDEFAULT,
+                                 CW_USEDEFAULT,
+                                 dim.right - dim.left,
+                                 dim.bottom - dim.top,
+                                 0, 0,
+                                 hInstance,
+                                 0
+                                 );
     if (!platform.hwnd) {
         OutputDebugString("Window creation failed!\n");
         return 1;
@@ -385,7 +385,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     void *buff = arena_pushn(platform.arena, u8, GAME_MEMORY_SIZE);
     shared_game_data.game_memory = (Game_Memory_Package){buff, GAME_MEMORY_SIZE};
     game_init(shared_game_data.game_memory, view_bounds);    
-
+    
     //- @note: THREADING INIT
     f32 game_tick_hz = 25.f;
     f32 game_render_hz = 60.f; 

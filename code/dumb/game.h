@@ -34,13 +34,12 @@ typedef struct Entity {
     f32 rotation_diff;
     
     s32 curr_sector;
-    b32 in_transition;
 } Entity;
 
 typedef u32 Asset_Group_Type;
 enum {
     ASSET_GROUP_NULL,
-
+    
     ASSET_GROUP_IMAGES,
     ASSET_GROUP_MUSIC,
     ASSET_GROUP_FONTS,

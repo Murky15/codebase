@@ -4,8 +4,8 @@
 #define ASPECT_W 16.f
 #define ASPECT_H 9.f
 
-#define RESOLUTION_W 640
-#define RESOLUTION_H 360
+#define RESOLUTION_W 320 // 640
+#define RESOLUTION_H 180 // 360
 #define TEXTURE_VERT_REPEAT_SCALE 1.5
 
 #define MAX_COLUMNS RESOLUTION_W

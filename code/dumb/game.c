@@ -1,5 +1,3 @@
-// Voodoo is a sick name
-
 //- @note: Headers
 #include <stdio.h>
 
@@ -182,14 +180,18 @@ game_tick (Game_Memory_Package memory, Game_Input_Package input, f32 dt) {
         dir = v2norm(dir);
     player->pos = v2add(player->pos, v2muls(dir, PLAYER_MOVE_SPEED * dt));
     
-    update_current_sector(&gs->player, &gs->test_level);
+    // @note: Player sector is updated in game_render! (Otherwise we get a nasty flicker which we can't solve through approximation)
+    // We just reuse the "lerped player's" current sector to avoid calling the `update_current_sector` function more than we need to
 }
 
 function void
 game_render (Game_Memory_Package memory, f32 lerp_amount) {
     Game_State *gs = (Game_State*)memory.memory;
     Entity lerped_player = entity_lerp(gs->old_player, gs->player, lerp_amount);
-    Sector *player_sector = &gs->test_level.sectors[gs->player.curr_sector];
-    r_clear(); // @todo: Just in case I forget, I don't need this
+    
+    update_current_sector(&lerped_player, &gs->test_level);
+    Sector *player_sector = &gs->test_level.sectors[lerped_player.curr_sector];
+    gs->player.curr_sector = lerped_player.curr_sector;
+    
     r_sector(&gs->test_level, player_sector, gs->level_textures, &lerped_player, -1, 0, gs->view_bounds);
 }
