@@ -197,9 +197,9 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
     f32 full_depth  = (f32)sector->floor - actual_height;
     
     if (num_iterations < MAX_ITERATIONS) {
-        Vec2 floor_verticies[MAX_SURFACE_VERTICIES];
-        Vec2 ceil_verticies[MAX_SURFACE_VERTICIES];
-        u64 fvi = 0, cvi = 0;
+        Edge floor_edges[MAX_WALLS_IN_SECTOR];
+        Edge ceil_edges[MAX_WALLS_IN_SECTOR];
+        u64 floor_edge_count = 0, ceil_edge_count = 0;
         
         for (u64 wall_idx = 0; wall_idx < sector->num_walls; ++wall_idx) {
             Wall *wall = &sector->walls[wall_idx];
@@ -215,8 +215,6 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             f32 floor = full_depth + floor_diff;
             
             //- Transform wall relative to player
-            if (last_sector > -1 && wall->next_sector == last_sector)
-                continue;
             
             Vec2 t0 = v2sub(wall->p0, cam->pos);
             Vec2 t1 = v2sub(wall->p1, cam->pos);
@@ -294,8 +292,20 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             f32 start_x = clamp(minp.x, window.first, window.last);
             f32 end_x = clamp(maxp.x, window.first, window.last);   
             
+            // @note: Add new verticies into list 
+            // @todo: This is ugly, we do this computation again in the wall render loop. How can we clean this up?
+            f32 start_norm  = norm(start_x, minp.x, maxp.x);
+            f32 end_norm    = norm(end_x, minp.x, maxp.x);
+            
+            f32 start_depth = lerp(minp.depth, maxp.depth, start_norm); 
+            f32 end_depth   = lerp(minp.depth, maxp.depth, end_norm); 
+            f32 start_height  = lerp(minp.height, maxp.height, start_norm);
+            f32 end_height    = lerp(minp.height, maxp.height, end_norm);
+            floor_edges[floor_edge_count++] = r_make_edge(v2(start_x, start_depth), v2(end_x, end_depth));
+            ceil_edges[ceil_edge_count++] = r_make_edge(v2(start_x, start_height), v2(end_x, end_height));
+            
             // Render into next scene (if applicable)
-            if (wall->next_sector >= 0) { // @todo: This will result in an infinite loop for "circular" sectors
+            if (wall->next_sector >= 0 && wall->next_sector != last_sector) { // @todo: This will result in an infinite loop for "circular" sectors
                 Sector *next_sector = &map->sectors[wall->next_sector];
                 Range bounds;
                 bounds.first = start_x;
@@ -331,16 +341,39 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 f32 floor  = lerp(minp.floor, maxp.floor, xnorm); 
                 f32 ceil   = lerp(minp.ceil, maxp.ceil, xnorm);
                 
-                r_draw_vert(x, depth, floor, Color_Maroon); // ledge
+                //r_draw_vert(x, depth, floor, Color_Maroon); // ledge
                 if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, sector->ceiling-sector->floor, test_wall_texture.img, test_texture_map_type, texx); // wall
-                r_draw_vert(x, ceil, height, Color_Maroon); // ledge
+                //r_draw_vert(x, ceil, height, Color_Maroon); // ledge
                 
                 r_draw_vert(x, -1.f, depth, Color_Black); // floor
                 r_draw_vert(x, height, canvas_height, Color_Black); // Cielling
             } 
         }
         
-        // Render floor and ceiling
+        //- Render floor and ceiling
+        
+        // Sort edge tables
+        Edge global_floor_table[MAX_WALLS_IN_SECTOR] = {0};
+        Edge global_ceil_table[MAX_WALLS_IN_SECTOR] = {0};
+        for (u64 i = 0 ; i < floor_edge_count; ++i) {
+            Edge e = floor_edges[i];
+            if (!almost_equal(1.f / e.recslope, 0.f, 0.0001f)) {
+                for (u64 j = 0; j < array_count(global_floor_table); ++j) {
+                    if (e.)
+                }
+            }
+        }
+        
+        Edge active_floor_table[MAX_WALLS_IN_SECTOR];
+        Edge active_ceil_table[MAX_WALLS_IN_SECTOR];
+        
+        // Debug wireframe view
+        for (u64 i = 0; i < floor_edge_count; ++i) {
+            r_draw_line(floor_edges[i].minp, floor_edges[i].maxp, Color_Lime);
+        }
+        for (u64 i = 0; i < ceil_edge_count; ++i) {
+            r_draw_line(ceil_edges[i].minp, ceil_edges[i].maxp, Color_Lime);
+        }
     }
 }
 

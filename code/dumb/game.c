@@ -194,5 +194,6 @@ game_render (Game_Memory_Package memory, f32 lerp_amount) {
     Sector *player_sector = &gs->test_level.sectors[lerped_player.curr_sector];
     gs->player.curr_sector = lerped_player.curr_sector;
     
+    r_clear();
     r_sector(&gs->test_level, player_sector, gs->level_textures, &lerped_player, -1, 0, gs->view_bounds);
 }

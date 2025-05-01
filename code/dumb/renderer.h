@@ -12,7 +12,7 @@
 #define MAX_SPANS   RESOLUTION_H
 
 #define MAX_ITERATIONS (s32_max - 1)
-#define MAX_SURFACE_VERTICIES 32
+#define MAX_WALLS_IN_SECTOR 64
 
 typedef struct Bitmap {
     u32 *pixels;
