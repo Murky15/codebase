@@ -134,6 +134,7 @@ lerp (f32 v0, f32 v1, f32 t) {
 }
 
 core_function b32 
-almost_equal (f32 a, f32 b, f32 e) {
+almost_equal (f32 a, f32 b) {
+    local_persist read_only f32 e = 0.0001f; 
     return fabs(a - b) <= e;
 }

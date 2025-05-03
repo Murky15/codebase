@@ -181,7 +181,7 @@ core_function Vec3 v3cross(Vec3 a, Vec3 b);
 //- @note: Some float helpers
 core_function f32 fmod_cycling(f32 x, f32 y); // Ripped this straight from Jai
 core_function f32 lerp (f32 v0, f32 v1, f32 t);
-core_function b32 almost_equal (f32 a, f32 b, f32 e);
+core_function b32 almost_equal (f32 a, f32 b);
 
 #undef make_array_type
 #endif // BASE_TYPES_H

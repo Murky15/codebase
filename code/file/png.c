@@ -460,8 +460,8 @@ png_decode (Arena *arena, String8 png_data) {
                     }
                     
                     if (critical_data.interlace != PNG_Interlace_Null) {
-                      fputs("It's 2024, who is still using interlace in a png!\n", stderr);
-                      goto exit;
+                        fputs("It's 2024, who is still using interlace in a png!\n", stderr);
+                        goto exit;
                     }
                 } else if (chunk.type.code == fourcc("PLTE")) {
                     critical_data.palette_entry_count = chunk.length / 3;
@@ -505,7 +505,7 @@ png_decode (Arena *arena, String8 png_data) {
                 };
                 
             } else {
-                printf("PNG: No ancillary chunks are supported yet!\n");
+                //printf("PNG: No ancillary chunks are supported yet!\n");
             }
         }
         

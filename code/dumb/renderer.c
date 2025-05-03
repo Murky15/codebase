@@ -170,15 +170,57 @@ r_draw_rect (Vec2 p, Vec2 sz, Color c) {
 }
 
 function Edge
-r_make_edge (Vec2 minp, Vec2 maxp) {
+r_make_edge (Vec2 p0, Vec2 p1) {
     Edge result = {0};
-    result.minp = minp;
-    result.maxp = maxp;
     
-    f32 slope = (maxp.y-minp.y)/(maxp.x-minp.x);
+    if (p0.y < p1.y) {
+        result.minp = p0;
+        result.maxp = p1;
+    } else {
+        result.minp = p1;
+        result.maxp = p0;
+    }
+    
+    f32 slope = (p1.y-p0.y)/(p1.x-p0.x);
+    result.slope = slope;
     result.recslope = 1.f/slope;
     
     return result;
+}
+
+function void
+r_edge_array_insert (Edge_Array *array, Edge edge, s32 index) {
+    s32 index_diff = array->count - index;
+    if (index_diff > 0) {
+        for (s32 i = array->count; i > index; --i)
+            array->edges[i] = array->edges[i-1];
+    }
+    array->edges[index] = edge;
+    array->count++;
+}
+
+function void
+r_edge_array_add (Edge_Array *array, Edge edge) {
+    s32 index = 0;
+    for (;index < array->count; ++index) {
+        Edge *e = &array->edges[index];
+        if (edge.minp.y > e->minp.y)
+            continue;
+        if (edge.minp.x > e->minp.x && edge.minp.y < e->minp.y)
+            continue;
+        
+        break;
+    }
+    if (!almost_equal(edge.slope, 0.f))
+        r_edge_array_insert(array, edge, index);
+    
+    Vec2 minx = edge.minp, maxx = edge.maxp;
+    if (minx.x > maxx.x)
+        swap(Vec2, minx, maxx);
+    if (minx.x < array->leftmost.x)
+        array->leftmost = v2add(minx, v2(1,0)); // @todo: Don't modify these!
+    else if (maxx.x > array->rightmost.x)
+        array->rightmost = v2sub(maxx, v2(1,0));
 }
 
 function void
@@ -197,9 +239,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
     f32 full_depth  = (f32)sector->floor - actual_height;
     
     if (num_iterations < MAX_ITERATIONS) {
-        Edge floor_edges[MAX_WALLS_IN_SECTOR];
-        Edge ceil_edges[MAX_WALLS_IN_SECTOR];
-        u64 floor_edge_count = 0, ceil_edge_count = 0;
+        Edge_Array floor_edges = {0}, ceil_edges = {0};
         
         for (u64 wall_idx = 0; wall_idx < sector->num_walls; ++wall_idx) {
             Wall *wall = &sector->walls[wall_idx];
@@ -293,16 +333,20 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             f32 end_x = clamp(maxp.x, window.first, window.last);   
             
             // @note: Add new verticies into list 
-            // @todo: This is ugly, we do this computation again in the wall render loop. How can we clean this up?
-            f32 start_norm  = norm(start_x, minp.x, maxp.x);
-            f32 end_norm    = norm(end_x, minp.x, maxp.x);
-            
-            f32 start_depth = lerp(minp.depth, maxp.depth, start_norm); 
-            f32 end_depth   = lerp(minp.depth, maxp.depth, end_norm); 
-            f32 start_height  = lerp(minp.height, maxp.height, start_norm);
-            f32 end_height    = lerp(minp.height, maxp.height, end_norm);
-            floor_edges[floor_edge_count++] = r_make_edge(v2(start_x, start_depth), v2(end_x, end_depth));
-            ceil_edges[ceil_edge_count++] = r_make_edge(v2(start_x, start_height), v2(end_x, end_height));
+            if (start_x != end_x) {
+                f32 start_norm  = norm(start_x, minp.x, maxp.x);
+                f32 end_norm    = norm(end_x, minp.x, maxp.x);
+                
+                f32 start_depth = lerp(minp.depth, maxp.depth, start_norm); 
+                f32 end_depth   = lerp(minp.depth, maxp.depth, end_norm); 
+                f32 start_height  = lerp(minp.height, maxp.height, start_norm);
+                f32 end_height    = lerp(minp.height, maxp.height, end_norm);
+                
+                Edge fedge = r_make_edge(v2(start_x, start_depth), v2(end_x, end_depth));
+                Edge cedge = r_make_edge(v2(start_x, start_height), v2(end_x, end_height));
+                r_edge_array_add(&floor_edges, fedge);
+                r_edge_array_add(&ceil_edges, cedge);
+            }
             
             // Render into next scene (if applicable)
             if (wall->next_sector >= 0 && wall->next_sector != last_sector) { // @todo: This will result in an infinite loop for "circular" sectors
@@ -352,29 +396,27 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
         
         //- Render floor and ceiling
         
-        // Sort edge tables
-        Edge global_floor_table[MAX_WALLS_IN_SECTOR] = {0};
-        Edge global_ceil_table[MAX_WALLS_IN_SECTOR] = {0};
-        for (u64 i = 0 ; i < floor_edge_count; ++i) {
-            Edge e = floor_edges[i];
-            if (!almost_equal(1.f / e.recslope, 0.f, 0.0001f)) {
-                for (u64 j = 0; j < array_count(global_floor_table); ++j) {
-                    if (e.)
-                }
+        // Complete polyon
+        if (num_iterations == 0) { 
+            if (floor_edges.leftmost.y > -1.f) {
+                Edge c = r_make_edge(v2(0.f, 0.f), floor_edges.leftmost);
+                r_edge_array_add(&floor_edges, c);
+            }
+            if (floor_edges.rightmost.y > -1.f) {
+                Edge c = r_make_edge(v2(canvas_width-1, 0.f), floor_edges.rightmost);
+                r_edge_array_add(&floor_edges, c);
             }
         }
-        
-        Edge active_floor_table[MAX_WALLS_IN_SECTOR];
-        Edge active_ceil_table[MAX_WALLS_IN_SECTOR];
-        
         // Debug wireframe view
-        for (u64 i = 0; i < floor_edge_count; ++i) {
-            r_draw_line(floor_edges[i].minp, floor_edges[i].maxp, Color_Lime);
-        }
-        for (u64 i = 0; i < ceil_edge_count; ++i) {
-            r_draw_line(ceil_edges[i].minp, ceil_edges[i].maxp, Color_Lime);
-        }
+        for (u64 i = 0; i < floor_edges.count; ++i) 
+            r_draw_line(floor_edges.edges[i].minp, floor_edges.edges[i].maxp, Color_Lime);
     }
+    
+    /*
+    for (u64 i = 0; i < ceil_edges.count; ++i) {
+        r_draw_line(ceil_edges.edges[i].minp, ceil_edges.edges[i].maxp, Color_Lime);
+    }
+    */
 }
 
 function void

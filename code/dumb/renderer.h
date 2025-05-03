@@ -12,7 +12,7 @@
 #define MAX_SPANS   RESOLUTION_H
 
 #define MAX_ITERATIONS (s32_max - 1)
-#define MAX_WALLS_IN_SECTOR 64
+#define EDGE_ARRAY_COUNT 64
 
 typedef struct Bitmap {
     u32 *pixels;
@@ -20,9 +20,17 @@ typedef struct Bitmap {
 } Bitmap;
 
 typedef struct Edge {
-    Vec2 minp, maxp;
+    Vec2 minp;
+    Vec2 maxp;
+    f32 slope;
     f32 recslope;
 } Edge;
+
+typedef struct Edge_Array {
+    Edge edges[EDGE_ARRAY_COUNT];
+    Vec2 leftmost, rightmost;
+    s32 count;
+} Edge_Array;
 
 //- @note: Fundementals
 function Bitmap* r_get_framebuffer(void);
@@ -41,7 +49,8 @@ function void r_draw_quad_frame(Vec2 p0, Vec2 p1, Vec2 p2, Vec2 p3, Color c);
 function void r_draw_rect(Vec2 p, Vec2 sz, Color c);
 
 //- @note: Game specific
-function Edge r_make_edge(Vec2 minp, Vec2 maxp);
+function Edge r_make_edge(Vec2 p0, Vec2 p1);
+function void r_edge_array_insert(Edge_Array *array, Edge edge, s32 index);
 function void r_sector(Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, s32 num_iterations, Range window);
 function void r_map(Map map, Vec3 map_cam, Entity player, b32 show_player);
 

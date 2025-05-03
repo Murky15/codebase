@@ -2,41 +2,15 @@
 
 /// watches ///////////////////////////////////////////////////////////////////
 
-watch: "start_x"
-watch: "end_x"
-watch: "wall"
-watch: "minp"
-watch: "maxp"
-watch: "num_iterations"
-watch: "t0"
-watch: "t1"
-watch: "d0"
-watch: "d1"
-watch: "cam"
+watch: "floor_edges"
 watch: "sector"
-watch: "last_sector"
-watch: "cam"
+watch: "c"
 
 /// breakpoints ///////////////////////////////////////////////////////////////
 
 breakpoint:
 {
-  disabled: 1
-  location: ("../code/dumb/map.c":80)
-}
-
-breakpoint:
-{
-  disabled: 1
-  location: ("../code/dumb/renderer.c":281)
-  condition: "wall->next_sector == 1 && sector->id == 0"
-}
-
-breakpoint:
-{
-  disabled: 1
-  location: ("../code/dumb/game.c":126)
-  condition: "a.curr_sector != b.curr_sector"
+  location: ("../code/dumb/renderer.c":400)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////
