@@ -10,7 +10,7 @@ watch: "c"
 
 breakpoint:
 {
-  location: ("../code/dumb/renderer.c":400)
+  location: ("../code/dumb/renderer.c":193)
 }
 
 /// targets ///////////////////////////////////////////////////////////////////

@@ -190,11 +190,10 @@ r_make_edge (Vec2 p0, Vec2 p1) {
 
 function void
 r_edge_array_insert (Edge_Array *array, Edge edge, s32 index) {
-    s32 index_diff = array->count - index;
-    if (index_diff > 0) {
-        for (s32 i = array->count; i > index; --i)
-            array->edges[i] = array->edges[i-1];
-    }
+    assert(index < EDGE_ARRAY_COUNT);
+    
+    for (s32 i = array->count; i > index; --i)
+        array->edges[i] = array->edges[i-1];
     array->edges[index] = edge;
     array->count++;
 }
@@ -208,7 +207,6 @@ r_edge_array_add (Edge_Array *array, Edge edge) {
             continue;
         if (edge.minp.x > e->minp.x && edge.minp.y < e->minp.y)
             continue;
-        
         break;
     }
     if (!almost_equal(edge.slope, 0.f))
@@ -217,9 +215,10 @@ r_edge_array_add (Edge_Array *array, Edge edge) {
     Vec2 minx = edge.minp, maxx = edge.maxp;
     if (minx.x > maxx.x)
         swap(Vec2, minx, maxx);
+    
     if (minx.x < array->leftmost.x)
-        array->leftmost = v2add(minx, v2(1,0)); // @todo: Don't modify these!
-    else if (maxx.x > array->rightmost.x)
+        array->leftmost = v2add(minx, v2(1,0)); // @todo: Remove the add/subtract here
+    if (maxx.x > array->rightmost.x)
         array->rightmost = v2sub(maxx, v2(1,0));
 }
 
@@ -266,7 +265,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             d1.x = t1.x * cosf(t) - t1.y * sinf(t);
             d1.y = t1.x * sinf(t) + t1.y * cosf(t);
             
-            //- Clip walls behind camera
+            // Clip walls behind camera
             if (d0.y < near_plane && d1.y < near_plane)
                 continue;
             
@@ -367,6 +366,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             f32 wall_length = sqrtf(sqr(d0_preclip.x-d1_preclip.x) + sqr(d0_preclip.y-d1_preclip.y)); // @todo: Cache this when loading level json
             f32 pages_per_wall = wall_length / img_width;
             
+            //- Render walls
             for (f32 x = start_x; x <= end_x; ++x) {
                 f32 xnorm  = norm(x, minp.x, maxp.x);
                 f32 texnorm = norm(x, minp.x_preclip, maxp.x_preclip);
@@ -399,24 +399,22 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
         // Complete polyon
         if (num_iterations == 0) { 
             if (floor_edges.leftmost.y > -1.f) {
-                Edge c = r_make_edge(v2(0.f, 0.f), floor_edges.leftmost);
+                Edge c = r_make_edge(v2(0.f, -1.f), floor_edges.leftmost); // @todo (-1, -1)
                 r_edge_array_add(&floor_edges, c);
             }
             if (floor_edges.rightmost.y > -1.f) {
-                Edge c = r_make_edge(v2(canvas_width-1, 0.f), floor_edges.rightmost);
+                Edge c = r_make_edge(v2(canvas_width-1, -1.f), floor_edges.rightmost); // @todo (canvas_width, -1)
                 r_edge_array_add(&floor_edges, c);
             }
         }
+        
+        Edge_Array active_edges = {0};
+        
+        
         // Debug wireframe view
         for (u64 i = 0; i < floor_edges.count; ++i) 
             r_draw_line(floor_edges.edges[i].minp, floor_edges.edges[i].maxp, Color_Lime);
     }
-    
-    /*
-    for (u64 i = 0; i < ceil_edges.count; ++i) {
-        r_draw_line(ceil_edges.edges[i].minp, ceil_edges.edges[i].maxp, Color_Lime);
-    }
-    */
 }
 
 function void
