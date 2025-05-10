@@ -1,5 +1,3 @@
-#include <windows.h>
-
 core_function String8
 os_read_file (Arena *arena, String8 path, b32 create_if_not_exist) {
     Temp_Arena scratch = get_scratch(&arena,1);
