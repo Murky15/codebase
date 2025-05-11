@@ -37,6 +37,7 @@ read_only s32 s32_max = 0x7fffffff;
 read_only s64 s64_min = 0x8000000000000000;
 read_only s64 s64_max = 0x7fffffffffffffff;
 
+#ifndef BASE_TYPES_ESSENTIAL_ONLY
 // @todo: Fixed-point implementation
 
 //- @note: Array Types
@@ -184,4 +185,5 @@ core_function f32 lerp (f32 v0, f32 v1, f32 t);
 core_function b32 almost_equal (f32 a, f32 b);
 
 #undef make_array_type
+#endif // BASE_TYPES_ESSENTIAL_ONLY
 #endif // BASE_TYPES_H

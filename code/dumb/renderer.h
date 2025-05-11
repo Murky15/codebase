@@ -42,6 +42,7 @@ function void r_clear_color(Color c);
 //- @note: Primitives
 function void r_draw_circle(Vec2 p, f32 r, Color c);
 function void r_draw_line(Vec2 p0, Vec2 p1, Color c);
+function void r_draw_hori(f32 y, f32 x0, f32 x1, Color c);
 function void r_draw_vert(f32 x, f32 y0, f32 y1, Color c);
 function void r_draw_vert_textured (f32 x, f32 y0, f32 y1, f32 actual_height, PNG_Bitmap_RGBA texture, Texture_Map_Type map_type, s32 texx);
 function void r_draw_quad_framef(f32 x0, f32 y0, f32 x1, f32 y1, Color c);

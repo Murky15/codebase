@@ -125,6 +125,15 @@ r_draw_vert (f32 x, f32 y0, f32 y1, Color c) {
 }
 
 function void
+r_draw_hori (f32 y, f32 x0, f32 x1, Color c) {
+    Bitmap *canvas = r_get_framebuffer();
+    f32 start_x = max(-1.f, x0);
+    f32 end_x = min(x1, canvas->width);
+    for (f32 x = start_x; x <= end_x; ++x)
+        r_put_pixel_at(v2(x,y), c);
+}
+
+function void
 r_draw_vert_textured (f32 x, f32 y0, f32 y1, f32 actual_height, PNG_Bitmap_RGBA texture, Texture_Map_Type map_type, s32 texx) {
     Color c;
     Bitmap *canvas = r_get_framebuffer();
@@ -408,11 +417,28 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             }
         }
         
-        Edge_Array active_edges = {0};
+        // Initialize fill algorithm
+        b32 even_parity = true;
+        f32 scan_line = floor_edges.edges[0].minp.y;
         
+        // Do we need another edge_array here? For our particular problem there can only be ONE edge PAIR
+        // so we only need storage for two edges
+        Edge_Array active_edges = {0};
+        for (s32 i = 0; i < floor_edges.count; ++i) {
+            Edge e = floor_edges.edges[i];
+            if (e.minp.y <= scan_line)
+                active_edges.edges[active_edges.count++] = e;
+            else
+                break;
+        }
+        
+        // Fill polygon
+        for (;active_edges.count > 0;) {
+            r_draw_hori(scan_line, );
+        }
         
         // Debug wireframe view
-        for (u64 i = 0; i < floor_edges.count; ++i) 
+        for (s32 i = 0; i < floor_edges.count; ++i) 
             r_draw_line(floor_edges.edges[i].minp, floor_edges.edges[i].maxp, Color_Lime);
     }
 }

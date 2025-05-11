@@ -34,13 +34,14 @@ load_paths = {
 
 commands = {
     //- Build commands
-    .build_dumb = {.win="tclsh butler.tcl build msvc mslink dumb", .out="*output*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false},
-    
+    .build_dumb = {.win="tclsh butler.tcl build msvc mslink dumb", .out="*output*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false},    
 	.build_geoc = {.win="tclsh butler.tcl build tcc geometry_compiler", .out="*output*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false},
+	.build_le =   {.win="tclsh butler.tcl build tcc dumb_level_editor", .out="*output*", .footer_panel=true, .save_dirty_files=true, .cursor_at_end=false},
 
     //- Run commands
     .run_dumb = {.win="build\dumb.exe", .out="*output*"},
-	.run_geoc = {.win="build\geoc.exe text_selector.ggb", .out="*output*"},    
+	.run_geoc = {.win="build\geoc.exe text_selector.ggb", .out="*output*"},  
+	.run_le   = {.win="build\dumb_level_editor", .out="*output*"},  
 
     //- Misc commands
     .open_debugger = {.win="call misc\open_debugger.bat"},
@@ -53,5 +54,8 @@ fkey_command = {
 	.F3 = "build_geoc",
 	.F4 = "run_geocs",
     
+	.F5 = "build_le",
+	.F6 = "run_le",
+
     .F9 = "open_debugger",
 };

@@ -2,7 +2,19 @@
 
 #if OS_WINDOWS
 # undef function
-# include <windows.h>
+
+# ifdef BASE_MEMORY_STANDALONE
+extern void *VirtualAlloc(void*,size_t,u32,u32);
+extern bool VirtualFree(void*,size_t,u32);
+#  define MEM_RESERVE    0x00002000
+#  define MEM_COMMIT     0x00001000
+#  define MEM_DECOMMIT   0x00004000
+#  define MEM_RELEASE    0x00008000
+#  define PAGE_READWRITE 0x04
+# else
+#  include <windows.h>
+# endif
+
 # define mem_reserve(size) VirtualAlloc(0, size, MEM_RESERVE, PAGE_READWRITE)
 # define mem_commit(ptr, size) VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE)
 # define mem_decommit(ptr, size) VirtualFree(ptr, size, MEM_DECOMMIT)
