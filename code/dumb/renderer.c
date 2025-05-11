@@ -432,10 +432,11 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 break;
         }
         
-        // Fill polygon
+        /* Fill polygon
         for (;active_edges.count > 0;) {
             r_draw_hori(scan_line, );
         }
+*/
         
         // Debug wireframe view
         for (s32 i = 0; i < floor_edges.count; ++i) 

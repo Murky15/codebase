@@ -1,5 +1,4 @@
 #include "game.c"
-#include "dev.c"
 
 #include <Windows.h>
 
@@ -24,8 +23,6 @@ global struct {
     u32 window_width;
     u32 window_height;
     b32 mouse_captured;
-    
-    HWND tool_window;
 } platform;
 
 global struct {
@@ -82,81 +79,68 @@ win32_ms_to_tick_interval (f32 ms) {
 
 function LRESULT
 win32_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    if (hwnd == platform.hwnd) { // @todo: Preserve aspect ratio
-        switch (uMsg) {
-            case WM_CLOSE: PostQuitMessage(0); return 0;
+    switch (uMsg) {
+        case WM_CLOSE: PostQuitMessage(0); return 0;
+        
+        case WM_INPUT: {
+            u32 size;
+            GetRawInputData((HRAWINPUT)lParam, RID_INPUT, 0, &size, sizeof(RAWINPUTHEADER));
+            LPBYTE buff = malloc(size);
+            if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, buff, &size, sizeof(RAWINPUTHEADER)) != size)
+                OutputDebugString("GetRawInputData does not return correct size !\n");
             
-            case WM_INPUT: {
-                u32 size;
-                GetRawInputData((HRAWINPUT)lParam, RID_INPUT, 0, &size, sizeof(RAWINPUTHEADER));
-                LPBYTE buff = malloc(size);
-                if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, buff, &size, sizeof(RAWINPUTHEADER)) != size)
-                    OutputDebugString("GetRawInputData does not return correct size !\n");
-                
-                RAWINPUT *input = (RAWINPUT*)buff;
-                if (input->header.dwType == RIM_TYPEKEYBOARD) {
-                    RAWKEYBOARD *keyboard = &input->data.keyboard;
-                    b32 key_down = (keyboard->Flags & RI_KEY_BREAK) == 0;
-                    if (keyboard->MakeCode != KEYBOARD_OVERRUN_MAKE_CODE) {
-                        u8 extension = keyboard->Flags & RI_KEY_E0 ? 0xE0 : keyboard->Flags & RI_KEY_E1 ? 0xE1 : 0x00;
-                        u16 scan_code = (extension << 8) | (keyboard->MakeCode & 0x7F);
-                        
-                        switch (scan_code) {
-                            case 0x0011: {      // W
-                                game_input.move_forward = key_down;
-                            } break;
-                            
-                            case 0x001F: {      // S
-                                game_input.move_back = key_down;
-                            } break;
-                            
-                            case 0x001E: {      // A
-                                game_input.strafe_left = key_down;
-                            } break;
-                            
-                            case 0x0020: {      // D
-                                game_input.strafe_right = key_down;
-                            } break;
-                            
-                            case 0x0001: {      // Escape
-                                if (platform.mouse_captured) {
-                                    platform.mouse_captured = false;
-                                    ShowCursor(true);
-                                }
-                            } break;
-                        }
-                    }
-                } else if (input->header.dwType == RIM_TYPEMOUSE) {
-                    RAWMOUSE *mouse = &input->data.mouse;
+            RAWINPUT *input = (RAWINPUT*)buff;
+            if (input->header.dwType == RIM_TYPEKEYBOARD) {
+                RAWKEYBOARD *keyboard = &input->data.keyboard;
+                b32 key_down = (keyboard->Flags & RI_KEY_BREAK) == 0;
+                if (keyboard->MakeCode != KEYBOARD_OVERRUN_MAKE_CODE) {
+                    u8 extension = keyboard->Flags & RI_KEY_E0 ? 0xE0 : keyboard->Flags & RI_KEY_E1 ? 0xE1 : 0x00;
+                    u16 scan_code = (extension << 8) | (keyboard->MakeCode & 0x7F);
                     
-                    // @todo: Only capture the mouse if it is in client rect
-                    if (mouse->usButtonFlags & RI_MOUSE_BUTTON_1_UP) { // @hack
-                        if (!platform.mouse_captured) {
-                            ShowCursor(false);
-                            win32_capture_mouse();
-                        }
+                    switch (scan_code) {
+                        case 0x0011: {      // W
+                            game_input.move_forward = key_down;
+                        } break;
+                        
+                        case 0x001F: {      // S
+                            game_input.move_back = key_down;
+                        } break;
+                        
+                        case 0x001E: {      // A
+                            game_input.strafe_left = key_down;
+                        } break;
+                        
+                        case 0x0020: {      // D
+                            game_input.strafe_right = key_down;
+                        } break;
+                        
+                        case 0x0001: {      // Escape
+                            if (platform.mouse_captured) {
+                                platform.mouse_captured = false;
+                                ShowCursor(true);
+                            }
+                        } break;
                     }
-#if 0
-                    if (mouse->usButtonFlags & RI_MOUSE_WHEEL) {
-                        short wheel = (short)mouse->usButtonData;
-                        f32 wheel_delta = (f32)wheel / (f32)WHEEL_DELTA;
-                        map_cam.z -= wheel_delta * MOUSE_SCROLL_SENSITIVITY;
-                        map_cam.z = max(map_cam.z,1);
-                    }
-#endif
-                    if (platform.mouse_captured) {
-                        s32 movex = mouse->lLastX;
-                        game_input.turn_amount = ((f32)movex * MOUSE_SENSITIVITY);
+                }
+            } else if (input->header.dwType == RIM_TYPEMOUSE) {
+                RAWMOUSE *mouse = &input->data.mouse;
+                
+                // @todo: Only capture the mouse if it is in client rect
+                if (mouse->usButtonFlags & RI_MOUSE_BUTTON_1_UP) { // @hack
+                    if (!platform.mouse_captured) {
+                        ShowCursor(false);
                         win32_capture_mouse();
                     }
                 }
-                free(buff);
-                return 0;
+                
+                if (platform.mouse_captured) {
+                    s32 movex = mouse->lLastX;
+                    game_input.turn_amount = ((f32)movex * MOUSE_SENSITIVITY);
+                    win32_capture_mouse();
+                }
             }
-        }
-    } else if (hwnd == platform.tool_window) {
-        switch (uMsg) {
-            
+            free(buff);
+            return 0;
         }
     }
     
@@ -234,72 +218,6 @@ win32_game_render (LPVOID param) {
         u64 super_end = win32_query_clock();
         //fprintf(stderr, "Time to render (ms): %f\n", win32_get_elapsed_ms(start, super_end));   
     }
-}
-
-function DWORD WINAPI
-win32_dev_tools (LPVOID param) {
-    HDC dev_dc;
-    HGLRC dev_gl_ctx;
-    
-    HWND dev_window = CreateWindow("default window class",
-                                   "VOODOO: DEVELOPER TOOLS",
-                                   WS_OVERLAPPED | WS_VISIBLE | WS_THICKFRAME,
-                                   CW_USEDEFAULT,
-                                   CW_USEDEFAULT,
-                                   800,
-                                   600,
-                                   0,0,
-                                   platform.hInstance,
-                                   0
-                                   );
-    if (dev_window) {
-        platform.tool_window = dev_window;
-        dev_dc = GetDC(dev_window);
-        
-        PIXELFORMATDESCRIPTOR pfd =
-        {
-            sizeof(PIXELFORMATDESCRIPTOR),
-            1,
-            PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
-            PFD_TYPE_RGBA,
-            32,
-            0, 0, 0, 0, 0, 0,
-            0,
-            0,
-            0,
-            0, 0, 0, 0,
-            24,
-            8,
-            0,
-            PFD_MAIN_PLANE,
-            0, 
-            0, 0, 0
-        };
-        
-        int fid = ChoosePixelFormat(dev_dc, &pfd);
-        if (fid != 0) {
-            SetPixelFormat(dev_dc, fid, &pfd);
-            dev_gl_ctx = wglCreateContext(dev_dc);
-            assert(wglMakeCurrent(dev_dc, dev_gl_ctx));
-        }
-        
-    } else {
-        OutputDebugString("Failure to create developer window!\n");
-        return 1;
-    }
-    
-    while (1) {
-        for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-        
-        dev_main_loop();
-        
-        SwapBuffers(dev_dc);
-    }
-    
-    return 0;
 }
 
 int
@@ -394,7 +312,6 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     shared_game_data.mutex = CreateMutex(NULL, false, NULL);
     CreateThread(NULL, 0, win32_game_tick, &game_tick_hz, 0, 0);
     CreateThread(NULL, 0, win32_game_render, &timing, 0, 0);
-    CreateThread(NULL, 0, win32_dev_tools, 0, 0, 0);
     
     //- @note: INPUT LOOP
     for (MSG msg; GetMessage(&msg, 0, 0, 0);) {
