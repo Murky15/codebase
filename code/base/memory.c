@@ -3,7 +3,7 @@
 #if OS_WINDOWS
 # undef function
 
-# ifdef BASE_MEMORY_STANDALONE
+# ifdef BASE_MEMORY_MINIMAL
 extern void *VirtualAlloc(void*,size_t,u32,u32);
 extern bool VirtualFree(void*,size_t,u32);
 #  define MEM_RESERVE    0x00002000

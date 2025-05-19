@@ -5,15 +5,12 @@
 #include "raymath.h"
 
 #define BASE_TYPES_ESSENTIAL_ONLY
-#define BASE_MEMORY_STANDALONE
-#include "base/context.h"
-#include "base/macros.h"
-#include "base/types.h"
-#include "base/memory.h"
+#define BASE_MEMORY_MINIMAL
+#include "base/include.h"
 
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
-#include "base/memory.c"
+#include "base/include.c"
 
 void
 draw_grid_old (int columns, int spacing) {
