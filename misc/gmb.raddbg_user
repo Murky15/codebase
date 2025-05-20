@@ -1,41 +1,21 @@
-// raddbg 0.9.17 user file
+// raddbg 0.9.16 user file
 
 recent_project: path: "root.raddbg_project"
+recent_project: path: path
 window:
 {
-  split_x
-  monitor: "\\\\.\\DISPLAY1"
-  size: 2520 1456
-  dpi: 96.000000
-  main_font_size: 12
-  code_font_size: 12
-  smooth_ui_text: 1
-  smooth_code_text: 0
-  hint_ui_text: 1
-  hint_code_text: 1
+  size: 1536.000000 816.000000
   panels:
   {
-    0.25:
+    0.311367:
     {
-      0.25:
+      0.596120:
       {
-        locals: selected project: "root.raddbg_project"
-        breakpoints: project: "root.raddbg_project"
-        targets: project: "root.raddbg_project"
-        watch: project: "root.raddbg_project"
-      }
-      0.25:
-      {
-        watch:
-        {
-          expression: "query:threads"
-          selected
-        }
+        watch: expression: "query:threads"
         watch: expression: "query:targets"
-        watch: expression: "query:breakpoints"
-        watch: expression: "query:watch_pins"
+        watch: selected expression: "query:breakpoints"
       }
-      0.25:
+      0.070547:
       {
         disasm:
         {
@@ -45,7 +25,7 @@ window:
         }
         text: expression: "query:output"
       }
-      0.25:
+      0.333333:
       {
         watch:
         {
@@ -55,94 +35,55 @@ window:
         watch: expression: "query:modules"
       }
     }
-    0.75:
+    0.362099:
     {
-      0.692982:
+      selected
+      getting_started
+      text:
+      {
+        expression: "file:\"W:/code/dumb/platform_win32_multithreaded.c\".data"
+        auto: 1
+        query: input: ""
+        cursor_line: 224
+        cursor_column: 1
+        mark_line: 224
+        mark_column: 1
+      }
+      text:
       {
         selected
-        text:
-        {
-          project: "root.raddbg_project"
-          query: "file:\"../code/dumb/renderer.c\"" input: ""
-          cursor_line: 199
-          cursor_column: 1
-          mark_line: 199
-          mark_column: 1
-        }
-        text:
-        {
-          project: "root.raddbg_project"
-          query: "file:\"../code/dumb/map.c\""
-          cursor_line: 86
-          cursor_column: 5
-          mark_line: 86
-          mark_column: 5
-        }
-        text:
-        {
-          project: "root.raddbg_project"
-          query: "file:\"../code/dumb/game.c\""
-          cursor_line: 126
-          cursor_column: 14
-          mark_line: 126
-          mark_column: 14
-        }
-        text:
-        {
-          project: "root.raddbg_project"
-          query: "file:\"../code/base/memory.c\""
-          cursor_line: 72
-          cursor_column: 6
-          mark_line: 72
-          mark_column: 6
-        }
-        text:
-        {
-          expression: "file:\"W:/code/dumb/game.c\".data"
-          project: "W:/misc/root.raddbg_project"
-          query: input: ""
-          cursor_line: 26
-          cursor_column: 3
-          mark_line: 26
-          mark_column: 3
-        }
-        text:
-        {
-          selected
-          expression: "file:\"W:/code/dumb/platform_win32_multithreaded.c\".data"
-          auto: 1
-          query: input: ""
-          cursor_line: 318
-          cursor_column: 1
-          mark_line: 318
-          mark_column: 1
-        }
+        expression: "file:\"W:/code/dumb/renderer.c\".data"
+        project: "W:/misc/root.raddbg_project"
+        query: input: ""
+        cursor_line: 349
+        cursor_column: 56
+        mark_line: 349
+        mark_column: 56
       }
-      0.307018:
+    }
+    0.326534:
+    {
+      watch:
       {
-        output:
-        {
-          selected
-          project: "root.raddbg_project"
-          cursor_line: 2
-          cursor_column: 1
-          mark_line: 2
-          mark_column: 1
-        }
-        memory:
-        {
-          project: "root.raddbg_project"
-          cursor_vaddr: 0x0
-          mark_vaddr: 0x0
-          bytes_per_cell: 0x1
-          num_columns: 0x10
-        }
+        selected
+        expression: ""
+        watch: x
+        watch: active_edges
+        watch: last_sector
+        watch: scan_line
+        watch: start_idx
+        watch: floor_edges
+        watch: j
+        watch: e
+        watch: i
       }
+      watch: expression: "query:locals"
     }
   }
   split_x
-  pos: -8 -8
+  pos: 64 64
   monitor: "\\\\.\\DISPLAY1"
+  maximized
 }
 keybindings:
 {
@@ -262,4 +203,4 @@ keybindings:
   { log_marker m ctrl shift alt }
   { toggle_dev_menu d ctrl shift alt }
 }
-current_path: "W:/build"
+current_path: "W:/code/dumb"

@@ -213,8 +213,8 @@ r_edge_array_add (Edge_Array *array, Edge edge) {
     for (;index < array->count; ++index) {
         Edge *e = &array->edges[index];
         if (edge.minp.y > e->minp.y)
-            continue;
-        if (edge.minp.x > e->minp.x && edge.minp.y < e->minp.y)
+            continue; 
+        if (edge.minp.x > e->minp.x && edge.minp.y >= e->minp.y)
             continue;
         break;
     }
@@ -226,9 +226,9 @@ r_edge_array_add (Edge_Array *array, Edge edge) {
         swap(Vec2, minx, maxx);
     
     if (minx.x < array->leftmost.x)
-        array->leftmost = v2add(minx, v2(1,0)); // @todo: Remove the add/subtract here
+        array->leftmost = minx;
     if (maxx.x > array->rightmost.x)
-        array->rightmost = v2sub(maxx, v2(1,0));
+        array->rightmost = maxx;
 }
 
 function void
@@ -345,10 +345,10 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 f32 start_norm  = norm(start_x, minp.x, maxp.x);
                 f32 end_norm    = norm(end_x, minp.x, maxp.x);
                 
-                f32 start_depth = lerp(minp.depth, maxp.depth, start_norm); 
-                f32 end_depth   = lerp(minp.depth, maxp.depth, end_norm); 
-                f32 start_height  = lerp(minp.height, maxp.height, start_norm);
-                f32 end_height    = lerp(minp.height, maxp.height, end_norm);
+                f32 start_depth = clamp(lerp(minp.depth, maxp.depth, start_norm), -1, canvas_height); 
+                f32 end_depth   = clamp(lerp(minp.depth, maxp.depth, end_norm), -1, canvas_height); 
+                f32 start_height  = clamp(lerp(minp.height, maxp.height, start_norm), -1, canvas_height);
+                f32 end_height    = clamp(lerp(minp.height, maxp.height, end_norm), -1, canvas_height);
                 
                 Edge fedge = r_make_edge(v2(start_x, start_depth), v2(end_x, end_depth));
                 Edge cedge = r_make_edge(v2(start_x, start_height), v2(end_x, end_height));
@@ -408,38 +408,52 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
         // Complete polyon
         if (num_iterations == 0) { 
             if (floor_edges.leftmost.y > -1.f) {
-                Edge c = r_make_edge(v2(0.f, -1.f), floor_edges.leftmost); // @todo (-1, -1)
+                Edge c = r_make_edge(v2(-1.f, -1.f), floor_edges.leftmost);
                 r_edge_array_add(&floor_edges, c);
             }
             if (floor_edges.rightmost.y > -1.f) {
-                Edge c = r_make_edge(v2(canvas_width-1, -1.f), floor_edges.rightmost); // @todo (canvas_width, -1)
+                Edge c = r_make_edge(v2(canvas_width, -1.f), floor_edges.rightmost);
                 r_edge_array_add(&floor_edges, c);
             }
         }
         
         // Initialize fill algorithm
-        b32 even_parity = true;
         f32 scan_line = floor_edges.edges[0].minp.y;
+        s32 start_idx = 0;
         
-        // Do we need another edge_array here? For our particular problem there can only be ONE edge PAIR
-        // so we only need storage for two edges
-        Edge_Array active_edges = {0};
-        for (s32 i = 0; i < floor_edges.count; ++i) {
+        Edge active_edges[2] = {0};
+        for (s32 i=start_idx,j=0; (i < floor_edges.count) && (j < array_count(active_edges)); ++i) {
             Edge e = floor_edges.edges[i];
             if (e.minp.y <= scan_line)
-                active_edges.edges[active_edges.count++] = e;
-            else
-                break;
+                active_edges[j++] = e;
         }
+        start_idx += 2;
         
         // Fill polygon
-        for (;active_edges.count > 0;) {
-            r_draw_hori(scan_line, );
+        f32 x[array_count(active_edges)] = {active_edges[0].minp.x, active_edges[1].minp.x};
+        while (scan_line <= floor_edges.edges[floor_edges.count-1].maxp.y) {
+            r_draw_hori(scan_line, x[0], x[1], Color_Cyan);
+            scan_line++;
+            for (s32 i = start_idx; i < floor_edges.count; ++i) {
+                Edge e = floor_edges.edges[i];
+                for (s32 j = 0; j < array_count(active_edges); ++j) {
+                    if (active_edges[j].maxp.y <= scan_line && e.minp.y <= scan_line) {
+                        active_edges[j] = e;
+                        x[j] = active_edges[j].minp.x;
+                        start_idx++;
+                        break;
+                    }
+                }
+            }
+            x[0] = x[0] + active_edges[0].recslope;
+            x[1] = x[1] + active_edges[1].recslope;
         }
         
         // Debug wireframe view
+#if 0
         for (s32 i = 0; i < floor_edges.count; ++i) 
             r_draw_line(floor_edges.edges[i].minp, floor_edges.edges[i].maxp, Color_Lime);
+#endif
     }
 }
 
@@ -448,6 +462,7 @@ r_plane (Edge *e, u64 num_edges) {
     // https://www.cs.rit.edu/~icss571/filling/how_to.html
 }
 
+//- legacy functions
 function void
 r_map (Map map, Vec3 map_cam, Entity player, b32 show_player) {
     Bitmap *canvas = r_get_framebuffer();

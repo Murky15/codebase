@@ -1,10 +1,30 @@
-// raddbg 0.9.17 project file
+// raddbg 0.9.16 project file
 
+recent_file: path: "../code/dumb/renderer.c"
 recent_file: path: "../code/dumb/platform_win32_multithreaded.c"
-recent_file: path: "../code/dumb/game.c"
+recent_file: path: path
+recent_file: path: path
 target:
 {
   executable: "../build/dumb.exe"
-  working_directory: "../build/"
+  working_directory: "../build"
   enabled: 1
+}
+breakpoint:
+{
+  source_location: "W:/code/dumb/renderer.c:434:1"
+  hit_count: 1
+  enabled: 1
+}
+breakpoint:
+{
+  source_location: "W:/code/dumb/renderer.c:441:1"
+  hit_count: 0
+  enabled: 0
+}
+breakpoint:
+{
+  source_location: "W:/code/dumb/renderer.c:415:1"
+  hit_count: 0
+  enabled: 0
 }
