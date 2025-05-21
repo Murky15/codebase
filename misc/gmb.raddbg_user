@@ -1,89 +1,111 @@
-// raddbg 0.9.16 user file
+// raddbg 0.9.17 user file
 
 recent_project: path: "root.raddbg_project"
 recent_project: path: path
 window:
 {
   size: 1536.000000 816.000000
+  pos: 484 312
+  monitor: "\\\\.\\DISPLAY1"
+  maximized
   panels:
   {
-    0.311367:
+    0.788954:
     {
-      0.596120:
+      0.311367:
       {
-        watch: expression: "query:threads"
-        watch: expression: "query:targets"
-        watch: selected expression: "query:breakpoints"
-      }
-      0.070547:
-      {
-        disasm:
+        0.345206:
+        {
+          watch: expression: "query:threads"
+          watch: expression: "query:targets"
+          watch: selected expression: "query:breakpoints"
+        }
+        0.321461: disasm:
         {
           selected
           expression: ""
           query: input: ""
         }
-        text: expression: "query:output"
+        0.333333:
+        {
+          watch:
+          {
+            expression: "query:call_stack"
+            selected
+          }
+          watch: expression: "query:modules"
+        }
       }
-      0.333333:
+      0.403732:
+      {
+        selected
+        getting_started
+        text:
+        {
+          expression: "file:\"W:/code/dumb/platform_win32_multithreaded.c\".data"
+          auto: 1
+          query: input: ""
+          cursor_line: 224
+          cursor_column: 1
+          mark_line: 224
+          mark_column: 1
+        }
+        text:
+        {
+          selected
+          expression: "file:\"W:/code/dumb/renderer.c\".data"
+          project: "W:/misc/root.raddbg_project"
+          query: input: ""
+          cursor_line: 375
+          cursor_column: 1
+          mark_line: 375
+          mark_column: 1
+        }
+      }
+      0.284901:
       {
         watch:
         {
-          expression: "query:call_stack"
-          selected
+          expression: ""
+          watch: x
+          watch: active_edges
+          watch: last_sector
+          watch: scan_line
+          watch: start_idx
+          watch: floor_edges
+          watch: j
+          watch: e
+          watch: i
+          normal: 0.350000 0.496821 0.153179
         }
-        watch: expression: "query:modules"
+        watch:
+        {
+          selected
+          expression: ""
+          watch: x
+          watch: adjusted
+          watch: last_sector
+          watch: start_x
+          watch: end_x
+          watch: fminp
+          watch: fmaxp
+          watch: start_depth
+          watch: end_depth
+        }
+        watch: expression: "query:locals"
       }
     }
-    0.362099:
+    0.211046: text:
     {
       selected
-      getting_started
-      text:
-      {
-        expression: "file:\"W:/code/dumb/platform_win32_multithreaded.c\".data"
-        auto: 1
-        query: input: ""
-        cursor_line: 224
-        cursor_column: 1
-        mark_line: 224
-        mark_column: 1
-      }
-      text:
-      {
-        selected
-        expression: "file:\"W:/code/dumb/renderer.c\".data"
-        project: "W:/misc/root.raddbg_project"
-        query: input: ""
-        cursor_line: 349
-        cursor_column: 56
-        mark_line: 349
-        mark_column: 56
-      }
-    }
-    0.326534:
-    {
-      watch:
-      {
-        selected
-        expression: ""
-        watch: x
-        watch: active_edges
-        watch: last_sector
-        watch: scan_line
-        watch: start_idx
-        watch: floor_edges
-        watch: j
-        watch: e
-        watch: i
-      }
-      watch: expression: "query:locals"
+      expression: "query:output"
+      query: input: ""
+      cursor_line: 1
+      cursor_column: 1
+      mark_line: 1
+      mark_column: 1
     }
   }
-  split_x
-  pos: 64 64
-  monitor: "\\\\.\\DISPLAY1"
-  maximized
 }
 keybindings:
 {

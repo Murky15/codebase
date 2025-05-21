@@ -4,8 +4,8 @@
 #define ASPECT_W 16.f
 #define ASPECT_H 9.f
 
-#define RESOLUTION_W 320 // 320
-#define RESOLUTION_H 180 // 180
+#define RESOLUTION_W 640 // 320
+#define RESOLUTION_H 360 // 180
 #define TEXTURE_VERT_REPEAT_SCALE 1.5
 
 #define MAX_COLUMNS RESOLUTION_W
@@ -29,6 +29,7 @@ typedef struct Edge {
 typedef struct Edge_Array {
     Edge edges[EDGE_ARRAY_COUNT];
     Vec2 leftmost, rightmost;
+    f32 top;
     s32 count;
 } Edge_Array;
 
@@ -51,8 +52,8 @@ function void r_draw_rect(Vec2 p, Vec2 sz, Color c);
 
 //- @note: Game specific
 function Edge r_make_edge(Vec2 p0, Vec2 p1);
+function Edge_Array r_edge_array_init(void);
 function void r_edge_array_insert(Edge_Array *array, Edge edge, s32 index);
 function void r_sector(Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, s32 num_iterations, Range window);
-function void r_map(Map map, Vec3 map_cam, Entity player, b32 show_player);
 
 #endif //RENDERER_H

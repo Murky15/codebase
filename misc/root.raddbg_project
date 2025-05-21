@@ -1,4 +1,4 @@
-// raddbg 0.9.16 project file
+// raddbg 0.9.17 project file
 
 recent_file: path: "../code/dumb/renderer.c"
 recent_file: path: "../code/dumb/platform_win32_multithreaded.c"
@@ -12,19 +12,13 @@ target:
 }
 breakpoint:
 {
-  source_location: "W:/code/dumb/renderer.c:434:1"
-  hit_count: 1
+  source_location: "../code/dumb/renderer.c:365:1"
+  hit_count: 9
   enabled: 1
 }
 breakpoint:
 {
-  source_location: "W:/code/dumb/renderer.c:441:1"
-  hit_count: 0
-  enabled: 0
-}
-breakpoint:
-{
-  source_location: "W:/code/dumb/renderer.c:415:1"
-  hit_count: 0
+  source_location: "../code/dumb/renderer.c:461:1"
+  hit_count: 7
   enabled: 0
 }
