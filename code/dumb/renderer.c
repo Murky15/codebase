@@ -199,9 +199,8 @@ r_make_edge (Vec2 p0, Vec2 p1) {
 
 function Edge_Array
 r_edge_array_init (void) {
-    Bitmap *canvas = r_get_framebuffer();
     Edge_Array result = {0};
-    result.leftmost.x = canvas->width;
+    result.leftmost.x = INFINITY;
     
     return result;
 }
@@ -218,19 +217,18 @@ r_edge_array_insert (Edge_Array *array, Edge edge, s32 index) {
 
 function void
 r_edge_array_add (Edge_Array *array, Edge edge) {
-    s32 index = 0;
-    for (;index < array->count; ++index) {
-        Edge *e = &array->edges[index];
-        if (floorf(edge.minp.y) > floorf(e->minp.y))
-            continue; 
-        if (edge.minp.x > e->minp.x && almost_equal(floorf(edge.minp.y),floorf(e->minp.y)))
-            continue;
-        break;
-    }
-    if (!almost_equal(edge.slope, 0.f))
+    if (!almost_equal(edge.slope, 0.f)) {
+        s32 index = 0;
+        for (;index < array->count; ++index) {
+            Edge *e = &array->edges[index];
+            if (floorf(edge.minp.y) > floorf(e->minp.y))
+                continue; 
+            if (edge.minp.x > e->minp.x && almost_equal(floorf(edge.minp.y),floorf(e->minp.y)))
+                continue;
+            break;
+        }
         r_edge_array_insert(array, edge, index);
-    
-    
+    }
     Vec2 minx = edge.minp, maxx = edge.maxp;
     if (minx.x > maxx.x)
         swap(Vec2, minx, maxx);
@@ -353,25 +351,31 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             f32 end_x = clamp(maxp.x, window.first, window.last);   
             
             // @note: Add new verticies into list 
-            if (start_x != end_x) {
-                f32 start_norm  = norm(start_x, minp.x, maxp.x);
-                f32 end_norm    = norm(end_x, minp.x, maxp.x);
+            if (start_x != end_x || num_iterations > 0) {
+                
+                // @note: This works for all cases 
+                start_norm = 0.f;
+                end_norm = 1.f;
+                x1 = minp.x;
+                x2 = maxp.x;
                 
                 f32 start_depth = lerp(minp.depth, maxp.depth, start_norm);
                 f32 end_depth   = lerp(minp.depth, maxp.depth, end_norm); 
                 if (!(start_depth < 0.f && end_depth < 0.f)) {
-                    Vec2 fminp = v2(start_x, start_depth);
-                    Vec2 fmaxp = v2(end_x, end_depth);
-                    
-                    if (start_depth < 0.f || end_depth < 0.f) {
+                    Vec2 fminp = v2(x1, start_depth);
+                    Vec2 fmaxp = v2(x2, end_depth);
+                    if (start_depth < 0.f) {
                         f32 depth_norm = norm(-1.f, minp.depth, maxp.depth);
                         f32 x = lerp(minp.x, maxp.x, depth_norm);
                         Vec2 adjusted = v2(x, -1.f);
-                        if (start_depth < 0.f)
-                            fminp = adjusted;
-                        else
-                            fmaxp = adjusted;
+                        fminp = adjusted;
+                    } else if (end_depth < 0.f) {
+                        f32 depth_norm = norm(-1.f, minp.depth, maxp.depth);
+                        f32 x = lerp(minp.x, maxp.x, depth_norm);
+                        Vec2 adjusted = v2(x, -1.f);
+                        fmaxp = adjusted;
                     }
+                    
                     Edge fedge = r_make_edge(fminp, fmaxp);
                     r_edge_array_add(&floor_edges, fedge);
                 }
@@ -452,7 +456,7 @@ f32 start_height  = lerp(minp.height, maxp.height, start_norm);
         Edge active_edges[2] = {0};
         for (s32 i=start_idx,j=0; (i < floor_edges.count) && (j < array_count(active_edges)); ++i) {
             Edge e = floor_edges.edges[i];
-            if (e.minp.y <= scan_line)
+            if (floorf(e.minp.y) <= scan_line)
                 active_edges[j++] = e;
         }
         start_idx += 2;
@@ -460,7 +464,7 @@ f32 start_height  = lerp(minp.height, maxp.height, start_norm);
         // Fill polygon
         f32 x[array_count(active_edges)] = {active_edges[0].minp.x, active_edges[1].minp.x};
         while (scan_line <= floor_edges.top) {
-            r_draw_hori(scan_line, x[0], x[1], Color_Cyan);
+            r_draw_hori(scan_line, max(x[0],window.first), min(x[1],window.last), Color_Cyan);
             scan_line++;
             for (s32 i = start_idx; i < floor_edges.count; ++i) {
                 Edge e = floor_edges.edges[i];

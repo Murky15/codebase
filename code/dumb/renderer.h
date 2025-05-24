@@ -54,6 +54,7 @@ function void r_draw_rect(Vec2 p, Vec2 sz, Color c);
 function Edge r_make_edge(Vec2 p0, Vec2 p1);
 function Edge_Array r_edge_array_init(void);
 function void r_edge_array_insert(Edge_Array *array, Edge edge, s32 index);
+function void r_edge_array_add(Edge_Array *array, Edge edge);
 function void r_sector(Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, s32 num_iterations, Range window);
 
 #endif //RENDERER_H
