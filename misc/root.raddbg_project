@@ -1,6 +1,9 @@
 // raddbg 0.9.16 project file
 
 recent_file: path: "../code/dumb/renderer.c"
+recent_file: path: "../code/dumb/map.c"
+recent_file: path: "../code/base/types.c"
+recent_file: path: "../code/dumb/platform_win32_multithreaded.c"
 recent_file: path: path
 recent_file: path: path
 recent_file: path: path
@@ -11,9 +14,45 @@ target:
   working_directory: "../build"
   enabled: 1
 }
+win32_procedure_not_found: 1
+win32_module_not_found: 1
+win32_sanitizer_raw_access_violation: 1
+win32_win_rt_originate_error: 1
+win32_win_rt_transform_error: 1
+win32_rpc_call_cancelled: 1
+win32_datatype_misalignment: 1
+win32_in_page_error: 1
+win32_not_enough_quota: 1
+win32_illegal_instruction: 1
+win32_cannot_continue_exception: 1
+win32_invalid_exception_disposition: 1
+win32_array_bounds_exceeded: 1
+win32_floating_point_denormal_operand: 1
+win32_floating_point_sse_multiple_faults: 1
+win32_floating_point_sse_multiple_traps: 1
+win32_dll_initialization_failed: 1
+win32_entry_point_not_found: 1
+win32_ordinal_not_found: 1
+win32_unable_to_locate_dll: 1
+win32_stack_overflow: 1
+win32_privileged_instruction: 1
+win32_integer_overflow: 1
+win32_floating_point_division_by_zero: 1
+win32_floating_point_inexact_result: 1
+win32_floating_point_invalid_operation: 1
+win32_floating_point_overflow: 1
+win32_floating_point_stack_check: 1
+win32_floating_point_underflow: 1
+win32_integer_division_by_zero: 1
 breakpoint:
 {
-  source_location: "W:/code/dumb/renderer.c:363:1"
-  hit_count: 0
-  enabled: 0
+  source_location: "W:/code/dumb/renderer.c:448:1"
+  hit_count: 14
+  enabled: 1
+}
+breakpoint:
+{
+  source_location: "W:/code/dumb/renderer.c:246:1"
+  hit_count: 6
+  enabled: 1
 }

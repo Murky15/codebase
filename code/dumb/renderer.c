@@ -125,10 +125,11 @@ r_draw_vert (f32 x, f32 y0, f32 y1, Color c) {
 }
 
 function void
-r_draw_hori (f32 y, f32 x0, f32 x1, Color c) {
-    Bitmap *canvas = r_get_framebuffer();
-    f32 start_x = max(-1.f, x0);
-    f32 end_x = min(x1, canvas->width);
+r_draw_hori (f32 y, f32 x0, f32 x1, Range bounds, Color c) {
+    if (x0 > x1)
+        swap(f32, x0, x1);
+    f32 start_x = max(bounds.first, x0);
+    f32 end_x = min(x1, bounds.last);
     for (f32 x = start_x; x <= end_x; ++x)
         r_put_pixel_at(v2(x,y), c);
 }
@@ -197,14 +198,6 @@ r_make_edge (Vec2 p0, Vec2 p1) {
     return result;
 }
 
-function Edge_Array
-r_edge_array_init (void) {
-    Edge_Array result = {0};
-    result.leftmost.x = INFINITY;
-    
-    return result;
-}
-
 function void
 r_edge_array_insert (Edge_Array *array, Edge edge, s32 index) {
     assert(index < EDGE_ARRAY_COUNT);
@@ -229,15 +222,44 @@ r_edge_array_add (Edge_Array *array, Edge edge) {
         }
         r_edge_array_insert(array, edge, index);
     }
-    Vec2 minx = edge.minp, maxx = edge.maxp;
-    if (minx.x > maxx.x)
-        swap(Vec2, minx, maxx);
-    if (minx.x < array->leftmost.x)
-        array->leftmost = minx;
-    if (maxx.x > array->rightmost.x)
-        array->rightmost = maxx;
+    
     if (edge.maxp.y > array->top)
         array->top = edge.maxp.y;
+}
+
+function void
+r_draw_plane (Edge_Array *edges, Range bounds) {
+    // Initialize fill algorithm
+    f32 scan_line = edges->edges[0].minp.y;
+    s32 start_idx = 0;
+    
+    Edge active_edges[2] = {0};
+    for (s32 i=start_idx,j=0; (i < edges->count) && (j < array_count(active_edges)); ++i) {
+        Edge e = edges->edges[i];
+        if (floorf(e.minp.y) <= scan_line)
+            active_edges[j++] = e;
+    }
+    start_idx += 2;
+    
+    // Fill polygon
+    f32 x[array_count(active_edges)] = {active_edges[0].minp.x, active_edges[1].minp.x};
+    while (ceil(scan_line) < edges->top) {
+        r_draw_hori(scan_line, x[0], x[1], bounds, Color_Navy);
+        scan_line++;
+        x[0] = x[0] + active_edges[0].recslope;
+        x[1] = x[1] + active_edges[1].recslope;
+        for (s32 i = start_idx; i < edges->count; ++i) {
+            Edge e = edges->edges[i];
+            for (s32 j = 0; j < array_count(active_edges); ++j) {
+                if (floor(active_edges[j].maxp.y) < scan_line && floor(e.minp.y) < scan_line) {
+                    active_edges[j] = e;
+                    x[j] = active_edges[j].minp.x;
+                    start_idx++;
+                    break;
+                }
+            }
+        }
+    }
 }
 
 function void
@@ -256,8 +278,8 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
     f32 full_depth  = (f32)sector->floor - actual_height;
     
     if (num_iterations < MAX_ITERATIONS) {
-        Edge_Array floor_edges = r_edge_array_init();
-        Edge_Array ceil_edges = r_edge_array_init();
+        Edge_Array floor_edges = {0};
+        Edge_Array ceil_edges = {0};
         
         for (u64 wall_idx = 0; wall_idx < sector->num_walls; ++wall_idx) {
             Wall *wall = &sector->walls[wall_idx];
@@ -350,44 +372,6 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             f32 start_x = clamp(minp.x, window.first, window.last);
             f32 end_x = clamp(maxp.x, window.first, window.last);   
             
-            // @note: Add new verticies into list 
-            if (start_x != end_x || num_iterations > 0) {
-                
-                // @note: This works for all cases 
-                start_norm = 0.f;
-                end_norm = 1.f;
-                x1 = minp.x;
-                x2 = maxp.x;
-                
-                f32 start_depth = lerp(minp.depth, maxp.depth, start_norm);
-                f32 end_depth   = lerp(minp.depth, maxp.depth, end_norm); 
-                if (!(start_depth < 0.f && end_depth < 0.f)) {
-                    Vec2 fminp = v2(x1, start_depth);
-                    Vec2 fmaxp = v2(x2, end_depth);
-                    if (start_depth < 0.f) {
-                        f32 depth_norm = norm(-1.f, minp.depth, maxp.depth);
-                        f32 x = lerp(minp.x, maxp.x, depth_norm);
-                        Vec2 adjusted = v2(x, -1.f);
-                        fminp = adjusted;
-                    } else if (end_depth < 0.f) {
-                        f32 depth_norm = norm(-1.f, minp.depth, maxp.depth);
-                        f32 x = lerp(minp.x, maxp.x, depth_norm);
-                        Vec2 adjusted = v2(x, -1.f);
-                        fmaxp = adjusted;
-                    }
-                    
-                    Edge fedge = r_make_edge(fminp, fmaxp);
-                    r_edge_array_add(&floor_edges, fedge);
-                }
-                
-                /* For later...
-f32 start_height  = lerp(minp.height, maxp.height, start_norm);
-                                f32 end_height    = lerp(minp.height, maxp.height, end_norm);
-                                Edge cedge = r_make_edge(v2(start_x, start_height), v2(end_x, end_height));
-                                r_edge_array_add(&ceil_edges, cedge);
-                                */
-            }
-            
             // Render into next scene (if applicable)
             if (wall->next_sector >= 0 && wall->next_sector != last_sector) { // @todo: This will result in an infinite loop for "circular" sector chains
                 Sector *next_sector = &map->sectors[wall->next_sector];
@@ -433,58 +417,34 @@ f32 start_height  = lerp(minp.height, maxp.height, start_norm);
                 r_draw_vert(x, -1.f, depth, Color_Black); // floor
                 r_draw_vert(x, height, canvas_height, Color_Black); // Cielling
             } 
+            
+            // Add floor / ceiling edges
+            Vec2 f0 = v2(minp.x, minp.depth), f1 = v2(maxp.x, maxp.depth);
+            if (!(f0.y < 0.f && f1.y < 0.f)) {
+                f32 depth_norm = norm(-1.f, minp.depth, maxp.depth);
+                f32 x = lerp(minp.x, maxp.x, depth_norm);
+                if (f0.y < 0.f)
+                    f0 = v2(x, -1.f);
+                else if (f1.y < 0.f) 
+                    f1 = v2(x, -1.f);
+                Edge edge = r_make_edge(f0, f1);
+                r_edge_array_add(&floor_edges, edge);
+            }
+            
+            Vec2 c0 = v2(minp.x, minp.height), c1 = v2(maxp.x, maxp.height);
+            if (!(c0.y > canvas_height && c1.y > canvas_height)) {
+                f32 height_norm = norm(canvas_height, minp.height, maxp.height);
+                f32 x = lerp(minp.x, maxp.x, height_norm);
+                if (c0.y > canvas_height) 
+                    c0 = v2(x, canvas_height);
+                else if (c1.y > canvas_height) 
+                    c1 = v2(x, canvas_height);
+                Edge edge = r_make_edge(c0, c1);
+                r_edge_array_add(&ceil_edges, edge);
+            }
         }
-        
         //- Render floor and ceiling
-        
-        // Complete polyon
-        if (num_iterations == 0) { 
-            if (floor_edges.leftmost.y > -1.f) {
-                Edge c = r_make_edge(v2(-1.f, -1.f), floor_edges.leftmost);
-                r_edge_array_add(&floor_edges, c);
-            }
-            if (floor_edges.rightmost.y > -1.f) {
-                Edge c = r_make_edge(v2(canvas_width, -1.f), floor_edges.rightmost);
-                r_edge_array_add(&floor_edges, c);
-            }
-        }
-        
-        // Initialize fill algorithm
-        f32 scan_line = floor_edges.edges[0].minp.y;
-        s32 start_idx = 0;
-        
-        Edge active_edges[2] = {0};
-        for (s32 i=start_idx,j=0; (i < floor_edges.count) && (j < array_count(active_edges)); ++i) {
-            Edge e = floor_edges.edges[i];
-            if (floorf(e.minp.y) <= scan_line)
-                active_edges[j++] = e;
-        }
-        start_idx += 2;
-        
-        // Fill polygon
-        f32 x[array_count(active_edges)] = {active_edges[0].minp.x, active_edges[1].minp.x};
-        while (scan_line <= floor_edges.top) {
-            r_draw_hori(scan_line, max(x[0],window.first), min(x[1],window.last), Color_Cyan);
-            scan_line++;
-            for (s32 i = start_idx; i < floor_edges.count; ++i) {
-                Edge e = floor_edges.edges[i];
-                for (s32 j = 0; j < array_count(active_edges); ++j) {
-                    if (active_edges[j].maxp.y <= scan_line && e.minp.y <= scan_line) {
-                        active_edges[j] = e;
-                        x[j] = active_edges[j].minp.x;
-                        start_idx++;
-                        break;
-                    }
-                }
-            }
-            x[0] = x[0] + active_edges[0].recslope;
-            x[1] = x[1] + active_edges[1].recslope;
-        }
-        
-        // Debug wireframe view
-#if 1
-        for (s32 i = 0; i < floor_edges.count; ++i) 
-            r_draw_line(floor_edges.edges[i].minp, floor_edges.edges[i].maxp, Color_Lime);
-#endif
+        r_draw_plane(&floor_edges, window);
+        r_draw_plane(&ceil_edges, window);
     }
 }

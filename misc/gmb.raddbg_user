@@ -7,46 +7,55 @@ window:
 {
   size: 1536.000000 816.000000
   split_x
-  pos: 32 32
+  pos: 192 102
   monitor: "\\\\.\\DISPLAY1"
   panels:
   {
-    0.200663:
+    0.284345:
     {
       0.333333: watch: selected expression: "query:breakpoints"
       0.333333:
       {
-        selected
         disasm:
         {
-          selected
           expression: ""
           query: input: ""
         }
-        watch: expression: "query:threads"
+        watch: selected expression: "query:threads"
       }
       0.333333:
       {
-        watch:
-        {
-          expression: "query:call_stack"
-          selected
-        }
         watch: expression: "query:modules"
+        watch: selected expression: "query:call_stack"
       }
     }
-    0.486923:
+    0.356693:
     {
-      0.778307: getting_started text:
+      0.778307:
       {
         selected
-        expression: "file:\"W:/code/dumb/renderer.c\".data"
-        project: "W:/misc/root.raddbg_project"
-        query: input: ""
-        cursor_line: 342
-        cursor_column: 32
-        mark_line: 342
-        mark_column: 32
+        getting_started
+        text:
+        {
+          selected
+          expression: "file:\"W:/code/dumb/renderer.c\".data"
+          project: "W:/misc/root.raddbg_project"
+          query: input: ""
+          cursor_line: 256
+          cursor_column: 51
+          mark_line: 256
+          mark_column: 51
+        }
+        text:
+        {
+          expression: "file:\"W:/code/dumb/map.c\".data"
+          auto: 1
+          query: input: ""
+          cursor_line: 88
+          cursor_column: 1
+          mark_line: 88
+          mark_column: 1
+        }
       }
       0.221693: text:
       {
@@ -59,11 +68,10 @@ window:
         mark_column: 1
       }
     }
-    0.312413:
+    0.358961:
     {
       watch:
       {
-        selected
         expression: ""
         watch: sector
         watch: last_sector
@@ -75,12 +83,15 @@ window:
           cmd: search
           input: ""
         }
-        watch: fminp
-        watch: fmaxp
-        watch: fedge
         normal: 0.350000 0.540381 0.109619
+        watch: f0
+        watch: f1
+        watch: minp
+        watch: maxp
+        watch: x
+        watch: bounds
       }
-      watch: expression: "query:locals"
+      watch: selected expression: "query:locals"
     }
   }
   maximized
