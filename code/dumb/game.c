@@ -26,17 +26,15 @@
 /*
 @todo
 -Bake asset path
--Microui
 -Level editor
 -Hot Reloading
 -Lighting
 -Wall texture mapping
 -Collisions
--SIMD???? -> compile renderer code into ISPC
 -Optimize / profile render functions
+-compile renderer code into ISPC AoS->SoA layout
 -Parse c file and pass #run directive to stdin of compiler, link with result
 -sin/cos/tan table lookup: https://namoseley.wordpress.com/2015/07/26/sincos-generation-using-table-lookup-and-iterpolation/
--Better Asset structure
 -Asan / Libfuzzer
 -Aspect ratio correction
 -OH I FORGOT ABOUT AUDIO

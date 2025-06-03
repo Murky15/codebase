@@ -1,4 +1,4 @@
-// raddbg 0.9.16 project file
+// raddbg 0.9.17 project file
 
 recent_file: path: "../code/dumb/renderer.c"
 recent_file: path: "../code/dumb/map.c"
@@ -12,7 +12,6 @@ target:
 {
   executable: "../build/dumb.exe"
   working_directory: "../build"
-  enabled: 1
 }
 win32_procedure_not_found: 1
 win32_module_not_found: 1
@@ -46,13 +45,19 @@ win32_floating_point_underflow: 1
 win32_integer_division_by_zero: 1
 breakpoint:
 {
-  source_location: "W:/code/dumb/renderer.c:448:1"
-  hit_count: 14
+  source_location: "../code/dumb/renderer.c:448:1"
+  hit_count: 0
   enabled: 1
 }
 breakpoint:
 {
-  source_location: "W:/code/dumb/renderer.c:246:1"
-  hit_count: 6
+  source_location: "../code/dumb/renderer.c:246:1"
+  hit_count: 0
+  enabled: 1
+}
+target:
+{
+  executable: "../build/dumb_level_editor.exe"
+  working_directory: "../build/"
   enabled: 1
 }

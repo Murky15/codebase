@@ -10,7 +10,7 @@
 
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
-#include "base/include.c"
+#include "base/memory.c"
 
 void
 draw_grid_old (int columns, int spacing) {
@@ -55,7 +55,7 @@ main()
     cam.zoom = 1.f;
     cam.offset = (Vector2){GetRenderWidth()/2, GetRenderHeight()/2};
     
-    int ideal_grid_spacing = 32;
+    int ideal_grid_spacing = 10;
     float grid_scale = ideal_grid_spacing;
     while (!WindowShouldClose())
     {
@@ -79,14 +79,14 @@ main()
             cam.offset = GetMousePosition();
             cam.target = mouse_world_pos;
             float scale = 0.2f*wheel;
-            cam.zoom = Clamp(expf(logf(cam.zoom)+scale), 0.125f, 64.0f);
+            cam.zoom = min(expf(logf(cam.zoom)+scale), ideal_grid_spacing);
             
             // Scale grid accordingly
             float world_units_per_pixel = 1.f / cam.zoom;
             float target_spacing = ideal_grid_spacing * world_units_per_pixel;
-            float log_spacing = log2f(target_spacing);
-            float snapped = roundf(log_spacing);
-            grid_scale = powf(2.f, snapped);
+            float log_spacing = log10f(target_spacing);
+            float snapped = floorf(log_spacing);
+            grid_scale = powf(10.f, snapped);
         }
         
         //- Render
