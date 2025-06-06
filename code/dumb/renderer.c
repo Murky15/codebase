@@ -229,33 +229,38 @@ r_edge_array_add (Edge_Array *array, Edge edge) {
 
 function void
 r_draw_plane (Edge_Array *edges, Range bounds) {
-    // Initialize fill algorithm
-    f32 scan_line = edges->edges[0].minp.y;
-    s32 start_idx = 0;
-    
-    Edge active_edges[2] = {0};
-    for (s32 i=start_idx,j=0; (i < edges->count) && (j < array_count(active_edges)); ++i) {
-        Edge e = edges->edges[i];
-        if (floorf(e.minp.y) <= scan_line)
-            active_edges[j++] = e;
-    }
-    start_idx += 2;
-    
-    // Fill polygon
-    f32 x[array_count(active_edges)] = {active_edges[0].minp.x, active_edges[1].minp.x};
-    while (ceil(scan_line) < edges->top) {
-        r_draw_hori(scan_line, x[0], x[1], bounds, Color_Navy);
-        scan_line++;
-        x[0] = x[0] + active_edges[0].recslope;
-        x[1] = x[1] + active_edges[1].recslope;
-        for (s32 i = start_idx; i < edges->count; ++i) {
+    if (bounds.first != bounds.last) {
+        // Initialize fill algorithm
+        f32 scan_line = edges->edges[0].minp.y; 
+        s32 start_idx = 0;
+        
+        assert(scan_line >= -1.f);
+        assert(edges->top <= RESOLUTION_H);
+        
+        Edge active_edges[2] = {0};
+        for (s32 i=start_idx,j=0; (i < edges->count) && (j < array_count(active_edges)); ++i) {
             Edge e = edges->edges[i];
-            for (s32 j = 0; j < array_count(active_edges); ++j) {
-                if (floor(active_edges[j].maxp.y) < scan_line && floor(e.minp.y) < scan_line) {
-                    active_edges[j] = e;
-                    x[j] = active_edges[j].minp.x;
-                    start_idx++;
-                    break;
+            if (floorf(e.minp.y) <= scan_line)
+                active_edges[j++] = e;
+        }
+        start_idx += 2;
+        
+        // Fill polygon
+        f32 x[array_count(active_edges)] = {active_edges[0].minp.x, active_edges[1].minp.x};
+        while (ceil(scan_line) < edges->top) {
+            r_draw_hori(scan_line, x[0], x[1], bounds, Color_Navy);
+            scan_line++;
+            x[0] = x[0] + active_edges[0].recslope;
+            x[1] = x[1] + active_edges[1].recslope;
+            for (s32 i = start_idx; i < edges->count; ++i) {
+                Edge e = edges->edges[i];
+                for (s32 j = 0; j < array_count(active_edges); ++j) {
+                    if (floor(active_edges[j].maxp.y) < scan_line && floor(e.minp.y) < scan_line) {
+                        active_edges[j] = e;
+                        x[j] = active_edges[j].minp.x;
+                        start_idx++;
+                        break;
+                    }
                 }
             }
         }

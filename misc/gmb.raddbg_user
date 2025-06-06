@@ -1,20 +1,29 @@
-// raddbg 0.9.17 user file
+// raddbg 0.9.16 user file
 
 recent_project: path: "root.raddbg_project"
+recent_project: path: path
 recent_project: path: path
 recent_project: path: path
 window:
 {
   size: 1536.000000 816.000000
-  split_x
-  pos: 484 312
-  monitor: "\\\\.\\DISPLAY1"
   panels:
   {
-    0.284345:
+    0.166667:
     {
-      0.333333: watch: selected expression: "query:breakpoints"
-      0.333333:
+      0.25:
+      {
+        watch: selected expression: ""
+        watch: expression: "query:types"
+      }
+      0.25:
+      {
+        watch: selected expression: "query:threads"
+        watch: expression: "query:targets"
+        watch: expression: "query:breakpoints"
+        watch: expression: "query:watch_pins"
+      }
+      0.25:
       {
         disasm:
         {
@@ -22,82 +31,34 @@ window:
           expression: ""
           query: input: ""
         }
-        watch: expression: "query:threads"
+        text: expression: "query:output"
       }
-      0.333333:
+      0.25:
       {
-        watch: expression: "query:modules"
-        watch: selected expression: "query:call_stack"
-      }
-    }
-    0.356693:
-    {
-      0.778307:
-      {
-        selected
-        getting_started
-        text:
+        watch:
         {
+          expression: "query:call_stack"
           selected
-          expression: "file:\"W:/code/dumb/renderer.c\".data"
-          project: "W:/misc/root.raddbg_project"
-          query: input: ""
-          cursor_line: 255
-          cursor_column: 41
-          mark_line: 255
-          mark_column: 41
         }
-        text:
-        {
-          expression: "file:\"W:/code/dumb/map.c\".data"
-          auto: 1
-          query: input: ""
-          cursor_line: 88
-          cursor_column: 1
-          mark_line: 88
-          mark_column: 1
-        }
-      }
-      0.221693:
-      {
-        text:
-        {
-          expression: "query:output"
-          query: input: ""
-          cursor_line: 1
-          cursor_column: 1
-          mark_line: 1
-          mark_column: 1
-        }
-        watch: selected expression: "query:targets"
+        watch: expression: "query:modules"
       }
     }
-    0.358961:
+    0.507845: selected getting_started text:
     {
-      watch:
-      {
-        expression: ""
-        watch: sector
-        watch: last_sector
-        watch: floor_edges
-        watch: scan_line
-        watch: active_edges
-        query:
-        {
-          cmd: search
-          input: ""
-        }
-        normal: 0.350000 0.540381 0.109619
-        watch: f0
-        watch: f1
-        watch: minp
-        watch: maxp
-        watch: x
-        watch: bounds
-      }
-      watch: selected expression: "query:locals"
+      selected
+      expression: "file:\"W:/code/dumb/renderer.c\".data"
+      auto: 1
+      query: input: ""
+      cursor_line: 236
+      cursor_column: 27
+      mark_line: 236
+      mark_column: 27
     }
+    0.325488: watch: selected expression: "query:locals"
   }
+  split_x
+  pos: 192 102
+  monitor: "\\\\.\\DISPLAY1"
   maximized
 }
 keybindings:
