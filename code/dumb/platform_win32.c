@@ -1,3 +1,5 @@
+// @note: The multithreaded one is the one actually being used
+
 #include "game.c"
 
 #include <Windows.h>

@@ -7,7 +7,7 @@ sector_list_push_ref (Arena *arena, Sector_List *list,  Sector *ref) {
 }
 
 // @todo: Textures should be stored per-wall for more flexibility
-// @todo: Hella annoying editing this file by hand
+// @todo: Annoying editing this file by hand
 function Map
 map_load (Arena *arena, String8 path) {
     Temp_Arena scratch = get_scratch(&arena, 1);

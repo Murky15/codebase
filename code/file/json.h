@@ -103,7 +103,7 @@ core_function Json_Value json_object_fetch(Json_Object *object, String8 key);
 core_function void json_value_list_push(Arena *arena, Json_Value_List *list, Json_Value value);
 
 //- @incomplete Serialization functions & better program-side data mutability
-core_function void json_print(Json_Value value);
+core_function void json_print(Json_Value value, int depth);
 
 //- Parsing functions
 // @note: Trailing commas are *not supported*

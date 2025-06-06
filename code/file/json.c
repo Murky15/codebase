@@ -142,8 +142,8 @@ json_process_object (Arena *arena, Json_Token_Node **token) {
                 Json_Set *new_set = arena_pushn(scratch.arena, Json_Set, 1);
                 num_sets++;
                 if (object_sets == 0)
-                  object_sets = new_set;
-
+                    object_sets = new_set;
+                
                 new_set->key = key->token.value;
                 Json_Token_Node *seperator = key->next;
                 if (seperator->token.value.str[0] == ':') {
@@ -270,10 +270,7 @@ json_process_token (Arena *arena, Json_Token_Node **token_stream) {
 }
 
 core_function void
-json_print (Json_Value value) {
-    local_persist int depth=-1;
-    depth++;
-    
+json_print (Json_Value value, int depth) {
 #define print_depth() \
 for (int j = 0; j < depth; ++j) { \
 printf("  "); \
@@ -290,7 +287,7 @@ printf("  "); \
                 Json_Set set = object->table[i];
                 print_depth()
                     printf("%.*s: ", str8_expand(set.key));
-                json_print(set.value);
+                json_print(set.value, depth+1);
                 if (i < object->count-1) printf("\n");
             }
             depth--;
@@ -302,7 +299,7 @@ printf("  "); \
             u64 i = 1;
             for (Json_Value_Node *value_node = array->values.first; 
                  value_node; value_node = value_node->next, ++i) {
-                json_print(value_node->value);
+                json_print(value_node->value, depth+1);
                 if (i < array->values.count)
                     printf(", ");
             }
@@ -353,7 +350,7 @@ int main (void) {
     Temp_Arena scratch = get_scratch(0,0);
     String8 file = os_read_file(scratch.arena, str8_lit("json_tests/test3.json"), false);
     Json_Value value = json_parse(scratch.arena, file);
-    json_print(value);
+    json_print(value, 0);
     release_scratch(scratch);
 }
 #endif

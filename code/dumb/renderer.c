@@ -9,12 +9,12 @@ r_test_gradient (void) {
     Bitmap *canvas = r_get_framebuffer();
     
     local_persist u8 xOffset, yOffset;
-    for (u32 y = 0; y < canvas->height; ++y) {
-        for (u32 x = 0; x < canvas->width; ++x) {
+    for (u32 y = 0; y < RESOLUTION_H; ++y) {
+        for (u32 x = 0; x < RESOLUTION_W; ++x) {
             u8 r = (u8)x + xOffset;
             u8 g = (u8)y + yOffset;
             u8 b = 0;  
-            canvas->pixels[y * canvas->width + x] = (r << 16 | g << 8 | b);
+            canvas->pixels[y * RESOLUTION_W + x] = (r << 16 | g << 8 | b);
         }
     }
     xOffset = ++yOffset;
@@ -25,21 +25,21 @@ r_put_pixel_at (Vec2 p, Color c) {
     Bitmap *canvas = r_get_framebuffer();
     
     Vec2i pi = v2i_from_v2(p);
-    if (pi.x >= 0 && pi.y >= 0 && pi.x < canvas->width && pi.y < canvas->height)
-        canvas->pixels[pi.y * canvas->width + pi.x] = (c.r << 16 | c.g << 8 | c.b);
+    if (pi.x >= 0 && pi.y >= 0 && pi.x < RESOLUTION_W && pi.y < RESOLUTION_H)
+        canvas->pixels[pi.y * RESOLUTION_W + pi.x] = (c.r << 16 | c.g << 8 | c.b);
 }
 
 function void
 r_clear (void) {
     Bitmap *canvas = r_get_framebuffer();
-    memory_zero(canvas->pixels, canvas->width * canvas->height * sizeof(u32));
+    memory_zero(canvas->pixels, RESOLUTION_W * RESOLUTION_H * sizeof(u32));
 }
 
 // @slow
 function void
 r_clear_color (Color c) {
     Bitmap *canvas = r_get_framebuffer();
-    for (u32 pidx = 0; pidx < canvas->width * canvas->height; ++pidx) {
+    for (u32 pidx = 0; pidx < RESOLUTION_W * RESOLUTION_H; ++pidx) {
         canvas->pixels[pidx] = (c.r << 16 | c.g << 8 | c.b);
     }
 }
@@ -117,9 +117,8 @@ r_draw_line (Vec2 p0, Vec2 p1, Color c) {
 
 function void
 r_draw_vert (f32 x, f32 y0, f32 y1, Color c) {
-    Bitmap *canvas = r_get_framebuffer();
     f32 start_y = max(-1.f, y0);
-    f32 end_y = min(y1, canvas->height);
+    f32 end_y = min(y1, RESOLUTION_H);
     for (f32 y = start_y; y <= end_y; ++y)
         r_put_pixel_at(v2(x,y), c);
 }
@@ -137,9 +136,8 @@ r_draw_hori (f32 y, f32 x0, f32 x1, Range bounds, Color c) {
 function void
 r_draw_vert_textured (f32 x, f32 y0, f32 y1, f32 actual_height, PNG_Bitmap_RGBA texture, Texture_Map_Type map_type, s32 texx) {
     Color c;
-    Bitmap *canvas = r_get_framebuffer();
     f32 start_y = max(-1.f, y0);
-    f32 end_y = min(y1, canvas->height);
+    f32 end_y = min(y1, RESOLUTION_H);
     f32 img_height = texture.height;
     f32 pages_per_wall = (actual_height * TEXTURE_VERT_REPEAT_SCALE) / img_height;
     for (f32 y = start_y; y <= end_y; ++y) {
@@ -264,14 +262,12 @@ r_draw_plane (Edge_Array *edges, Range bounds) {
 
 function void
 r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, s32 num_iterations, Range window) {
-    Bitmap *canvas = r_get_framebuffer();
-    
     local_persist read_only f32 forward = M_PI32 / 2.f;
     local_persist read_only f32 near_plane = 0.001f;
-    f32 canvas_width = (f32)canvas->width;
-    f32 canvas_height = (f32)canvas->height;
-    f32 width_middle = canvas->width/2.f;
-    f32 height_middle = canvas->height/2.f;
+    f32 canvas_width = (f32)RESOLUTION_W;
+    f32 canvas_height = (f32)RESOLUTION_H;
+    f32 width_middle = RESOLUTION_W/2.f;
+    f32 height_middle = RESOLUTION_H/2.f;
     
     f32 actual_height = cam->height + (f32)sector->floor;
     f32 full_height = (f32)sector->ceiling - actual_height;
@@ -384,6 +380,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             }
             
             Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_1A.PNG"));
+            Asset test_ledge_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_1A.PNG"));
             Asset test_floor_texture = asset_group_fetch(&environment_textures, str8_lit("COBBLES_1B.PNG"));
             Texture_Map_Type test_texture_map_type = TEXTURE_MAP_REPEAT;
             
@@ -411,7 +408,9 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 f32 ceil   = lerp(minp.ceil, maxp.ceil, xnorm);
                 
                 //r_draw_vert(x, depth, floor, Color_Maroon); // ledge
+                r_draw_vert_textured(x, depth, floor, floor_diff, test_ledge_texture.img, test_texture_map_type, texx);
                 if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, sector->ceiling-sector->floor, test_wall_texture.img, test_texture_map_type, texx); // wall
+                r_draw_vert_textured(x, ceil, height, ceil_diff, test_ledge_texture.img, test_texture_map_type, texx);
                 //r_draw_vert(x, ceil, height, Color_Maroon); // ledge
                 
                 r_draw_vert(x, -1.f, depth, Color_Black); // floor
