@@ -94,7 +94,7 @@ main()
             u64 num_points = num_edges*2;
             for (u64 i = 0; i < num_points; ++i) {
                 Vector2 p = points[i];
-                if (CheckCollisionPointCircle(mouse_world_pos, p, 5.f)) {
+                if (CheckCollisionPointCircle(mouse_world_pos, p, 30.f/cam.zoom)) {
                     cursor = p;
                     snapped = true;
                     break;
@@ -125,14 +125,14 @@ main()
             
             BeginMode2D(cam);
             {
-                DrawCircle(0, 0, 10/cam.zoom, BLACK); // Origin 
-                DrawCircleV(cursor, 8/cam.zoom, DARKBLUE);
-                // Draw Lines
                 if (active_point.x != INFINITY)
                     DrawLineEx(active_point, cursor, 0.5f, GREEN);
                 for (u64 i = 0; i < num_edges; ++i) {
                     DrawLineEx(edges[i].p0, edges[i].p1, 0.5f, RED);
                 }
+                
+                DrawCircle(0, 0, 10/cam.zoom, BLACK); // Origin 
+                DrawCircleV(cursor, 8/cam.zoom, DARKBLUE);
             }
             EndMode2D();
             

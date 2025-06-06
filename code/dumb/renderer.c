@@ -384,8 +384,8 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 r_sector(map, next_sector, environment_textures, &modified_cam, sector->id, num_iterations + 1, bounds);
             }
             
-            Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_1A.PNG"));
-            Asset test_ledge_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_1A.PNG"));
+            Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("STEEL_1D.PNG"));
+            Asset test_ledge_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_6C.PNG"));
             Asset test_floor_texture = asset_group_fetch(&environment_textures, str8_lit("COBBLES_1B.PNG"));
             Texture_Map_Type test_texture_map_type = TEXTURE_MAP_REPEAT;
             
@@ -403,7 +403,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 if (test_texture_map_type == TEXTURE_MAP_FIT) {                                          
                     texx = lerp(0, img_width/maxp.z, texnorm) / lerp(1.f/minp.z, 1.f/maxp.z, texnorm);
                 } else if (test_texture_map_type == TEXTURE_MAP_REPEAT) {
-                    texx = lerp(0, (img_width*pages_per_wall)/maxp.z, texnorm) / lerp(1.f/minp.z, 1.f/maxp.z, texnorm);
+                    texx = lerp(0, (img_width*TEXTURE_HORI_REPEAT_SCALE*pages_per_wall)/maxp.z, texnorm) / lerp(1.f/minp.z, 1.f/maxp.z, texnorm);
                     texx %= (u32)img_width;
                 }
                 
@@ -412,14 +412,9 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 f32 floor  = lerp(minp.floor, maxp.floor, xnorm); 
                 f32 ceil   = lerp(minp.ceil, maxp.ceil, xnorm);
                 
-                //r_draw_vert(x, depth, floor, Color_Maroon); // ledge
-                r_draw_vert_textured(x, depth, floor, floor_diff, test_ledge_texture.img, test_texture_map_type, texx);
-                if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, sector->ceiling-sector->floor, test_wall_texture.img, test_texture_map_type, texx); // wall
-                r_draw_vert_textured(x, ceil, height, ceil_diff, test_ledge_texture.img, test_texture_map_type, texx);
-                //r_draw_vert(x, ceil, height, Color_Maroon); // ledge
-                
-                r_draw_vert(x, -1.f, depth, Color_Black); // floor
-                r_draw_vert(x, height, canvas_height, Color_Black); // Cielling
+                if (floor_diff > 0) r_draw_vert_textured(x, depth, floor, floor_diff, test_ledge_texture.img, test_texture_map_type, texx);
+                if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, sector->ceiling-sector->floor, test_wall_texture.img, test_texture_map_type, texx);
+                if (ceil_diff < 0) r_draw_vert_textured(x, ceil, height, -ceil_diff, test_ledge_texture.img, test_texture_map_type, texx);
             } 
             
             // Add floor / ceiling edges
