@@ -171,28 +171,44 @@ r_draw_hori_textured (f32 y, f32 x0, f32 x1, Range bounds, Rect world_region, En
     f32 end_x = min(x1, bounds.last);
     f32 img_height = texture.height;
     f32 img_width = texture.width;
+    // @todo: Probably a way to cache this
+    f32 region_length = world_region.max.x - world_region.min.x;
+    f32 region_width = world_region.max.y - world_region.min.y;
+    f32 horizontal_page_step = region_length / img_width;
+    f32 vertical_page_step = region_width / img_height;
     f32 t = -cam->rotation_angle + DIR_FORWARD;
     if (start_x != end_x) {
-        for (f32 x = start_x; x <= end_x; ++x) {
-            // Obtain x in camera space
-            f32 xcam = (ycam*ASPECT_W*(x-width_middle))/(canvas_width*cam_dist);
-            // Now that we have both xcam and ycam, we can transform them back to world
+        /*
+         1. Obtain x in camera space
+                 2. Now that we have both xcam and ycam, we can transform them back to world
+                 3. Sample texture coordinates
+                */
+        Vec2 w0, w1;
+        {
+            f32 xcam = (ycam*ASPECT_W*(start_x-width_middle))/(canvas_width*cam_dist);
             f32 rx = xcam * cosf(t) + ycam * sinf(t);
             f32 ry = xcam * -sinf(t) + ycam * cosf(t);
-            f32 xworld = rx + cam->pos.x;
-            f32 yworld = ry + cam->pos.y;
-            // Sample texture coordinates
+            w0.x = rx + cam->pos.x;
+            w0.y = ry + cam->pos.y;
+        }
+        {
+            f32 xcam = (ycam*ASPECT_W*(end_x-width_middle))/(canvas_width*cam_dist);
+            f32 rx = xcam * cosf(t) + ycam * sinf(t);
+            f32 ry = xcam * -sinf(t) + ycam * cosf(t);
+            w1.x = rx + cam->pos.x;
+            w1.y = ry + cam->pos.y;
+        }
+        
+        for (f32 x = start_x; x <= end_x; ++x) {
+            f32 line_pos = norm(x, start_x, end_x);
+            f32 xworld = lerp(w0.x, w1.x, line_pos);
+            f32 yworld = lerp(w0.y, w1.y, line_pos);
             f32 xnorm = norm(xworld, world_region.min.x, world_region.max.x);
             f32 ynorm = norm(yworld, world_region.min.y, world_region.max.y);
             if (map_type == TEXTURE_MAP_FIT) {
                 texx = clamp(lerp(0, img_width, xnorm), 0, img_width-1);
                 texy = clamp(lerp(0, img_height, ynorm), 0, img_height-1);
             } else if (map_type == TEXTURE_MAP_REPEAT) {
-                // @todo: Probably a way to cache this
-                f32 region_length = world_region.max.x - world_region.min.x;
-                f32 region_width = world_region.max.y - world_region.min.y;
-                f32 horizontal_page_step = region_length / img_width;
-                f32 vertical_page_step = region_width / img_height;
                 texx = lerp(0, img_width*horizontal_page_step, xnorm);
                 texy = lerp(0, img_height*vertical_page_step, ynorm);
                 texx %= (u32)img_width;
