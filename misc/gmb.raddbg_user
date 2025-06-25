@@ -1,4 +1,4 @@
-// raddbg 0.9.16 user file
+// raddbg 0.9.17 user file
 
 recent_project: path: "root.raddbg_project"
 recent_project: path: path
@@ -13,14 +13,13 @@ window:
     {
       0.25:
       {
-        watch: selected expression: ""
         watch: expression: "query:types"
+        watch: selected expression: "query:breakpoints"
       }
       0.25:
       {
         watch: selected expression: "query:threads"
         watch: expression: "query:targets"
-        watch: expression: "query:breakpoints"
         watch: expression: "query:watch_pins"
       }
       0.25:
@@ -49,15 +48,31 @@ window:
       expression: "file:\"W:/code/dumb/renderer.c\".data"
       auto: 1
       query: input: ""
-      cursor_line: 236
-      cursor_column: 27
-      mark_line: 236
-      mark_column: 27
+      cursor_line: 277
+      cursor_column: 34
+      mark_line: 277
+      mark_column: 34
     }
-    0.325488: watch: selected expression: "query:locals"
+    0.325488:
+    {
+      watch: expression: "query:locals"
+      watch:
+      {
+        selected
+        expression: ""
+        watch: texy
+        watch: floor_region
+        watch: minp
+        watch: maxp
+        watch: temp
+        watch: z
+        watch: world_region
+        watch: texnorm
+      }
+    }
   }
   split_x
-  pos: 192 102
+  pos: 484 312
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }

@@ -15,6 +15,8 @@
 #define MAX_ITERATIONS (s32_max - 1)
 #define EDGE_ARRAY_COUNT 64
 
+#define DIR_FORWARD M_PI32 / 2.f
+
 typedef struct Bitmap {
     u32 *pixels;
     u32 width, height;
@@ -56,7 +58,7 @@ function void r_draw_quad_frame(Vec2 p0, Vec2 p1, Vec2 p2, Vec2 p3, Color c);
 function void r_draw_rect(Vec2 p, Vec2 sz, Color c);
 
 //- @note: Game specific
-function void r_draw_plane(Edge_Array *edges, Range bounds);
+//function void r_draw_plane(Edge_Array *edges, Range bounds, Rect world_region, Asset texture);
 function void r_sector(Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, s32 num_iterations, Range window);
 
 #endif //RENDERER_H

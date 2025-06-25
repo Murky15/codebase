@@ -71,7 +71,7 @@ win32_game_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                                 cam_up = key_down;
                             } else {
                                 cam_up = 0;
-                                game_input.move_forward = key_down;
+                                game_input.move_DIR_FORWARD = key_down;
                             }
                         } break;
                         

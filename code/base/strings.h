@@ -67,7 +67,7 @@ core_function b32 char_is_control(u8 c);
 core_function b32 char_is_space(u8 c);
 core_function u8  char_to_upper(u8 c);
 core_function u8  char_to_lower(u8 c);
-core_function u8  char_to_forward_slash(u8 c);
+core_function u8  char_to_DIR_FORWARD_slash(u8 c);
 core_function u64 cstr_length(const char *cstr);
 
 // @note: String functions

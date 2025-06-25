@@ -43,7 +43,7 @@
 /*
 What if instead of header files we just had source files and the metaprogram 
 would travel to every source file in a dir/project and generate
-forward declarations for structs and functions into one huge "project.inc"
+DIR_FORWARD declarations for structs and functions into one huge "project.inc"
 that you would include. That way you don't need to fret about ordering, you could write
 all your structs like
 
@@ -168,7 +168,7 @@ game_tick (Game_Memory_Package memory, Game_Input_Package input, f32 dt) {
     
     Vec2 dir;
     f32 x = 0, y = 0;
-    if (input.move_forward)   x +=  1;
+    if (input.move_DIR_FORWARD)   x +=  1;
     if (input.move_back)      x += -1;
     if (input.strafe_left)    y +=  1;
     if (input.strafe_right)   y += -1;

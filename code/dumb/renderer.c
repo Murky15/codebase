@@ -129,8 +129,10 @@ r_draw_hori (f32 y, f32 x0, f32 x1, Range bounds, Color c) {
         swap(f32, x0, x1);
     f32 start_x = max(bounds.first, x0);
     f32 end_x = min(x1, bounds.last);
-    for (f32 x = start_x; x <= end_x; ++x)
-        r_put_pixel_at(v2(x,y), c);
+    if (start_x != end_x) {
+        for (f32 x = start_x; x <= end_x; ++x)
+            r_put_pixel_at(v2(x,y), c);
+    }
 }
 
 function void
@@ -144,14 +146,33 @@ r_draw_vert_textured (f32 x, f32 y0, f32 y1, f32 actual_height, PNG_Bitmap_RGBA 
         f32 ynorm = norm(y, y0, y1);
         s32 texy;
         if (map_type == TEXTURE_MAP_FIT) {
-            texy = lerp(0, texture.height, ynorm);
+            texy = lerp(0, img_height, ynorm);
         } else if (map_type == TEXTURE_MAP_REPEAT) {
-            texy = lerp(0, texture.height*pages_per_wall, ynorm);
+            texy = lerp(0, img_height*pages_per_wall, ynorm);
             texy %= (u32)img_height;
         }
         texy = img_height - texy - 1;
         c.packed = texture.pixels[texy * texture.width + texx];
         r_put_pixel_at(v2(x,y), c);
+    }
+}
+
+
+function void
+r_draw_hori_textured (f32 y, f32 x0, f32 x1, Range bounds, Vec2 tex_bounds, PNG_Bitmap_RGBA texture, Texture_Map_Type map_type, s32 texy) {
+    if (x0 > x1)
+        swap(f32, x0, x1);
+    Color c;
+    f32 start_x = max(bounds.first, x0);
+    f32 end_x = min(x1, bounds.last);
+    f32 img_width = texture.width;
+    if (start_x != end_x) {
+        for (f32 x = start_x; x <= end_x; ++x) {
+            f32 xnorm = norm(x, x0, x1);
+            s32 texx = lerp(0, img_width, xnorm);
+            c.packed = texture.pixels[texy * texture.width + texx];
+            r_put_pixel_at(v2(x,y), c);
+        }
     }
 }
 
@@ -226,14 +247,20 @@ r_edge_array_add (Edge_Array *array, Edge edge) {
 }
 
 function void
-r_draw_plane (Edge_Array *edges, Range bounds) {
+r_draw_plane (Edge_Array *edges, Range bounds, Rect world_region, f32 world_height, f32 cam_dist, f32 rotation_angle, Asset texture) {
     if (bounds.first != bounds.last) {
         // Initialize fill algorithm
-        f32 scan_line = edges->edges[0].minp.y; 
+        f32 bottom = edges->edges[0].minp.y;
+        f32 top = edges->top;
+        f32 canvas_height = (f32)RESOLUTION_H;
+        f32 height_middle = canvas_height/2.f;
+        f32 scan_line = bottom; 
         s32 start_idx = 0;
         
         assert(scan_line >= -1.f);
         assert(edges->top <= RESOLUTION_H);
+        
+        f32 img_height = texture.img.height;
         
         Edge active_edges[2] = {0};
         for (s32 i=start_idx,j=0; (i < edges->count) && (j < array_count(active_edges)); ++i) {
@@ -246,7 +273,10 @@ r_draw_plane (Edge_Array *edges, Range bounds) {
         // Fill polygon
         f32 x[array_count(active_edges)] = {active_edges[0].minp.x, active_edges[1].minp.x};
         while (ceil(scan_line) < edges->top) {
-            r_draw_hori(scan_line, x[0], x[1], bounds, Color_Navy);
+            f32 z = (world_height*cam_dist*canvas_height)/(ASPECT_H*(scan_line-height_middle));
+            f32 texnorm = norm(z, world_region.min.y, world_region.max.y);
+            s32 texy = lerp(0, img_height, texnorm);
+            r_draw_hori_textured(scan_line, x[0], x[1], bounds, v2(world_region.min.x, world_region.max.x), texture.img, TEXTURE_MAP_FIT, texy);
             scan_line++;
             x[0] = x[0] + active_edges[0].recslope;
             x[1] = x[1] + active_edges[1].recslope;
@@ -267,20 +297,27 @@ r_draw_plane (Edge_Array *edges, Range bounds) {
 
 function void
 r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *cam, s32 last_sector, s32 num_iterations, Range window) {
-    local_persist read_only f32 forward = M_PI32 / 2.f;
     local_persist read_only f32 near_plane = 0.001f;
+    local_persist read_only f32 cam_dist = 0.89f * ASPECT_H; // 90 Degree horizontal FOV
     f32 canvas_width = (f32)RESOLUTION_W;
     f32 canvas_height = (f32)RESOLUTION_H;
-    f32 width_middle = RESOLUTION_W/2.f;
-    f32 height_middle = RESOLUTION_H/2.f;
+    f32 width_middle = canvas_width/2.f;
+    f32 height_middle = canvas_height/2.f;
     
     f32 actual_height = cam->height + (f32)sector->floor;
     f32 full_height = (f32)sector->ceiling - actual_height;
     f32 full_depth  = (f32)sector->floor - actual_height;
     
     if (num_iterations < MAX_ITERATIONS) {
-        Edge_Array floor_edges = {0};
-        Edge_Array ceil_edges = {0};
+        Edge_Array floor_edges = {0}, ceil_edges = {0};
+        Rect floor_region = {0}, ceil_region = {0};
+        floor_region.min = v2(INFINITY, INFINITY);
+        ceil_region.min = v2(INFINITY, INFINITY);
+        
+        Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("STEEL_1D.PNG"));
+        Asset test_ledge_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_6C.PNG"));
+        Asset test_floor_texture = asset_group_fetch(&environment_textures, str8_lit("COBBLES_1B.PNG"));
+        Texture_Map_Type test_texture_map_type = TEXTURE_MAP_REPEAT;
         
         for (u64 wall_idx = 0; wall_idx < sector->num_walls; ++wall_idx) {
             Wall *wall = &sector->walls[wall_idx];
@@ -300,15 +337,20 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             Vec2 t0 = v2sub(wall->p0, cam->pos);
             Vec2 t1 = v2sub(wall->p1, cam->pos);
             
-            f32 t = -cam->rotation_angle + forward;
+            f32 t = -cam->rotation_angle + DIR_FORWARD;
             Vec2 d0, d1;
             d0.x = t0.x * cosf(t) - t0.y * sinf(t); 
             d0.y = t0.x * sinf(t) + t0.y * cosf(t);
             d1.x = t1.x * cosf(t) - t1.y * sinf(t);
             d1.y = t1.x * sinf(t) + t1.y * cosf(t);
             
+            floor_region.min.x = min(floor_region.min.x, min(d0.x, d1.x));
+            floor_region.min.y = min(floor_region.min.y, min(d0.y, d1.y));
+            floor_region.max.y = max(floor_region.max.y, max(d0.y, d1.y));
+            floor_region.max.x = max(floor_region.max.x, max(d0.x, d1.x));
+            
             // Clip walls behind camera
-            if (d0.y < near_plane && d1.y < near_plane)
+            if (d0.y < near_plane && d1.y < near_plane) 
                 continue;
             
             Vec2 d0_preclip = d0;
@@ -323,7 +365,6 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
             //- Perspective projection
             f32 z0 = d0.y;
             f32 z1 = d1.y;
-            f32 cam_dist = 0.89f * ASPECT_H; // 90 Degree horizontal FOV
             
 #define proj_x(x,z) (((x*canvas_width)/(z*ASPECT_W))*cam_dist)+width_middle
 #define proj_y(y,z) (((y*canvas_height)/(z*ASPECT_H))*cam_dist)+height_middle
@@ -370,8 +411,34 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 maxp = temp; 
             }
             
+            // Floor
+            Vec2 f0 = v2(minp.x, minp.depth), f1 = v2(maxp.x, maxp.depth);
+            if (!(f0.y < 0.f && f1.y < 0.f)) {
+                f32 depth_norm = norm(-1.f, minp.depth, maxp.depth);
+                f32 x = lerp(minp.x, maxp.x, depth_norm);
+                if (f0.y < 0.f)
+                    f0 = v2(x, -1.f);
+                else if (f1.y < 0.f) 
+                    f1 = v2(x, -1.f);
+                Edge edge = r_make_edge(f0, f1);
+                r_edge_array_add(&floor_edges, edge);
+            }
+            
+            // Ceiling
+            Vec2 c0 = v2(minp.x, minp.height), c1 = v2(maxp.x, maxp.height);
+            if (!(c0.y > canvas_height && c1.y > canvas_height)) {
+                f32 height_norm = norm(canvas_height, minp.height, maxp.height);
+                f32 x = lerp(minp.x, maxp.x, height_norm);
+                if (c0.y > canvas_height) 
+                    c0 = v2(x, canvas_height);
+                else if (c1.y > canvas_height) 
+                    c1 = v2(x, canvas_height);
+                Edge edge = r_make_edge(c0, c1);
+                r_edge_array_add(&ceil_edges, edge);
+            }
+            
             f32 start_x = clamp(minp.x, window.first, window.last);
-            f32 end_x = clamp(maxp.x, window.first, window.last);   
+            f32 end_x = clamp(maxp.x, window.first, window.last); 
             
             // Render into next scene (if applicable)
             if (wall->next_sector >= 0 && wall->next_sector != last_sector) { // @todo: This will result in an infinite loop for "circular" sector chains
@@ -383,11 +450,6 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 modified_cam.height = actual_height - next_sector->floor;
                 r_sector(map, next_sector, environment_textures, &modified_cam, sector->id, num_iterations + 1, bounds);
             }
-            
-            Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("STEEL_1D.PNG"));
-            Asset test_ledge_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_6C.PNG"));
-            Asset test_floor_texture = asset_group_fetch(&environment_textures, str8_lit("COBBLES_1B.PNG"));
-            Texture_Map_Type test_texture_map_type = TEXTURE_MAP_REPEAT;
             
             f32 img_width = test_wall_texture.img.width;
             f32 wall_length = sqrtf(sqr(d0_preclip.x-d1_preclip.x) + sqr(d0_preclip.y-d1_preclip.y)); // @todo: Cache this when loading level json
@@ -417,33 +479,11 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 if (ceil_diff < 0) r_draw_vert_textured(x, ceil, height, -ceil_diff, test_ledge_texture.img, test_texture_map_type, texx);
             } 
             
-            // Add floor / ceiling edges
-            Vec2 f0 = v2(minp.x, minp.depth), f1 = v2(maxp.x, maxp.depth);
-            if (!(f0.y < 0.f && f1.y < 0.f)) {
-                f32 depth_norm = norm(-1.f, minp.depth, maxp.depth);
-                f32 x = lerp(minp.x, maxp.x, depth_norm);
-                if (f0.y < 0.f)
-                    f0 = v2(x, -1.f);
-                else if (f1.y < 0.f) 
-                    f1 = v2(x, -1.f);
-                Edge edge = r_make_edge(f0, f1);
-                r_edge_array_add(&floor_edges, edge);
-            }
             
-            Vec2 c0 = v2(minp.x, minp.height), c1 = v2(maxp.x, maxp.height);
-            if (!(c0.y > canvas_height && c1.y > canvas_height)) {
-                f32 height_norm = norm(canvas_height, minp.height, maxp.height);
-                f32 x = lerp(minp.x, maxp.x, height_norm);
-                if (c0.y > canvas_height) 
-                    c0 = v2(x, canvas_height);
-                else if (c1.y > canvas_height) 
-                    c1 = v2(x, canvas_height);
-                Edge edge = r_make_edge(c0, c1);
-                r_edge_array_add(&ceil_edges, edge);
-            }
         }
+        
         //- Render floor and ceiling
-        r_draw_plane(&floor_edges, window);
-        r_draw_plane(&ceil_edges, window);
+        r_draw_plane(&floor_edges, window, floor_region, full_depth, cam_dist, cam->rotation_angle, test_floor_texture);
+        //r_draw_plane(&ceil_edges, window, ceil_region, test_floor_texture);
     }
 }

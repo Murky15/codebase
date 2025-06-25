@@ -52,7 +52,7 @@ char_to_lower (u8 c) {
 }
 
 core_function u8
-char_to_forward_slash (u8 c) {
+char_to_DIR_FORWARD_slash (u8 c) {
     return c == '\\' ? '/' : c;
 }
 
@@ -133,7 +133,7 @@ str8_match (String8 a, String8 b, String8_Matchflags flags) {
         for (int i = 0; i < a.len; ++i) {
             b32 match = a.str[i] == b.str[i];
             if (flags & MATCH_CASE_INSENSITIVE) match |= (char_to_lower(a.str[i]) == char_to_lower(b.str[i]));
-            if (flags & MATCH_SLASH_INSENSITIVE) match |= (char_to_forward_slash(a.str[i]) == char_to_forward_slash(b.str[i]));
+            if (flags & MATCH_SLASH_INSENSITIVE) match |= (char_to_DIR_FORWARD_slash(a.str[i]) == char_to_DIR_FORWARD_slash(b.str[i]));
             if (match == 0) {
                 result = 0;
                 break;

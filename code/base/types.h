@@ -129,12 +129,17 @@ typedef union Vec3i {
     u32 e[2];
 } Vec3i;
 
-// @todo: Add functions for this
 typedef union Vec4 {
     struct { f32 x, y, z, w; };
+    struct { Vec2 xy, zw; };
     struct { Vec3 xyz; };
+    
+    struct { Vec2 min, max; };
+    struct { Vec2 __p0; f32 width, height; };
+    
     f32 e[4];
 } Vec4;
+typedef Vec4 Rect;
 
 typedef struct Quad2D {
     Vec2 p0, p1, p2, p3;

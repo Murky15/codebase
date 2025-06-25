@@ -1,4 +1,4 @@
-// raddbg 0.9.16 project file
+// raddbg 0.9.17 project file
 
 recent_file: path: "../code/dumb/renderer.c"
 recent_file: path: path
@@ -20,4 +20,9 @@ target:
   executable: "../build/dumb_level_editor.exe"
   working_directory: "../build"
   enabled: 0
+}
+breakpoint:
+{
+  source_location: "../code/dumb/renderer.c:273:1"
+  hit_count: 4
 }

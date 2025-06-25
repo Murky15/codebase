@@ -9,7 +9,7 @@ typedef struct Game_Memory_Package {
 } Game_Memory_Package;
 
 typedef struct Game_Input_Package {
-    b32 move_forward;
+    b32 move_DIR_FORWARD;
     b32 move_back;
     b32 strafe_left;
     b32 strafe_right;
@@ -31,7 +31,7 @@ typedef struct Entity {
     f32 radius;
     
     f32 rotation_angle;
-    f32 rotation_diff;
+    f32 rotation_diff; // For movement calculation purposes only
     
     s32 curr_sector;
 } Entity;

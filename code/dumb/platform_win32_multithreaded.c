@@ -99,7 +99,7 @@ win32_window_proc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
                     
                     switch (scan_code) {
                         case 0x0011: {      // W
-                            game_input.move_forward = key_down;
+                            game_input.move_DIR_FORWARD = key_down;
                         } break;
                         
                         case 0x001F: {      // S
