@@ -354,10 +354,10 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
         floor_region.min = v2(INFINITY, INFINITY);
         ceil_region.min = v2(INFINITY, INFINITY);
         
-        Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("STEEL_1D.PNG"));
-        Asset test_ledge_texture = asset_group_fetch(&environment_textures, str8_lit("BRICK_6C.PNG"));
-        Asset test_floor_texture = asset_group_fetch(&environment_textures, str8_lit("COBBLES_1B.PNG"));
-        Asset test_ceil_texture = asset_group_fetch(&environment_textures, str8_lit("FENCE_1A.PNG"));
+        Asset test_wall_texture = asset_group_fetch(&environment_textures, str8_lit("STEEL_4A.PNG"));
+        Asset test_ledge_texture = asset_group_fetch(&environment_textures, str8_lit("PANEL_3C.PNG"));
+        Asset test_floor_texture = asset_group_fetch(&environment_textures, str8_lit("TILE_3D.PNG"));
+        Asset test_ceil_texture = asset_group_fetch(&environment_textures, str8_lit("LIGHT_1B.PNG"));
         Texture_Map_Type test_texture_map_type = TEXTURE_MAP_REPEAT;
         
         for (u64 wall_idx = 0; wall_idx < sector->num_walls; ++wall_idx) {
@@ -507,22 +507,18 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
                 f32 texnorm = norm(x, minp.x_preclip, maxp.x_preclip);
                 
                 // Wall Texture mapping
-                s32 texx;
-                if (test_texture_map_type == TEXTURE_MAP_FIT) {                                          
-                    texx = lerp(0, img_width/maxp.z, texnorm) / lerp(1.f/minp.z, 1.f/maxp.z, texnorm);
-                } else if (test_texture_map_type == TEXTURE_MAP_REPEAT) {
-                    texx = lerp(0, (img_width*TEXTURE_HORI_REPEAT_SCALE*pages_per_wall)/maxp.z, texnorm) / lerp(1.f/minp.z, 1.f/maxp.z, texnorm);
-                    texx %= (u32)img_width;
-                }
+                s32 texx_fit = lerp(0, img_width/maxp.z, texnorm) / lerp(1.f/minp.z, 1.f/maxp.z, texnorm);
+                s32 texx_rep = lerp(0, (img_width*TEXTURE_HORI_REPEAT_SCALE*pages_per_wall)/maxp.z, texnorm) / lerp(1.f/minp.z, 1.f/maxp.z, texnorm);
+                texx_rep  %= (u32)img_width;
                 
                 f32 depth  = lerp(minp.depth, maxp.depth, xnorm); 
                 f32 height = lerp(minp.height, maxp.height, xnorm);
                 f32 floor  = lerp(minp.floor, maxp.floor, xnorm); 
                 f32 ceil   = lerp(minp.ceil, maxp.ceil, xnorm);
                 
-                if (floor_diff > 0) r_draw_vert_textured(x, depth, floor, floor_diff, test_ledge_texture.img, test_texture_map_type, texx);
-                if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, sector->ceiling-sector->floor, test_wall_texture.img, test_texture_map_type, texx);
-                if (ceil_diff < 0) r_draw_vert_textured(x, ceil, height, -ceil_diff, test_ledge_texture.img, test_texture_map_type, texx);
+                if (floor_diff > 0) r_draw_vert_textured(x, depth, floor, floor_diff, test_ledge_texture.img, TEXTURE_MAP_FIT, texx_fit);
+                if (wall->next_sector == -1) r_draw_vert_textured(x, floor, ceil, sector->ceiling-sector->floor, test_wall_texture.img, test_texture_map_type, test_texture_map_type == TEXTURE_MAP_FIT ? texx_fit : texx_rep);
+                if (ceil_diff < 0) r_draw_vert_textured(x, ceil, height, -ceil_diff, test_ledge_texture.img, TEXTURE_MAP_FIT, texx_fit);
             } 
             
             
