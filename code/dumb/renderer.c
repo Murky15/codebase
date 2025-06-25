@@ -163,18 +163,20 @@ r_draw_hori_textured (f32 y, f32 x0, f32 x1, Range bounds, Rect world_region, En
     if (x0 > x1)
         swap(f32, x0, x1);
     Color c;
+    s32 texx;
+    s32 texy;
     f32 canvas_width = (f32)RESOLUTION_W;
     f32 width_middle = canvas_width / 2.f;
     f32 start_x = max(bounds.first, x0);
     f32 end_x = min(x1, bounds.last);
     f32 img_height = texture.height;
     f32 img_width = texture.width;
+    f32 t = -cam->rotation_angle + DIR_FORWARD;
     if (start_x != end_x) {
         for (f32 x = start_x; x <= end_x; ++x) {
             // Obtain x in camera space
             f32 xcam = (ycam*ASPECT_W*(x-width_middle))/(canvas_width*cam_dist);
             // Now that we have both xcam and ycam, we can transform them back to world
-            f32 t = -cam->rotation_angle + DIR_FORWARD;
             f32 rx = xcam * cosf(t) + ycam * sinf(t);
             f32 ry = xcam * -sinf(t) + ycam * cosf(t);
             f32 xworld = rx + cam->pos.x;
@@ -182,8 +184,20 @@ r_draw_hori_textured (f32 y, f32 x0, f32 x1, Range bounds, Rect world_region, En
             // Sample texture coordinates
             f32 xnorm = norm(xworld, world_region.min.x, world_region.max.x);
             f32 ynorm = norm(yworld, world_region.min.y, world_region.max.y);
-            s32 texy = clamp(lerp(0, img_height, ynorm), 0, img_height-1);
-            s32 texx = clamp(lerp(0, img_width, xnorm), 0, img_width-1);
+            if (map_type == TEXTURE_MAP_FIT) {
+                texx = clamp(lerp(0, img_width, xnorm), 0, img_width-1);
+                texy = clamp(lerp(0, img_height, ynorm), 0, img_height-1);
+            } else if (map_type == TEXTURE_MAP_REPEAT) {
+                // @todo: Probably a way to cache this
+                f32 region_length = world_region.max.x - world_region.min.x;
+                f32 region_width = world_region.max.y - world_region.min.y;
+                f32 horizontal_page_step = region_length / img_width;
+                f32 vertical_page_step = region_width / img_height;
+                texx = lerp(0, img_width*horizontal_page_step, xnorm);
+                texy = lerp(0, img_height*vertical_page_step, ynorm);
+                texx %= (u32)img_width;
+                texy %= (u32)img_height;
+            }
             c.packed = texture.pixels[texy * texture.width + texx];
             r_put_pixel_at(v2(x,y), c);
         }
@@ -261,7 +275,7 @@ r_edge_array_add (Edge_Array *array, Edge edge) {
 }
 
 function void
-r_draw_plane (Entity *cam, f32 cam_dist, Edge_Array *edges, Range bounds, Rect world_region, f32 world_height, Asset texture) {
+r_draw_plane (Entity *cam, f32 cam_dist, Edge_Array *edges, Range bounds, Rect world_region, f32 world_height, Asset texture, Texture_Map_Type map_type) {
     if (bounds.first != bounds.last) {
         // Initialize fill algorithm
         f32 bottom = edges->edges[0].minp.y;
@@ -286,7 +300,7 @@ r_draw_plane (Entity *cam, f32 cam_dist, Edge_Array *edges, Range bounds, Rect w
         f32 x[array_count(active_edges)] = {active_edges[0].minp.x, active_edges[1].minp.x};
         while (ceil(scan_line) < edges->top) {
             f32 y = (world_height*cam_dist*canvas_height)/(ASPECT_H*(scan_line-height_middle));
-            r_draw_hori_textured(scan_line, x[0], x[1], bounds, world_region, cam, cam_dist, texture.img, TEXTURE_MAP_FIT, y);
+            r_draw_hori_textured(scan_line, x[0], x[1], bounds, world_region, cam, cam_dist, texture.img, map_type, y);
             scan_line++;
             x[0] = x[0] + active_edges[0].recslope;
             x[1] = x[1] + active_edges[1].recslope;
@@ -499,7 +513,7 @@ r_sector (Map *map, Sector *sector, Asset_Group environment_textures, Entity *ca
         }
         
         //- Render floor and ceiling
-        r_draw_plane(cam, cam_dist, &floor_edges, window, floor_region, full_depth, test_floor_texture);
-        r_draw_plane(cam, cam_dist, &ceil_edges, window, ceil_region, full_height, test_ceil_texture);
+        r_draw_plane(cam, cam_dist, &floor_edges, window, floor_region, full_depth, test_floor_texture, TEXTURE_MAP_REPEAT);
+        r_draw_plane(cam, cam_dist, &ceil_edges, window, ceil_region, full_height, test_ceil_texture, TEXTURE_MAP_REPEAT);
     }
 }
