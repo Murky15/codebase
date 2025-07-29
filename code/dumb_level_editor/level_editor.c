@@ -77,9 +77,8 @@ draw_grid (Camera2D cam, int spacing) {
 function int
 add_edge (Edge_Array *a, Vector2 p0, Vector2 p1) {
     Edge *new_edge;
-    int new_index;
-    if (a->next_free_edge > -1) {
-        new_index = a->next_free_edge;
+    int new_index = a->next_free_edge;
+    if (new_index > -1) {
         new_edge = &a->e[new_index];
         a->next_free_edge = new_edge->p0.x == INFINITY ? -1 : new_edge->p0.x;
     } else {
@@ -88,7 +87,7 @@ add_edge (Edge_Array *a, Vector2 p0, Vector2 p1) {
         new_edge = &a->e[new_index];
     }
     *new_edge = (Edge){p0, p1};
-    memory_zero(&a->data[new_index], sizeof(Edge_Data));
+    memory_zero_struct(&a->data[new_index]);
     
     return new_index;
 }

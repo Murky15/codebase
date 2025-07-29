@@ -40,7 +40,7 @@ commands = {
 
     //- Run commands
     .run_dumb = {.win="build\dumb.exe", .out="*output*"},
-	.run_geoc = {.win="build\geoc.exe text_selector.ggb", .out="*output*"},  
+	.run_geoc = {.win="build\geoc.exe", .out="*output*"},  
 	.run_le   = {.win="build\dumb_level_editor", .out="*output*"},  
 
     //- Misc commands
@@ -52,7 +52,7 @@ fkey_command = {
     .F2 = "run_dumb",
 
 	.F3 = "build_geoc",
-	.F4 = "run_geocs",
+	.F4 = "run_geoc",
     
 	.F5 = "build_le",
 	.F6 = "run_le",
