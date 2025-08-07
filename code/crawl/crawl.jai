@@ -89,7 +89,7 @@ MAX_ANIMATION_FRAMES :: 4;
 Animation :: struct {
   frames: [] Atlas_Index;
   width, height: float;
-  intended_playback_speed: float; // Should be specified as a ratio seconds/frame
+  seconds_per_frame: float;
 }
 
 Texture_Registry :: struct {
@@ -138,10 +138,6 @@ Map :: struct {
 WINDOW_WIDTH :: 1280;
 WINDOW_HEIGHT :: 720;
 
-TILE_WIDTH   :: 32*1.5;
-TILE_LENGTH  :: 32*1.5;
-TILE_HEIGHT  :: 32*1.5;
-
 TEST_MAP :: Map.{
   width = 16,
   height = 16,
@@ -167,6 +163,7 @@ TEST_MAP :: Map.{
 
 MOVE_SPEED :: 500;
 SPRITE_SCALE :: 3;
+TILE_SCALE :: 3;
 
 arena: Flat_Pool;
 textures: Texture_Registry;
@@ -210,11 +207,12 @@ load_textures :: (path_to_folder: string) -> Texture_Registry {
   left, right := break_by_spaces(line);
   while outer := true {
     if ends_with(left, "f0") {
-      frames: [..] Atlas_Index;
       name := copy_string(slice(left,0,left.count-3));
       index, width, height := make_index(right, texture_dim);
-      anim := table_add(*result.characters, name, .{width=width, height=height});
+      frames: [..] Atlas_Index;
       array_add(*frames, index);
+
+      anim := table_add(*result.characters, name, .{width=width, height=height});
       for 1..MAX_ANIMATION_FRAMES-1 {
         line, found = consume_next_line(*atlas);
         if !found break outer;
@@ -259,34 +257,40 @@ draw_map :: (map: Map) {
   GRID_LEEWAY :: 2;
   for j: 0..map.height-1{
     for i: 0..map.width-1 {
-      x := cast(float)i * TILE_WIDTH;
-      y := cast(float)j * TILE_LENGTH;
-      z := 0.0;
-      p0 := view_matrix * xyzw(x,y,z,1);
-      p1 := view_matrix * xyzw(x+TILE_WIDTH,y,z,1);
-      p2 := view_matrix * xyzw(x+TILE_WIDTH,y+TILE_LENGTH,z,1);
-      p3 := view_matrix * xyzw(x,y+TILE_LENGTH,z,1);
-
+      x,y,z: float;
       // Draw floor
       key := map.data[j*map.width+i];
       success, texcoords := table_find_new(*textures.environment, key);
-      if success Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz, .{1,1,1,1}, texcoords.uv0, texcoords.uv1, texcoords.uv2, texcoords.uv3);
+      if success {
+        x = cast(float)i * texcoords.width * TILE_SCALE;
+        y = cast(float)j * texcoords.height * TILE_SCALE;
+        z = 0.0;
 
-      success, texcoords = table_find_new(*textures.environment, .WALL_MID);
-      if success && i == map.width-1 {
-        p0 := view_matrix * xyzw(x+TILE_WIDTH,y,z,1);
-        p1 := view_matrix * xyzw(x+TILE_WIDTH,y,z-TILE_HEIGHT,1);
-        p2 := view_matrix * xyzw(x+TILE_WIDTH,y+TILE_LENGTH,z-TILE_HEIGHT,1);
-        p3 := view_matrix * xyzw(x+TILE_WIDTH,y+TILE_LENGTH,z,1);
-        Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz,.{1,1,1,1}, texcoords.uv1, texcoords.uv2, texcoords.uv3, texcoords.uv0);
+        p0 := view_matrix * xyzw(x,y,z,1);
+        p1 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y,z,1);
+        p2 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y+texcoords.height*TILE_SCALE,z,1);
+        p3 := view_matrix * xyzw(x,y+texcoords.height*TILE_SCALE,z,1);
+
+        Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz, .{1,1,1,1}, texcoords.uv0, texcoords.uv1, texcoords.uv2, texcoords.uv3);
       }
 
-      if success && j == map.height-1 {
-        p0 := view_matrix * xyzw(x,y+TILE_LENGTH,z,1);
-        p1 := view_matrix * xyzw(x,y+TILE_LENGTH,z-TILE_HEIGHT,1);
-        p2 := view_matrix * xyzw(x+TILE_WIDTH,y+TILE_LENGTH,z-TILE_HEIGHT,1);
-        p3 := view_matrix * xyzw(x+TILE_WIDTH,y+TILE_LENGTH,z,1);
-        Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz,.{1,1,1,1}, texcoords.uv0, texcoords.uv3, texcoords.uv2, texcoords.uv1);
+      success, texcoords = table_find_new(*textures.environment, .WALL_MID);
+      if success {
+        if i == map.width-1 {
+          p0 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y,z,1);
+          p1 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y,z-texcoords.height*TILE_SCALE,1);
+          p2 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y+texcoords.height*TILE_SCALE,z-texcoords.height*TILE_SCALE,1);
+          p3 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y+texcoords.height*TILE_SCALE,z,1);
+          Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz,.{1,1,1,1}, texcoords.uv1, texcoords.uv2, texcoords.uv3, texcoords.uv0);
+        }
+
+        if j == map.height-1 {
+          p0 := view_matrix * xyzw(x,y+texcoords.height*TILE_SCALE,z,1);
+          p1 := view_matrix * xyzw(x,y+texcoords.height*TILE_SCALE,z-texcoords.height*TILE_SCALE,1);
+          p2 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y+texcoords.height*TILE_SCALE,z-texcoords.height*TILE_SCALE,1);
+          p3 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y+texcoords.height*TILE_SCALE,z,1);
+          Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz,.{1,1,1,1}, texcoords.uv0, texcoords.uv3, texcoords.uv2, texcoords.uv1);
+        }
       }
     }
   }
@@ -295,10 +299,14 @@ draw_map :: (map: Map) {
 draw_entity :: (e: Entity) {
   anim := e.anim;
   frame := anim.frames[0];
-  p0 := view_matrix * xyzw(e.x,e.y,e.z,1);
-  p1 := view_matrix * xyzw(e.x+anim.width*SPRITE_SCALE,e.y,e.z,1);
-  p2 := view_matrix * xyzw(e.x+anim.width*SPRITE_SCALE,e.y,e.z+anim.height*SPRITE_SCALE,1);
-  p3 := view_matrix * xyzw(e.x,e.y,e.z+anim.height*SPRITE_SCALE,1);
+  angle := cast(float)seconds_since_init() * 100; // Calculate this from entity dir
+  rotation: Quaternion;
+  set_from_axis_and_angle(*rotation, .{0,0,1}, angle * (PI/180.0));
+  rot_matrix := rotation_matrix(Matrix4, rotation);
+  p0 := view_matrix * rot_matrix * xyzw(e.x,e.y,e.z,1);
+  p1 := view_matrix * rot_matrix * xyzw(e.x+anim.width*SPRITE_SCALE,e.y,e.z,1);
+  p2 := view_matrix * rot_matrix * xyzw(e.x+anim.width*SPRITE_SCALE,e.y,e.z+anim.height*SPRITE_SCALE,1);
+  p3 := view_matrix * rot_matrix * xyzw(e.x,e.y,e.z+anim.height*SPRITE_SCALE,1);
 
   Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz,.{1,1,1,1},frame.uv3,frame.uv2,frame.uv1,frame.uv0);
 }
