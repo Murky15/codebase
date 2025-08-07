@@ -12,7 +12,7 @@ function Map
 map_load (Arena *arena, String8 path) {
     Temp_Arena scratch = get_scratch(&arena, 1);
     Map map = {0};
-    
+
     String8 json = os_read_file(scratch.arena, path, false);
     Json_Value level_data = json_parse(scratch.arena, json);
     if (level_data.type > 0) {
@@ -38,7 +38,7 @@ map_load (Arena *arena, String8 path) {
                 sector->walls[j].p1.x = json_fetch_num(&wall_data, f32, str8_lit("x2"));
                 sector->walls[j].p1.y = json_fetch_num(&wall_data, f32, str8_lit("y2"));
                 sector->walls[j].next_sector = json_fetch_num(&wall_data, s32, str8_lit("next sector"));
-                
+
                 s32 pot_adj_id = sector->walls[j].next_sector;
                 if (pot_adj_id >= 0) {
                     Sector *adj = map.sectors + pot_adj_id;
@@ -49,7 +49,7 @@ map_load (Arena *arena, String8 path) {
     } else {
         fprintf(stderr, "Error parsing level file!\n");
     }
-    
+
     release_scratch(scratch);
     return map;
 }
@@ -64,9 +64,9 @@ entity_in_sector (Entity *e, Sector *s) {
         Vec2 p0 = s->walls[i].p0;
         Vec2 p1 = s->walls[i].p1;
         if (((p0.y > p.y) != (p1.y > p.y)) && (p.x < (p1.x-p0.x) * (p.y-p0.y) / (p1.y-p0.y) + p0.x))
-            result = !result;   
+            result = !result;
     }
-    
+
     return result;
 }
 
@@ -75,7 +75,7 @@ update_current_sector (Entity *entity, Map *map) {
     // First check if we haven't moved
     Sector *curr_sector = &map->sectors[entity->curr_sector];
     if (entity_in_sector(entity, curr_sector)) return;
-    
+
     // Check adjacent sectors
     for (Sector_Ref *adj = curr_sector->adjacent.first; adj; adj = adj->next) {
         if (entity_in_sector(entity, adj->sector)) {
@@ -83,10 +83,10 @@ update_current_sector (Entity *entity, Map *map) {
             return;
         }
     }
-    
+
     // Unreachable
     assert(0);
-    
+
 #if 0
     // Linearly search (where did our entity go??)
     for (u64 s = 0; s < map->num_sectors; ++s) {
