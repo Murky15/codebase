@@ -319,8 +319,9 @@ draw_entity :: (e: *Entity, view_matrix: Matrix4) {
 
   angle_from_initial := get_rotation_angle(e.dir,initial_rotation_vector);
   if is_approximately_zero(fmod_cycling(angle_from_initial, PI)) { // Check if we are trying to move parallel to the view dir
-    angle_from_initial = normalize_angle(angle_from_initial - PI/2);
+    angle_from_initial -= PI/2;
   }
+  angle_from_initial = normalize_angle(angle_from_initial);
 
   if !values_are_close(angle_from_initial, normalize_angle(e.rotation_anim.new)) {
     e.rotation_anim.old = normalize_angle(e.rotation_anim.current);
@@ -343,13 +344,16 @@ draw_entity :: (e: *Entity, view_matrix: Matrix4) {
 }
 
 get_rotation_angle :: (terminal: Vector2, initial: Vector2 = .{1,0}) -> float {
-  return normalize_angle(atan2(terminal.y,terminal.x) - atan2(initial.y, initial.x));
+  return atan2(terminal.y,terminal.x) - atan2(initial.y, initial.x);
 }
 
 closest_rotation_on_circle :: (t0: float, t1: float) -> float {
   diff := t1 - t0;
-  if diff > PI then diff -= 2*PI;
-  if diff < -PI then diff += 2*PI;
+  if diff > PI {
+    diff -= 2*PI;
+  } else if diff < -PI {
+    diff += 2*PI;
+  }
 
   return diff;
 }
