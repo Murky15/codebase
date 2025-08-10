@@ -85,17 +85,31 @@ Sprite :: struct {
   width, height: float;
 }
 
-MAX_ANIMATION_FRAMES :: 4;
 Animation :: struct {
+  active: bool;
+  started_at: float;
+  seconds_to_complete: float;
+}
+
+Transform_Animation :: struct (T: Type) {
+  #assert T != string;
+  #as using animation: Animation;
+  old: T;
+  new: T;
+  current: T;
+}
+
+MAX_ANIMATION_FRAMES :: 4;
+Sprite_Animation :: struct {
+  #as using animation: Animation;
   frames: [] Atlas_Index;
   width, height: float;
-  seconds_per_frame: float;
 }
 
 Texture_Registry :: struct {
   texture:      Simp.Texture;
   environment:  Table(Environment_Texture_Key,Sprite);
-  characters:   Table(string,Animation);
+  characters:   Table(string,Sprite_Animation);
   items:        Table(string,Sprite);
 }
 
@@ -116,18 +130,12 @@ Entity_Tweaks :: enum_flags {
   PLACEHOLDER;
 }
 
-Cardinal_Dir :: enum_flags {
-  NORTH;
-  EAST;
-  SOUTH;
-  WEST;
-}
-
 Entity :: struct {
-  using pos: Vector3;
-  facing: Cardinal_Dir;
   tweaks: Entity_Tweaks;
-  anim: Animation;
+  using pos: Vector3;
+  dir: Vector2;
+  sprite_anim: Sprite_Animation;
+  rotation_anim: Transform_Animation(float);
 }
 
 Map :: struct {
@@ -135,8 +143,6 @@ Map :: struct {
   data: [] Environment_Texture_Key;
 }
 
-WINDOW_WIDTH :: 1280;
-WINDOW_HEIGHT :: 720;
 
 TEST_MAP :: Map.{
   width = 16,
@@ -160,14 +166,14 @@ TEST_MAP :: Map.{
     4,4,11,7,4,4,4,4,4,4,11,7,4,4,4,4
   ]
 };
-
+WINDOW_WIDTH :: 1280;
+WINDOW_HEIGHT :: 720;
 MOVE_SPEED :: 500;
 SPRITE_SCALE :: 3;
 TILE_SCALE :: 3;
 
 arena: Flat_Pool;
 textures: Texture_Registry;
-view_matrix: Matrix4;
 
 load_textures :: (path_to_folder: string) -> Texture_Registry {
   make_index :: (in: string, texture_dim: Vector2) -> Atlas_Index, float, float #expand {
@@ -204,6 +210,7 @@ load_textures :: (path_to_folder: string) -> Texture_Registry {
   start_file(*atlas, "Atlas Parser", tprint("%/tile_list_v1.7", path_to_folder));
   line, found := consume_next_line(*atlas);
   if !found return .{};
+
   left, right := break_by_spaces(line);
   while outer := true {
     if ends_with(left, "f0") {
@@ -247,68 +254,113 @@ load_textures :: (path_to_folder: string) -> Texture_Registry {
 
     line, found = consume_next_line(*atlas);
     if !found break;
+
     left, right = break_by_spaces(line);
   }
 
   return result;
 }
 
-draw_map :: (map: Map) {
-  GRID_LEEWAY :: 2;
+draw_map :: (map: Map, view_matrix: Matrix4) {
+  prep_render :: (x: float, y: float, z: float) -> Vector4 #expand {
+    return `view_matrix * xyzw(x,y,z,1);
+  }
   for j: 0..map.height-1{
     for i: 0..map.width-1 {
-      x,y,z: float;
       // Draw floor
       key := map.data[j*map.width+i];
-      success, texcoords := table_find_new(*textures.environment, key);
-      if success {
-        x = cast(float)i * texcoords.width * TILE_SCALE;
-        y = cast(float)j * texcoords.height * TILE_SCALE;
-        z = 0.0;
+      _, texcoords := table_find_new(*textures.environment, key);
+      tile_width := texcoords.width * TILE_SCALE;
+      tile_height := texcoords.height * TILE_SCALE;
+      x := cast(float)i * tile_width;
+      y := cast(float)j * tile_height;
+      z := 0.0;
 
-        p0 := view_matrix * xyzw(x,y,z,1);
-        p1 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y,z,1);
-        p2 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y+texcoords.height*TILE_SCALE,z,1);
-        p3 := view_matrix * xyzw(x,y+texcoords.height*TILE_SCALE,z,1);
+      p0 := prep_render(x,y,z);
+      p1 := prep_render(x+tile_width,y,z);
+      p2 := prep_render(x+tile_width,y+tile_height,z);
+      p3 := prep_render(x,y+tile_height,z);
 
-        Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz, .{1,1,1,1}, texcoords.uv0, texcoords.uv1, texcoords.uv2, texcoords.uv3);
+      Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz, .{1,1,1,1}, texcoords.uv0, texcoords.uv1, texcoords.uv2, texcoords.uv3);
+
+      _, texcoords = table_find_new(*textures.environment, .WALL_MID);
+      if i == map.width-1 {
+        p0 := prep_render(x+tile_width,y,z);
+        p1 := prep_render(x+tile_width,y,z-tile_height);
+        p2 := prep_render(x+tile_width,y+tile_height,z-tile_height);
+        p3 := prep_render(x+tile_width,y+tile_height,z);
+        Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz,.{1,1,1,1}, texcoords.uv1, texcoords.uv2, texcoords.uv3, texcoords.uv0);
       }
 
-      success, texcoords = table_find_new(*textures.environment, .WALL_MID);
-      if success {
-        if i == map.width-1 {
-          p0 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y,z,1);
-          p1 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y,z-texcoords.height*TILE_SCALE,1);
-          p2 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y+texcoords.height*TILE_SCALE,z-texcoords.height*TILE_SCALE,1);
-          p3 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y+texcoords.height*TILE_SCALE,z,1);
-          Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz,.{1,1,1,1}, texcoords.uv1, texcoords.uv2, texcoords.uv3, texcoords.uv0);
-        }
-
-        if j == map.height-1 {
-          p0 := view_matrix * xyzw(x,y+texcoords.height*TILE_SCALE,z,1);
-          p1 := view_matrix * xyzw(x,y+texcoords.height*TILE_SCALE,z-texcoords.height*TILE_SCALE,1);
-          p2 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y+texcoords.height*TILE_SCALE,z-texcoords.height*TILE_SCALE,1);
-          p3 := view_matrix * xyzw(x+texcoords.width*TILE_SCALE,y+texcoords.height*TILE_SCALE,z,1);
-          Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz,.{1,1,1,1}, texcoords.uv0, texcoords.uv3, texcoords.uv2, texcoords.uv1);
-        }
+      if j == map.height-1 {
+        p0 := prep_render(x,y+tile_height,z);
+        p1 := prep_render(x,y+tile_height,z-tile_height);
+        p2 := prep_render(x+tile_width,y+tile_height,z-tile_height);
+        p3 := prep_render(x+tile_width,y+tile_height,z);
+        Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz,.{1,1,1,1}, texcoords.uv0, texcoords.uv3, texcoords.uv2, texcoords.uv1);
       }
     }
   }
 }
 
-draw_entity :: (e: Entity) {
-  anim := e.anim;
+draw_entity :: (e: *Entity, view_matrix: Matrix4) {
+  prep_render :: (x: float, y: float, z: float) -> Vector4 #expand {
+    return `view_matrix * `rot_matrix * xyzw(x,y,z,1);
+  }
+
+  anim := e.sprite_anim;
   frame := anim.frames[0];
-  angle := cast(float)seconds_since_init() * 100; // Calculate this from entity dir
+
+  sprite_width := anim.width*SPRITE_SCALE;
+  sprite_width_rotated := sprite_width/sqrt(2);
+  sprite_height := anim.height*SPRITE_SCALE;
+  initial_rotation_vector := xy(sprite_width_rotated,sprite_width_rotated);
+  pivot := xyz(e.pos.xy+initial_rotation_vector/2,e.z);
+
+  angle_from_initial := get_rotation_angle(e.dir,initial_rotation_vector);
+  if is_approximately_zero(fmod_cycling(angle_from_initial, PI)) { // Check if we are trying to move parallel to the view dir
+    angle_from_initial = normalize_angle(angle_from_initial - PI/2);
+  }
+
+  if !values_are_close(angle_from_initial, normalize_angle(e.rotation_anim.new)) {
+    e.rotation_anim.old = normalize_angle(e.rotation_anim.current);
+    e.rotation_anim.new = e.rotation_anim.old + closest_rotation_on_circle(e.rotation_anim.old, angle_from_initial);
+    start_animation(*e.rotation_anim, 0.15);
+  }
+
+  angle := update_transform_animation(*e.rotation_anim);
   rotation: Quaternion;
-  set_from_axis_and_angle(*rotation, .{0,0,1}, angle * (PI/180.0));
-  rot_matrix := rotation_matrix(Matrix4, rotation);
-  p0 := view_matrix * rot_matrix * xyzw(e.x,e.y,e.z,1);
-  p1 := view_matrix * rot_matrix * xyzw(e.x+anim.width*SPRITE_SCALE,e.y,e.z,1);
-  p2 := view_matrix * rot_matrix * xyzw(e.x+anim.width*SPRITE_SCALE,e.y,e.z+anim.height*SPRITE_SCALE,1);
-  p3 := view_matrix * rot_matrix * xyzw(e.x,e.y,e.z+anim.height*SPRITE_SCALE,1);
+  set_from_axis_and_angle(*rotation, .{0,0,1}, angle);
+
+  // TODO: Optimize! (We can probably bake/cache this somehow)
+  rot_matrix := make_translation_matrix4(pivot) * rotation_matrix(Matrix4, rotation) * make_translation_matrix4(-pivot);
+  p0 := prep_render(e.x,e.y,e.z);
+  p1 := prep_render(e.x+sprite_width_rotated,e.y+sprite_width_rotated,e.z);
+  p2 := prep_render(e.x+sprite_width_rotated,e.y+sprite_width_rotated,e.z+sprite_height);
+  p3 := prep_render(e.x,e.y,e.z+sprite_height);
 
   Simp.immediate_quad(p0.xyz,p1.xyz,p2.xyz,p3.xyz,.{1,1,1,1},frame.uv3,frame.uv2,frame.uv1,frame.uv0);
+}
+
+get_rotation_angle :: (terminal: Vector2, initial: Vector2 = .{1,0}) -> float {
+  return normalize_angle(atan2(terminal.y,terminal.x) - atan2(initial.y, initial.x));
+}
+
+closest_rotation_on_circle :: (t0: float, t1: float) -> float {
+  diff := t1 - t0;
+  if diff > PI then diff -= 2*PI;
+  if diff < -PI then diff += 2*PI;
+
+  return diff;
+}
+
+normalize_angle :: (angle: float) -> float {
+  return fmod_cycling(angle,2*PI);
+}
+
+normalize :: (min: float, max: float, x: float) -> float {
+  result := (x-min)/(max-min);
+  return clamp(result, 0, 1);
 }
 
 update_camera_tracking :: (cam: *Camera) {
@@ -319,6 +371,25 @@ update_camera_tracking :: (cam: *Camera) {
       adjustment := distance_from_target - cam.desired_distance_from_target;
       cam.pos += adjustment;
   }
+}
+
+start_animation :: (anim: *$T/Animation, seconds_to_complete: float) {
+  anim.active = true;
+  anim.started_at = cast(float) seconds_since_init(); // Should this be more precise?
+  anim.seconds_to_complete = seconds_to_complete;
+}
+
+update_transform_animation :: (anim: *Transform_Animation) -> anim.T {
+  if anim.active {
+    now := cast(float) seconds_since_init();
+    t := normalize(anim.started_at, anim.started_at+anim.seconds_to_complete, now);
+    anim.current = lerp(anim.old, anim.new, t);
+    if t > 1 {
+      anim.active = false;
+    }
+  }
+
+  return anim.current;
 }
 
 main :: () {
@@ -338,7 +409,7 @@ main :: () {
   }
 
   player: Entity;
-  player.anim = anim;
+  player.sprite_anim = anim;
 
   cam: Camera;
   cam.tracking = .FOLLOW;
@@ -376,18 +447,20 @@ main :: () {
     if move_right move_dir.x += 1;
     if length(move_dir) > 1 normalize(*move_dir);
     player.pos += xyz(move_dir,0) * MOVE_SPEED * dt;
-
+    if move_dir != .{0,0}  {
+      player.dir = move_dir;
+    }
     update_camera_tracking(*cam);
 
-    view_matrix = make_translation_matrix4(.{cast(float)render_width/2, cast(float) render_height/2, 0}) * make_look_at_matrix(cam.pos, cam.target, .{0,0,1}, false);
+    view_matrix := make_translation_matrix4(.{cast(float)render_width/2, cast(float) render_height/2, 0}) * make_look_at_matrix(cam.pos, cam.target, .{0,0,1}, false);
     Simp.clear_render_target(.15, .15, .2, 0);
     Simp.set_shader_for_images(*textures.texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     Simp.immediate_begin();
     {
-      draw_map(TEST_MAP);
-      draw_entity(player);
+      draw_map(TEST_MAP, view_matrix);
+      draw_entity(*player, view_matrix);
     }
     Simp.swap_buffers(window);
   }
@@ -396,6 +469,7 @@ main :: () {
 #import "Basic";
 #import "Reflection";
 #import "Math";
+#import "Sloppy_Math";
 #import "String";
 #import "Flat_Pool";
 #import "Hash_Table";
