@@ -86,14 +86,16 @@ Sprite :: struct {
 }
 
 Animation :: struct {
-  active: bool;
+  completed: bool;
+  repeat: bool;
   started_at: float;
   seconds_to_complete: float;
 }
 
+// TODO: I should make this a linked list so that I can chain together
+// multiple animations (Ex: enemy moves, turns 180, moves back, turns 180, repeats).
 Transform_Animation :: struct (T: Type) {
-  #assert T != string;
-  #as using animation: Animation;
+  #as using common: Animation;
   old: T;
   new: T;
   current: T;
@@ -101,9 +103,12 @@ Transform_Animation :: struct (T: Type) {
 
 MAX_ANIMATION_FRAMES :: 4;
 Sprite_Animation :: struct {
-  #as using animation: Animation;
+  #as using common: Animation;
+  current_frame: int;
   frames: [] Atlas_Index;
   width, height: float;
+  seconds_per_frame: float;
+  last_time: float;
 }
 
 Texture_Registry :: struct {
@@ -133,8 +138,11 @@ Entity_Tweaks :: enum_flags {
 Entity :: struct {
   tweaks: Entity_Tweaks;
   using pos: Vector3;
-  dir: Vector2;
-  sprite_anim: Sprite_Animation;
+  move_dir: Vector2;
+  facing: Vector2;
+  idle_anim: Sprite_Animation;
+  run_anim: Sprite_Animation;
+
   rotation_anim: Transform_Animation(float);
 }
 
@@ -142,7 +150,6 @@ Map :: struct {
   width, height: int;
   data: [] Environment_Texture_Key;
 }
-
 
 TEST_MAP :: Map.{
   width = 16,
@@ -176,6 +183,9 @@ arena: Flat_Pool;
 textures: Texture_Registry;
 
 load_textures :: (path_to_folder: string) -> Texture_Registry {
+  #import "Text_File_Handler";
+  #import "Reflection";
+
   make_index :: (in: string, texture_dim: Vector2) -> Atlas_Index, float, float #expand {
     x, y, width, height: float;
     success := scan2(in, "% % % %", *x, *y, *width, *height);
@@ -203,7 +213,6 @@ load_textures :: (path_to_folder: string) -> Texture_Registry {
   assert(Simp.texture_load_from_file(*result.texture, tprint("%/0x72_DungeonTilesetII_v1.7.png", path_to_folder)));
   texture_dim := Vector2.{xx result.texture.width, xx result.texture.height};
 
-  #import "Text_File_Handler";
   atlas := Text_File_Handler.{do_version_number=false};
   defer deinit(*atlas);
 
@@ -304,20 +313,36 @@ draw_map :: (map: Map, view_matrix: Matrix4) {
 }
 
 draw_entity :: (e: *Entity, view_matrix: Matrix4) {
+  IDLE_ANIMATION_SPEED :: 0.5;
+  ROTATION_ANIMATION_SPEED :: 0.17;
+
   prep_render :: (x: float, y: float, z: float) -> Vector4 #expand {
     return `view_matrix * `rot_matrix * xyzw(x,y,z,1);
   }
 
-  anim := e.sprite_anim;
-  frame := anim.frames[0];
+  anim: *Sprite_Animation;
+  if e.move_dir == .{0,0} {
+    anim = *e.idle_anim;
+    if anim.started_at > 0 stop_animation(*e.run_anim);
+  } else {
+    anim = *e.run_anim;
+    if anim.started_at > 0 stop_animation(*e.idle_anim);
+  }
+  if anim.started_at == 0 {
+    start_animation(anim, 0.5, true);
+  }
+  frame := update_sprite_animation(anim);
 
+  // TODO: This whole rotation animation section will need to be changed and moved to the "update" portion of the game logic.
+  // This is because *other* transform animations could change the entity's position or other properties which would affect simulation logic.
+  // However, I am leaving this here for now because I can't reason how to make this fit cleanly for all entities.
   sprite_width := anim.width*SPRITE_SCALE;
   sprite_width_rotated := sprite_width/sqrt(2);
   sprite_height := anim.height*SPRITE_SCALE;
   initial_rotation_vector := xy(sprite_width_rotated,sprite_width_rotated);
   pivot := xyz(e.pos.xy+initial_rotation_vector/2,e.z);
 
-  angle_from_initial := get_rotation_angle(e.dir,initial_rotation_vector);
+  angle_from_initial := get_rotation_angle(e.facing,initial_rotation_vector);
   if is_approximately_zero(fmod_cycling(angle_from_initial, PI)) { // Check if we are trying to move parallel to the view dir
     angle_from_initial -= PI/2;
   }
@@ -326,7 +351,7 @@ draw_entity :: (e: *Entity, view_matrix: Matrix4) {
   if !values_are_close(angle_from_initial, normalize_angle(e.rotation_anim.new)) {
     e.rotation_anim.old = normalize_angle(e.rotation_anim.current);
     e.rotation_anim.new = e.rotation_anim.old + closest_rotation_on_circle(e.rotation_anim.old, angle_from_initial);
-    start_animation(*e.rotation_anim, 0.15);
+    start_animation(*e.rotation_anim, 0.17);
   }
 
   angle := update_transform_animation(*e.rotation_anim);
@@ -377,23 +402,54 @@ update_camera_tracking :: (cam: *Camera) {
   }
 }
 
-start_animation :: (anim: *$T/Animation, seconds_to_complete: float) {
-  anim.active = true;
-  anim.started_at = cast(float) seconds_since_init(); // Should this be more precise?
+start_animation :: (anim: *$T/Animation, seconds_to_complete: float, repeat := false) {
+  anim.completed = false;
+  anim.repeat = repeat;
+  anim.started_at = cast(float) seconds_since_init();
   anim.seconds_to_complete = seconds_to_complete;
+  #if type_of(anim.*) == Sprite_Animation {
+    anim.seconds_per_frame = anim.seconds_to_complete / cast(float) anim.frames.count;
+    anim.last_time = anim.started_at;
+  }
 }
 
-update_transform_animation :: (anim: *Transform_Animation) -> anim.T {
-  if anim.active {
+stop_animation :: (anim: *$T/Animation) {
+  anim.common = Animation.{};
+  anim.completed = true;
+}
+
+update_transform_animation :: (anim: *Transform_Animation, tween: (anim.T,anim.T,float)->anim.T = lerp) -> anim.T {
+  if !anim.completed {
     now := cast(float) seconds_since_init();
     t := normalize(anim.started_at, anim.started_at+anim.seconds_to_complete, now);
-    anim.current = lerp(anim.old, anim.new, t);
+    anim.current = tween(anim.old, anim.new, t);
     if t > 1 {
-      anim.active = false;
+      anim.completed = true;
     }
   }
 
   return anim.current;
+}
+
+update_sprite_animation :: (anim: *Sprite_Animation) -> Atlas_Index {
+  if !anim.completed {
+    now := cast(float) seconds_since_init();
+    time_diff := now - anim.last_time;
+    if time_diff > anim.seconds_per_frame {
+      excess := time_diff - anim.seconds_per_frame; // Might be overkill but who cares
+      anim.current_frame += 1;
+      anim.last_time = now - excess;
+
+      if anim.repeat {
+        anim.current_frame %= anim.frames.count;
+      } else if anim.current_frame == anim.frames.count {
+        anim.current_frame = 0;
+        anim.completed = true;
+      }
+    }
+  }
+
+  return anim.frames[anim.current_frame];
 }
 
 main :: () {
@@ -406,14 +462,11 @@ main :: () {
 
   textures = load_textures("W:/assets/crawl/0x72_DungeonTilesetII_v1.7");
 
-  success, anim := table_find_new(*textures.characters, "wizzard_m_idle_anim");
-  if !success {
-    print("Unable to locate player animation!\n");
-    return;
-  }
-
+  _, idle_anim := table_find_new(*textures.characters, "doc_idle_anim");
+  _, run_anim  := table_find_new(*textures.characters, "doc_run_anim");
   player: Entity;
-  player.sprite_anim = anim;
+  player.idle_anim = idle_anim;
+  player.run_anim = run_anim;
 
   cam: Camera;
   cam.tracking = .FOLLOW;
@@ -422,11 +475,13 @@ main :: () {
   cam.target = *player.pos;
 
   move_up, move_down, move_left, move_right: bool;
-  ts1 := seconds_since_init();
+  last := seconds_since_init();
 
   running := true;
   while running {
     reset_temporary_storage();
+
+    // Input
     Input.update_window_events();
     for e: Input.events_this_frame {
       if e.type == {
@@ -440,9 +495,10 @@ main :: () {
       }
     }
 
-    ts2 := seconds_since_init();
-    dt := cast(float) (ts2 - ts1);
-    ts1 = ts2;
+    // Update
+    now := seconds_since_init();
+    dt := cast(float) (now - last);
+    last = now;
 
     move_dir: Vector2;
     if move_up    move_dir.y -= 1;
@@ -451,11 +507,11 @@ main :: () {
     if move_right move_dir.x += 1;
     if length(move_dir) > 1 normalize(*move_dir);
     player.pos += xyz(move_dir,0) * MOVE_SPEED * dt;
-    if move_dir != .{0,0}  {
-      player.dir = move_dir;
-    }
+    player.move_dir = move_dir;
+    player.facing = ifx move_dir != .{0,0} then move_dir else player.facing;
     update_camera_tracking(*cam);
 
+    // Render
     view_matrix := make_translation_matrix4(.{cast(float)render_width/2, cast(float) render_height/2, 0}) * make_look_at_matrix(cam.pos, cam.target, .{0,0,1}, false);
     Simp.clear_render_target(.15, .15, .2, 0);
     Simp.set_shader_for_images(*textures.texture);
@@ -471,7 +527,6 @@ main :: () {
 }
 
 #import "Basic";
-#import "Reflection";
 #import "Math";
 #import "Sloppy_Math";
 #import "String";
