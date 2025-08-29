@@ -7,70 +7,67 @@
 #import "d3d_compiler";
 
 SHADER :: #string DONE
-cbuffer VS_Constants : register(b0) {
+cbuffer Vertex_Uniforms : register(b0) {
   row_major matrix view_proj;
 };
 
-struct VS_Input {
-  float3 position : POSITION;
-  float3 color    : COLOR;
+struct Vertex_Data {
+  float3 pos : POSITION;
+  float2 uv  : TEXCOORD;
+};
+
+struct Instance_Data {
+  float4 row0  : MATRIX0;
+  float4 row1  : MATRIX1;
+  float4 row2  : MATRIX2;
+  float4 row3  : MATRIX3;
+
+  float3 col   : COLOR;
 };
 
 struct PS_Input {
-  float4 position : SV_POSITION;
-  float4 color    : COLOR;
+  float4 pos : SV_POSITION;
+  float4 col : COLOR;
+  float2 uv  : TEXCOORD;
 };
 
 PS_Input
-vs_main (VS_Input input) {
+vs_main (Vertex_Data vert, Instance_Data inst) {
   PS_Input result;
-  float4 pos = float4(input.position, 1.f);
-  result.position = mul(view_proj, pos);
-  result.color = float4(input.color, 1.f);
+
+  matrix world = {
+    inst.row0,
+    inst.row1,
+    inst.row2,
+    inst.row3
+  };
+
+  float4 pos = float4(vert.pos, 1.0);
+  pos = mul(world, pos);
+  result.pos = mul(view_proj, pos);
+  result.col = float4(inst.col, 1.0);
+  result.uv = vert.uv;
 
   return result;
 }
 
+// TODO: We should probably setup a constant buffer for the pixel shader.
+static float outline_width = 0.01;
+static float4 outline_color = float4(0.0,0.0,0.0,1.0);
+
 float4
 ps_main (PS_Input input) : SV_TARGET {
-  return input.color;
+  float2 distance_to_edges = min(input.uv, 1.0 - input.uv);
+  float  shortest_distance = min(distance_to_edges[0], distance_to_edges[1]);
+  float pixel_size = fwidth(shortest_distance);
+  float t = smoothstep(outline_width + pixel_size, outline_width, shortest_distance);
+  float4 output_color = lerp(input.col, outline_color, t);
+
+  return output_color;
 }
 DONE
 
-Simple_Vertex :: struct {
-  pos: Vector3;
-  col: Vector3;
-}
-
-quad :: Simple_Vertex.[
-  .{.{0,0,0},.{.5,0,.5}},
-  .{.{1,0,0},.{.5,0,.5}},
-  .{.{1,1,0},.{.5,0,.5}},
-  .{.{0,1,0},.{.5,0,.5}},
-];
-
-quad_indices :: u32.[0,1,2,2,3,0];
-
-input_layout_desc :: D3D11_INPUT_ELEMENT_DESC.[
-  .{"POSITION", 0, .R32G32B32_FLOAT, 0, 0,  .VERTEX_DATA, 0},
-  .{"COLOR",    0, .R32G32B32_FLOAT, 0, 12, .VERTEX_DATA, 0},
-];
-
-
-Vertex_Constants :: struct {
-  view_proj: Matrix4 #align 16;
-}
-
-renderer_backend: struct {
-  swap_chain: *IDXGISwapChain;
-  device: *ID3D11Device;
-  ctx: *ID3D11DeviceContext;
-
-  depth_stencil_view: *ID3D11DepthStencilView;
-  render_target_view: *ID3D11RenderTargetView;
-
-  vertex_constants: *ID3D11Buffer;
-}
+MAX_OBJECTS_ON_SCREEN :: 1024;
 
 WndProc :: (hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #c_call {
   if msg == {
@@ -105,7 +102,17 @@ main :: () {
      hinstance,
      null);
 
+
   // General init
+  swap_chain: *IDXGISwapChain;
+  device: *ID3D11Device;
+  ctx: *ID3D11DeviceContext;
+
+  depth_stencil_view: *ID3D11DepthStencilView;
+  render_target_view: *ID3D11RenderTargetView;
+
+  vertex_uniforms: *ID3D11Buffer;
+
   sd: DXGI_SWAP_CHAIN_DESC;
   sd.BufferDesc.Format = .R8G8B8A8_UNORM;
   sd.SampleDesc.Count = 1;
@@ -122,12 +129,12 @@ main :: () {
                                 D3D_FEATURE_LEVEL.[._11_0].data,
                                 1,
                                 D3D11_SDK_VERSION,
-                                *sd, *renderer_backend.swap_chain,
-                                *renderer_backend.device, null, *renderer_backend.ctx);
+                                *sd, *swap_chain,
+                                *device, null, *ctx);
 
   back_buffer: *ID3D11Texture2D;
-  IDXGISwapChain_GetBuffer(renderer_backend.swap_chain, 0, *uid(ID3D11Texture2D_UUID), xx *back_buffer);
-  ID3D11Device_CreateRenderTargetView(renderer_backend.device, back_buffer, null, *renderer_backend.render_target_view);
+  IDXGISwapChain_GetBuffer(swap_chain, 0, *uid(ID3D11Texture2D_UUID), xx *back_buffer);
+  ID3D11Device_CreateRenderTargetView(device, back_buffer, null, *render_target_view);
 
   back_buffer_desc: D3D11_TEXTURE2D_DESC;
   ID3D11Texture2D_GetDesc(back_buffer, *back_buffer_desc);
@@ -144,19 +151,54 @@ main :: () {
   vertex_shader: *ID3D11VertexShader;
   pixel_shader: *ID3D11PixelShader;
 
-  ID3D11Device_CreateVertexShader(renderer_backend.device, vs_compiled.data, xx vs_compiled.count, null, *vertex_shader);
-  ID3D11Device_CreatePixelShader(renderer_backend.device, ps_compiled.data, xx ps_compiled.count, null, *pixel_shader);
-  ID3D11DeviceContext_VSSetShader(renderer_backend.ctx, vertex_shader, null, 0);
-  ID3D11DeviceContext_PSSetShader(renderer_backend.ctx, pixel_shader, null, 0);
+  ID3D11Device_CreateVertexShader(device, vs_compiled.data, xx vs_compiled.count, null, *vertex_shader);
+  ID3D11Device_CreatePixelShader(device, ps_compiled.data, xx ps_compiled.count, null, *pixel_shader);
+  ID3D11DeviceContext_VSSetShader(ctx, vertex_shader, null, 0);
+  ID3D11DeviceContext_PSSetShader(ctx, pixel_shader, null, 0);
 
   // IA
+  Simple_Vertex :: struct {
+    pos: Vector3;
+    uv:  Vector2;
+  }
+
+  Instance_Data :: struct {
+    world: Matrix4;
+    color: Vector3;
+  }
+
+  Vertex_Uniforms :: struct {
+    view_proj: Matrix4 #align 16;
+  }
+
+  quad :: Simple_Vertex.[
+    .{.{0,0,0},.{0,0}},
+    .{.{1,0,0},.{1,0}},
+    .{.{1,1,0},.{1,1}},
+    .{.{0,1,0},.{0,1}},
+  ];
+
+  quad_indices :: u32.[0,1,2,2,3,0];
+
+  input_layout_desc :: D3D11_INPUT_ELEMENT_DESC.[
+    .{"POSITION", 0, .R32G32B32_FLOAT,    0, 0,  .VERTEX_DATA,   0},
+    .{"TEXCOORD", 0, .R32G32_FLOAT,       0, 12, .VERTEX_DATA,   0},
+
+    .{"MATRIX",   0, .R32G32B32A32_FLOAT, 1, 0,  .INSTANCE_DATA, 1},
+    .{"MATRIX",   1, .R32G32B32A32_FLOAT, 1, 16, .INSTANCE_DATA, 1},
+    .{"MATRIX",   2, .R32G32B32A32_FLOAT, 1, 32, .INSTANCE_DATA, 1},
+    .{"MATRIX",   3, .R32G32B32A32_FLOAT, 1, 48, .INSTANCE_DATA, 1},
+
+    .{"COLOR",    0, .R32G32B32_FLOAT,    1, 64, .INSTANCE_DATA, 1}
+  ];
+
   vertex_desc: D3D11_BUFFER_DESC;
   vertex_desc.ByteWidth = size_of(Simple_Vertex) * quad.count;
   vertex_desc.BindFlags = .VERTEX_BUFFER;
   vertex_res: D3D11_SUBRESOURCE_DATA;
   vertex_res.pSysMem = quad.data;
   vbuffer: *ID3D11Buffer;
-  ID3D11Device_CreateBuffer(renderer_backend.device, *vertex_desc, *vertex_res, *vbuffer);
+  ID3D11Device_CreateBuffer(device, *vertex_desc, *vertex_res, *vbuffer);
 
   index_desc: D3D11_BUFFER_DESC;
   index_desc.ByteWidth = size_of(u32) * quad_indices.count;
@@ -164,25 +206,34 @@ main :: () {
   index_res: D3D11_SUBRESOURCE_DATA;
   index_res.pSysMem = quad_indices.data;
   ibuffer: *ID3D11Buffer;
-  ID3D11Device_CreateBuffer(renderer_backend.device, *index_desc, *index_res, *ibuffer);
+  ID3D11Device_CreateBuffer(device, *index_desc, *index_res, *ibuffer);
+
+  instance_desc: D3D11_BUFFER_DESC;
+  instance_desc.ByteWidth = size_of(Instance_Data) * MAX_OBJECTS_ON_SCREEN;
+  instance_desc.Usage = .DYNAMIC;
+  instance_desc.BindFlags = .VERTEX_BUFFER;
+  instance_desc.CPUAccessFlags = .WRITE;
+  instance_buffer: *ID3D11Buffer;
+  ID3D11Device_CreateBuffer(device, *instance_desc, null, *instance_buffer);
 
   input_layout: *ID3D11InputLayout;
-  ID3D11Device_CreateInputLayout(renderer_backend.device, input_layout_desc.data, input_layout_desc.count, vs_compiled.data, xx vs_compiled.count, *input_layout);
+  ID3D11Device_CreateInputLayout(device, input_layout_desc.data, input_layout_desc.count, vs_compiled.data, xx vs_compiled.count, *input_layout);
 
-  stride := cast(u32) size_of(Simple_Vertex);
-  offset: u32 = 0;
-  ID3D11DeviceContext_IASetVertexBuffers(renderer_backend.ctx, 0, 1, *vbuffer, *stride, *offset);
-  ID3D11DeviceContext_IASetIndexBuffer(renderer_backend.ctx, ibuffer, .R32_UINT, 0);
-  ID3D11DeviceContext_IASetInputLayout(renderer_backend.ctx, input_layout);
-  ID3D11DeviceContext_IASetPrimitiveTopology(renderer_backend.ctx, .TRIANGLELIST);
+  vertex_buffers := *ID3D11Buffer.[vbuffer, instance_buffer];
+  strides := u32.[size_of(Simple_Vertex), size_of(Instance_Data)];
+  offsets := u32.[0,0];
+  ID3D11DeviceContext_IASetVertexBuffers(ctx, 0, vertex_buffers.count, vertex_buffers.data, strides.data, offsets.data);
+  ID3D11DeviceContext_IASetIndexBuffer(ctx, ibuffer, .R32_UINT, 0);
+  ID3D11DeviceContext_IASetInputLayout(ctx, input_layout);
+  ID3D11DeviceContext_IASetPrimitiveTopology(ctx, .TRIANGLELIST);
 
-  vertex_constants_desc: D3D11_BUFFER_DESC;
-  vertex_constants_desc.ByteWidth = size_of(Vertex_Constants);
-  vertex_constants_desc.Usage = .DYNAMIC;
-  vertex_constants_desc.BindFlags = .CONSTANT_BUFFER;
-  vertex_constants_desc.CPUAccessFlags = .WRITE;
-  ID3D11Device_CreateBuffer(renderer_backend.device, *vertex_constants_desc, null, *renderer_backend.vertex_constants);
-  ID3D11DeviceContext_VSSetConstantBuffers(renderer_backend.ctx, 0, 1, *renderer_backend.vertex_constants);
+  vuniforms_desc: D3D11_BUFFER_DESC;
+  vuniforms_desc.ByteWidth = size_of(Vertex_Uniforms);
+  vuniforms_desc.Usage = .DYNAMIC;
+  vuniforms_desc.BindFlags = .CONSTANT_BUFFER;
+  vuniforms_desc.CPUAccessFlags = .WRITE;
+  ID3D11Device_CreateBuffer(device, *vuniforms_desc, null, *vertex_uniforms);
+  ID3D11DeviceContext_VSSetConstantBuffers(ctx, 0, 1, *vertex_uniforms);
 
   // Rasterizer
   viewport: D3D11_VIEWPORT;
@@ -190,7 +241,7 @@ main :: () {
   viewport.Height = xx back_buffer_desc.Height;
   viewport.MinDepth = 0;
   viewport.MaxDepth = 1;
-  ID3D11DeviceContext_RSSetViewports(renderer_backend.ctx, 1, *viewport);
+  ID3D11DeviceContext_RSSetViewports(ctx, 1, *viewport);
 
   rstate_desc: D3D11_RASTERIZER_DESC;
   rstate_desc.CullMode = .NONE;
@@ -198,10 +249,10 @@ main :: () {
   rstate_desc.DepthClipEnable = 1;
   rstate_desc.FillMode = .SOLID;
   rstate: *ID3D11RasterizerState;
-  ID3D11Device_CreateRasterizerState(renderer_backend.device, *rstate_desc, *rstate);
-  ID3D11DeviceContext_RSSetState(renderer_backend.ctx, rstate);
+  ID3D11Device_CreateRasterizerState(device, *rstate_desc, *rstate);
+  ID3D11DeviceContext_RSSetState(ctx, rstate);
 
-  // OM/depth stencil
+  // OM
   depth_texture_desc: D3D11_TEXTURE2D_DESC;
   depth_texture_desc.Width = back_buffer_desc.Width;
   depth_texture_desc.Height = back_buffer_desc.Height;
@@ -212,22 +263,39 @@ main :: () {
   depth_texture_desc.SampleDesc.Quality = 0;
   depth_texture_desc.BindFlags = .DEPTH_STENCIL;
   depth_stencil_texture: *ID3D11Texture2D;
-  ID3D11Device_CreateTexture2D(renderer_backend.device, *depth_texture_desc, null, *depth_stencil_texture);
+  ID3D11Device_CreateTexture2D(device, *depth_texture_desc, null, *depth_stencil_texture);
 
   depth_stencil_desc: D3D11_DEPTH_STENCIL_DESC;
   depth_stencil_desc.DepthEnable = 1;
   depth_stencil_desc.DepthWriteMask = .ALL;
   depth_stencil_desc.DepthFunc = .LESS;
   depth_stencil_state: *ID3D11DepthStencilState;
-  ID3D11Device_CreateDepthStencilState(renderer_backend.device, *depth_stencil_desc, *depth_stencil_state);
-  ID3D11DeviceContext_OMSetDepthStencilState(renderer_backend.ctx, depth_stencil_state, 1);
+  ID3D11Device_CreateDepthStencilState(device, *depth_stencil_desc, *depth_stencil_state);
+  ID3D11DeviceContext_OMSetDepthStencilState(ctx, depth_stencil_state, 1);
 
   depth_stencil_view_desc: D3D11_DEPTH_STENCIL_VIEW_DESC;
   depth_stencil_view_desc.Format = depth_texture_desc.Format;
   depth_stencil_view_desc.ViewDimension = .TEXTURE2D;
+  ID3D11Device_CreateDepthStencilView(device, depth_stencil_texture, *depth_stencil_view_desc, *depth_stencil_view);
 
-  ID3D11Device_CreateDepthStencilView(renderer_backend.device, depth_stencil_texture, *depth_stencil_view_desc, *renderer_backend.depth_stencil_view);
-  ID3D11DeviceContext_OMSetRenderTargets(renderer_backend.ctx, 1, *renderer_backend.render_target_view, renderer_backend.depth_stencil_view);
+  blend_desc: D3D11_BLEND_DESC;
+  blend_desc.RenderTarget[0].BlendEnable = 1;
+  blend_desc.RenderTarget[0].SrcBlend = .SRC_ALPHA;
+  blend_desc.RenderTarget[0].DestBlend = .INV_SRC_ALPHA;
+  blend_desc.RenderTarget[0].BlendOp = .ADD;
+  blend_desc.RenderTarget[0].SrcBlendAlpha = .ONE;
+  blend_desc.RenderTarget[0].DestBlendAlpha = .INV_SRC_ALPHA;
+  blend_desc.RenderTarget[0].BlendOpAlpha = .ADD;
+  blend_desc.RenderTarget[0].RenderTargetWriteMask = xx D3D11_COLOR_WRITE_ENABLE.ALL;
+  blend_state: *ID3D11BlendState;
+  ID3D11Device_CreateBlendState(device, *blend_desc, *blend_state);
+  ID3D11DeviceContext_OMSetBlendState(ctx, blend_state, null, 0xFFFFFFFF);
+
+  ID3D11DeviceContext_OMSetRenderTargets(ctx, 1, *render_target_view, depth_stencil_view);
+
+  map_width :: 32;
+  map_height :: 32;
+  tiles: [map_width*map_height] Instance_Data;
 
   game_running := true;
   while main_loop := game_running {
@@ -242,26 +310,42 @@ main :: () {
       DispatchMessageW(*msg);
     }
 
-    camera_zoom: float = 8 + 5.0 * xx sin(seconds_since_init());
+    camera_zoom: float = 40;
     camera_pos := Vector3.{camera_zoom/sqrt(2), camera_zoom * sin(atan(1/sqrt(2))), camera_zoom/sqrt(2)};
     iso_rotation: Quaternion;
     set_from_axis_and_angle(*iso_rotation, .{1,0,0}, PI/2);
 
     proj  := make_projection_matrix(PI/4, cast(float) back_buffer_desc.Width/back_buffer_desc.Height, 0.1, 100, depth_range_01=true);
     view  := make_look_at_matrix(camera_pos, .{0,0,0}, .{0,1,0}, false);
-    world := rotation_matrix(Matrix4, iso_rotation);
-    world_view_proj := proj * view * world;
+    view_proj := proj * view;
 
-    buffer: D3D11_MAPPED_SUBRESOURCE;
-    new_data := Vertex_Constants.{world_view_proj};
-    ID3D11DeviceContext_Map(renderer_backend.ctx, renderer_backend.vertex_constants, 0, .WRITE_DISCARD, 0, *buffer);
-    memcpy(buffer.pData, *new_data, size_of(Vertex_Constants));
-    ID3D11DeviceContext_Unmap(renderer_backend.ctx, renderer_backend.vertex_constants, 0);
+    tile_rotation := rotation_matrix(Matrix4, iso_rotation);
+    for y: 0..map_height-1 {
+      for x: 0..map_width-1 {
+        pos := Vector3.{xx x, 0, xx y};
+        translation := make_translation_matrix4(pos);
+        tile := *tiles[y * map_width + x];
+        tile.world = translation * tile_rotation;
+        tile.color = .{cast(float) x/map_width, cast(float) y/map_width, 0};
+      }
+    }
+
+    constant_buffer: D3D11_MAPPED_SUBRESOURCE;
+    new_transform_data := Vertex_Uniforms.{view_proj};
+    ID3D11DeviceContext_Map(ctx, vertex_uniforms, 0, .WRITE_DISCARD, 0, *constant_buffer);
+    memcpy(constant_buffer.pData, *new_transform_data, size_of(Vertex_Uniforms));
+    ID3D11DeviceContext_Unmap(ctx, vertex_uniforms, 0);
+
+    instances: D3D11_MAPPED_SUBRESOURCE;
+    new_instance_data := tiles;
+    ID3D11DeviceContext_Map(ctx, instance_buffer, 0, .WRITE_DISCARD, 0, *instances);
+    memcpy(instances.pData, *new_instance_data, size_of(Instance_Data) * tiles.count);
+    ID3D11DeviceContext_Unmap(ctx, instance_buffer, 0);
 
     clear_color := float.[1, 1, 1, 1];
-    ID3D11DeviceContext_ClearRenderTargetView(renderer_backend.ctx, renderer_backend.render_target_view, *clear_color);
-    ID3D11DeviceContext_ClearDepthStencilView(renderer_backend.ctx, renderer_backend.depth_stencil_view, xx D3D11_CLEAR_FLAG.DEPTH, 1, 0);
-    ID3D11DeviceContext_DrawIndexed(renderer_backend.ctx, quad_indices.count, 0, 0);
-    IDXGISwapChain_Present(renderer_backend.swap_chain, 0, 0);
+    ID3D11DeviceContext_ClearRenderTargetView(ctx, render_target_view, *clear_color);
+    ID3D11DeviceContext_ClearDepthStencilView(ctx, depth_stencil_view, xx D3D11_CLEAR_FLAG.DEPTH, 1, 0);
+    ID3D11DeviceContext_DrawIndexedInstanced(ctx, quad_indices.count, tiles.count, 0, 0, 0);
+    IDXGISwapChain_Present(swap_chain, 0, 0);
   }
 }
