@@ -1,5 +1,6 @@
 #import "Basic";
 #import "Math";
+#import "String";
 #import "Windows";
 #import "Windows_Utf8";
 #import "dxgi";
@@ -13,7 +14,7 @@ cbuffer Vertex_Uniforms : register(b0) {
 
 struct Vertex_Data {
   float3 pos : POSITION;
-  float2 uv  : TEXCOORD;
+  float2 uv  : TEXCOORD0;
 };
 
 struct Instance_Data {
@@ -22,7 +23,8 @@ struct Instance_Data {
   float4 row2  : MATRIX2;
   float4 row3  : MATRIX3;
 
-  float3 col   : COLOR;
+  float4 coords : TEXCOORD1;
+  float3 col    : COLOR;
 };
 
 struct PS_Input {
@@ -45,8 +47,15 @@ vs_main (Vertex_Data vert, Instance_Data inst) {
   float4 pos = float4(vert.pos, 1.0);
   pos = mul(world, pos);
   result.pos = mul(view_proj, pos);
+
+  float2 iuv = vert.uv;
+  float2 scale  = inst.coords.xy;
+  float2 offset = inst.coords.zw;
+  float2 uv = ((iuv * scale) + offset) /* / texture.dim */;
+
+  result.uv = uv;
+
   result.col = float4(inst.col, 1.0);
-  result.uv = vert.uv;
 
   return result;
 }
@@ -67,15 +76,211 @@ ps_main (PS_Input input) : SV_TARGET {
 }
 DONE
 
+Sprite_ID :: enum {
+  big_demon_idle_anim
+  big_demon_run_anim
+  big_zombie_idle_anim
+  big_zombie_run_anim
+  bomb
+  chest_empty_open_anim
+  chest_full_open_anim
+  chest_mimic_open_anim
+  coin_anim
+  flask_big_blue
+  flask_big_red
+  flask_big_green
+  flask_big_yellow
+  flask_blue
+  flask_red
+  flask_green
+  flask_yellow
+  wizzard_f_hit_anim
+  wizzard_f_idle_anim
+  wizzard_f_run_anim
+  wizzard_m_hit_anim
+  wizzard_m_idle_anim
+  wizzard_m_run_anim
+  imp_idle_anim
+  imp_run_anim
+  lizard_f_hit_anim
+  lizard_f_idle_anim
+  lizard_f_run_anim
+  dwarf_m_idle_anim
+  dwarf_m_run_anim
+  dwarf_m_hit_anim
+  knight_f_hit_anim
+  knight_f_idle_anim
+  knight_f_run_anim
+  dwarf_f_idle_anim
+  dwarf_f_run_anim
+  dwarf_f_hit_anim
+  weapon_anime_sword
+  weapon_arrow
+  weapon_baton_with_spikes
+  weapon_big_hammer
+  weapon_bow
+  weapon_bow_2
+  weapon_double_axe
+  weapon_cleaver
+  weapon_duel_sword
+  weapon_golden_sword
+  weapon_green_magic_staff
+  weapon_hammer
+  weapon_katana
+  weapon_knife
+  weapon_knight_sword
+  weapon_lavish_sword
+  weapon_mace
+  weapon_saw_sword
+  weapon_machete
+  weapon_red_gem_sword
+  weapon_red_magic_staff
+  weapon_regular_sword
+  weapon_rusty_sword
+  weapon_spear
+  weapon_waraxe
+  weapon_throwing_axe
+  weapon_axe
+  wogol_idle_anim
+  wogol_run_anim
+  zombie_anim
+  tiny_zombie_idle_anim
+  tiny_zombie_run_anim
+  goblin_idle_anim
+  goblin_run_anim
+  ice_zombie_anim
+  knight_m_idle_anim
+  knight_m_run_anim
+  knight_m_hit_anim
+  crate
+  edge_down
+  orc_shaman_idle_anim
+  orc_shaman_run_anim
+  swampy_anim
+  muddy_anim
+  necromancer_anim
+  masked_orc_idle_anim
+  masked_orc_run_anim
+  orc_warrior_idle_anim
+  orc_warrior_run_anim
+  skelet_idle_anim
+  skelet_run_anim
+  skull
+  ogre_idle_anim
+  ogre_run_anim
+  ui_heart_empty
+  ui_heart_full
+  ui_heart_half
+  doc_idle_anim
+  doc_run_anim
+  pumpkin_dude_idle_anim
+  pumpkin_dude_run_anim
+  angel_idle_anim
+  angel_run_anim
+  chort_idle_anim
+  chort_run_anim
+  column
+  column_wall
+  wall_fountain_mid_blue_anim
+  wall_fountain_mid_red_anim
+  wall_fountain_basin_red_anim
+  wall_fountain_basin_blue_anim
+  wall_goo_base
+  wall_goo
+  wall_hole_1
+  wall_hole_2
+  wall_banner_blue
+  wall_banner_red
+  wall_banner_green
+  wall_banner_yellow
+  floor_ladder
+  floor_spikes_anim
+  hole
+  floor_stairs
+  floor_1
+  floor_2
+  floor_3
+  floor_4
+  floor_5
+  floor_6
+  floor_7
+  floor_8
+  wall_left
+  wall_mid
+  wall_right
+  wall_top_left
+  wall_top_mid
+  wall_top_right
+  lizard_m_idle_anim
+  lizard_m_run_anim
+  lizard_m_hit_anim
+  elf_f_idle_anim
+  elf_f_run_anim
+  elf_f_hit_anim
+  elf_m_idle_anim
+  elf_m_run_anim
+  elf_m_hit_anim
+  button_red_up
+  button_red_down
+  button_blue_up
+  button_blue_down
+  lever_left
+  lever_right
+  doors_frame_left
+  doors_frame_right
+  doors_frame_top
+  doors_leaf_closed
+  doors_leaf_open
+  wall_edge_bottom_left
+  wall_edge_bottom_right
+  wall_edge_mid_left
+  wall_edge_top_left
+  wall_edge_left
+  wall_edge_top_right
+  wall_edge_right
+  wall_edge_mid_right
+  wall_edge_tshape_bottom_right
+  wall_edge_tshape_bottom_left
+  wall_edge_tshape_right
+  wall_edge_tshape_left
+  wall_outer_front_right
+  wall_outer_front_left
+  wall_outer_mid_left
+  wall_outer_top_left
+  wall_outer_top_right
+  wall_outer_mid_right
+  wall_fountain_top_1
+  wall_fountain_top_2
+  wall_fountain_top_3
+  slug_anim
+  tiny_slug_anim
+}
+
 MAX_OBJECTS_ON_SCREEN :: 4096;
+TILE_LENGTH :: 16;
+TILE_WIDTH  :: 16;
 
 Simple_Vertex :: struct {
   pos: Vector3;
   uv:  Vector2;
 }
 
+Atlas_Coords :: struct {
+  scale := Vector2.{1,1};
+  offset:  Vector2;
+}
+
+// Frame step rate is given by coords.scale.x.
+Sprite_Info :: struct {
+  coords: Atlas_Coords;
+  num_frames: int;
+  animation_started_at: float;
+  seconds_to_complete: float;
+}
+
 Instance_Data :: struct {
   world: Matrix4;
+  atlas_coords: Atlas_Coords;
   color: Color;
 }
 
@@ -84,10 +289,10 @@ Vertex_Uniforms :: struct {
 }
 
 quad :: Simple_Vertex.[
-  .{.{0,0,0},.{0,0}},
-  .{.{1,0,0},.{1,0}},
-  .{.{1,1,0},.{1,1}},
-  .{.{0,1,0},.{0,1}},
+  .{.{0,0,1},.{0,0}},
+  .{.{1,0,1},.{1,0}},
+  .{.{1,1,1},.{1,1}},
+  .{.{0,1,1},.{0,1}},
 ];
 quad_indices :: u32.[0,1,2,2,3,0];
 
@@ -99,7 +304,8 @@ input_layout_desc :: D3D11_INPUT_ELEMENT_DESC.[
   .{"MATRIX",   1, .R32G32B32A32_FLOAT, 1, 16, .INSTANCE_DATA, 1},
   .{"MATRIX",   2, .R32G32B32A32_FLOAT, 1, 32, .INSTANCE_DATA, 1},
   .{"MATRIX",   3, .R32G32B32A32_FLOAT, 1, 48, .INSTANCE_DATA, 1},
-  .{"COLOR",    0, .R32G32B32_FLOAT,    1, 64, .INSTANCE_DATA, 1}
+  .{"TEXCOORD", 1, .R32G32B32A32_FLOAT, 1, 64, .INSTANCE_DATA, 1},
+  .{"COLOR",    0, .R32G32B32_FLOAT,    1, 80, .INSTANCE_DATA, 1}
 ];
 
 Color :: Vector3;
@@ -300,12 +506,18 @@ d3d11_update_transform :: (m: Matrix4) {
   ID3D11DeviceContext_Unmap(ctx, vertex_uniforms, 0);
 }
 
-d3d11_push_quad :: (world: Matrix4, c: Color) {
+d3d11_push_quad :: (pos: Vector3, scale := Vector2.{1,1}, rotation := Quaternion.{}, color := Color.{1,1,1}, atlas_coords := Atlas_Coords.{}) {
   using render_state;
   next_inst := *quads[num_quads];
-  next_inst.world = world;
-  next_inst.color = c;
   num_quads += 1;
+
+  t := make_translation_matrix4(pos);
+  r := rotation_matrix(Matrix4, rotation);
+  s := make_scale_matrix4(xyz(scale, 0));
+  world := t * r * s;
+  next_inst.world = world;
+  next_inst.atlas_coords = atlas_coords;
+  next_inst.color = color;
 }
 
 d3d11_draw_instances_and_present :: () {
@@ -358,8 +570,27 @@ win32_create_window :: () -> HWND {
   return hwnd;
 }
 
-create_texture_atlas_from_dir :: () {
+create_texture_atlas_from_dir :: (asset_path_absolute: string) -> [] Sprite_Info {
+  #import "Text_File_Handler";
+  atlas_parser := Text_File_Handler.{do_version_number = false};
+  defer deinit(*atlas_parser);
 
+  result: [..] Sprite_Info;
+  start_file(*atlas_parser, "Atlas Parser", asset_path_absolute);
+  while true {
+    line, found := consume_next_line(*atlas_parser);
+    if !found break;
+
+    left, right := break_by_spaces(line);
+    if ends_with(left, "f0") {
+
+    }
+  }
+  if atlas_parser.failed {
+    print("There was an error parsing the texture atlas.\n");
+  }
+
+  return result;
 }
 
 main :: () {
@@ -367,6 +598,10 @@ main :: () {
   render_width, render_height := d3d11_init(hwnd);
 
   game_running := true;
+  proj  := make_projection_matrix(PI/4, render_width/render_height, 0.01, 1000000, depth_range_01=true);
+  iso_rotation: Quaternion;
+  set_from_axis_and_angle(*iso_rotation, .{1,0,0}, PI/2);
+
   while main_loop := game_running {
     // Input
     msg: MSG;
@@ -381,28 +616,21 @@ main :: () {
     }
 
     // Update
-    camera_zoom: float = 40 + 10 * cast(float) sin(seconds_since_init());
+    camera_zoom: float = 400 + 50 * cast(float) sin(seconds_since_init());
     camera_pos := Vector3.{camera_zoom/sqrt(2), camera_zoom * sin(atan(1/sqrt(2))), camera_zoom/sqrt(2)};
-    iso_rotation: Quaternion;
-    set_from_axis_and_angle(*iso_rotation, .{1,0,0}, PI/2);
+    view := make_look_at_matrix(camera_pos, .{0,0,0}, .{0,1,0}, false);
 
-    proj  := make_projection_matrix(PI/4, render_width/render_height, 0.1, 100, depth_range_01=true);
-    view  := make_look_at_matrix(camera_pos, .{0,0,0}, .{0,1,0}, false);
     view_proj := proj * view;
-
 
     // Render
     d3d11_prep();
     map_width :: 32;
     map_height :: 32;
-    tile_rotation := rotation_matrix(Matrix4, iso_rotation);
     for y: 0..map_height-1 {
       for x: 0..map_width-1 {
-        pos := Vector3.{xx x, 0, xx y};
-        translation := make_translation_matrix4(pos);
-        world := translation * tile_rotation;
+        pos := Vector3.{xx (x * TILE_LENGTH), 0, xx (y * TILE_WIDTH)};
         color := Color.{cast(float) x/map_width, cast(float) y/map_width, 0};
-        d3d11_push_quad(world, color);
+        d3d11_push_quad(pos, scale = .{TILE_LENGTH, TILE_WIDTH}, rotation = iso_rotation, color = color);
       }
     }
     d3d11_update_transform(view_proj);
