@@ -18,8 +18,8 @@ window:
       }
       0.25:
       {
-        watch: selected expression: "query:threads"
-        watch: expression: "query:targets"
+        watch: expression: "query:threads"
+        watch: selected expression: "query:targets"
         watch: expression: "query:watch_pins"
       }
       0.25:
@@ -42,32 +42,29 @@ window:
         watch: expression: "query:modules"
       }
     }
-    0.507845: selected getting_started text:
+    0.604322: getting_started text:
     {
       selected
-      expression: "file:\"W:/code/dumb/renderer.c\".data"
+      expression: "file:\"W:/code/rougelike/rougelike.c\".data"
       auto: 1
       query: input: ""
-      cursor_line: 277
-      cursor_column: 34
-      mark_line: 277
-      mark_column: 34
+      cursor_line: 148
+      cursor_column: 1
+      mark_line: 148
+      mark_column: 1
     }
-    0.325488:
+    0.229011:
     {
+      selected
       watch: expression: "query:locals"
       watch:
       {
         selected
         expression: ""
-        watch: texy
-        watch: floor_region
-        watch: minp
-        watch: maxp
-        watch: temp
-        watch: z
-        watch: world_region
-        watch: texnorm
+        watch: vs_code_blob
+        watch: ps_code_blob
+        watch: vs_errors_blob
+        watch: ps_errors_blob
       }
     }
   }
