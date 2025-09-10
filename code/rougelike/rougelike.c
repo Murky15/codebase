@@ -21,6 +21,15 @@ typedef struct Atlas_Coords {
   Vec2 offset;
 } Atlas_Coords;
 
+typedef struct Vertex {
+  Vec3 pos;
+  Vec2 uv;
+} Vertex;
+
+typedef struct Vertex_Uniforms {
+  Mat4 view_proj;
+} Vertex_Uniforms;
+
 typedef struct Instance_Data {
   Mat4 world;
   Atlas_Coords atlas_coords;
@@ -89,15 +98,6 @@ win32_create_window (HINSTANCE hInstance) {
 
 function Vec2i
 r_init (HWND hwnd) {
-  struct Vertex {
-    Vec3 pos;
-    Vec2 uv;
-  };
-
-  struct Vertex_Uniforms {
-    Mat4 view_proj;
-  };
-
   local_persist read_only struct Vertex quad_vertices[4] = {
     {{0, 0, 0}, {0, 0}},
     {{1, 0, 0}, {1, 0}},
@@ -152,6 +152,7 @@ r_init (HWND hwnd) {
   ID3DBlob *vs_errors_blob, *ps_errors_blob;
   D3DCompileFromFile(TEXT("W:/code/rougelike/shaders.hlsl"), 0, 0, "vs_main", "vs_5_0", D3DCOMPILE_DEBUG, 0, &vs_code_blob, &vs_errors_blob);
   D3DCompileFromFile(TEXT("W:/code/rougelike/shaders.hlsl"), 0, 0, "ps_main", "ps_5_0", D3DCOMPILE_DEBUG, 0, &ps_code_blob, &ps_errors_blob);
+  assert(!vs_errors_blob && !ps_errors_blob);
   Simple_Buffer vs_code, ps_code, vs_errors, ps_errors;
   vs_code = d3d11_buffer_from_blob(vs_code_blob);
   ps_code = d3d11_buffer_from_blob(ps_code_blob);
@@ -167,7 +168,7 @@ r_init (HWND hwnd) {
 
   // IA
   D3D11_BUFFER_DESC vertex_desc = {0};
-  vertex_desc.ByteWidth = sizeof(struct Vertex) * array_count(quad_vertices);
+  vertex_desc.ByteWidth = sizeof(Vertex) * array_count(quad_vertices);
   vertex_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
   D3D11_SUBRESOURCE_DATA vertex_res = {0};
   vertex_res.pSysMem = quad_vertices;
@@ -191,14 +192,14 @@ r_init (HWND hwnd) {
   ID3D11Device_CreateInputLayout(device, input_layout_desc, array_count(input_layout_desc), vs_code.data, vs_code.count, &input_layout);
   ID3D11Buffer *vertex_uniforms;
   ID3D11Buffer *vertex_buffers[] = {vbuffer, instance_buffer};
-  u32 strides[] = {sizeof(struct Vertex), sizeof(Instance_Data)};
+  u32 strides[] = {sizeof(Vertex), sizeof(Instance_Data)};
   u32 offsets[] = {0,0};
   ID3D11DeviceContext_IASetVertexBuffers(ctx, 0, array_count(vertex_buffers), vertex_buffers, strides, offsets);
   ID3D11DeviceContext_IASetIndexBuffer(ctx, ibuffer, DXGI_FORMAT_R32_UINT, 0);
   ID3D11DeviceContext_IASetInputLayout(ctx, input_layout);
   ID3D11DeviceContext_IASetPrimitiveTopology(ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   D3D11_BUFFER_DESC vuniforms_desc = {0};
-  vuniforms_desc.ByteWidth = sizeof(struct Vertex_Uniforms);
+  vuniforms_desc.ByteWidth = sizeof(Vertex_Uniforms);
   vuniforms_desc.Usage = D3D11_USAGE_DYNAMIC;
   vuniforms_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
   vuniforms_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -259,6 +260,7 @@ r_init (HWND hwnd) {
   ID3D11DeviceContext_OMSetBlendState(ctx, blend_state, 0, 0xFFFFFFFF);
   ID3D11DeviceContext_OMSetRenderTargets(ctx, 1, &render_target_view, depth_stencil_view);
 
+
   com_release(back_buffer);
   com_release(vs_code_blob);
   com_release(ps_code_blob);
@@ -276,6 +278,7 @@ r_init (HWND hwnd) {
   com_release(depth_stencil_state);
   com_release(blend_state);
   com_release(render_target_view);
+
 
   return (Vec2i){render_width, render_height};
 }
@@ -297,20 +300,21 @@ r_prep (void) {
   com_release(render_target_view);
 }
 
-/*
+
 function void
-r_update_transform () {
-  using render_state;
-  constant_buffer: D3D11_MAPPED_SUBRESOURCE;
-  new_transform_data := Vertex_Uniforms.{m};
-  ID3D11Buffer vertex_uniforms;
+r_update_transform (Mat4 m) {
+  D3D11_MAPPED_SUBRESOURCE constant_buffer = {0};
+  Vertex_Uniforms new_transform_data = {m};
+  ID3D11Buffer *vertex_uniforms;
+  ID3D11DeviceContext_VSGetConstantBuffers(ctx, 0, 1, &vertex_uniforms);
+  ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)vertex_uniforms, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer);
+  memcpy(constant_buffer.pData, &new_transform_data, sizeof(Vertex_Uniforms));
+  ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)vertex_uniforms, 0);
+
   com_release(vertex_uniforms);
-  ID3D11DeviceContext_VSGetConstantBuffers(ctx, 0, 1, *vertex_uniforms);
-  ID3D11DeviceContext_Map(ctx, vertex_uniforms, 0, .WRITE_DISCARD, 0, *constant_buffer);
-  memcpy(constant_buffer.pData, *new_transform_data, size_of(Vertex_Uniforms));
-  ID3D11DeviceContext_Unmap(ctx, vertex_uniforms, 0);
 }
 
+/*
 d3d11_push_quad :: (pos: Vector3, scale := Vector2.{1,1}, rotation := Quaternion.{}, color := Color.{1,1,1}, atlas_coords := Atlas_Coords.{}) {
   using render_state;
   next_inst := *quads[num_quads];
@@ -326,28 +330,56 @@ d3d11_push_quad :: (pos: Vector3, scale := Vector2.{1,1}, rotation := Quaternion
 }
 */
 
+// We could probably auto-generate this through metaprogramming
+struct Quad_Param_Data {
+  Vec3 pos;
+  Vec2 scale;
+  Vec3 col;
+  Quat rot;
+  Atlas_Coords atlas_coords;
+};
+#define r_push_quad(...) r_push_quad_(&(struct Quad_Param_Data){.scale = (Vec2){1,1}, .col = (Vec3){1,1,1}, .rot = (Quat){0,0,0,1}, __VA_ARGS__})
+function void
+r_push_quad_ (struct Quad_Param_Data *p) {
+  Instance_Data *next_inst = &quads[num_quads++];
+  Mat4 T = m4translate(p->pos);
+  Mat4 R = m4rotate(p->rot);
+  Mat4 S = m4scale(v3(p->scale.x, p->scale.y, 1));
+  Mat4 world = m4mul(T,R);
+  world = m4mul(world,S);
+
+  next_inst->world = world;
+  next_inst->atlas_coords = p->atlas_coords;
+  next_inst->color = p->col;
+}
+
 function void
 r_present (void) {
-  /*
-  instances: D3D11_MAPPED_SUBRESOURCE;
-  ID3D11Buffer instance_buffer;
-  com_release(instance_buffer);
-  ID3D11DeviceContext_IAGetVertexBuffers(ctx, 1, 1, *instance_buffer, null, null);
-  ID3D11DeviceContext_Map(ctx, instance_buffer, 0, .WRITE_DISCARD, 0, *instances);
-  memcpy(instances.pData, quads.data, size_of(Instance_Data) * num_quads);
-  ID3D11DeviceContext_Unmap(ctx, instance_buffer, 0);
-  */
+  D3D11_MAPPED_SUBRESOURCE instances = {0};
+  ID3D11Buffer *instance_buffer;
+  ID3D11DeviceContext_IAGetVertexBuffers(ctx, 1, 1, &instance_buffer, 0, 0);
+  ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instances);
+  memcpy(instances.pData, quads, sizeof(Instance_Data) * num_quads);
+  ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)instance_buffer, 0);
+
   ID3D11DeviceContext_DrawIndexedInstanced(ctx, 6, num_quads, 0, 0, 0);
   IDXGISwapChain_Present(swap_chain, 0, 0);
+  //com_release(instance_buffer);
 }
 
 function int
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
   HWND hwnd = win32_create_window(hInstance);
   Vec2i render_dim = r_init(hwnd);
+  f32 render_width = render_dim.width;
+  f32 render_height = render_dim.height;
+
+  Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 0.001f, 100000000.f);
+  Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
 
   b32 game_running = true;
   for (;game_running;) {
+    // Input
     for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
       if (msg.message == WM_QUIT) {
         game_running = false;
@@ -357,7 +389,24 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
       DispatchMessage(&msg);
     }
 
+    // Update
+    f32 cam_zoom = 400;
+    Vec3 cam_pos = v3(cam_zoom/sqrtf(2), cam_zoom*sinf(atanf(1.f/sqrtf(2))), cam_zoom/sqrtf(2));
+    Mat4 view = m4lookat(cam_pos, v3(0,0,0), v3(0,1,0));
+    Mat4 VP = m4mul(proj, view);
+
+    // Render
     r_prep();
+
+    for (int y = 0; y < 32; ++y) {
+      for (int x = 0; x < 32; ++x) {
+        Vec3 pos = v3(x * 16.f, 0, y * 16.f);
+        Vec3 col = v3((float)x/32.f, (float)y/32.f, 0);
+        r_push_quad(.pos = pos, .col = col, .scale = v2(16.f, 16.f), .rot = tile_rot);
+      }
+    }
+
+    r_update_transform(VP);
     r_present();
   }
 

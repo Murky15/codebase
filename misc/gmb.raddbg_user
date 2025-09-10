@@ -42,34 +42,38 @@ window:
         watch: expression: "query:modules"
       }
     }
-    0.604322: getting_started text:
+    0.390151: selected getting_started text:
     {
       selected
-      expression: "file:\"W:/code/rougelike/rougelike.c\".data"
+      expression: "file:\"W:/code/base/types.c\".data"
       auto: 1
-      query: input: ""
-      cursor_line: 148
-      cursor_column: 1
-      mark_line: 148
-      mark_column: 1
+      query:
+      {
+        input: ""
+        cmd: search
+      }
+      cursor_line: 302
+      cursor_column: 28
+      mark_line: 302
+      mark_column: 28
     }
-    0.229011:
+    0.443182:
     {
-      selected
-      watch: expression: "query:locals"
       watch:
       {
         selected
+        expression: "query:locals"
+        normal: 0.575391 0.374609 0.050000
+      }
+      watch:
+      {
         expression: ""
-        watch: vs_code_blob
-        watch: ps_code_blob
-        watch: vs_errors_blob
-        watch: ps_errors_blob
+        watch: quads
       }
     }
   }
   split_x
-  pos: 484 312
+  pos: 976 0
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }

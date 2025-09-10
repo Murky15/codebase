@@ -35,23 +35,25 @@ vs_main (Vertex_Data vert, Instance_Data inst) {
   };
 
   float4 pos = float4(vert.pos, 1.0);
-  pos = mul(world, pos);
-  result.pos = mul(view_proj, pos);
+  matrix wvp = mul(view_proj, world);
+  result.pos = mul(wvp, pos);
 
+  /*
   float2 iuv = vert.uv;
   float2 scale  = inst.coords.xy;
   float2 offset = inst.coords.zw;
-  float2 uv = ((iuv * scale) + offset) /* / texture.dim */;
+  Also multiply this by texture dim
+  float2 uv = ((iuv * scale) + offset);
+  */
 
-  result.uv = uv;
-
+  result.uv = vert.uv;
   result.col = float4(inst.col, 1.0);
 
   return result;
 }
 
-// @todo: We're gonna use MSAA so we can get rid of the analytical anti aliasing
 static float outline_width = 0.01;
+static float blend_factor = 1.5;
 static float4 outline_color = float4(0.0,0.0,0.0,1.0);
 
 float4
@@ -59,7 +61,7 @@ ps_main (PS_Input input) : SV_TARGET {
   float2 distance_to_edges = min(input.uv, 1.0 - input.uv);
   float  shortest_distance = min(distance_to_edges[0], distance_to_edges[1]);
   float pixel_size = fwidth(shortest_distance);
-  float t = smoothstep(outline_width + pixel_size, outline_width, shortest_distance);
+  float t = smoothstep(outline_width + pixel_size*blend_factor, outline_width, shortest_distance);
   float4 output_color = lerp(input.col, outline_color, t);
 
   return output_color;

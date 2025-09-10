@@ -119,36 +119,41 @@ v3cross (Vec3 a, Vec3 b) {
 }
 
 core_function Quat
-axis_angle(f32 t, Vec3 v) {
+qi (void) {
+  return comp_lit(Quat, 0, 0, 0, 1);
+}
+
+core_function Quat
+axis_angle (Vec3 v, f32 t) {
   v = v3norm(v);
   f32 st = sinf(t/2.f);
   f32 ct = cosf(t/2.f);
 
-  return (Quat){v.x*st, v.y*st, v.z*st, ct};
+  return comp_lit(Quat, v.x*st, v.y*st, v.z*st, ct);
 }
 
 core_function Quat
-qnorm(Quat q) {
+qnorm (Quat q) {
   f32 len = sqrtf(q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w);
-  if (len == 0) { return (Quat){0,0,0,1}; }
+  if (len == 0) { return comp_lit(Quat, 0,0,0,1); }
   f32 s = 1.f / len;
   f32 x = q.x * s;
   f32 y = q.y * s;
   f32 z = q.z * s;
   f32 w = q.w * s;
 
-  return (Quat){x,y,z,w};
+  return comp_lit(Quat, x,y,z,w);
 }
 
 core_function Quat
-qmul(Quat a, Quat b) {
+qmul (Quat a, Quat b) {
   f32 w = a.w*b.w - v3dot(a.xyz, b.xyz);
   Vec3 v0 = v3muls(b.xyz, a.w);
   Vec3 v1 = v3muls(a.xyz, b.w);
   Vec3 v2 = v3cross(a.xyz, b.xyz);
   Vec3 v = v3add(v3add(v0,v1),v2);
 
-  return (Quat){v.x,v.y,v.z,w};
+  return comp_lit(Quat, v.x,v.y,v.z,w);
 }
 
 core_function Mat4
@@ -315,16 +320,17 @@ m4translate (Vec3 t) {
 core_function Mat4
 m4perspective(f32 fovy, f32 aspect, f32 znear, f32 zfar) {
   Mat4 r = {0};
-  f32 h = 1.f / tanf(fovy/2.f);
+  f32 h = 1.f / tanf(fovy*0.5f);
   f32 w = h / aspect;
-  f32 a = zfar / (zfar - znear);
-  f32 b = (-znear * zfar) / (zfar - znear);
+  f32 frange = zfar / (zfar - znear);
 
   r.i[0][0] = w;
   r.i[1][1] = h;
-  r.i[2][2] = a;
-  r.i[2][3] = 1.f;
-  r.i[3][2] = b;
+  r.i[2][2] = frange;
+  r.i[2][3] = -frange * znear;
+  r.i[3][2] = 1.f;
+
+  return r;
 }
 
 core_function Mat4
@@ -338,7 +344,9 @@ m4orthographic(f32 width, f32 height, f32 znear, f32 zfar) {
   r.i[0][0] = w;
   r.i[1][1] = h;
   r.i[2][2] = a;
-  r.i[3][2] = b;
+  r.i[2][3] = b;
+
+  return r;
 }
 
 core_function Mat4
@@ -348,9 +356,9 @@ m4lookat(Vec3 viewpoint, Vec3 focus, Vec3 reference_up) {
   Vec3 t = v3norm(v3cross(f, s));
 
   Mat4 V = m4i();
-  V.r[0] = (Vec4){s.x, t.x, f.x};
-  V.r[1] = (Vec4){s.y, t.y, f.y};
-  V.r[2] = (Vec4){s.z, t.z, f.z};
+  V.r[0] = comp_lit(Vec4, s.x, s.y, s.z);
+  V.r[1] = comp_lit(Vec4, t.x, t.y, t.z);
+  V.r[2] = comp_lit(Vec4, f.x, f.y, f.z);
   Mat4 T = m4translate(v3(-viewpoint.x, -viewpoint.y, -viewpoint.z));
   Mat4 r = m4mul(V,T);
 

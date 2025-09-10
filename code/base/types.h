@@ -197,7 +197,8 @@ core_function Vec3 v3norm(Vec3 v);
 core_function Vec3 v3cross(Vec3 a, Vec3 b);
 
 //- @note: Quaternions
-core_function Quat axis_angle(f32 t, Vec3 v);
+core_function Quat qi(void);
+core_function Quat axis_angle(Vec3 v, f32 t);
 core_function Quat qnorm(Quat q);
 core_function Quat qmul(Quat a, Quat b);
 
