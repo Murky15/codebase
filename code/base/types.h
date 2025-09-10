@@ -40,7 +40,7 @@ read_only s64 s64_max = 0x7fffffffffffffff;
 #ifndef BASE_TYPES_ESSENTIAL_ONLY
 // @todo: Fixed-point implementation
 
-//- @note: Array Types
+//- @note: Array Types (this was a dumb idea)
 
 #define make_array_type(T) typedef struct {T *array; u64 count;} glue(T,Array)
 
@@ -148,7 +148,7 @@ typedef union Mat4 {
     f32 _20, _21, _22, _23;
     f32 _30, _31, _32, _33;
   };
-  Vec4 rows[4];
+  Vec4 r[4];
   f32 i[4][4];
   f32 e[16];
 } Mat4;
@@ -213,9 +213,10 @@ core_function Mat4 m4scale(Vec3 s);
 core_function Mat4 m4rotate(Quat r);
 core_function Mat4 m4translate(Vec3 t);
 
-core_function Mat4 m4perspective();
-core_function Mat4 m4orthographic();
-core_function Mat4 m4lookat();
+// These are all left handed
+core_function Mat4 m4perspective(f32 fovy, f32 aspect, f32 znear, f32 zfar);
+core_function Mat4 m4orthographic(f32 width, f32 height, f32 znear, f32 zfar);
+core_function Mat4 m4lookat(Vec3 viewpoint, Vec3 focus, Vec3 reference_up);
 
 //- @note: Quaternions
 

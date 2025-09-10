@@ -312,6 +312,51 @@ m4translate (Vec3 t) {
   return r;
 }
 
+core_function Mat4
+m4perspective(f32 fovy, f32 aspect, f32 znear, f32 zfar) {
+  Mat4 r = {0};
+  f32 h = 1.f / tanf(fovy/2.f);
+  f32 w = h / aspect;
+  f32 a = zfar / (zfar - znear);
+  f32 b = (-znear * zfar) / (zfar - znear);
+
+  r.i[0][0] = w;
+  r.i[1][1] = h;
+  r.i[2][2] = a;
+  r.i[2][3] = 1.f;
+  r.i[3][2] = b;
+}
+
+core_function Mat4
+m4orthographic(f32 width, f32 height, f32 znear, f32 zfar) {
+  Mat4 r = m4i();
+  f32 w = 2.f/width;
+  f32 h = 2.f/height;
+  f32 a = 1.f/(zfar-znear);
+  f32 b = -a * znear;
+
+  r.i[0][0] = w;
+  r.i[1][1] = h;
+  r.i[2][2] = a;
+  r.i[3][2] = b;
+}
+
+core_function Mat4
+m4lookat(Vec3 viewpoint, Vec3 focus, Vec3 reference_up) {
+  Vec3 f = v3norm(v3sub(focus, viewpoint));
+  Vec3 s = v3norm(v3cross(reference_up, f));
+  Vec3 t = v3norm(v3cross(f, s));
+
+  Mat4 V = m4i();
+  V.r[0] = (Vec4){s.x, t.x, f.x};
+  V.r[1] = (Vec4){s.y, t.y, f.y};
+  V.r[2] = (Vec4){s.z, t.z, f.z};
+  Mat4 T = m4translate(v3(-viewpoint.x, -viewpoint.y, -viewpoint.z));
+  Mat4 r = m4mul(V,T);
+
+  return r;
+}
+
 core_function f32
 fmod_cycling (f32 x, f32 y) {
   if (y == 0) {
