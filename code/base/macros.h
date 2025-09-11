@@ -39,7 +39,7 @@
 #define local_persist static
 #define function static
 #define fallthrough
-#define core_function function // @note: So now we can change this if we want to build a dll or lib or something
+#define core_function function // @note: For base functions so we can build a dll/lib
 
 //- @note: Function macros
 #define unused(v) (void)(v)
@@ -95,13 +95,13 @@
 
 #if ARCH_X64
 # define reverse_byte(x) (((x) * 0x0202020202ULL & 0x010884422010ULL) % 1023)
-#else 
+#else
 # error "No 32 bit support for byte reversal!"
 #endif
 
 #define check_bit(x,b) ((x)&(1<<(b)))
 #define bit_mask(c) ((1<<(c))-1)
-#define fourcc(x) *((u32*)x) 
+#define fourcc(x) *((u32*)x)
 
 #define int_from_ptr(p) (u64)((void*)p)
 #define ptr_from_int(i) (void*)(i)
@@ -128,7 +128,7 @@
 ((byte) & 0x08 ? '1' : '0'), \
 ((byte) & 0x04 ? '1' : '0'), \
 ((byte) & 0x02 ? '1' : '0'), \
-((byte) & 0x01 ? '1' : '0') 
+((byte) & 0x01 ? '1' : '0')
 
 //- @note: Memory operation wrappers
 

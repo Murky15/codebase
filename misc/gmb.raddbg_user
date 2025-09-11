@@ -18,8 +18,8 @@ window:
       }
       0.25:
       {
-        watch: selected expression: "query:threads"
-        watch: expression: "query:targets"
+        watch: expression: "query:threads"
+        watch: selected expression: "query:targets"
         watch: expression: "query:watch_pins"
       }
       0.25:
@@ -42,37 +42,38 @@ window:
         watch: expression: "query:modules"
       }
     }
-    0.507845: selected getting_started text:
+    0.390151: selected getting_started text:
     {
       selected
-      expression: "file:\"W:/code/dumb/renderer.c\".data"
+      expression: "file:\"W:/code/base/types.c\".data"
       auto: 1
-      query: input: ""
-      cursor_line: 277
-      cursor_column: 34
-      mark_line: 277
-      mark_column: 34
+      query:
+      {
+        input: ""
+        cmd: search
+      }
+      cursor_line: 302
+      cursor_column: 28
+      mark_line: 302
+      mark_column: 28
     }
-    0.325488:
+    0.443182:
     {
-      watch: expression: "query:locals"
       watch:
       {
         selected
+        expression: "query:locals"
+        normal: 0.575391 0.374609 0.050000
+      }
+      watch:
+      {
         expression: ""
-        watch: texy
-        watch: floor_region
-        watch: minp
-        watch: maxp
-        watch: temp
-        watch: z
-        watch: world_region
-        watch: texnorm
+        watch: quads
       }
     }
   }
   split_x
-  pos: 484 312
+  pos: 976 0
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }

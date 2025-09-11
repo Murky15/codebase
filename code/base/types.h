@@ -40,7 +40,7 @@ read_only s64 s64_max = 0x7fffffffffffffff;
 #ifndef BASE_TYPES_ESSENTIAL_ONLY
 // @todo: Fixed-point implementation
 
-//- @note: Array Types
+//- @note: Array Types (this was a dumb idea)
 
 #define make_array_type(T) typedef struct {T *array; u64 count;} glue(T,Array)
 
@@ -61,8 +61,8 @@ make_array_type(f64);
 
 //- @note: Tangible types
 typedef union Color {
-    struct {u8 r, g, b, a;};
-    u32 packed;
+  struct {u8 r, g, b, a;};
+  u32 packed;
 } Color;
 
 // @todo: Maybe add functionality for defining per-project "color-pallettes"?
@@ -102,51 +102,63 @@ colors
 #define deg2rad (M_PI32/180.f)
 
 typedef union Vec2 {
-    struct { f32 x, y; };
-    struct { f32 width, height; };
-    struct { f32 first, last; };
-    f32 e[2];
+  struct { f32 x, y; };
+  struct { f32 width, height; };
+  struct { f32 first, last; };
+  f32 e[2];
 } Vec2;
 typedef Vec2 Range, Pair;
 
 typedef union Vec2i {
-    struct { u32 x, y; };
-    struct { u32 width, height; };
-    struct { u32 first, last; };
-    u32 e[2];
+  struct { u32 x, y; };
+  struct { u32 width, height; };
+  struct { u32 first, last; };
+  u32 e[2];
 } Vec2i;
 typedef Vec2i Rangei, Pairi;
 
 typedef union Vec3 {
-    struct { f32 x, y, z; };
-    Vec2 xy;
-    f32 e[3];
+  struct { f32 x, y, z; };
+  Vec2 xy;
+  f32 e[3];
 } Vec3;
 
 typedef union Vec3i {
-    struct { u32 x, y, z; };
-    Vec2i xy;
-    u32 e[2];
+  struct { u32 x, y, z; };
+  Vec2i xy;
+  u32 e[2];
 } Vec3i;
 
 typedef union Vec4 {
-    struct { f32 x, y, z, w; };
-    struct { Vec2 xy, zw; };
-    struct { Vec3 xyz; };
+  struct { f32 x, y, z, w; };
+  struct { Vec2 xy, zw; };
+  struct { Vec3 xyz; };
 
-    struct { Vec2 min, max; };
-    struct { Vec2 __p0; f32 width, height; };
+  struct { Vec2 min, max; };
+  struct { Vec2 __p0; f32 width, height; };
 
-    f32 e[4];
+  f32 e[4];
 } Vec4;
-typedef Vec4 Rect;
+typedef Vec4 Rect, Quat;
+
+typedef union Mat4 {
+  struct {
+    f32 _00, _01, _02, _03;
+    f32 _10, _11, _12, _13;
+    f32 _20, _21, _22, _23;
+    f32 _30, _31, _32, _33;
+  };
+  Vec4 r[4];
+  f32 i[4][4];
+  f32 e[16];
+} Mat4;
 
 typedef struct Quad2D {
-    Vec2 p0, p1, p2, p3;
+  Vec2 p0, p1, p2, p3;
 } Quad2D;
 
 typedef struct Quad3D {
-    Vec3 p0, p1, p2, p3;
+  Vec3 p0, p1, p2, p3;
 } Quad3D;
 
 //- @note: Vector constants
@@ -166,7 +178,7 @@ core_function Vec3i v3i(u32 x, u32 y, u32 z);
 core_function Vec3i v3i_from_v3(Vec3 v);
 core_function Vec3  pv2(Vec2 v, f32 z); // promote v2
 
-//- @note: Basic ops
+//- @note: Vectors
 core_function f32  v2len(Vec2 v);
 core_function f32  v2dot(Vec2 a, Vec2 b);
 core_function f32  v2cross(Vec2 a, Vec2 b);
@@ -184,8 +196,33 @@ core_function Vec3 v3muls(Vec3 v, f32 s);
 core_function Vec3 v3norm(Vec3 v);
 core_function Vec3 v3cross(Vec3 a, Vec3 b);
 
+//- @note: Quaternions
+core_function Quat qi(void);
+core_function Quat axis_angle(Vec3 v, f32 t);
+core_function Quat qnorm(Quat q);
+core_function Quat qmul(Quat a, Quat b);
+
+//- @note: Matricies
+core_function Mat4 m4i(void);
+core_function Mat4 m4add(Mat4 a, Mat4 b);
+core_function Mat4 m4sub(Mat4 a, Mat4 b);
+core_function Mat4 m4mul(Mat4 a, Mat4 b);
+core_function Mat4 m4muls(Mat4 m, f32 s);
+core_function Vec4 m4mulv(Mat4 m, Vec4 v);
+
+core_function Mat4 m4scale(Vec3 s);
+core_function Mat4 m4rotate(Quat r);
+core_function Mat4 m4translate(Vec3 t);
+
+// These are all left handed
+core_function Mat4 m4perspective(f32 fovy, f32 aspect, f32 znear, f32 zfar);
+core_function Mat4 m4orthographic(f32 width, f32 height, f32 znear, f32 zfar);
+core_function Mat4 m4lookat(Vec3 viewpoint, Vec3 focus, Vec3 reference_up);
+
+//- @note: Quaternions
+
 //- @note: Some float helpers
-core_function f32 fmod_cycling(f32 x, f32 y); // Ripped this straight from Jai
+core_function f32 fmod_cycling(f32 x, f32 y);
 core_function f32 lerp (f32 v0, f32 v1, f32 t);
 core_function b32 almost_equal (f32 a, f32 b);
 

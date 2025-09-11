@@ -1,5 +1,7 @@
 // raddbg 0.9.17 project file
 
+recent_file: path: "../code/base/types.c"
+recent_file: path: "../code/rougelike/rougelike.c"
 recent_file: path: "../code/dumb/renderer.c"
 recent_file: path: path
 recent_file: path: path
@@ -13,16 +15,20 @@ target:
 {
   executable: "../build/dumb.exe"
   working_directory: "../build"
-  enabled: 1
 }
 target:
 {
   executable: "../build/dumb_level_editor.exe"
   working_directory: "../build"
-  enabled: 0
+}
+target:
+{
+  executable: "../build/rougelike.exe"
+  working_directory: "../build"
+  enabled: 1
 }
 breakpoint:
 {
-  source_location: "../code/dumb/renderer.c:273:1"
-  hit_count: 4
+  source_location: "../code/rougelike/rougelike.c:377:1"
+  hit_count: 1
 }
