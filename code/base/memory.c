@@ -52,7 +52,7 @@ arena_alloc (void) {
         result->commit_pos = PAGE_TABLE_SIZE;
         result->cap = ARENA_DEFAULT_RESERVE_SIZE;
     }
-    
+
     return result;
 }
 
@@ -65,7 +65,7 @@ core_function void*
 arena_push_no_zero (Arena *arena, u64 size, u64 align) {
     assert(arena);
     void *result = 0;
-    
+
     u8 *base = (u8*)arena;
     u64 aligned_pos = round_up_pow2(arena->pos, align);
     u64 new_pos = aligned_pos + size;
@@ -82,7 +82,7 @@ arena_push_no_zero (Arena *arena, u64 size, u64 align) {
         // @todo: Come up with better fallback strategies, right now just fail
         assert(0);
     }
-    
+
     return result;
 }
 
@@ -90,7 +90,7 @@ core_function void*
 arena_push (Arena *arena, u64 size, u64 align) {
     void *result = arena_push_no_zero(arena, size, align);
     memory_zero(result, size);
-    
+
     return result;
 }
 
@@ -100,7 +100,7 @@ arena_pop_to (Arena *arena, u64 pos) {
     u64 min_pos = sizeof(Arena);
     u64 max_pos = arena->pos;
     pos = clamp(pos, min_pos, max_pos);
-    
+
     arena->pos = pos;
     if (arena->type == Arena_Type_MMU) {
         u64 nearest_commit = round_up_pow2(pos, PAGE_TABLE_SIZE);
@@ -145,14 +145,14 @@ temp_arena_end (Temp_Arena temp) {
 core_function Temp_Arena
 get_scratch (Arena **conflicts, u64 num_conflicts) {
     local_persist threadvar Arena *scratch_pool[2];
-    
+
     // First time init
     if (scratch_pool[0] == 0) {
         for (int i = 0; i < array_count(scratch_pool); ++i) {
             scratch_pool[i] = arena_alloc();
         }
     }
-    
+
     // Find conflicting arena
     for (int i = 0; i < array_count(scratch_pool); ++i) {
         b32 is_conflict = 0;
@@ -164,11 +164,11 @@ get_scratch (Arena **conflicts, u64 num_conflicts) {
                 break;
             }
         }
-        
+
         if (!is_conflict) {
             return temp_arena(scratch);
         }
     }
-    
+
     return comp_lit(Temp_Arena, zero_struct);
 }
