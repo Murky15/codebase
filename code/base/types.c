@@ -365,23 +365,23 @@ m4lookat(Vec3 viewpoint, Vec3 focus, Vec3 reference_up) {
   return r;
 }
 
-core_function f32
-fmod_cycling (f32 x, f32 y) {
+core_function f64
+fmod_cycling (f64 x, f64 y) {
   if (y == 0) {
     return INFINITY;
   }
-  f32 remainder = x - ((f32)floor(x/y) * y);
+  f64 remainder = x - ((f64)floor(x/y) * y);
 
   return remainder;
 }
 
-core_function f32
-lerp (f32 v0, f32 v1, f32 t) {
+core_function f64
+lerp (f64 v0, f64 v1, f64 t) {
   return (1.f - t) * v0 + t * v1;
 }
 
 core_function b32
-almost_equal (f32 a, f32 b) {
-  local_persist read_only f32 e = 0.0001f;
+almost_equal (f64 a, f64 b) {
+  local_persist read_only f64 e = 0.0001f;
   return fabs(a - b) <= e;
 }

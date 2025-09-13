@@ -1,8 +1,15 @@
-// raddbg 0.9.17 project file
+// raddbg 0.9.21 project file
 
-recent_file: path: "../code/base/types.c"
 recent_file: path: "../code/rougelike/rougelike.c"
-recent_file: path: "../code/dumb/renderer.c"
+recent_file: path: "../code/base/strings.c"
+recent_file: path: "../code/os/win32/io.c"
+recent_file: path: "../code/base/memory.c"
+recent_file: path: "d:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm"
+recent_file: path: "../code/base/types.c"
+recent_file: path: "../build/rougelike.exe"
+recent_file: path: path
+recent_file: path: path
+recent_file: path: path
 recent_file: path: path
 recent_file: path: path
 recent_file: path: path
@@ -25,10 +32,16 @@ target:
 {
   executable: "../build/rougelike.exe"
   working_directory: "../build"
+}
+target:
+{
+  executable: "../build/rougelike.exe"
+  working_directory: "../build"
   enabled: 1
 }
 breakpoint:
 {
-  source_location: "../code/rougelike/rougelike.c:377:1"
+  source_location: "../code/rougelike/rougelike.c:492:1"
   hit_count: 1
 }
+type_view

@@ -1,0 +1,18 @@
+For metaprogramming: obviously we don't have the same freedoms as Jai, types aren't a first-class construct. But we can work around this. We can compile the code into a single
+translation-unit, and then feed that into another C program which lexes and generates type info for structs. The program would place this type info into a hash table into
+a generated object file that is then linked to this TU in a second compile pass so that we can query get_type_info(String type), where type is the name of a struct or something.
+This would then index into a hash table full of Type_Infos given by the metaprogram. The end result would be able to have something like this
+
+function void print (String8 str, ...) // Where ... indicates formatting arguments
+
+struct Format_Info {
+  String8 type_name;
+  void *value;
+}
+function Format_Info
+format_ (String8 type, void *value)
+#define format(T,v) format_(stringify(T),(v))
+
+My_Struct thing = {4, 5, "hello", 2};
+int another = 129043;
+print(str8_lit("Hello, world! This is my struct: %, and this is my int: %\n"), format(My_Struct, &thing), format(int, &another));

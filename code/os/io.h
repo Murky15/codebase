@@ -3,9 +3,9 @@
 
 /*
 @todo:
--[X] Reading & writing to files synchronously 
+-[X] Reading & writing to files synchronously
 -[ ] Std-free writing to console output (error handling) & Debug printing
--[ ] Directory traversal / scanning
+-[X] Directory traversal / scanning
 -[ ] Message-box Assertions
 */
 

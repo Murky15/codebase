@@ -113,7 +113,6 @@ core_function String8 str8_list_join(Arena *arena, String8List list, String8Join
 // Conversion routines
 core_function u8* str8_to_cstr(Arena *arena, String8 string);
 core_function String8Array str8_list_to_array(Arena *arena, String8List *list);
-// Credits to Ryan Fleury for these
 core_function u64 u64_from_str8 (String8 string, u32 radix);
 core_function s64 cint_from_str8 (String8 string);
 core_function f64 f64_from_str8 (String8 string);

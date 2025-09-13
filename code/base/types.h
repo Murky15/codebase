@@ -222,9 +222,9 @@ core_function Mat4 m4lookat(Vec3 viewpoint, Vec3 focus, Vec3 reference_up);
 //- @note: Quaternions
 
 //- @note: Some float helpers
-core_function f32 fmod_cycling(f32 x, f32 y);
-core_function f32 lerp (f32 v0, f32 v1, f32 t);
-core_function b32 almost_equal (f32 a, f32 b);
+core_function f64 fmod_cycling(f64 x, f64 y);
+core_function f64 lerp (f64 v0, f64 v1, f64 t);
+core_function b32 almost_equal (f64 a, f64 b);
 
 #undef make_array_type
 #endif // BASE_TYPES_ESSENTIAL_ONLY

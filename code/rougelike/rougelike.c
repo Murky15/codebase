@@ -1,4 +1,4 @@
-#define UNICODE
+//#define UNICODE
 #define D3D11_NO_HELPERS
 #define CINTERFACE
 #define COBJMACROS
@@ -7,19 +7,45 @@
 #include <d3d11.h>
 #include <D3DCompiler.h>
 #include <stdio.h>
-
 #define ENABLE_ASSERT 1
+#define DEBUG 1
 #include <base/include.h>
+#include <os/include.h>
+#include <file/png.h>
+
 #include <base/include.c>
+#include <os/include.c>
+#include <file/png.c>
 
 #define com_release(I) if(I) IUnknown_Release(I)
 
 #define MAX_OBJECTS_ON_SCREEN 4096
+#define TILE_SCALE 16.f
+
+typedef struct Simple_Buffer {
+  void *data;
+  u64 count;
+} Simple_Buffer;
 
 typedef struct Atlas_Coords {
   Vec2 scale;
   Vec2 offset;
 } Atlas_Coords;
+
+#define MAX_FRAMES 4
+typedef struct Sprite {
+  String8 name;
+  Atlas_Coords coords[MAX_FRAMES];
+  u64 num_frames;
+  f32 animation_stated_at;
+  f32 seconds_to_complete;
+} Sprite;
+
+typedef struct Texture_Atlas {
+  PNG_Bitmap_RGBA raw_texture_data;
+  Sprite *sprites;
+  u64 num_sprites;
+} Texture_Atlas;
 
 typedef struct Vertex {
   Vec3 pos;
@@ -36,17 +62,54 @@ typedef struct Instance_Data {
   Vec3 color;
 } Instance_Data;
 
-typedef struct Simple_Buffer {
-  void *data;
-  size_t count;
-} Simple_Buffer;
-
 ID3D11Device *device;
 ID3D11DeviceContext *ctx;
 IDXGISwapChain *swap_chain;
 
 Instance_Data quads[MAX_OBJECTS_ON_SCREEN];
-int num_quads;
+u64 num_quads;
+
+function u64
+win32_get_perf_frequency (void) {
+  local_persist threadvar LARGE_INTEGER freq;
+  if (freq.QuadPart == 0)
+    QueryPerformanceFrequency(&freq);
+
+  return freq.QuadPart;
+}
+
+function u64
+win32_query_clock (void) {
+  LARGE_INTEGER tick;
+  QueryPerformanceCounter(&tick);
+
+  return tick.QuadPart;
+}
+
+function f32
+win32_get_elapsed_ms (u64 t1, u64 t2) {
+  u64 freq = win32_get_perf_frequency();
+  u64 elapsed_ms = (t2 - t1) * 1000;
+
+  return (f32)elapsed_ms / freq;
+}
+
+function f64
+win32_seconds_since_init (void) {
+  u64 freq = win32_get_perf_frequency();
+  u64 current_time = win32_query_clock();
+
+  return (f64)current_time / freq;
+}
+
+function u64
+win32_ms_to_tick_interval (f32 ms) {
+  u64 freq = win32_get_perf_frequency();
+  u64 ticks = ms * freq;
+  ticks /= 1000;
+
+  return ticks;
+}
 
 function Simple_Buffer
 d3d11_buffer_from_blob (ID3DBlob *blob) {
@@ -127,7 +190,7 @@ r_init (HWND hwnd) {
   sd.OutputWindow = hwnd;
   sd.Windowed = 1;
 
-  D3D_FEATURE_LEVEL feature_level = D3D_FEATURE_LEVEL_11_1;
+  D3D_FEATURE_LEVEL feature_level = D3D_FEATURE_LEVEL_11_0;
   D3D11CreateDeviceAndSwapChain(0,
                                 D3D_DRIVER_TYPE_HARDWARE,
                                 0,
@@ -150,8 +213,8 @@ r_init (HWND hwnd) {
   // Compile & create shaders
   ID3DBlob *vs_code_blob, *ps_code_blob;
   ID3DBlob *vs_errors_blob, *ps_errors_blob;
-  D3DCompileFromFile(TEXT("W:/code/rougelike/shaders.hlsl"), 0, 0, "vs_main", "vs_5_0", D3DCOMPILE_DEBUG, 0, &vs_code_blob, &vs_errors_blob);
-  D3DCompileFromFile(TEXT("W:/code/rougelike/shaders.hlsl"), 0, 0, "ps_main", "ps_5_0", D3DCOMPILE_DEBUG, 0, &ps_code_blob, &ps_errors_blob);
+  D3DCompileFromFile(L"W:/code/rougelike/shaders.hlsl", 0, 0, "vs_main", "vs_5_0", D3DCOMPILE_DEBUG, 0, &vs_code_blob, &vs_errors_blob);
+  D3DCompileFromFile(L"W:/code/rougelike/shaders.hlsl", 0, 0, "ps_main", "ps_5_0", D3DCOMPILE_DEBUG, 0, &ps_code_blob, &ps_errors_blob);
   assert(!vs_errors_blob && !ps_errors_blob);
   Simple_Buffer vs_code, ps_code, vs_errors, ps_errors;
   vs_code = d3d11_buffer_from_blob(vs_code_blob);
@@ -260,7 +323,6 @@ r_init (HWND hwnd) {
   ID3D11DeviceContext_OMSetBlendState(ctx, blend_state, 0, 0xFFFFFFFF);
   ID3D11DeviceContext_OMSetRenderTargets(ctx, 1, &render_target_view, depth_stencil_view);
 
-
   com_release(back_buffer);
   com_release(vs_code_blob);
   com_release(ps_code_blob);
@@ -278,7 +340,6 @@ r_init (HWND hwnd) {
   com_release(depth_stencil_state);
   com_release(blend_state);
   com_release(render_target_view);
-
 
   return (Vec2i){render_width, render_height};
 }
@@ -300,7 +361,6 @@ r_prep (void) {
   com_release(render_target_view);
 }
 
-
 function void
 r_update_transform (Mat4 m) {
   D3D11_MAPPED_SUBRESOURCE constant_buffer = {0};
@@ -313,22 +373,6 @@ r_update_transform (Mat4 m) {
 
   com_release(vertex_uniforms);
 }
-
-/*
-d3d11_push_quad :: (pos: Vector3, scale := Vector2.{1,1}, rotation := Quaternion.{}, color := Color.{1,1,1}, atlas_coords := Atlas_Coords.{}) {
-  using render_state;
-  next_inst := *quads[num_quads];
-  num_quads += 1;
-
-  t := make_translation_matrix4(pos);
-  r := rotation_matrix(Mat44, rotation);
-  s := make_scale_matrix4(xyz(scale, 0));
-  world := t * r * s;
-  next_inst.world = world;
-  next_inst.atlas_coords = atlas_coords;
-  next_inst.color = color;
-}
-*/
 
 // We could probably auto-generate this through metaprogramming
 struct Quad_Param_Data {
@@ -344,7 +388,7 @@ r_push_quad_ (struct Quad_Param_Data *p) {
   Instance_Data *next_inst = &quads[num_quads++];
   Mat4 T = m4translate(p->pos);
   Mat4 R = m4rotate(p->rot);
-  Mat4 S = m4scale(v3(p->scale.x, p->scale.y, 1));
+  Mat4 S = m4scale(v3(p->scale.x, p->scale.y, 0));
   Mat4 world = m4mul(T,R);
   world = m4mul(world,S);
 
@@ -354,7 +398,7 @@ r_push_quad_ (struct Quad_Param_Data *p) {
 }
 
 function void
-r_present (void) {
+r_present (b32 enable_vsync) {
   D3D11_MAPPED_SUBRESOURCE instances = {0};
   ID3D11Buffer *instance_buffer;
   ID3D11DeviceContext_IAGetVertexBuffers(ctx, 1, 1, &instance_buffer, 0, 0);
@@ -363,19 +407,95 @@ r_present (void) {
   ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)instance_buffer, 0);
 
   ID3D11DeviceContext_DrawIndexedInstanced(ctx, 6, num_quads, 0, 0, 0);
-  IDXGISwapChain_Present(swap_chain, 0, 0);
-  //com_release(instance_buffer);
+  IDXGISwapChain_Present(swap_chain, enable_vsync, 0);
+  com_release(instance_buffer);
 }
 
-function int
+function Sprite*
+get_sprite_in_atlas (Texture_Atlas atlas, String8 key) {
+  Sprite *result = 0;
+  u64 hash = str8_hash(key) % atlas.num_sprites;
+  while (true) {
+    Sprite *selected = &atlas.sprites[hash];
+    if (str8_match(selected->name, key, 0) || selected->name.len == 0) {
+      result = selected;
+      break;
+    }
+    hash = (hash + 1) % atlas.num_sprites;
+  }
+
+  return result;
+}
+
+function Atlas_Coords
+make_atlas_coords_from_string (String8 coords) {
+  Atlas_Coords result = {0};
+  Temp_Arena scratch;
+  ldefer (scratch=get_scratch(0,0), release_scratch(scratch)) {
+    String8List numbers = str8_split(scratch.arena, coords, 1, " ");
+    Vec4 coords = {0};
+    int i = 0;
+    foreach (num, &numbers) {
+      coords.e[i++] = f64_from_str8(num->string);
+    }
+    result.scale = coords.zw;
+    result.offset = coords.xy;
+  }
+
+  return result;
+}
+
+function Texture_Atlas
+load_textures (Arena *arena, String8 absolute_path_to_asset_dir) {
+  Texture_Atlas result = {0};
+  Temp_Arena scratch;
+  ldefer(scratch=get_scratch(&arena, 1),release_scratch(scratch)) {
+    String8 path_to_atlas_data = str8_pushf(scratch.arena, "%.*s/tile_list_v1.7", str8_expand(absolute_path_to_asset_dir));
+    String8 atlas_txt = os_read_file(arena, path_to_atlas_data, false);
+
+    String8List atlas_lines = str8_split(scratch.arena, atlas_txt, 1, "\n");
+    result.num_sprites = atlas_lines.num_nodes;
+    result.sprites = arena_pushn(arena, Sprite, result.num_sprites);
+    foreach(line, &atlas_lines) {
+      u64 sep_pos = str8_find(line->string, str8_lit(" "), 0, 0);
+      String8 name = str8_prefix(line->string, sep_pos);
+      String8 coords = str8_skip(line->string, sep_pos+1);
+      String8 frame = str8_sub(name, name.len-3, name.len-1);
+
+      if (str8_match(frame, str8_lit("_f"), 0)) {
+        name = str8_chop(name, 3);
+      }
+      Sprite *sprite = get_sprite_in_atlas(result, name);
+      sprite->name = name;
+      sprite->coords[sprite->num_frames++] = make_atlas_coords_from_string(coords);
+    }
+
+    String8 path_to_texture_data = str8_pushf(scratch.arena, "%.*s/0x72_DungeonTilesetII_v1.7.png", str8_expand(absolute_path_to_asset_dir));
+    String8 texture_png_data = os_read_file(scratch.arena, path_to_texture_data, false);
+    result.raw_texture_data = png_decode(arena, texture_png_data);
+  }
+  return result;
+}
+
+int
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
+  Arena *perm_arena = arena_alloc();
+
   HWND hwnd = win32_create_window(hInstance);
   Vec2i render_dim = r_init(hwnd);
   f32 render_width = render_dim.width;
   f32 render_height = render_dim.height;
 
-  Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 0.001f, 100000000.f);
+  Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 0.001f, 100000.f);
   Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
+
+  Texture_Atlas sprites = load_textures(perm_arena, str8_lit("W:/assets/rougelike/0x72_DungeonTilesetII_v1.7"));
+  for (int i = 0; i < sprites.num_sprites; ++i) {
+    Sprite s = sprites.sprites[i];
+    if (s.num_frames != 0) {
+      printf("Sprite: %.*s: (%f, %f, %f, %f), %llu\n", str8_expand(s.name), s.coords[0].scale.x, s.coords[0].scale.y, s.coords[0].offset.x, s.coords[0].offset.y, s.num_frames);
+    }
+  }
 
   b32 game_running = true;
   for (;game_running;) {
@@ -390,24 +510,28 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     }
 
     // Update
-    f32 cam_zoom = 400;
-    Vec3 cam_pos = v3(cam_zoom/sqrtf(2), cam_zoom*sinf(atanf(1.f/sqrtf(2))), cam_zoom/sqrtf(2));
-    Mat4 view = m4lookat(cam_pos, v3(0,0,0), v3(0,1,0));
+    f32 cam_zoom = 400.f;
+    Vec4 cam_pos = (Vec4){cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), cam_zoom/sqrtf(2.f), 1};
+    Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_seconds_since_init(), 2 * M_PI));
+    cam_pos = m4mulv(m4rotate(cam_rot), cam_pos);
+    Mat4 view = m4lookat(cam_pos.xyz, v3((32.f * TILE_SCALE),0,(32.f * TILE_SCALE)), v3(0,1,0));
     Mat4 VP = m4mul(proj, view);
 
     // Render
     r_prep();
 
+    int i = 0;
     for (int y = 0; y < 32; ++y) {
       for (int x = 0; x < 32; ++x) {
-        Vec3 pos = v3(x * 16.f, 0, y * 16.f);
-        Vec3 col = v3((float)x/32.f, (float)y/32.f, 0);
-        r_push_quad(.pos = pos, .col = col, .scale = v2(16.f, 16.f), .rot = tile_rot);
+        Vec3 pos = v3((f32)x*TILE_SCALE, 8 * sin(10*win32_seconds_since_init() + i), (f32)y*TILE_SCALE);
+        Vec3 col = v3((f32)x/32.f, (f32)y/32.f, 0);
+        r_push_quad(.pos = pos, .col = col, .scale = v2(TILE_SCALE, TILE_SCALE), .rot = tile_rot);
+        ++i;
       }
     }
 
     r_update_transform(VP);
-    r_present();
+    r_present(true);
   }
 
   return 0;

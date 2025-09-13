@@ -52,15 +52,15 @@ vs_main (Vertex_Data vert, Instance_Data inst) {
   return result;
 }
 
-static float outline_width = 0.01;
-static float blend_factor = 1.5;
+static float outline_width = 0.02;
+static float blend_factor = 1;
 static float4 outline_color = float4(0.0,0.0,0.0,1.0);
 
 float4
 ps_main (PS_Input input) : SV_TARGET {
   float2 distance_to_edges = min(input.uv, 1.0 - input.uv);
   float  shortest_distance = min(distance_to_edges[0], distance_to_edges[1]);
-  float pixel_size = fwidth(shortest_distance);
+  float pixel_size = fwidth(length(input.uv));
   float t = smoothstep(outline_width + pixel_size*blend_factor, outline_width, shortest_distance);
   float4 output_color = lerp(input.col, outline_color, t);
 

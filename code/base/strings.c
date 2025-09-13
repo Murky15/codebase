@@ -95,7 +95,7 @@ str8_sub (String8 string, u64 first, u64 opl) {
     if (first > opl) return str8_zero();
     result.str = string.str + first;
     result.len = opl - first;
-    
+
     return result;
 }
 
@@ -140,7 +140,7 @@ str8_match (String8 a, String8 b, String8_Matchflags flags) {
             }
         }
     }
-    
+
     return result;
 }
 
@@ -157,7 +157,7 @@ str8_find (String8 haystack, String8 needle, u64 start_pos, String8_Matchflags f
             }
         }
     }
-    
+
     return found_pos;
 }
 
@@ -174,7 +174,7 @@ core_function String8
 str8_pushfv (Arena *arena, char *fmt, va_list args) {
     va_list backup_args;
     va_copy(backup_args, args);
-    
+
     u64 try_size = Kilobytes(1);
     u8 *buffer = arena_pushn(arena, u8, try_size);
     u64 actual_size = vsnprintf((char*)buffer, try_size, fmt, args);
@@ -187,7 +187,7 @@ str8_pushfv (Arena *arena, char *fmt, va_list args) {
         arena_pop(arena, try_size - actual_size);
     }
     va_end(backup_args);
-    
+
     return comp_lit(String8, buffer, actual_size);
 }
 
@@ -198,7 +198,7 @@ str8_pushf (Arena *arena, char *fmt, ...) {
     va_start(args, fmt);
     result = str8_pushfv(arena, fmt, args);
     va_end(args);
-    
+
     return result;
 }
 
@@ -237,7 +237,7 @@ str8_list_pushf (Arena *arena, String8List *list, char *fmt, ...) {
     va_start(args, fmt);
     String8 string = str8_pushfv(arena, fmt, args);
     va_end(args);
-    
+
     str8_list_push(arena, list, string);
 }
 
@@ -259,7 +259,7 @@ str8_list_concat (String8List *base, String8List *appending) {
 core_function String8List
 str8_split (Arena *arena, String8 string, u64 num_splits, char *splits) {
     String8List result = zero_struct;
-    
+
     u8 *ptr = string.str;
     u8 *word = ptr;
     u8 *opl = ptr + string.len;
@@ -272,7 +272,7 @@ str8_split (Arena *arena, String8 string, u64 num_splits, char *splits) {
                 break;
             }
         }
-        
+
         if (is_split) {
             if (word < ptr) {
                 str8_list_push(arena, &result, str8_range(word, ptr));
@@ -280,11 +280,11 @@ str8_split (Arena *arena, String8 string, u64 num_splits, char *splits) {
             word = ptr + 1;
         }
     }
-    
+
     if (word < ptr) {
         str8_list_push(arena, &result, str8_range(word, ptr));
     }
-    
+
     return result;
 }
 
@@ -292,12 +292,12 @@ core_function String8
 str8_list_join (Arena *arena, String8List list, String8Join *opt_join_params) {
     String8Join join = zero_struct;
     if (opt_join_params) memory_copy(&join, opt_join_params, sizeof(String8Join));
-    
+
     u64 size = join.pre.len + join.post.len + join.sep.len * (list.num_nodes - 1) + list.total_len;
     u8 *buffer = arena_pushn(arena, u8, size + 1);
     u8 *ptr = buffer;
     String8 result = comp_lit(String8, buffer, size);
-    
+
     memory_copy(ptr, join.pre.str, join.pre.len);
     ptr += join.pre.len;
     for (String8Node *node = list.first; node != 0; node = node->next) {
@@ -309,17 +309,17 @@ str8_list_join (Arena *arena, String8List list, String8Join *opt_join_params) {
         }
     }
     memory_copy(ptr, join.post.str, join.post.len);
-    
+
     return result;
 }
 
 // Conversions
-core_function u8* 
+core_function u8*
 str8_to_cstr(Arena *arena, String8 string) {
     u8 *buffer = arena_pushn(arena, u8, string.len + 1);
     memory_copy(buffer, string.str, string.len);
     buffer[string.len] = '\0';
-    
+
     return buffer;
 }
 
@@ -332,7 +332,7 @@ str8_list_to_array (Arena *arena, String8List *list) {
     for (String8Node *node = list->first; node != 0; node = node->next, ++idx) {
         result.strings[idx] = node->string;
     }
-    
+
     return result;
 }
 
@@ -359,7 +359,7 @@ u64_from_str8 (String8 string, u32 radix) {
 core_function s64
 cint_from_str8 (String8 string) {
     u64 p = 0;
-    
+
     // consume sign
     s64 sign = +1;
     if(p < string.len)
@@ -375,7 +375,7 @@ cint_from_str8 (String8 string) {
             p += 1;
         }
     }
-    
+
     // radix from prefix
     u64 radix = 10;
     if(p < string.len)
@@ -401,11 +401,11 @@ cint_from_str8 (String8 string) {
             }
         }
     }
-    
+
     // consume integer "digits"
     String8 digits_substr = str8_skip(string, p);
     u64 n = u64_from_str8(digits_substr, (u32)radix);
-    
+
     // combine result
     s64 result = sign*n;
     return result;
@@ -424,12 +424,12 @@ f64_from_str8 (String8 string) {
     return atof(str);
 }
 
-core_function u64 
+core_function u64
 str8_hash (String8 string) {
     u64 hash = 5381;
     for (u64 c = 0; c < string.len; ++c) {
         hash = ((hash << 5) + hash) + c;
     }
-    
+
     return hash;
 }

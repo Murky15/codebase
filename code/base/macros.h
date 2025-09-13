@@ -67,11 +67,17 @@
 #endif
 
 #if COMPILER_CL || COMPILER_TCC
-# define align_of(x) __alignof(x)
+# define alignof(x) __alignof(x)
 #elif COMPILER_CLANG || COMPILER_GCC
-# define align_of(x) __alignof__(x)
+# define alignof(x) __alignof__(x)
 #else
-# error "align_of not implemented!"
+# error "alignof not implemented!"
+#endif
+
+#if !LANG_CPP
+# if COMPILER_CL // Every other compiler should define this correctly
+#  define typeof(x) __typeof__(x)
+# endif
 #endif
 
 #if LANG_CPP
@@ -88,7 +94,7 @@
 #define sign(x) (fabs(x)/(x))
 
 #define array_count(a) (sizeof(a) / sizeof(a[0]))
-#define swap(T, a, b) stmnt( T __temp = a; a = b; b = __temp; )
+#define swap(a, b) stmnt( typeof(a) __temp = a; a = b; b = __temp; )
 
 #define be_to_le16(x) ((((u8*)(x))[0] << 8) | (((u8*)(x))[1]))
 #define be_to_le32(x) ((((u8*)(x))[0] << 24) | (((u8*)(x))[1] << 16) | (((u8*)(x))[2] << 8) | (((u8*)(x))[3]))
@@ -144,7 +150,10 @@
 #define memory_copy_array(d,s) memory_copy((d),(s),min(sizeof(d),sizeof(s)))
 #define memory_copy_typed(d,s,c) memory_copy((d),(s),min(sizeof(*(d)),sizeof(*(s)))*(c))
 
-#define DeferLoop(start, end) for(int _i_ = ((start), 0); _i_ == 0; (_i_ += 1, (end)))
+//- @note: Syntax helpers
+
+#define ldefer(start, end) for(int _i_ = ((start), 0); _i_ == 0; (_i_ += 1, (end)))
+#define foreach(i,lp) for(typeof((lp)->first)(i)=(lp)->first;(i);(i)=(i)->next)
 
 //- @note: Linked list macros
 
