@@ -18,6 +18,7 @@
 #include <file/png.c>
 
 #define com_release(I) if(I) IUnknown_Release(I)
+//#define com_release(T)
 
 #define MAX_OBJECTS_ON_SCREEN 4096
 #define TILE_SCALE 16.f
@@ -345,6 +346,34 @@ r_init (HWND hwnd) {
 }
 
 function void
+r_create_and_bind_texture (PNG_Bitmap_RGBA raw_texture_data) {
+  D3D11_TEXTURE2D_DESC tex_desc = {0};
+  tex_desc.Width = raw_texture_data.width;
+  tex_desc.Height = raw_texture_data.height;
+  tex_desc.MipLevels = 1;
+  tex_desc.ArraySize = 1;
+  tex_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  tex_desc.SampleDesc.Count = 1;
+  tex_desc.SampleDesc.Quality = 0;
+  tex_desc.Usage = D3D11_USAGE_DEFAULT;
+  tex_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+  D3D11_SUBRESOURCE_DATA pixels = {0};
+  pixels.pSysMem = raw_texture_data.pixels;
+  pixels.SysMemPitch = (u32)sizeof(u32) * raw_texture_data.width;
+
+  ID3D11Texture2D *tex;
+  ID3D11ShaderResourceView *tex_view;
+  ID3D11Device_CreateTexture2D(device, &tex_desc, &pixels, &tex);
+  ID3D11Device_CreateShaderResourceView(device, (ID3D11Resource*)tex, 0, &tex_view);
+  ID3D11DeviceContext_VSSetShaderResources(ctx, 0, 1, &tex_view);
+  ID3D11DeviceContext_PSSetShaderResources(ctx, 0, 1, &tex_view);
+
+  com_release(tex);
+  com_release(tex_view);
+}
+
+function void
 r_prep (void) {
   local_persist read_only float clear_color[4] = {0.1f, 0.2f, 0.3f, 1.f};
 
@@ -490,12 +519,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
   Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
 
   Texture_Atlas sprites = load_textures(perm_arena, str8_lit("W:/assets/rougelike/0x72_DungeonTilesetII_v1.7"));
-  for (int i = 0; i < sprites.num_sprites; ++i) {
-    Sprite s = sprites.sprites[i];
-    if (s.num_frames != 0) {
-      printf("Sprite: %.*s: (%f, %f, %f, %f), %llu\n", str8_expand(s.name), s.coords[0].scale.x, s.coords[0].scale.y, s.coords[0].offset.x, s.coords[0].offset.y, s.num_frames);
-    }
-  }
+  r_create_and_bind_texture(sprites.raw_texture_data);
 
   b32 game_running = true;
   for (;game_running;) {
@@ -512,21 +536,21 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     // Update
     f32 cam_zoom = 400.f;
     Vec4 cam_pos = (Vec4){cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), cam_zoom/sqrtf(2.f), 1};
-    Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_seconds_since_init(), 2 * M_PI));
-    cam_pos = m4mulv(m4rotate(cam_rot), cam_pos);
+    //Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_seconds_since_init(), 2 * M_PI));
+    //cam_pos = m4mulv(m4rotate(cam_rot), cam_pos);
     Mat4 view = m4lookat(cam_pos.xyz, v3((32.f * TILE_SCALE),0,(32.f * TILE_SCALE)), v3(0,1,0));
     Mat4 VP = m4mul(proj, view);
 
     // Render
     r_prep();
 
-    int i = 0;
+    f32 height = 20 * sin(10*win32_seconds_since_init());
+    unused(height);
+    Sprite *floor = get_sprite_in_atlas(sprites, str8_lit("floor_2"));
     for (int y = 0; y < 32; ++y) {
       for (int x = 0; x < 32; ++x) {
-        Vec3 pos = v3((f32)x*TILE_SCALE, 8 * sin(10*win32_seconds_since_init() + i), (f32)y*TILE_SCALE);
-        Vec3 col = v3((f32)x/32.f, (f32)y/32.f, 0);
-        r_push_quad(.pos = pos, .col = col, .scale = v2(TILE_SCALE, TILE_SCALE), .rot = tile_rot);
-        ++i;
+        Vec3 pos = v3((f32)x*TILE_SCALE, 0, (f32)y*TILE_SCALE);
+        r_push_quad(.pos = pos, .atlas_coords = floor->coords[0], .scale = v2(TILE_SCALE, TILE_SCALE), .rot = tile_rot);
       }
     }
 
