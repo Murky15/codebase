@@ -6,6 +6,7 @@
 #include <dxgi.h>
 #include <d3d11.h>
 #include <D3DCompiler.h>
+#include <stdlib.h>
 #include <stdio.h>
 #define ENABLE_ASSERT 1
 #define DEBUG 1
@@ -21,12 +22,6 @@
 //#define com_release(T)
 
 #define MAX_OBJECTS_ON_SCREEN 4096
-#define TILE_SCALE 16.f
-
-typedef struct Simple_Buffer {
-  void *data;
-  u64 count;
-} Simple_Buffer;
 
 typedef struct Atlas_Coords {
   Vec2 scale;
@@ -62,6 +57,11 @@ typedef struct Instance_Data {
   Atlas_Coords atlas_coords;
   Vec3 color;
 } Instance_Data;
+
+typedef struct Camera {
+  Vec3 pan;
+  Vec3 focus;
+} Camera;
 
 ID3D11Device *device;
 ID3D11DeviceContext *ctx;
@@ -112,12 +112,12 @@ win32_ms_to_tick_interval (f32 ms) {
   return ticks;
 }
 
-function Simple_Buffer
+function String8
 d3d11_buffer_from_blob (ID3DBlob *blob) {
   // COM makes no sense
-  Simple_Buffer result = {0};
+  String8 result = {0};
   if (blob) {
-    result = (Simple_Buffer){ID3D10Blob_GetBufferPointer(blob), ID3D10Blob_GetBufferSize(blob)};
+    result = str8(ID3D10Blob_GetBufferPointer(blob), ID3D10Blob_GetBufferSize(blob));
   }
 
   return result;
@@ -216,17 +216,24 @@ r_init (HWND hwnd) {
   ID3DBlob *vs_errors_blob, *ps_errors_blob;
   D3DCompileFromFile(L"W:/code/rougelike/shaders.hlsl", 0, 0, "vs_main", "vs_5_0", D3DCOMPILE_DEBUG, 0, &vs_code_blob, &vs_errors_blob);
   D3DCompileFromFile(L"W:/code/rougelike/shaders.hlsl", 0, 0, "ps_main", "ps_5_0", D3DCOMPILE_DEBUG, 0, &ps_code_blob, &ps_errors_blob);
-  assert(!vs_errors_blob && !ps_errors_blob);
-  Simple_Buffer vs_code, ps_code, vs_errors, ps_errors;
+  String8 vs_code, ps_code, vs_errors, ps_errors;
   vs_code = d3d11_buffer_from_blob(vs_code_blob);
   ps_code = d3d11_buffer_from_blob(ps_code_blob);
-  vs_errors = d3d11_buffer_from_blob(vs_errors_blob);
-  ps_errors = d3d11_buffer_from_blob(ps_errors_blob);
+  if (vs_errors_blob) {
+    vs_errors = d3d11_buffer_from_blob(vs_errors_blob);
+    printf("%.*s\n", str8_expand(vs_errors));
+    exit(1);
+  }
+  if (ps_errors_blob) {
+    ps_errors = d3d11_buffer_from_blob(ps_errors_blob);
+    printf("%.*s\n", str8_expand(ps_errors));
+    exit(1);
+  }
 
   ID3D11VertexShader *vertex_shader;
   ID3D11PixelShader *pixel_shader;
-  ID3D11Device_CreateVertexShader(device, vs_code.data, vs_code.count, 0, &vertex_shader);
-  ID3D11Device_CreatePixelShader(device, ps_code.data, ps_code.count, 0, &pixel_shader);
+  ID3D11Device_CreateVertexShader(device, vs_code.str, vs_code.len, 0, &vertex_shader);
+  ID3D11Device_CreatePixelShader(device, ps_code.str, ps_code.len, 0, &pixel_shader);
   ID3D11DeviceContext_VSSetShader(ctx, vertex_shader, 0, 0);
   ID3D11DeviceContext_PSSetShader(ctx, pixel_shader, 0, 0);
 
@@ -253,7 +260,7 @@ r_init (HWND hwnd) {
   ID3D11Buffer *instance_buffer;
   ID3D11Device_CreateBuffer(device, &instance_desc, 0, &instance_buffer);
   ID3D11InputLayout *input_layout;
-  ID3D11Device_CreateInputLayout(device, input_layout_desc, array_count(input_layout_desc), vs_code.data, vs_code.count, &input_layout);
+  ID3D11Device_CreateInputLayout(device, input_layout_desc, array_count(input_layout_desc), vs_code.str, vs_code.len, &input_layout);
   ID3D11Buffer *vertex_uniforms;
   ID3D11Buffer *vertex_buffers[] = {vbuffer, instance_buffer};
   u32 strides[] = {sizeof(Vertex), sizeof(Instance_Data)};
@@ -369,8 +376,27 @@ r_create_and_bind_texture (PNG_Bitmap_RGBA raw_texture_data) {
   ID3D11DeviceContext_VSSetShaderResources(ctx, 0, 1, &tex_view);
   ID3D11DeviceContext_PSSetShaderResources(ctx, 0, 1, &tex_view);
 
+  D3D11_SAMPLER_DESC sampler_desc;
+  sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT; // Anisotropic filtering also looks kinda good, but blurry.
+  sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+  sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+  sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+  sampler_desc.MinLOD = 0;
+  sampler_desc.MaxLOD = 0;
+  sampler_desc.MipLODBias = 0.f;
+  sampler_desc.MaxAnisotropy = 8;
+  sampler_desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+  sampler_desc.BorderColor[0] = 1.f;
+  sampler_desc.BorderColor[1] = 1.f;
+  sampler_desc.BorderColor[2] = 1.f;
+  sampler_desc.BorderColor[3] = 1.f;
+  ID3D11SamplerState *sampler;
+  ID3D11Device_CreateSamplerState(device, &sampler_desc, &sampler);
+  ID3D11DeviceContext_PSSetSamplers(ctx, 0, 1, &sampler);
+
   com_release(tex);
   com_release(tex_view);
+  com_release(sampler);
 }
 
 function void
@@ -534,11 +560,11 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     }
 
     // Update
-    f32 cam_zoom = 400.f;
+    f32 cam_zoom = 300.f;
     Vec4 cam_pos = (Vec4){cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), cam_zoom/sqrtf(2.f), 1};
     //Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_seconds_since_init(), 2 * M_PI));
     //cam_pos = m4mulv(m4rotate(cam_rot), cam_pos);
-    Mat4 view = m4lookat(cam_pos.xyz, v3((32.f * TILE_SCALE),0,(32.f * TILE_SCALE)), v3(0,1,0));
+    Mat4 view = m4lookat(cam_pos.xyz, v3(0,0,0), v3(0,1,0));
     Mat4 VP = m4mul(proj, view);
 
     // Render
@@ -546,11 +572,12 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
 
     f32 height = 20 * sin(10*win32_seconds_since_init());
     unused(height);
-    Sprite *floor = get_sprite_in_atlas(sprites, str8_lit("floor_2"));
+    Sprite *floor = get_sprite_in_atlas(sprites, str8_lit("floor_1"));
+    Vec2 scale = floor->coords[0].scale;
     for (int y = 0; y < 32; ++y) {
       for (int x = 0; x < 32; ++x) {
-        Vec3 pos = v3((f32)x*TILE_SCALE, 0, (f32)y*TILE_SCALE);
-        r_push_quad(.pos = pos, .atlas_coords = floor->coords[0], .scale = v2(TILE_SCALE, TILE_SCALE), .rot = tile_rot);
+        Vec3 pos = v3((f32)x*scale.x, 0, (f32)y*scale.y);
+        r_push_quad(.pos = pos, .atlas_coords = floor->coords[0], .scale = scale, .rot = tile_rot);
       }
     }
 

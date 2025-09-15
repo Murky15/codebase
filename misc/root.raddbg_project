@@ -39,9 +39,4 @@ target:
   working_directory: "../build"
   enabled: 1
 }
-breakpoint:
-{
-  source_location: "../code/rougelike/rougelike.c:492:1"
-  hit_count: 1
-}
 type_view

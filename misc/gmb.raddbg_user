@@ -44,20 +44,19 @@ window:
         watch: expression: "query:modules"
       }
     }
-    0.366108: getting_started text:
+    0.483263: selected getting_started text:
     {
       selected
       expression: "file:\"W:/code/rougelike/rougelike.c\".data"
       auto: 1
       query: input: ""
-      cursor_line: 483
+      cursor_line: 218
       cursor_column: 1
-      mark_line: 483
+      mark_line: 218
       mark_column: 1
     }
-    0.467225:
+    0.350070:
     {
-      selected
       watch: expression: "query:locals"
       watch:
       {

@@ -24,11 +24,7 @@ cbuffer Vertex_Uniforms : register(b0) {
 };
 
 Texture2D atlas : register(t0);
-SamplerState atlas_sampler {
-  Filter = MIN_MAG_MIP_POINT;
-  AddressU = Clamp;
-  AddressV = Clamp;
-};
+SamplerState atlas_sampler : register(s0);
 
 static float outline_width = 0.02;
 static float blend_factor = 1;
@@ -65,13 +61,13 @@ vs_main (Vertex_Data vert, Instance_Data inst) {
 
 float4
 ps_main (PS_Input input) : SV_TARGET {
-  float2 distance_to_edges = min(input.uv, 1.0 - input.uv);
+  /*float2 distance_to_edges = min(input.uv, 1.0 - input.uv);
   float  shortest_distance = min(distance_to_edges[0], distance_to_edges[1]);
   float pixel_size = fwidth(length(input.uv));
   float t = smoothstep(outline_width + pixel_size*blend_factor, outline_width, shortest_distance);
-
+  float4 output_color = lerp(tex_color, outline_color, t);
+  */
   float4 tex_color = atlas.Sample(atlas_sampler, input.uv);
-  //float4 output_color = lerp(tex_color, outline_color, t);
 
   return tex_color;
 }
