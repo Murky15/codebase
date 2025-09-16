@@ -67,6 +67,7 @@ typedef struct Camera {
 typedef struct Entity {
   Vec3 pos;
   f32 rotation_angle;
+  f32 rotation_diff;
   Sprite idle;
   Sprite run;
 } Entity;
@@ -77,6 +78,8 @@ IDXGISwapChain *swap_chain;
 
 Instance_Data quads[MAX_OBJECTS_ON_SCREEN];
 u64 num_quads;
+
+b32 move_forward, move_back, strafe_left, strafe_right;
 
 function u64
 win32_get_perf_frequency (void) {
@@ -104,7 +107,7 @@ win32_get_elapsed_ms (u64 t1, u64 t2) {
 }
 
 function f64
-win32_seconds_since_init (void) {
+win32_tick_seconds (void) {
   u64 freq = win32_get_perf_frequency();
   u64 current_time = win32_query_clock();
 
@@ -135,6 +138,22 @@ function LRESULT
 WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
   switch (uMsg) {
     case WM_DESTROY: PostQuitMessage(0); return 0;
+    case WM_KEYUP: fallthrough
+    case WM_KEYDOWN: {
+      if (wParam == 'W') {
+
+      }
+      if (wParam == 'A') {
+
+      }
+      if (wParam == 'S') {
+
+      }
+      if (wParam == 'D') {
+
+      }
+      return 0;
+    }
   }
 
   return DefWindowProc(hwnd, uMsg, wParam, lParam);
@@ -583,18 +602,18 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     // Update
     f32 cam_zoom = 300.f;
     Vec4 cam_pos = (Vec4){cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), cam_zoom/sqrtf(2.f), 1};
-    Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_seconds_since_init(), 2 * M_PI));
-    cam_pos = m4mulv(m4rotate(cam_rot), cam_pos);
+    //Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_tick_seconds(), 2 * M_PI));
+    //cam_pos = m4mulv(m4rotate(cam_rot), cam_pos);
     Mat4 view = m4lookat(cam_pos.xyz, v3(0,0,0), v3(0,1,0));
     Mat4 VP = m4mul(proj, view);
 
     // Render
     r_prep();
 
-    f32 height = 20 * sin(8*win32_seconds_since_init());
+    f32 height = 20 * sin(8*win32_tick_seconds());
     unused(height);
 
-    local_persist Sprite tiles[32 * 32] = {0};
+    local_persist Sprite tiles[32 * 32];
     for (u64 y = 0; y < 32; ++y) {
       for (u64 x = 0; x < 32; ++x) {
         if (tiles[y * 32 + x].name.len == 0) {
