@@ -50,14 +50,14 @@ window:
       expression: "file:\"W:/code/rougelike/rougelike.c\".data"
       auto: 1
       query: input: ""
-      cursor_line: 218
-      cursor_column: 1
-      mark_line: 218
-      mark_column: 1
+      cursor_line: 591
+      cursor_column: 14
+      mark_line: 591
+      mark_column: 14
     }
     0.350070:
     {
-      watch: expression: "query:locals"
+      watch: selected expression: "query:locals"
       watch:
       {
         expression: ""
@@ -69,7 +69,6 @@ window:
       watch: expression: "query:type_views"
       bitmap:
       {
-        selected
         zoom: 0.866690f
         x: -2.845748f
         y: -54.299007f
@@ -80,7 +79,7 @@ window:
     }
   }
   split_x
-  pos: 192 102
+  pos: 484 312
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }

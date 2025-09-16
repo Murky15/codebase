@@ -19,16 +19,12 @@ struct PS_Input {
   float2 uv  : TEXCOORD;
 };
 
-cbuffer Vertex_Uniforms : register(b0) {
+cbuffer Uniforms : register(b0) {
   row_major matrix view_proj;
 };
 
 Texture2D atlas : register(t0);
 SamplerState atlas_sampler : register(s0);
-
-static float outline_width = 0.02;
-static float blend_factor = 1;
-static float4 outline_color = float4(0.0,0.0,0.0,1.0);
 
 PS_Input
 vs_main (Vertex_Data vert, Instance_Data inst) {
@@ -45,13 +41,12 @@ vs_main (Vertex_Data vert, Instance_Data inst) {
   matrix wvp = mul(view_proj, world);
   result.pos = mul(wvp, pos);
 
-  float tex_width;
-  float tex_height;
-  atlas.GetDimensions(tex_width, tex_height);
-  float2 iuv = vert.uv;
+  float2 tex_dim;
+  atlas.GetDimensions(tex_dim.x, tex_dim.y);
+
   float2 scale  = inst.coords.xy;
   float2 offset = inst.coords.zw;
-  float2 uv = ((iuv * scale) + offset) / float2(tex_width, tex_height);
+  float2 uv = ((vert.uv * scale) + offset) / tex_dim;
 
   result.uv = uv;
   result.col = float4(inst.col, 1.0);
@@ -61,13 +56,5 @@ vs_main (Vertex_Data vert, Instance_Data inst) {
 
 float4
 ps_main (PS_Input input) : SV_TARGET {
-  /*float2 distance_to_edges = min(input.uv, 1.0 - input.uv);
-  float  shortest_distance = min(distance_to_edges[0], distance_to_edges[1]);
-  float pixel_size = fwidth(length(input.uv));
-  float t = smoothstep(outline_width + pixel_size*blend_factor, outline_width, shortest_distance);
-  float4 output_color = lerp(tex_color, outline_color, t);
-  */
-  float4 tex_color = atlas.Sample(atlas_sampler, input.uv);
-
-  return tex_color;
+  return atlas.Sample(atlas_sampler, input.uv);
 }

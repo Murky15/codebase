@@ -48,9 +48,9 @@ typedef struct Vertex {
   Vec2 uv;
 } Vertex;
 
-typedef struct Vertex_Uniforms {
+typedef struct Uniforms {
   Mat4 view_proj;
-} Vertex_Uniforms;
+} Uniforms;
 
 typedef struct Instance_Data {
   Mat4 world;
@@ -59,9 +59,17 @@ typedef struct Instance_Data {
 } Instance_Data;
 
 typedef struct Camera {
-  Vec3 pan;
+  Vec3 pos;
   Vec3 focus;
+  Vec3 follow_distance;
 } Camera;
+
+typedef struct Entity {
+  Vec3 pos;
+  f32 rotation_angle;
+  Sprite idle;
+  Sprite run;
+} Entity;
 
 ID3D11Device *device;
 ID3D11DeviceContext *ctx;
@@ -208,8 +216,8 @@ r_init (HWND hwnd) {
   ID3D11Device_CreateRenderTargetView(device, (ID3D11Resource*)back_buffer, 0, &render_target_view);
   D3D11_TEXTURE2D_DESC back_buffer_desc = {0};
   ID3D11Texture2D_GetDesc(back_buffer, &back_buffer_desc);
-  int render_width = back_buffer_desc.Width;
-  int render_height = back_buffer_desc.Height;
+  u64 render_width = back_buffer_desc.Width;
+  u64 render_height = back_buffer_desc.Height;
 
   // Compile & create shaders
   ID3DBlob *vs_code_blob, *ps_code_blob;
@@ -270,7 +278,7 @@ r_init (HWND hwnd) {
   ID3D11DeviceContext_IASetInputLayout(ctx, input_layout);
   ID3D11DeviceContext_IASetPrimitiveTopology(ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   D3D11_BUFFER_DESC vuniforms_desc = {0};
-  vuniforms_desc.ByteWidth = sizeof(Vertex_Uniforms);
+  vuniforms_desc.ByteWidth = sizeof(Uniforms);
   vuniforms_desc.Usage = D3D11_USAGE_DYNAMIC;
   vuniforms_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
   vuniforms_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -401,7 +409,7 @@ r_create_and_bind_texture (PNG_Bitmap_RGBA raw_texture_data) {
 
 function void
 r_prep (void) {
-  local_persist read_only float clear_color[4] = {0.1f, 0.2f, 0.3f, 1.f};
+  local_persist read_only f32 clear_color[4] = {0.1f, 0.2f, 0.3f, 1.f};
 
   memory_zero(quads, num_quads);
   num_quads = 0;
@@ -419,11 +427,11 @@ r_prep (void) {
 function void
 r_update_transform (Mat4 m) {
   D3D11_MAPPED_SUBRESOURCE constant_buffer = {0};
-  Vertex_Uniforms new_transform_data = {m};
+  Uniforms new_transform_data = {m};
   ID3D11Buffer *vertex_uniforms;
   ID3D11DeviceContext_VSGetConstantBuffers(ctx, 0, 1, &vertex_uniforms);
   ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)vertex_uniforms, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer);
-  memcpy(constant_buffer.pData, &new_transform_data, sizeof(Vertex_Uniforms));
+  memcpy(constant_buffer.pData, &new_transform_data, sizeof(Uniforms));
   ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)vertex_uniforms, 0);
 
   com_release(vertex_uniforms);
@@ -466,6 +474,7 @@ r_present (b32 enable_vsync) {
   com_release(instance_buffer);
 }
 
+// These could probably be named better
 function Sprite*
 get_sprite_in_atlas (Texture_Atlas atlas, String8 key) {
   Sprite *result = 0;
@@ -482,6 +491,11 @@ get_sprite_in_atlas (Texture_Atlas atlas, String8 key) {
   return result;
 }
 
+function Sprite
+get_sprite (Texture_Atlas atlas, String8 key) {
+  return *get_sprite_in_atlas(atlas, key);
+}
+
 function Atlas_Coords
 make_atlas_coords_from_string (String8 coords) {
   Atlas_Coords result = {0};
@@ -489,7 +503,7 @@ make_atlas_coords_from_string (String8 coords) {
   ldefer (scratch=get_scratch(0,0), release_scratch(scratch)) {
     String8List numbers = str8_split(scratch.arena, coords, 1, " ");
     Vec4 coords = {0};
-    int i = 0;
+    u64 i = 0;
     foreach (num, &numbers) {
       coords.e[i++] = f64_from_str8(num->string);
     }
@@ -521,7 +535,9 @@ load_textures (Arena *arena, String8 absolute_path_to_asset_dir) {
         name = str8_chop(name, 3);
       }
       Sprite *sprite = get_sprite_in_atlas(result, name);
-      sprite->name = name;
+      if (sprite->name.len == 0) {
+        sprite->name = name;
+      }
       sprite->coords[sprite->num_frames++] = make_atlas_coords_from_string(coords);
     }
 
@@ -534,7 +550,8 @@ load_textures (Arena *arena, String8 absolute_path_to_asset_dir) {
 
 int
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
-  Arena *perm_arena = arena_alloc();
+  Arena *perm = arena_alloc();
+  Arena *frame = arena_alloc();
 
   HWND hwnd = win32_create_window(hInstance);
   Vec2i render_dim = r_init(hwnd);
@@ -544,11 +561,15 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
   Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 0.001f, 100000.f);
   Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
 
-  Texture_Atlas sprites = load_textures(perm_arena, str8_lit("W:/assets/rougelike/0x72_DungeonTilesetII_v1.7"));
+  Texture_Atlas sprites = load_textures(perm, str8_lit("W:/assets/rougelike/0x72_DungeonTilesetII_v1.7"));
   r_create_and_bind_texture(sprites.raw_texture_data);
+
+  srand(win32_query_clock());
 
   b32 game_running = true;
   for (;game_running;) {
+    arena_clear(frame);
+
     // Input
     for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
       if (msg.message == WM_QUIT) {
@@ -562,22 +583,29 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     // Update
     f32 cam_zoom = 300.f;
     Vec4 cam_pos = (Vec4){cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), cam_zoom/sqrtf(2.f), 1};
-    //Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_seconds_since_init(), 2 * M_PI));
-    //cam_pos = m4mulv(m4rotate(cam_rot), cam_pos);
+    Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_seconds_since_init(), 2 * M_PI));
+    cam_pos = m4mulv(m4rotate(cam_rot), cam_pos);
     Mat4 view = m4lookat(cam_pos.xyz, v3(0,0,0), v3(0,1,0));
     Mat4 VP = m4mul(proj, view);
 
     // Render
     r_prep();
 
-    f32 height = 20 * sin(10*win32_seconds_since_init());
+    f32 height = 20 * sin(8*win32_seconds_since_init());
     unused(height);
-    Sprite *floor = get_sprite_in_atlas(sprites, str8_lit("floor_1"));
-    Vec2 scale = floor->coords[0].scale;
-    for (int y = 0; y < 32; ++y) {
-      for (int x = 0; x < 32; ++x) {
-        Vec3 pos = v3((f32)x*scale.x, 0, (f32)y*scale.y);
-        r_push_quad(.pos = pos, .atlas_coords = floor->coords[0], .scale = scale, .rot = tile_rot);
+
+    local_persist Sprite tiles[32 * 32] = {0};
+    for (u64 y = 0; y < 32; ++y) {
+      for (u64 x = 0; x < 32; ++x) {
+        if (tiles[y * 32 + x].name.len == 0) {
+          String8 random_tile = str8_pushf(frame, "floor_%d", (rand()%8)+1);
+          tiles[y * 32 + x] = get_sprite(sprites, random_tile);
+          printf("%.*s\n", str8_expand(random_tile));
+        }
+        Sprite tile = tiles[y * 32 + x];
+        Vec2 scale = tile.coords[0].scale;
+        Vec3 pos = v3((f32)x*scale.x, height, (f32)y*scale.y);
+        r_push_quad(.pos = pos, .atlas_coords = tile.coords[0], .scale = scale, .rot = tile_rot);
       }
     }
 

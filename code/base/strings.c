@@ -188,7 +188,7 @@ str8_pushfv (Arena *arena, char *fmt, va_list args) {
     }
     va_end(backup_args);
 
-    return comp_lit(String8, buffer, actual_size);
+    return comp_lit(String8, buffer, actual_size-1);
 }
 
 core_function String8
