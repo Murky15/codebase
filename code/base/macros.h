@@ -90,7 +90,6 @@
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #define clamp(a,min,max) ((a) < (min) ? (min) : (a) > (max) ? (max) : (a))
-#define norm(x,min,max) (((x)-(min))/((max)-(min)))
 #define sign(x) (fabs(x)/(x))
 
 #define array_count(a) (sizeof(a) / sizeof(a[0]))

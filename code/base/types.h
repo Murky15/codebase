@@ -224,6 +224,7 @@ core_function Mat4 m4lookat(Vec3 viewpoint, Vec3 focus, Vec3 reference_up);
 //- @note: Some float helpers
 core_function f64 fmod_cycling(f64 x, f64 y);
 core_function f64 lerp (f64 v0, f64 v1, f64 t);
+core_function f64 norm (f64 x, f64 min, f64 max);
 core_function b32 almost_equal (f64 a, f64 b);
 
 #undef make_array_type

@@ -58,10 +58,16 @@ typedef struct Instance_Data {
   Vec3 color;
 } Instance_Data;
 
+/*
+  We can have a 'tween' function type here that takes two Vector3s
+  which is then packed in the Camera struct for camera_update_tracking
+  to modify how the camera changes position
+*/
+
 typedef struct Camera {
   Vec3 pos;
   Vec3 focus;
-  Vec3 follow_distance;
+  Vec3 follow_dist;
 } Camera;
 
 typedef struct Entity {
@@ -140,17 +146,18 @@ WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
     case WM_DESTROY: PostQuitMessage(0); return 0;
     case WM_KEYUP: fallthrough
     case WM_KEYDOWN: {
+      b32 key_down = !(lParam >> 31);
       if (wParam == 'W') {
-
+        move_forward = key_down;
       }
       if (wParam == 'A') {
-
+        strafe_left = key_down;
       }
       if (wParam == 'S') {
-
+        move_back = key_down;
       }
       if (wParam == 'D') {
-
+        strafe_right = key_down;
       }
       return 0;
     }
@@ -579,6 +586,12 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
 
   Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 0.001f, 100000.f);
   Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
+  Camera cam = {0};
+  f32 cam_zoom = 800.f;
+  //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
+  cam.pos = v3(0, -cam_zoom, 1); // Huh??
+  cam.focus = v3(0,0,0);
+  cam.follow_dist = v3sub(cam.pos,cam.focus);
 
   Texture_Atlas sprites = load_textures(perm, str8_lit("W:/assets/rougelike/0x72_DungeonTilesetII_v1.7"));
   r_create_and_bind_texture(sprites.raw_texture_data);
@@ -600,30 +613,34 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     }
 
     // Update
-    f32 cam_zoom = 300.f;
-    Vec4 cam_pos = (Vec4){cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), cam_zoom/sqrtf(2.f), 1};
     //Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_tick_seconds(), 2 * M_PI));
     //cam_pos = m4mulv(m4rotate(cam_rot), cam_pos);
-    Mat4 view = m4lookat(cam_pos.xyz, v3(0,0,0), v3(0,1,0));
-    Mat4 VP = m4mul(proj, view);
+    Vec2 move_dir = {0};
+    if (move_forward) move_dir.y -= 1;
+    if (strafe_left)  move_dir.x -= 1;
+    if (move_back)    move_dir.y += 1;
+    if (strafe_right) move_dir.x += 1;
+    if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
+    cam.pos = v3sub(cam.pos, v3(move_dir.x, 0, move_dir.y));
+    cam.focus = v3sub(cam.focus, v3(move_dir.x, 0, move_dir.y));
 
     // Render
     r_prep();
+    Mat4 view = m4lookat(cam.pos, cam.focus, v3(0,1,0));
+    Mat4 VP = m4mul(proj, view);
 
     f32 height = 20 * sin(8*win32_tick_seconds());
     unused(height);
-
     local_persist Sprite tiles[32 * 32];
     for (u64 y = 0; y < 32; ++y) {
       for (u64 x = 0; x < 32; ++x) {
         if (tiles[y * 32 + x].name.len == 0) {
           String8 random_tile = str8_pushf(frame, "floor_%d", (rand()%8)+1);
           tiles[y * 32 + x] = get_sprite(sprites, random_tile);
-          printf("%.*s\n", str8_expand(random_tile));
         }
         Sprite tile = tiles[y * 32 + x];
         Vec2 scale = tile.coords[0].scale;
-        Vec3 pos = v3((f32)x*scale.x, height, (f32)y*scale.y);
+        Vec3 pos = v3((f32)x*scale.x, 0, (f32)y*scale.y);
         r_push_quad(.pos = pos, .atlas_coords = tile.coords[0], .scale = scale, .rot = tile_rot);
       }
     }

@@ -380,6 +380,11 @@ lerp (f64 v0, f64 v1, f64 t) {
   return (1.f - t) * v0 + t * v1;
 }
 
+core_function f64
+norm (f64 x, f64 min, f64 max) {
+  return (x-min)/(max-min);
+}
+
 core_function b32
 almost_equal (f64 a, f64 b) {
   local_persist read_only f64 e = 0.0001f;
