@@ -22,6 +22,7 @@
 //#define com_release(T)
 
 #define MAX_OBJECTS_ON_SCREEN 4096
+#define PLAYER_MOVE_SPEED 0.15f
 
 typedef struct Atlas_Coords {
   Vec2 scale;
@@ -117,7 +118,7 @@ win32_get_elapsed_ms (u64 t1, u64 t2) {
 }
 
 function f64
-win32_tick_seconds (void) {
+win32_clock_seconds (void) {
   u64 freq = win32_get_perf_frequency();
   u64 current_time = win32_query_clock();
 
@@ -233,7 +234,7 @@ r_init (HWND hwnd) {
   D3D11CreateDeviceAndSwapChain(0,
                                 D3D_DRIVER_TYPE_HARDWARE,
                                 0,
-                                D3D11_CREATE_DEVICE_DEBUG,
+                                0,
                                 &feature_level,
                                 1,
                                 D3D11_SDK_VERSION,
@@ -566,17 +567,20 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
   Arena *perm = arena_alloc();
   Arena *frame = arena_alloc();
 
+  srand(win32_query_clock());
+
   HWND hwnd = win32_create_window(hInstance);
   Vec2i render_dim = r_init(hwnd);
   f32 render_width = render_dim.width;
   f32 render_height = render_dim.height;
 
-  Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 0.001f, 100000.f);
+  Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 1.f, 1000.f);
   Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
   Camera cam = {0};
-  f32 cam_zoom = 400.f;
-  cam.pos = v3(cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), cam_zoom/sqrtf(2.f));
+  f32 cam_zoom = 100.f;
+  //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
   //cam.pos = v3(0, -cam_zoom, 1);
+  cam.pos = v3(0, cam_zoom+10, -cam_zoom);
   cam.focus = v3(0,0,0);
   cam.follow_dist = v3sub(cam.pos,cam.focus);
 
@@ -588,7 +592,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
   player.idle = get_sprite(sprites, str8_lit("pumpkin_dude_idle_anim"));
   player.run  = get_sprite(sprites, str8_lit("pumpkin_dude_run_anim"));
 
-  srand(win32_query_clock());
+  u64 last = win32_query_clock();
   b32 game_running = true;
   for (;game_running;) {
     arena_clear(frame);
@@ -604,7 +608,11 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     }
 
     // Update
-    //Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_tick_seconds(), 2 * M_PI));
+    u64 now = win32_query_clock();
+    f32 dt = win32_get_elapsed_ms(last, now);
+    last = now;
+
+    //Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_clock_seconds(), 2 * M_PI))
     //cam_pos = m4mulv(m4rotate(cam_rot), cam_pos);
     Vec2 move_dir = {0};
     if (move_forward) move_dir.y += 1;
@@ -612,16 +620,16 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     if (move_back)    move_dir.y -= 1;
     if (strafe_right) move_dir.x += 1;
     if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
-    cam.pos = v3add(cam.pos, v3(move_dir.x, 0, move_dir.y));
-    cam.focus = v3add(cam.focus, v3(move_dir.x, 0, move_dir.y));
-    player.pos = v3add(player.pos, v3(move_dir.x, 0, move_dir.y));
+    cam.pos = v3add(cam.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
+    cam.focus = v3add(cam.focus, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
+    player.pos = v3add(player.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
 
     // Render
     r_prep();
     Mat4 view = m4lookat(cam.pos, cam.focus, v3(0,1,0));
     Mat4 VP = m4mul(proj, view);
 
-    f32 height = 20 * sin(8*win32_tick_seconds());
+    f32 height = 20 * sin(8*win32_clock_seconds());
     unused(height);
     local_persist Sprite tiles[32 * 32];
     for (u64 y = 0; y < 32; ++y) {
@@ -632,14 +640,14 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         }
         Sprite tile = tiles[y * 32 + x];
         Vec2 scale = tile.coords[0].scale;
-        Vec3 pos = v3((f32)x*scale.x, -1, (f32)y*scale.y);
+        Vec3 pos = v3((f32)x*scale.x, 0, (f32)y*scale.y);
         r_push_quad(.pos = pos, .atlas_coords = tile.coords[0], .scale = scale, .rot = tile_rot);
       }
     }
     r_draw_entity(&player);
 
     r_update_transform(VP);
-    r_present(true);
+    r_present(false);
   }
 
   return 0;
