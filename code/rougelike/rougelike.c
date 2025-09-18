@@ -81,6 +81,10 @@ typedef struct Entity {
 ID3D11Device *device;
 ID3D11DeviceContext *ctx;
 IDXGISwapChain *swap_chain;
+ID3D11RenderTargetView *render_target_view;
+ID3D11DepthStencilView *depth_stencil_view;
+ID3D11Buffer *uniforms;
+ID3D11Buffer *instance_buffer;
 
 Instance_Data quads[MAX_OBJECTS_ON_SCREEN];
 u64 num_quads;
@@ -197,10 +201,10 @@ win32_create_window (HINSTANCE hInstance) {
 function Vec2i
 r_init (HWND hwnd) {
   local_persist read_only struct Vertex quad_vertices[4] = {
-    {{0, 0, 0}, {0, 0}},
-    {{1, 0, 0}, {1, 0}},
-    {{1, 1, 0}, {1, 1}},
-    {{0, 1, 0}, {0, 1}},
+    {{0, 0, 0}, {0, 1}},
+    {{1, 0, 0}, {1, 1}},
+    {{1, 1, 0}, {1, 0}},
+    {{0, 1, 0}, {0, 0}},
   };
   local_persist read_only u32 quad_indices[6] = {0, 1, 2, 2, 3, 0};
 
@@ -229,14 +233,13 @@ r_init (HWND hwnd) {
   D3D11CreateDeviceAndSwapChain(0,
                                 D3D_DRIVER_TYPE_HARDWARE,
                                 0,
-                                0,
+                                D3D11_CREATE_DEVICE_DEBUG,
                                 &feature_level,
                                 1,
                                 D3D11_SDK_VERSION,
                                 &sd, &swap_chain,
                                 &device, 0, &ctx);
 
-  ID3D11RenderTargetView *render_target_view;
   ID3D11Texture2D *back_buffer;
   IDXGISwapChain_GetBuffer(swap_chain, 0, &IID_ID3D11Texture2D, &back_buffer);
   ID3D11Device_CreateRenderTargetView(device, (ID3D11Resource*)back_buffer, 0, &render_target_view);
@@ -291,11 +294,9 @@ r_init (HWND hwnd) {
   instance_desc.Usage = D3D11_USAGE_DYNAMIC;
   instance_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
   instance_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-  ID3D11Buffer *instance_buffer;
   ID3D11Device_CreateBuffer(device, &instance_desc, 0, &instance_buffer);
   ID3D11InputLayout *input_layout;
   ID3D11Device_CreateInputLayout(device, input_layout_desc, array_count(input_layout_desc), vs_code.str, vs_code.len, &input_layout);
-  ID3D11Buffer *vertex_uniforms;
   ID3D11Buffer *vertex_buffers[] = {vbuffer, instance_buffer};
   u32 strides[] = {sizeof(Vertex), sizeof(Instance_Data)};
   u32 offsets[] = {0,0};
@@ -303,13 +304,13 @@ r_init (HWND hwnd) {
   ID3D11DeviceContext_IASetIndexBuffer(ctx, ibuffer, DXGI_FORMAT_R32_UINT, 0);
   ID3D11DeviceContext_IASetInputLayout(ctx, input_layout);
   ID3D11DeviceContext_IASetPrimitiveTopology(ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-  D3D11_BUFFER_DESC vuniforms_desc = {0};
-  vuniforms_desc.ByteWidth = sizeof(Uniforms);
-  vuniforms_desc.Usage = D3D11_USAGE_DYNAMIC;
-  vuniforms_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-  vuniforms_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-  ID3D11Device_CreateBuffer(device, &vuniforms_desc, 0, &vertex_uniforms);
-  ID3D11DeviceContext_VSSetConstantBuffers(ctx, 0, 1, &vertex_uniforms);
+  D3D11_BUFFER_DESC uniforms_desc = {0};
+  uniforms_desc.ByteWidth = sizeof(Uniforms);
+  uniforms_desc.Usage = D3D11_USAGE_DYNAMIC;
+  uniforms_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+  uniforms_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+  ID3D11Device_CreateBuffer(device, &uniforms_desc, 0, &uniforms);
+  ID3D11DeviceContext_VSSetConstantBuffers(ctx, 0, 1, &uniforms);
 
   // Rasterizer
   D3D11_VIEWPORT viewport = {0};
@@ -328,13 +329,12 @@ r_init (HWND hwnd) {
   ID3D11DeviceContext_RSSetState(ctx, rstate);
 
   // OM
-  ID3D11DepthStencilView *depth_stencil_view;
   D3D11_TEXTURE2D_DESC depth_texture_desc = {0};
   depth_texture_desc.Width = back_buffer_desc.Width;
   depth_texture_desc.Height = back_buffer_desc.Height;
   depth_texture_desc.MipLevels = 1;
   depth_texture_desc.ArraySize = 1;
-  depth_texture_desc.Format = DXGI_FORMAT_D32_FLOAT;
+  depth_texture_desc.Format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
   depth_texture_desc.SampleDesc.Count = 1;
   depth_texture_desc.SampleDesc.Quality = 0;
   depth_texture_desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
@@ -343,7 +343,7 @@ r_init (HWND hwnd) {
   D3D11_DEPTH_STENCIL_DESC depth_stencil_desc = {0};
   depth_stencil_desc.DepthEnable = 1;
   depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-  depth_stencil_desc.DepthFunc = D3D11_COMPARISON_LESS;
+  depth_stencil_desc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
   ID3D11DepthStencilState *depth_stencil_state;
   ID3D11Device_CreateDepthStencilState(device, &depth_stencil_desc, &depth_stencil_state);
   ID3D11DeviceContext_OMSetDepthStencilState(ctx, depth_stencil_state, 1);
@@ -374,14 +374,10 @@ r_init (HWND hwnd) {
   com_release(pixel_shader);
   com_release(vbuffer);
   com_release(ibuffer);
-  com_release(instance_buffer);
-  com_release(vertex_uniforms);
   com_release(rstate);
-  com_release(depth_stencil_view);
   com_release(depth_stencil_texture);
   com_release(depth_stencil_state);
   com_release(blend_state);
-  com_release(render_target_view);
 
   return (Vec2i){render_width, render_height};
 }
@@ -436,34 +432,22 @@ r_create_and_bind_texture (PNG_Bitmap_RGBA raw_texture_data) {
 function void
 r_prep (void) {
   local_persist read_only f32 clear_color[4] = {0.1f, 0.2f, 0.3f, 1.f};
-
   memory_zero(quads, num_quads);
   num_quads = 0;
-
-  ID3D11RenderTargetView *render_target_view;
-  ID3D11DepthStencilView *depth_stencil_view;
-  ID3D11DeviceContext_OMGetRenderTargets(ctx, 1, &render_target_view, &depth_stencil_view);
-  ID3D11DeviceContext_ClearDepthStencilView(ctx, depth_stencil_view, D3D11_CLEAR_DEPTH, 1, 0);
+  ID3D11DeviceContext_ClearDepthStencilView(ctx, depth_stencil_view, D3D11_CLEAR_DEPTH, 1.f, 0);
   ID3D11DeviceContext_ClearRenderTargetView(ctx, render_target_view, clear_color);
-
-  com_release(depth_stencil_view);
-  com_release(render_target_view);
 }
 
 function void
 r_update_transform (Mat4 m) {
   D3D11_MAPPED_SUBRESOURCE constant_buffer = {0};
   Uniforms new_transform_data = {m};
-  ID3D11Buffer *vertex_uniforms;
-  ID3D11DeviceContext_VSGetConstantBuffers(ctx, 0, 1, &vertex_uniforms);
-  ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)vertex_uniforms, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer);
+  ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)uniforms, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer);
   memcpy(constant_buffer.pData, &new_transform_data, sizeof(Uniforms));
-  ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)vertex_uniforms, 0);
-
-  com_release(vertex_uniforms);
+  ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)uniforms, 0);
 }
 
-// We could probably auto-generate this through metaprogramming
+// We might be able to auto-generate this through metaprogramming
 struct Quad_Param_Data {
   Vec3 pos;
   Vec2 scale;
@@ -489,20 +473,17 @@ r_push_quad_ (struct Quad_Param_Data *p) {
 function void
 r_present (b32 enable_vsync) {
   D3D11_MAPPED_SUBRESOURCE instances = {0};
-  ID3D11Buffer *instance_buffer;
-  ID3D11DeviceContext_IAGetVertexBuffers(ctx, 1, 1, &instance_buffer, 0, 0);
   ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instances);
   memcpy(instances.pData, quads, sizeof(Instance_Data) * num_quads);
   ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)instance_buffer, 0);
 
   ID3D11DeviceContext_DrawIndexedInstanced(ctx, 6, num_quads, 0, 0, 0);
   IDXGISwapChain_Present(swap_chain, enable_vsync, 0);
-  com_release(instance_buffer);
 }
 
 // These could probably be named better
 function Sprite*
-get_sprite_in_atlas (Texture_Atlas atlas, String8 key) {
+get_atlas_slot (Texture_Atlas atlas, String8 key) {
   Sprite *result = 0;
   u64 hash = str8_hash(key) % atlas.num_sprites;
   while (true) {
@@ -519,7 +500,7 @@ get_sprite_in_atlas (Texture_Atlas atlas, String8 key) {
 
 function Sprite
 get_sprite (Texture_Atlas atlas, String8 key) {
-  return *get_sprite_in_atlas(atlas, key);
+  return *get_atlas_slot(atlas, key);
 }
 
 function Atlas_Coords
@@ -560,7 +541,7 @@ load_textures (Arena *arena, String8 absolute_path_to_asset_dir) {
       if (str8_match(frame, str8_lit("_f"), 0)) {
         name = str8_chop(name, 3);
       }
-      Sprite *sprite = get_sprite_in_atlas(result, name);
+      Sprite *sprite = get_atlas_slot(result, name);
       if (sprite->name.len == 0) {
         sprite->name = name;
       }
@@ -572,6 +553,12 @@ load_textures (Arena *arena, String8 absolute_path_to_asset_dir) {
     result.raw_texture_data = png_decode(arena, texture_png_data);
   }
   return result;
+}
+
+function void
+r_draw_entity (Entity *e) {
+  Atlas_Coords texcoord = e->idle.coords[0];
+  r_push_quad(.pos = e->pos, .scale = texcoord.scale, .atlas_coords = texcoord);
 }
 
 int
@@ -587,17 +574,21 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
   Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 0.001f, 100000.f);
   Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
   Camera cam = {0};
-  f32 cam_zoom = 800.f;
-  //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
-  cam.pos = v3(0, -cam_zoom, 1); // Huh??
+  f32 cam_zoom = 400.f;
+  cam.pos = v3(cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), cam_zoom/sqrtf(2.f));
+  //cam.pos = v3(0, -cam_zoom, 1);
   cam.focus = v3(0,0,0);
   cam.follow_dist = v3sub(cam.pos,cam.focus);
 
   Texture_Atlas sprites = load_textures(perm, str8_lit("W:/assets/rougelike/0x72_DungeonTilesetII_v1.7"));
   r_create_and_bind_texture(sprites.raw_texture_data);
 
-  srand(win32_query_clock());
+  Entity player = {0};
+  player.pos = v3(0,0,0);
+  player.idle = get_sprite(sprites, str8_lit("pumpkin_dude_idle_anim"));
+  player.run  = get_sprite(sprites, str8_lit("pumpkin_dude_run_anim"));
 
+  srand(win32_query_clock());
   b32 game_running = true;
   for (;game_running;) {
     arena_clear(frame);
@@ -616,13 +607,14 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     //Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_tick_seconds(), 2 * M_PI));
     //cam_pos = m4mulv(m4rotate(cam_rot), cam_pos);
     Vec2 move_dir = {0};
-    if (move_forward) move_dir.y -= 1;
+    if (move_forward) move_dir.y += 1;
     if (strafe_left)  move_dir.x -= 1;
-    if (move_back)    move_dir.y += 1;
+    if (move_back)    move_dir.y -= 1;
     if (strafe_right) move_dir.x += 1;
     if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
-    cam.pos = v3sub(cam.pos, v3(move_dir.x, 0, move_dir.y));
-    cam.focus = v3sub(cam.focus, v3(move_dir.x, 0, move_dir.y));
+    cam.pos = v3add(cam.pos, v3(move_dir.x, 0, move_dir.y));
+    cam.focus = v3add(cam.focus, v3(move_dir.x, 0, move_dir.y));
+    player.pos = v3add(player.pos, v3(move_dir.x, 0, move_dir.y));
 
     // Render
     r_prep();
@@ -640,10 +632,11 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
         }
         Sprite tile = tiles[y * 32 + x];
         Vec2 scale = tile.coords[0].scale;
-        Vec3 pos = v3((f32)x*scale.x, 0, (f32)y*scale.y);
+        Vec3 pos = v3((f32)x*scale.x, -1, (f32)y*scale.y);
         r_push_quad(.pos = pos, .atlas_coords = tile.coords[0], .scale = scale, .rot = tile_rot);
       }
     }
+    r_draw_entity(&player);
 
     r_update_transform(VP);
     r_present(true);
