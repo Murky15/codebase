@@ -40,8 +40,3 @@ target:
   enabled: 1
 }
 type_view
-breakpoint:
-{
-  source_location: "../code/rougelike/rougelike.c:600:1"
-  hit_count: 1
-}

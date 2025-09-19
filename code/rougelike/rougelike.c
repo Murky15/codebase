@@ -34,7 +34,8 @@ typedef struct Sprite {
   String8 name;
   Atlas_Coords coords[MAX_FRAMES];
   u64 num_frames;
-  f32 animation_stated_at;
+  u64 current_frame;
+  f32 started_at;
   f32 seconds_to_complete;
 } Sprite;
 
@@ -73,6 +74,7 @@ typedef struct Camera {
 
 typedef struct Entity {
   Vec3 pos;
+  Vec2 dir;
   f32 rotation_angle;
   f32 rotation_diff;
   Sprite idle;
@@ -558,7 +560,30 @@ load_textures (Arena *arena, String8 absolute_path_to_asset_dir) {
 
 function void
 r_draw_entity (Entity *e) {
-  Atlas_Coords texcoord = e->idle.coords[0];
+  Sprite *anim = &e->run;
+  Sprite *prev_anim = &e->idle;
+  if (e->dir.x == 0 && e->dir.y == 0) {
+    swap(anim, prev_anim);
+  }
+  if (prev_anim->started_at || anim->started_at == 0) {
+    anim->started_at = win32_clock_seconds();
+    anim->current_frame = 0;
+
+    prev_anim->started_at = 0;
+  }
+
+  f32 seconds_per_frame = anim->seconds_to_complete / anim->num_frames;
+  f32 current_step = anim->started_at + seconds_per_frame * anim->current_frame;
+  f32 now = win32_clock_seconds();
+  if (now - current_step >= seconds_per_frame) {
+    anim->current_frame++;
+    if (anim->current_frame == anim->num_frames) {
+      anim->started_at += seconds_per_frame * anim->current_frame;
+    }
+    anim->current_frame %= anim->num_frames;
+  }
+
+  Atlas_Coords texcoord = anim->coords[anim->current_frame];
   r_push_quad(.pos = e->pos, .scale = texcoord.scale, .atlas_coords = texcoord);
 }
 
@@ -577,7 +602,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
   Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 1.f, 1000.f);
   Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
   Camera cam = {0};
-  f32 cam_zoom = 100.f;
+  f32 cam_zoom = 300.f;
   //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
   //cam.pos = v3(0, -cam_zoom, 1);
   cam.pos = v3(0, cam_zoom+10, -cam_zoom);
@@ -590,7 +615,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
   Entity player = {0};
   player.pos = v3(0,0,0);
   player.idle = get_sprite(sprites, str8_lit("pumpkin_dude_idle_anim"));
+  player.idle.seconds_to_complete = 0.5f;
   player.run  = get_sprite(sprites, str8_lit("pumpkin_dude_run_anim"));
+  player.run.seconds_to_complete = 0.5f;
 
   u64 last = win32_query_clock();
   b32 game_running = true;
@@ -623,6 +650,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     cam.pos = v3add(cam.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
     cam.focus = v3add(cam.focus, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
     player.pos = v3add(player.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
+    player.dir = move_dir;
 
     // Render
     r_prep();
