@@ -79,6 +79,14 @@ v2cross3 (Vec2 a, Vec2 b, Vec2 c) {
 }
 
 core_function f32
+v2angle (Vec2 a, Vec2 b) {
+  f32 dot = v2dot(a, b);
+  f32 mag = v2len(a)*v2len(b);
+
+  return acosf(dot/mag);
+}
+
+core_function f32
 v3len (Vec3 v) {
   return (f32)sqrt(sqr(v.x) + sqr(v.y) + sqr(v.z));
 }
@@ -383,6 +391,11 @@ lerp (f64 v0, f64 v1, f64 t) {
 core_function f64
 norm (f64 x, f64 min, f64 max) {
   return (x-min)/(max-min);
+}
+
+core_function f64
+cnorm (f64 x, f64 min, f64 max) {
+  return clamp(norm(x,min,max),0.0,1.0);
 }
 
 core_function b32

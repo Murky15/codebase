@@ -183,6 +183,7 @@ core_function f32  v2len(Vec2 v);
 core_function f32  v2dot(Vec2 a, Vec2 b);
 core_function f32  v2cross(Vec2 a, Vec2 b);
 core_function f32  v2cross3(Vec2 a, Vec2 b, Vec2 c); // https://en.wikipedia.org/wiki/Cross_product#Computational_geometry
+core_function f32  v2angle(Vec2 a, Vec2 b);
 core_function Vec2 v2sub(Vec2 a, Vec2 b);
 core_function Vec2 v2add(Vec2 a, Vec2 b);
 core_function Vec2 v2muls(Vec2 v, f32 s);
@@ -219,13 +220,12 @@ core_function Mat4 m4perspective(f32 fovy, f32 aspect, f32 znear, f32 zfar);
 core_function Mat4 m4orthographic(f32 width, f32 height, f32 znear, f32 zfar);
 core_function Mat4 m4lookat(Vec3 viewpoint, Vec3 focus, Vec3 reference_up);
 
-//- @note: Quaternions
-
 //- @note: Some float helpers
 core_function f64 fmod_cycling(f64 x, f64 y);
-core_function f64 lerp (f64 v0, f64 v1, f64 t);
-core_function f64 norm (f64 x, f64 min, f64 max);
-core_function b32 almost_equal (f64 a, f64 b);
+core_function f64 lerp(f64 v0, f64 v1, f64 t);
+core_function f64 norm(f64 x, f64 min, f64 max);
+core_function f64 cnorm(f64 x, f64 min, f64 max); // Clamped norm
+core_function b32 almost_equal(f64 a, f64 b);
 
 #undef make_array_type
 #endif // BASE_TYPES_ESSENTIAL_ONLY

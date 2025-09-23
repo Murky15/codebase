@@ -24,6 +24,19 @@
 #define MAX_OBJECTS_ON_SCREEN 4096
 #define PLAYER_MOVE_SPEED 0.15f
 
+typedef u32 Cardinal_Dir;
+enum {
+  NORTH = (1 << 0),
+  SOUTH = (1 << 1),
+  EAST  = (1 << 2),
+  WEST  = (1 << 3),
+
+  NORTHEAST = NORTH | EAST,
+  NORTHWEST = NORTH | WEST,
+  SOUTHEAST = SOUTH | EAST,
+  SOUTHWEST = SOUTH | WEST,
+};
+
 typedef struct Atlas_Coords {
   Vec2 scale;
   Vec2 offset;
@@ -73,10 +86,18 @@ typedef struct Camera {
 } Camera;
 
 typedef struct Entity {
+  // General info
   Vec3 pos;
-  Vec2 dir;
   f32 rotation_angle;
-  f32 rotation_diff;
+
+  // Rotation animation
+  Cardinal_Dir dir;
+  f32 start_angle;
+  f32 end_angle;
+  f32 seconds_to_rotate;
+  f32 started_rotating_at;
+
+  // Sprites
   Sprite idle;
   Sprite run;
 } Entity;
@@ -204,10 +225,10 @@ win32_create_window (HINSTANCE hInstance) {
 function Vec2i
 r_init (HWND hwnd) {
   local_persist read_only struct Vertex quad_vertices[4] = {
-    {{0, 0, 0}, {0, 1}},
-    {{1, 0, 0}, {1, 1}},
-    {{1, 1, 0}, {1, 0}},
-    {{0, 1, 0}, {0, 0}},
+    {{-.5, 0, 0}, {0, 1}},
+    {{.5, 0, 0}, {1, 1}},
+    {{.5, 1, 0}, {1, 0}},
+    {{-.5, 1, 0}, {0, 0}},
   };
   local_persist read_only u32 quad_indices[6] = {0, 1, 2, 2, 3, 0};
 
@@ -484,6 +505,19 @@ r_present (b32 enable_vsync) {
   IDXGISwapChain_Present(swap_chain, enable_vsync, 0);
 }
 
+function Cardinal_Dir
+to_cardinal (Vec2 dir) {
+  Cardinal_Dir result = 0;
+  if (dir.x != 0) {
+    result |= dir.x > 0 ? EAST : WEST;
+  }
+  if (dir.y != 0) {
+    result |= dir.y > 0 ? NORTH : SOUTH;
+  }
+
+  return result;
+}
+
 // These could probably be named better
 function Sprite*
 get_atlas_slot (Texture_Atlas atlas, String8 key) {
@@ -562,7 +596,7 @@ function void
 r_draw_entity (Entity *e) {
   Sprite *anim = &e->run;
   Sprite *prev_anim = &e->idle;
-  if (e->dir.x == 0 && e->dir.y == 0) {
+  if (e->dir == 0) {
     swap(anim, prev_anim);
   }
   if (prev_anim->started_at || anim->started_at == 0) {
@@ -583,8 +617,9 @@ r_draw_entity (Entity *e) {
     anim->current_frame %= anim->num_frames;
   }
 
+  Quat rot = axis_angle(v3(0,1,0), e->rotation_angle);
   Atlas_Coords texcoord = anim->coords[anim->current_frame];
-  r_push_quad(.pos = e->pos, .scale = texcoord.scale, .atlas_coords = texcoord);
+  r_push_quad(.pos = e->pos, .scale = texcoord.scale, .rot = rot, .atlas_coords = texcoord);
 }
 
 int
@@ -599,25 +634,26 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
   f32 render_width = render_dim.width;
   f32 render_height = render_dim.height;
 
-  Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 1.f, 1000.f);
-  Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
-  Camera cam = {0};
-  f32 cam_zoom = 300.f;
-  //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
-  //cam.pos = v3(0, -cam_zoom, 1);
-  cam.pos = v3(0, cam_zoom+10, -cam_zoom);
-  cam.focus = v3(0,0,0);
-  cam.follow_dist = v3sub(cam.pos,cam.focus);
-
   Texture_Atlas sprites = load_textures(perm, str8_lit("W:/assets/rougelike/0x72_DungeonTilesetII_v1.7"));
   r_create_and_bind_texture(sprites.raw_texture_data);
 
   Entity player = {0};
   player.pos = v3(0,0,0);
-  player.idle = get_sprite(sprites, str8_lit("pumpkin_dude_idle_anim"));
+  player.seconds_to_rotate = 0.12f;
+  player.idle = get_sprite(sprites, str8_lit("doc_idle_anim"));
   player.idle.seconds_to_complete = 0.5f;
-  player.run  = get_sprite(sprites, str8_lit("pumpkin_dude_run_anim"));
+  player.run  = get_sprite(sprites, str8_lit("doc_run_anim"));
   player.run.seconds_to_complete = 0.5f;
+
+  Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 1.f, 1000.f);
+  Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
+  Camera cam = {0};
+  f32 cam_zoom = 100.f;
+  //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
+  //cam.pos = v3(0, -cam_zoom, 1);
+  cam.pos = v3(0, cam_zoom, -cam_zoom);
+  cam.focus = v3(0,0,0);
+  cam.follow_dist = v3sub(cam.pos,cam.focus);
 
   u64 last = win32_query_clock();
   b32 game_running = true;
@@ -650,15 +686,40 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     cam.pos = v3add(cam.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
     cam.focus = v3add(cam.focus, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
     player.pos = v3add(player.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
-    player.dir = move_dir;
+
+    // This section is very messy. I'll need to come back to this and clean it up somehow.
+    player.dir = to_cardinal(move_dir);
+    if (player.dir & EAST) {
+      player.end_angle = 0;
+    } else if (player.dir & WEST) {
+      player.end_angle = M_PI32;
+    }
+    if (player.dir & NORTH && player.end_angle == 0) {
+      player.end_angle = 2.f * M_PI32;
+    }
+    if (player.end_angle == 0 && player.rotation_angle == 2.f * M_PI32) {
+      player.rotation_angle = 0;
+    } else if (player.end_angle == 2.f * M_PI32 && player.rotation_angle == 0) {
+      player.rotation_angle = 2.f * M_PI32;
+    }
+
+    if (!almost_equal(player.rotation_angle, player.end_angle)) {
+      if (!player.started_rotating_at) {
+        player.started_rotating_at = win32_clock_seconds();
+      }
+      f64 current_time = win32_clock_seconds();
+      f64 rot_amt = cnorm(current_time, player.started_rotating_at, player.started_rotating_at + player.seconds_to_rotate);
+      player.rotation_angle = lerp(player.start_angle, player.end_angle, rot_amt);
+    } else {
+      player.start_angle = player.end_angle;
+      player.started_rotating_at = 0;
+    }
 
     // Render
     r_prep();
     Mat4 view = m4lookat(cam.pos, cam.focus, v3(0,1,0));
     Mat4 VP = m4mul(proj, view);
 
-    f32 height = 20 * sin(8*win32_clock_seconds());
-    unused(height);
     local_persist Sprite tiles[32 * 32];
     for (u64 y = 0; y < 32; ++y) {
       for (u64 x = 0; x < 32; ++x) {
