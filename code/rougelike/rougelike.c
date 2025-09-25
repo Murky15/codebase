@@ -102,18 +102,18 @@ typedef struct Entity {
   Sprite run;
 } Entity;
 
-ID3D11Device *device;
-ID3D11DeviceContext *ctx;
-IDXGISwapChain *swap_chain;
-ID3D11RenderTargetView *render_target_view;
-ID3D11DepthStencilView *depth_stencil_view;
-ID3D11Buffer *uniforms;
-ID3D11Buffer *instance_buffer;
+global ID3D11Device *device;
+global ID3D11DeviceContext *ctx;
+global IDXGISwapChain *swap_chain;
+global ID3D11RenderTargetView *render_target_view;
+global ID3D11DepthStencilView *depth_stencil_view;
+global ID3D11Buffer *uniforms;
+global ID3D11Buffer *instance_buffer;
 
-Instance_Data quads[MAX_OBJECTS_ON_SCREEN];
-u64 num_quads;
+global Instance_Data quads[MAX_OBJECTS_ON_SCREEN];
+global u64 num_quads;
 
-b32 move_forward, move_back, strafe_left, strafe_right;
+global b32 move_forward, move_back, strafe_left, strafe_right;
 
 function u64
 win32_get_perf_frequency (void) {
@@ -651,7 +651,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
   f32 cam_zoom = 100.f;
   //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
   //cam.pos = v3(0, -cam_zoom, 1);
-  cam.pos = v3(0, cam_zoom, -cam_zoom);
+  cam.pos = v3(0, cam_zoom-40, -cam_zoom);
   cam.focus = v3(0,0,0);
   cam.follow_dist = v3sub(cam.pos,cam.focus);
 

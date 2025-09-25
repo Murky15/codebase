@@ -1,3 +1,5 @@
+#ifndef BASE_TYPES_ESSENTIAL_ONLY
+
 core_function Vec2
 v2 (f32 x, f32 y) {
   return comp_lit(Vec2, {x, y});
@@ -87,6 +89,12 @@ v2angle (Vec2 a, Vec2 b) {
 }
 
 core_function f32
+v2dist (Vec2 a, Vec2 b) {
+  Vec2 diff = v2sub(a,b);
+  return v2len(diff);
+}
+
+core_function f32
 v3len (Vec3 v) {
   return (f32)sqrt(sqr(v.x) + sqr(v.y) + sqr(v.z));
 }
@@ -114,6 +122,12 @@ v3norm (Vec3 v) {
 core_function f32
 v3dot (Vec3 a, Vec3 b) {
   return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+core_function f32
+v3dist (Vec3 a, Vec3 b) {
+  Vec3 diff = v3sub(a,b);
+  return v3len(diff);
 }
 
 core_function Vec3
@@ -403,3 +417,5 @@ almost_equal (f64 a, f64 b) {
   local_persist read_only f64 e = 0.0001f;
   return fabs(a - b) <= e;
 }
+
+#endif // BASE_TYPES_ESSENTIAL_ONLY

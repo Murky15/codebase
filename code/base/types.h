@@ -57,40 +57,6 @@ make_array_type(u64);
 make_array_type(f32);
 make_array_type(f64);
 
-// @todo: Make array type constructors
-
-//- @note: Tangible types
-typedef union Color {
-  struct {u8 r, g, b, a;};
-  u32 packed;
-} Color;
-
-// @todo: Maybe add functionality for defining per-project "color-pallettes"?
-#define colors \
-color(Black,   0,   0,   0)   \
-color(White,   255, 255, 255) \
-color(Red,     255, 0,   0)   \
-color(Lime,    0,   255, 0)   \
-color(Blue,    0,   0,   255) \
-color(Yellow,  255, 255, 0)   \
-color(Cyan,    0,   255, 255) \
-color(Magenta, 255, 0,   255) \
-color(Silver,  192, 192, 192) \
-color(Gray,    128, 128, 128) \
-color(Maroon,  128, 0,   0)   \
-color(Olive,   128, 128, 0)   \
-color(Green,   0,   128, 0)   \
-color(Purple,  128, 0,   128) \
-color(Teal,    0,   128, 128) \
-color(Navy,    0,   0,   128) \
-
-
-
-#define color(name, r, g, b) read_only Color glue(Color_,name) = {r,g,b,255};
-colors
-#undef color
-#undef colors
-
 #include <math.h>
 
 //- @note: Math types
@@ -184,6 +150,7 @@ core_function f32  v2dot(Vec2 a, Vec2 b);
 core_function f32  v2cross(Vec2 a, Vec2 b);
 core_function f32  v2cross3(Vec2 a, Vec2 b, Vec2 c); // https://en.wikipedia.org/wiki/Cross_product#Computational_geometry
 core_function f32  v2angle(Vec2 a, Vec2 b);
+core_function f32  v2dist(Vec2 a, Vec2 b);
 core_function Vec2 v2sub(Vec2 a, Vec2 b);
 core_function Vec2 v2add(Vec2 a, Vec2 b);
 core_function Vec2 v2muls(Vec2 v, f32 s);
@@ -191,6 +158,7 @@ core_function Vec2 v2norm(Vec2 v);
 
 core_function f32  v3len(Vec3 v);
 core_function f32  v3dot(Vec3 a, Vec3 b);
+core_function f32  v3dist(Vec3 a, Vec3 b);
 core_function Vec3 v3sub(Vec3 a, Vec3 b);
 core_function Vec3 v3add(Vec3 a, Vec3 b);
 core_function Vec3 v3muls(Vec3 v, f32 s);

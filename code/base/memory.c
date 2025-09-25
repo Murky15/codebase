@@ -3,6 +3,7 @@
 #if OS_WINDOWS
 # undef function
 
+// This is stupid
 # ifdef BASE_MEMORY_MINIMAL
 extern void *VirtualAlloc(void*,size_t,u32,u32);
 extern bool VirtualFree(void*,size_t,u32);
