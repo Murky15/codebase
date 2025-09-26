@@ -42,7 +42,6 @@ function b32
 edges_are_equal (Edge a, Edge b) {
   return ((a.p0.x == b.p0.x) && (a.p0.y == b.p0.y) && (a.p1.x == b.p1.x) && (a.p1.y == b.p1.y)) ||
     ((a.p0.x == b.p1.x) && (a.p0.y == b.p1.y) && (a.p1.x == b.p0.x) && (a.p1.y == b.p0.y));
-    //((a.p1.x == b.p0.x) && (a.p1.y == b.p0.y) && (a.p0.x == b.p1.x) && (a.p0.y == b.p1.y));
 }
 
 function void
@@ -110,9 +109,9 @@ v2raylib (Vec2 v) {
 int
 main (void) {
   InitWindow(window_width, window_height, "Procedural dungeon generation workshop");
-  srand(0);
+  srand(5);
 
-  Vec2 test_points[15];
+  Vec2 test_points[50];
   for (u64 i = 0; i < array_count(test_points); ++i) {
     test_points[i].x = rand() % window_width;
     test_points[i].y = rand() % window_height;
@@ -122,7 +121,7 @@ main (void) {
   Temp_Arena scratch;
   ldefer(scratch=get_scratch(0,0),release_scratch(scratch)) {
     Triangle_Mesh delaunay = {0};
-    Triangle super = make_triangle(v2(-1000, -1000), v2(0, 1000), v2(1000, -1000));
+    Triangle super = make_triangle(v2(-10000, -10000), v2(0, 10000), v2(10000, -10000));
     mesh_push_triangle(scratch.arena, &delaunay, super);
     for (u64 i = 0; i < array_count(test_points); ++i) {
       Vec2 p = test_points[i];
