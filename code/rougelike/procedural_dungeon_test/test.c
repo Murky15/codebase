@@ -11,13 +11,21 @@
   too specialized to conviniently display this. Oops.
 */
 
-typedef Vec2 Edge[2];
+typedef struct Edge {
+  struct Edge *next;
+  Vec2 p0, p1;
+} Edge;
+
+typedef struct Polygon {
+  Edge *first, *last;
+  u64 count;
+} Polygon;
 
 typedef struct Triangle {
   struct Triangle *next;
-  u64 gen;
   b32 marked_for_delete;
   Vec2 p[3];
+  Edge e[3];
 
   Vec2 circum_center;
   f32  circum_radius;
@@ -28,7 +36,24 @@ typedef struct Triangle_Mesh {
   u64 count;
 } Triangle_Mesh;
 
-global u32 window_width = 1280, window_height = 720;
+global u64 window_width = 1280, window_height = 720;
+
+function b32
+edges_are_equal (Edge a, Edge b) {
+  return ((a.p0.x == b.p0.x) && (a.p0.y == b.p0.y) && (a.p1.x == b.p1.x) && (a.p1.y == b.p1.y)) ||
+    ((a.p0.x == b.p1.x) && (a.p0.y == b.p1.y) && (a.p1.x == b.p0.x) && (a.p1.y == b.p0.y));
+    //((a.p1.x == b.p0.x) && (a.p1.y == b.p0.y) && (a.p0.x == b.p1.x) && (a.p0.y == b.p1.y));
+}
+
+function void
+polygon_push_triangle_edges (Arena *arena, Polygon *p, Triangle triangle) {
+  Edge *newly_added_edges = arena_pushn(arena, Edge, 3);
+  memory_copy(newly_added_edges, triangle.e, sizeof(triangle.e));
+  sll_queue_push(p->first, p->last, &newly_added_edges[0]);
+  sll_queue_push(p->first, p->last, &newly_added_edges[1]);
+  sll_queue_push(p->first, p->last, &newly_added_edges[2]);
+  p->count += 3;
+}
 
 function void
 mesh_push_triangle (Arena *arena, Triangle_Mesh *mesh, Triangle triangle) {
@@ -38,12 +63,28 @@ mesh_push_triangle (Arena *arena, Triangle_Mesh *mesh, Triangle triangle) {
   mesh->count++;
 }
 
+function b32
+shared_vertex (Triangle a, Triangle b) {
+  for (u64 i = 0; i < 3; ++i) {
+    for (u64 j = 0; j < 3; ++j) {
+      if (a.p[i].x == b.p[j].x && a.p[i].y == b.p[j].y) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 function Triangle
 make_triangle (Vec2 p0, Vec2 p1, Vec2 p2) {
   Triangle result = {0};
   result.p[0] = p0;
   result.p[1] = p1;
   result.p[2] = p2;
+  result.e[0] = (Edge){.p0=p0, .p1=p1};
+  result.e[1] = (Edge){.p0=p1, .p1=p2};
+  result.e[2] = (Edge){.p0=p2, .p1=p0};
 
   Vec2 A = v2(0,0);
   Vec2 B = v2sub(p1, p0);
@@ -61,13 +102,18 @@ make_triangle (Vec2 p0, Vec2 p1, Vec2 p2) {
   return result;
 }
 
+function Vector2
+v2raylib (Vec2 v) {
+  return (Vector2){v.x, v.y};
+}
+
 int
 main (void) {
   InitWindow(window_width, window_height, "Procedural dungeon generation workshop");
   srand(0);
 
   Vec2 test_points[15];
-  for (u32 i = 0; i < array_count(test_points); ++i) {
+  for (u64 i = 0; i < array_count(test_points); ++i) {
     test_points[i].x = rand() % window_width;
     test_points[i].y = rand() % window_height;
   }
@@ -78,38 +124,54 @@ main (void) {
     Triangle_Mesh delaunay = {0};
     Triangle super = make_triangle(v2(-1000, -1000), v2(0, 1000), v2(1000, -1000));
     mesh_push_triangle(scratch.arena, &delaunay, super);
-    for (u32 i = 0; i < array_count(test_points); ++i) {
+    for (u64 i = 0; i < array_count(test_points); ++i) {
       Vec2 p = test_points[i];
-      Triangle_Mesh bad_triangles = {0};
+      Polygon edges = {0};
       foreach (triangle, &delaunay) {
         if (!triangle->marked_for_delete) {
           f32 dist = v2dist(p, triangle->circum_center);
-          if (dist <= triangle->circum_radius) {
+          if (dist < triangle->circum_radius) {
             triangle->marked_for_delete = true;
-            triangle->gen = i;
-            mesh_push_triangle(scratch.arena, &bad_triangles, *triangle);
+            polygon_push_triangle_edges(scratch.arena, &edges, *triangle);
           }
         }
       }
-
-      // @todo: Should I extend Temp_Arenas to be more robust for "pocket array" patterns like these?
-      u64 restore;
-      ldefer(restore=arena_pos(scratch.arena),arena_pop_to(scratch.arena,restore)) {
-        Edge *polygon = arena_pushn(scratch.arena, Edge, 0);
-
+      foreach (e1, &edges) {
+        b32 is_unique = true;
+        foreach (e2, &edges) {
+          if (e1 != e2 && edges_are_equal(*e1, *e2)) {
+            is_unique = false;
+            break;
+          }
+        }
+        if (is_unique) {
+          Triangle new_triangle = make_triangle(p, e1->p0, e1->p1);
+          mesh_push_triangle(scratch.arena, &delaunay, new_triangle);
+        }
       }
     }
-  }
-
-  while (!WindowShouldClose())
-  {
-    BeginDrawing();
-    ClearBackground(RAYWHITE);
-    for (u32 i = 0; i < array_count(test_points); ++i) {
-      DrawCircle(test_points[i].x, test_points[i].y, 5.f, GRAY);
+    foreach (triangle, &delaunay) {
+      if (!triangle->marked_for_delete && shared_vertex(*triangle, super)) {
+        triangle->marked_for_delete = true;
+      }
     }
-    EndDrawing();
-  }
+
+
+    while (!WindowShouldClose())
+    {
+      BeginDrawing();
+      ClearBackground(RAYWHITE);
+      foreach (triangle, &delaunay) {
+        if (!triangle->marked_for_delete) {
+          DrawTriangleLines(v2raylib(triangle->p[0]), v2raylib(triangle->p[1]), v2raylib(triangle->p[2]), GREEN);
+        }
+      }
+      for (u64 i = 0; i < array_count(test_points); ++i) {
+        DrawCircle(test_points[i].x, test_points[i].y, 5.f, GRAY);
+      }
+      EndDrawing();
+    }
+  } // Stick around
 
   CloseWindow();
   return 0;

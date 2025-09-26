@@ -140,14 +140,8 @@
 #include <string.h>
 #define memory_zero(p,s) memset((p), 0, (s))
 #define memory_init(p,s,v) memset((p), v, (s))
-#define memory_zero_struct(p) memory_zero((p), sizeof(*(p)))
-#define memory_zero_array(a) memory_zero((a), sizeof(a))
-#define memory_zero_typed(p,c) memory_zero((p), sizeof(*(p)*(c)))
 #define memory_match(a,b,s) (memcmp((a),(b),(s)) == 0)
 #define memory_copy(d,s,sz) memmove((d),(s),(sz))
-#define memory_copy_struct(d,s) memory_copy((d),(s),min(sizeof(*(d)),sizeof(*(s))))
-#define memory_copy_array(d,s) memory_copy((d),(s),min(sizeof(d),sizeof(s)))
-#define memory_copy_typed(d,s,c) memory_copy((d),(s),min(sizeof(*(d)),sizeof(*(s)))*(c))
 
 //- @note: Syntax helpers
 
