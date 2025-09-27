@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 #include "raylib.h"
 
 #define BASE_MEMORY_MINIMAL
@@ -9,6 +10,13 @@
 /*
   Simple workshop for building a dungeon generation algorithm b/c my D3D11 renderer is still in its infancy and
   too specialized to conviniently display this. Oops.
+
+  Next up:
+  https://en.wikipedia.org/wiki/Prim%27s_algorithm
+
+  For when I go 3D, here are some links relating to extending the bowyer-watson algorithm:
+  https://en.wikipedia.org/wiki/Tetrahedron# (Circumradius & circumcenter for the circumsphere are defined in this article)
+
 */
 
 typedef struct Edge {
@@ -101,30 +109,16 @@ make_triangle (Vec2 p0, Vec2 p1, Vec2 p2) {
   return result;
 }
 
-function Vector2
-v2raylib (Vec2 v) {
-  return (Vector2){v.x, v.y};
-}
+function Triangle_Mesh
+bowyer_watson_triangulate (Arena *arena, Vec2 *points, u64 num_points, Triangle super) { // I don't want the user to have to calculate the super triangle
+  Triangle_Mesh result = {0};
 
-int
-main (void) {
-  InitWindow(window_width, window_height, "Procedural dungeon generation workshop");
-  srand(5);
-
-  Vec2 test_points[50];
-  for (u64 i = 0; i < array_count(test_points); ++i) {
-    test_points[i].x = rand() % window_width;
-    test_points[i].y = rand() % window_height;
-  }
-
-  // Bowyer-Watson implementation
   Temp_Arena scratch;
-  ldefer(scratch=get_scratch(0,0),release_scratch(scratch)) {
+  ldefer(scratch=get_scratch(&arena,1),release_scratch(scratch)) {
     Triangle_Mesh delaunay = {0};
-    Triangle super = make_triangle(v2(-10000, -10000), v2(0, 10000), v2(10000, -10000));
     mesh_push_triangle(scratch.arena, &delaunay, super);
-    for (u64 i = 0; i < array_count(test_points); ++i) {
-      Vec2 p = test_points[i];
+    for (u64 i = 0; i < num_points; ++i) {
+      Vec2 p = points[i];
       Polygon edges = {0};
       foreach (triangle, &delaunay) {
         if (!triangle->marked_for_delete) {
@@ -149,28 +143,50 @@ main (void) {
         }
       }
     }
+
     foreach (triangle, &delaunay) {
-      if (!triangle->marked_for_delete && shared_vertex(*triangle, super)) {
-        triangle->marked_for_delete = true;
+      if (!triangle->marked_for_delete && !shared_vertex(*triangle, super)) {
+        mesh_push_triangle(arena, &result, *triangle);
       }
     }
+  }
 
+  return result;
+}
 
-    while (!WindowShouldClose())
-    {
-      BeginDrawing();
-      ClearBackground(RAYWHITE);
-      foreach (triangle, &delaunay) {
-        if (!triangle->marked_for_delete) {
-          DrawTriangleLines(v2raylib(triangle->p[0]), v2raylib(triangle->p[1]), v2raylib(triangle->p[2]), GREEN);
-        }
-      }
-      for (u64 i = 0; i < array_count(test_points); ++i) {
-        DrawCircle(test_points[i].x, test_points[i].y, 5.f, GRAY);
-      }
-      EndDrawing();
+function Vector2
+v2raylib (Vec2 v) {
+  return (Vector2){v.x, v.y};
+}
+
+int
+main (void) {
+  InitWindow(window_width, window_height, "Procedural dungeon generation workshop");
+  srand(time(0));
+
+  Arena *arena = arena_alloc();
+
+  Vec2 test_points[50];
+  for (u64 i = 0; i < array_count(test_points); ++i) {
+    test_points[i].x = rand() % window_width;
+    test_points[i].y = rand() % window_height;
+  }
+
+  Triangle super = make_triangle(v2(-10000, -10000), v2(0, 10000), v2(10000, -10000));
+  Triangle_Mesh bw_result = bowyer_watson_triangulate(arena, test_points, array_count(test_points), super);
+
+  while (!WindowShouldClose())
+  {
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+    foreach (triangle, &bw_result) {
+      DrawTriangleLines(v2raylib(triangle->p[0]), v2raylib(triangle->p[1]), v2raylib(triangle->p[2]), GREEN);
     }
-  } // Stick around
+    for (u64 i = 0; i < array_count(test_points); ++i) {
+      DrawCircle(test_points[i].x, test_points[i].y, 5.f, GRAY);
+    }
+    EndDrawing();
+  }
 
   CloseWindow();
   return 0;
