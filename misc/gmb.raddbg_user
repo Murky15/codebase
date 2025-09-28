@@ -15,12 +15,7 @@ window:
       0.25: watch: selected expression: "query:types"
       0.25:
       {
-        watch:
-        {
-          expression: "query:threads"
-          selected
-        }
-        watch: expression: "query:targets"
+        watch: selected expression: "query:threads"
         watch: expression: "query:breakpoints"
         watch: expression: "query:watch_pins"
       }
@@ -47,35 +42,29 @@ window:
     0.483263: selected getting_started text:
     {
       selected
-      expression: "file:\"W:/code/rougelike/rougelike.c\".data"
+      expression: "file:\"W:/code/rougelike/procedural_dungeon_test/test.c\".data"
       auto: 1
       query: input: ""
-      cursor_line: 571
+      cursor_line: 264
       cursor_column: 1
-      mark_line: 571
+      mark_line: 264
       mark_column: 1
     }
     0.350070:
     {
-      watch: selected expression: "query:locals"
-      watch:
+      0.647769:
       {
-        expression: ""
-        watch: sprites
-        normal: 0.350000 0.339024 0.310976
-        watch: "sprites.sprites"
-        watch: "sprites.raw_texture_data.pixels"
+        watch: expression: "query:locals"
+        watch:
+        {
+          selected
+          expression: ""
+          normal: 0.350000 0.339024 0.310976
+          watch: vertices
+        }
+        watch: expression: "query:type_views"
       }
-      watch: expression: "query:type_views"
-      bitmap:
-      {
-        zoom: 0.866690f
-        x: -2.845748f
-        y: -54.299007f
-        expression: "sprites.raw_texture_data.pixels"
-        w: "sprites.raw_texture_data.width"
-        h: "sprites.raw_texture_data.height"
-      }
+      0.352231: watch: selected expression: "query:targets"
     }
   }
   split_x

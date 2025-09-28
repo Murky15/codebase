@@ -24,25 +24,47 @@ typedef struct Edge {
   Vec2 p0, p1;
 } Edge;
 
-typedef struct Polygon {
+typedef struct Edge_List {
   Edge *first, *last;
   u64 count;
-} Polygon;
+} Edge_List, Polygon;
 
 typedef struct Triangle {
   struct Triangle *next;
-  b32 marked_for_delete;
-  Vec2 p[3];
   Edge e[3];
+  Vec2 p[3];
 
   Vec2 circum_center;
   f32  circum_radius;
+
+  b32 marked_for_delete;
 } Triangle;
 
 typedef struct Triangle_Mesh {
   Triangle *first, *last;
   u64 count;
 } Triangle_Mesh;
+
+typedef struct Vertex Vertex;
+
+typedef struct Vertex_Node {
+  struct Vertex_Node *next;
+  Vertex *v;
+} Vertex_Node;
+
+typedef struct Vertex_Neighborhood {
+  Vertex_Node *first, *last;
+  Vertex *cheapest_connection;
+  u64 count;
+} Vertex_Neighborhood;
+
+struct Vertex {
+  b32 slot_filled;
+  b32 explored;
+  Vec2 p;
+  f32 cheapest_cost;
+  Vertex_Neighborhood neighbors;
+};
 
 global u64 window_width = 1280, window_height = 720;
 
@@ -159,6 +181,53 @@ v2raylib (Vec2 v) {
   return (Vector2){v.x, v.y};
 }
 
+function u64
+v2hash (Vec2 v) {
+  u64 l = (u32)v.x;
+  u64 h = (u32)v.y;
+  return (u64)((h << 32) | l);
+}
+
+function Vertex*
+get_vertex (Vertex *vertices, u64 num_vertices, Vec2 v) {
+  Vertex *result = 0;
+  u64 hash = v2hash(v) % num_vertices;
+  while (true) {
+    result = &vertices[hash];
+    if ((result->p.x == v.x && result->p.y == v.y) || (result->slot_filled == false)) {
+      break;
+    }
+    hash = (hash + 1) % num_vertices;
+  }
+
+  return result;
+}
+
+function void
+push_vertex_if_unique (Arena *arena, Vertex_Neighborhood *n, Vertex *v) {
+  b32 unique = true;
+  foreach (neighbor, n) {
+    if (neighbor->v == v) {
+      unique = false;
+      break;
+    }
+  }
+  if (unique) {
+    Vertex_Node *node = arena_pushn(arena, Vertex_Node, 1);
+    node->v = v;
+    sll_queue_push(n->first, n->last, node);
+    n->count++;
+  }
+}
+
+function void
+push_edge (Arena *arena, Edge_List *edges, Edge e) {
+  Edge *node = arena_pushn(arena, Edge, 1);
+  *node = e;
+  sll_queue_push(edges->first, edges->last, node);
+  edges->count++;
+}
+
 int
 main (void) {
   InitWindow(window_width, window_height, "Procedural dungeon generation workshop");
@@ -166,14 +235,77 @@ main (void) {
 
   Arena *arena = arena_alloc();
 
-  Vec2 test_points[50];
-  for (u64 i = 0; i < array_count(test_points); ++i) {
+  Vec2 test_points[10];
+  u64 num_points = array_count(test_points);
+  for (u64 i = 0; i < num_points; ++i) {
     test_points[i].x = rand() % window_width;
     test_points[i].y = rand() % window_height;
   }
 
   Triangle super = make_triangle(v2(-10000, -10000), v2(0, 10000), v2(10000, -10000));
-  Triangle_Mesh bw_result = bowyer_watson_triangulate(arena, test_points, array_count(test_points), super);
+  Triangle_Mesh bw_result = bowyer_watson_triangulate(arena, test_points, num_points, super);
+  // Prim's algorithm
+  Edge_List mst = {0};
+  Vertex *vertices; // @todo: For debugging convenience, move this back.
+  Temp_Arena scratch;
+  ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+    // Transform Delaunay triangulation data to suit our needs
+    vertices = arena_pushn(scratch.arena, Vertex, num_points);
+    for (u64 i = 0; i < num_points; ++i) {
+      Vec2 p = test_points[i];
+      Vertex *v = get_vertex(vertices, num_points, p);
+      v->slot_filled = true;
+      v->p = p;
+      v->cheapest_cost = INFINITY;
+    }
+    foreach (triangle, &bw_result) {
+      Vertex *v0 = get_vertex(vertices, num_points, triangle->p[0]);
+      Vertex *v1 = get_vertex(vertices, num_points, triangle->p[1]);
+      Vertex *v2 = get_vertex(vertices, num_points, triangle->p[2]);
+      Vertex *cycle[3] = {v0, v1, v2};
+      for (u64 i = 0; i < 3; ++i) {
+        push_vertex_if_unique(scratch.arena, &cycle[i]->neighbors, cycle[(i+1)%3]);
+        push_vertex_if_unique(scratch.arena, &cycle[i]->neighbors, cycle[(i+2)%3]);
+      }
+    }
+
+    // Begin algorithm
+    vertices[0].cheapest_cost = 0;
+    u64 processed_vertices = 0;
+    while (processed_vertices < num_points) {
+      u64 next_vertex = 0;
+      f32 cheapest_cost = INFINITY;
+      for (u64 i = 0; i < num_points; ++i) {
+        if (!vertices[i].explored && vertices[i].cheapest_cost < cheapest_cost) {
+          next_vertex = i;
+          cheapest_cost = vertices[i].cheapest_cost;
+        }
+      }
+
+      Vertex *v = &vertices[next_vertex];
+      v->explored = true;
+      processed_vertices++;
+
+      foreach (neighbor, &v->neighbors) {
+        Vertex *n = neighbor->v;
+        if (!n->explored) {
+          f32 cost = v2dist(v->p, n->p);
+          if (cost < n->cheapest_cost) {
+            n->cheapest_cost = cost;
+            n->neighbors.cheapest_connection = v;
+          }
+        }
+      }
+    }
+
+    for (u64 i = 0; i < num_points; ++i) {
+      Vertex *vertex = &vertices[i];
+      Vertex *closest = vertex->neighbors.cheapest_connection;
+      if (closest != 0) {
+        push_edge(arena, &mst, (Edge){.p0=vertex->p, .p1=closest->p});
+      }
+    }
+  }
 
   while (!WindowShouldClose())
   {
@@ -182,7 +314,10 @@ main (void) {
     foreach (triangle, &bw_result) {
       DrawTriangleLines(v2raylib(triangle->p[0]), v2raylib(triangle->p[1]), v2raylib(triangle->p[2]), GREEN);
     }
-    for (u64 i = 0; i < array_count(test_points); ++i) {
+    foreach (edge, &mst) {
+      DrawLineV(v2raylib(edge->p0), v2raylib(edge->p1), RED);
+    }
+    for (u64 i = 0; i < num_points; ++i) {
       DrawCircle(test_points[i].x, test_points[i].y, 5.f, GRAY);
     }
     EndDrawing();
