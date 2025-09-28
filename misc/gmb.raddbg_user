@@ -70,7 +70,6 @@ window:
   split_x
   pos: 484 312
   monitor: "\\\\.\\DISPLAY1"
-  maximized
 }
 keybindings:
 {

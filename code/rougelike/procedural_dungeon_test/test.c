@@ -11,9 +11,6 @@
   Simple workshop for building a dungeon generation algorithm b/c my D3D11 renderer is still in its infancy and
   too specialized to conviniently display this. Oops.
 
-  Next up:
-  https://en.wikipedia.org/wiki/Prim%27s_algorithm
-
   For when I go 3D, here are some links relating to extending the bowyer-watson algorithm:
   https://en.wikipedia.org/wiki/Tetrahedron# (Circumradius & circumcenter for the circumsphere are defined in this article)
 
@@ -228,31 +225,16 @@ push_edge (Arena *arena, Edge_List *edges, Edge e) {
   edges->count++;
 }
 
-int
-main (void) {
-  InitWindow(window_width, window_height, "Procedural dungeon generation workshop");
-  srand(time(0));
+function Edge_List
+prim_mst (Arena *arena, Triangle_Mesh bw_result, Vec2 *points, u64 num_points) {
+  Edge_List result = {0};
 
-  Arena *arena = arena_alloc();
-
-  Vec2 test_points[10];
-  u64 num_points = array_count(test_points);
-  for (u64 i = 0; i < num_points; ++i) {
-    test_points[i].x = rand() % window_width;
-    test_points[i].y = rand() % window_height;
-  }
-
-  Triangle super = make_triangle(v2(-10000, -10000), v2(0, 10000), v2(10000, -10000));
-  Triangle_Mesh bw_result = bowyer_watson_triangulate(arena, test_points, num_points, super);
-  // Prim's algorithm
-  Edge_List mst = {0};
-  Vertex *vertices; // @todo: For debugging convenience, move this back.
   Temp_Arena scratch;
   ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
     // Transform Delaunay triangulation data to suit our needs
-    vertices = arena_pushn(scratch.arena, Vertex, num_points);
+    Vertex *vertices = arena_pushn(scratch.arena, Vertex, num_points);
     for (u64 i = 0; i < num_points; ++i) {
-      Vec2 p = test_points[i];
+      Vec2 p = points[i];
       Vertex *v = get_vertex(vertices, num_points, p);
       v->slot_filled = true;
       v->p = p;
@@ -302,10 +284,31 @@ main (void) {
       Vertex *vertex = &vertices[i];
       Vertex *closest = vertex->neighbors.cheapest_connection;
       if (closest != 0) {
-        push_edge(arena, &mst, (Edge){.p0=vertex->p, .p1=closest->p});
+        push_edge(arena, &result, (Edge){.p0=vertex->p, .p1=closest->p});
       }
     }
   }
+
+  return result;
+}
+
+int
+main (void) {
+  InitWindow(window_width, window_height, "Procedural dungeon generation workshop");
+  srand(time(0));
+
+  Arena *arena = arena_alloc();
+
+  Vec2 test_points[50];
+  u64 num_points = array_count(test_points);
+  for (u64 i = 0; i < num_points; ++i) {
+    test_points[i].x = rand() % window_width;
+    test_points[i].y = rand() % window_height;
+  }
+
+  Triangle super = make_triangle(v2(-10000, -10000), v2(0, 10000), v2(10000, -10000));
+  Triangle_Mesh bw_result = bowyer_watson_triangulate(arena, test_points, num_points, super);
+  Edge_List mst = prim_mst(arena, bw_result, test_points, num_points);
 
   while (!WindowShouldClose())
   {
