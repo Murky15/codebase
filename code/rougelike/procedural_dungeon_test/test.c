@@ -245,7 +245,7 @@ push_vertex_if_unique (Arena *arena, Vertex_Neighborhood *n, Vertex *v) {
 }
 
 function Edge_List
-prim_mst (Arena *arena, Edge_List bw_result, Vec2 *points, u64 num_points) {
+prim_mst (Arena *arena, Edge_List bw_result, u64 num_points) {
   Edge_List result = {0};
 
   Temp_Arena scratch;
@@ -326,7 +326,7 @@ main (void) {
 
   Triangle super = make_triangle(v2(-10000, -10000), v2(0, 10000), v2(10000, -10000));
   Edge_List bw_result = bowyer_watson_triangulate(arena, test_points, num_points, super);
-  Edge_List mst = prim_mst(arena, bw_result, test_points, num_points);
+  Edge_List mst = prim_mst(arena, bw_result, num_points);
 
   while (!WindowShouldClose())
   {
