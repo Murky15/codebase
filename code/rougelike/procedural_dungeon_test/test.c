@@ -9,14 +9,12 @@
 #include "../../base/include.h"
 #include "../../base/include.c"
 
-
 /*
   Simple workshop for building a dungeon generation algorithm b/c my D3D11 renderer is still in its infancy and
   too specialized to conviniently display this. Oops.
 
   For when I go 3D, here are some links relating to extending the bowyer-watson algorithm:
   https://en.wikipedia.org/wiki/Tetrahedron# (Circumradius & circumcenter for the circumsphere are defined in this article)
-
 */
 
 typedef struct Edge {
@@ -317,6 +315,9 @@ main (void) {
 
   Arena *arena = arena_alloc();
 
+  Camera2D cam = {0};
+  cam.zoom = 1.f;
+
   Vec2 test_points[50];
   u64 num_points = array_count(test_points);
   for (u64 i = 0; i < num_points; ++i) {
@@ -330,7 +331,26 @@ main (void) {
 
   while (!WindowShouldClose())
   {
+    Vector2 mouse_world_pos = GetScreenToWorld2D(GetMousePosition(), cam);
+
+    if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT))
+    {
+      Vec2 delta = v2(GetMouseDelta().x, GetMouseDelta().y);
+      delta = v2muls(delta, -1.0f/cam.zoom);
+      cam.target = v2raylib(v2add(v2(cam.target.x, cam.target.y), delta));
+    }
+
+    f32 wheel = GetMouseWheelMove();
+    if (wheel != 0)
+    {
+      cam.offset = GetMousePosition();
+      cam.target = mouse_world_pos;
+      f32 scale = 0.2f*wheel;
+      cam.zoom = clamp(expf(logf(cam.zoom)+scale), 0.1f, 64);
+    }
+
     BeginDrawing();
+    BeginMode2D(cam);
     ClearBackground(RAYWHITE);
     foreach (edge, &bw_result) {
       DrawLineV(v2raylib(edge->p0), v2raylib(edge->p1), GREEN);
@@ -341,8 +361,9 @@ main (void) {
     }
 
     for (u64 i = 0; i < num_points; ++i) {
-      DrawCircle(test_points[i].x, test_points[i].y, 5.f, GRAY);
+      DrawCircle(test_points[i].x, test_points[i].y, 5.f/cam.zoom, GRAY);
     }
+    EndMode2D();
     EndDrawing();
   }
 

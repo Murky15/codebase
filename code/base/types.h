@@ -145,6 +145,8 @@ core_function Vec3i v3i_from_v3(Vec3 v);
 core_function Vec3  pv2(Vec2 v, f32 z); // promote v2
 
 //- @note: Vectors
+core_function b32  v2exact(Vec2 a, Vec2 b);
+core_function b32  v2approx(Vec2 a, Vec2 b);
 core_function f32  v2len(Vec2 v);
 core_function f32  v2dot(Vec2 a, Vec2 b);
 core_function f32  v2cross(Vec2 a, Vec2 b);
@@ -156,6 +158,8 @@ core_function Vec2 v2add(Vec2 a, Vec2 b);
 core_function Vec2 v2muls(Vec2 v, f32 s);
 core_function Vec2 v2norm(Vec2 v);
 
+core_function b32  v3exact(Vec3 a, Vec3 b);
+core_function b32  v3approx(Vec3 a, Vec3 b);
 core_function f32  v3len(Vec3 v);
 core_function f32  v3dot(Vec3 a, Vec3 b);
 core_function f32  v3dist(Vec3 a, Vec3 b);

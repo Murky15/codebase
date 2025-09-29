@@ -40,6 +40,16 @@ pv2 (Vec2 v, f32 z) {
   return v3(v.x, v.y, z);
 }
 
+core_function b32
+v2exact (Vec2 a, Vec2 b) {
+  return (a.x == b.x) && (a.y == b.y);
+}
+
+core_function b32
+v2approx (Vec2 a, Vec2 b) {
+  return almost_equal(a.x, b.x) && almost_equal(a.y, b.y);
+}
+
 core_function f32
 v2len (Vec2 v) {
   return (f32)sqrt(sqr(v.x) + sqr(v.y));
@@ -92,6 +102,16 @@ core_function f32
 v2dist (Vec2 a, Vec2 b) {
   Vec2 diff = v2sub(a,b);
   return v2len(diff);
+}
+
+core_function b32
+v3exact (Vec3 a, Vec3 b) {
+  return (a.x == b.x) && (a.y == b.y) && (a.z == b.z);
+}
+
+core_function b32
+v3approx (Vec3 a, Vec3 b) {
+  return almost_equal(a.x, b.x) && almost_equal(a.y, b.y) && almost_equal(a.z, b.z);
 }
 
 core_function f32
