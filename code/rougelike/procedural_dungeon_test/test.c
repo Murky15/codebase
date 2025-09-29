@@ -1,11 +1,14 @@
+#pragma comment(lib, "raylib")
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
-#include "raylib.h"
+#include "raylib/include/raylib.h"
 
 #define BASE_MEMORY_MINIMAL
-#include "base/include.h"
-#include "base/include.c"
+#include "../../base/include.h"
+#include "../../base/include.c"
+
 
 /*
   Simple workshop for building a dungeon generation algorithm b/c my D3D11 renderer is still in its infancy and
@@ -65,6 +68,11 @@ struct Vertex {
 
 global u64 window_width = 1280, window_height = 720;
 
+function Vector2
+v2raylib (Vec2 v) {
+  return (Vector2){v.x, v.y};
+}
+
 function b32
 edges_are_equal (Edge a, Edge b) {
   return ((a.p0.x == b.p0.x) && (a.p0.y == b.p0.y) && (a.p1.x == b.p1.x) && (a.p1.y == b.p1.y)) ||
@@ -79,6 +87,28 @@ polygon_push_triangle_edges (Arena *arena, Polygon *p, Triangle triangle) {
   sll_queue_push(p->first, p->last, &newly_added_edges[1]);
   sll_queue_push(p->first, p->last, &newly_added_edges[2]);
   p->count += 3;
+}
+
+function void
+push_edge (Arena *arena, Edge_List *edges, Edge e) {
+  Edge *node = arena_pushn(arena, Edge, 1);
+  *node = e;
+  sll_queue_push(edges->first, edges->last, node);
+  edges->count++;
+}
+
+function void
+push_edge_if_unique (Arena *arena, Edge_List *edges, Edge e) {
+  b32 unique = true;
+  foreach (edge, edges) {
+    if (edges_are_equal(e, *edge)) {
+      unique = false;
+      break;
+    }
+  }
+  if (unique) {
+    push_edge(arena, edges, e);
+  }
 }
 
 function void
@@ -128,9 +158,9 @@ make_triangle (Vec2 p0, Vec2 p1, Vec2 p2) {
   return result;
 }
 
-function Triangle_Mesh
+function Edge_List
 bowyer_watson_triangulate (Arena *arena, Vec2 *points, u64 num_points, Triangle super) { // I don't want the user to have to calculate the super triangle
-  Triangle_Mesh result = {0};
+  Edge_List result = {0};
 
   Temp_Arena scratch;
   ldefer(scratch=get_scratch(&arena,1),release_scratch(scratch)) {
@@ -165,17 +195,14 @@ bowyer_watson_triangulate (Arena *arena, Vec2 *points, u64 num_points, Triangle 
 
     foreach (triangle, &delaunay) {
       if (!triangle->marked_for_delete && !shared_vertex(*triangle, super)) {
-        mesh_push_triangle(arena, &result, *triangle);
+        push_edge_if_unique(arena, &result, triangle->e[0]);
+        push_edge_if_unique(arena, &result, triangle->e[1]);
+        push_edge_if_unique(arena, &result, triangle->e[2]);
       }
     }
   }
 
   return result;
-}
-
-function Vector2
-v2raylib (Vec2 v) {
-  return (Vector2){v.x, v.y};
 }
 
 function u64
@@ -217,38 +244,29 @@ push_vertex_if_unique (Arena *arena, Vertex_Neighborhood *n, Vertex *v) {
   }
 }
 
-function void
-push_edge (Arena *arena, Edge_List *edges, Edge e) {
-  Edge *node = arena_pushn(arena, Edge, 1);
-  *node = e;
-  sll_queue_push(edges->first, edges->last, node);
-  edges->count++;
-}
-
 function Edge_List
-prim_mst (Arena *arena, Triangle_Mesh bw_result, Vec2 *points, u64 num_points) {
+prim_mst (Arena *arena, Edge_List bw_result, Vec2 *points, u64 num_points) {
   Edge_List result = {0};
 
   Temp_Arena scratch;
   ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
-    // Transform Delaunay triangulation data to suit our needs
     Vertex *vertices = arena_pushn(scratch.arena, Vertex, num_points);
-    for (u64 i = 0; i < num_points; ++i) {
-      Vec2 p = points[i];
-      Vertex *v = get_vertex(vertices, num_points, p);
-      v->slot_filled = true;
-      v->p = p;
-      v->cheapest_cost = INFINITY;
-    }
-    foreach (triangle, &bw_result) {
-      Vertex *v0 = get_vertex(vertices, num_points, triangle->p[0]);
-      Vertex *v1 = get_vertex(vertices, num_points, triangle->p[1]);
-      Vertex *v2 = get_vertex(vertices, num_points, triangle->p[2]);
-      Vertex *cycle[3] = {v0, v1, v2};
-      for (u64 i = 0; i < 3; ++i) {
-        push_vertex_if_unique(scratch.arena, &cycle[i]->neighbors, cycle[(i+1)%3]);
-        push_vertex_if_unique(scratch.arena, &cycle[i]->neighbors, cycle[(i+2)%3]);
+    foreach (edge, &bw_result) {
+      Vertex *v0 = get_vertex(vertices, num_points, edge->p0);
+      Vertex *v1 = get_vertex(vertices, num_points, edge->p1);
+      if (!v0->slot_filled) {
+        v0->slot_filled = true;
+        v0->p = edge->p0;
+        v0->cheapest_cost = INFINITY;
       }
+      if (!v1->slot_filled) {
+        v1->slot_filled = true;
+        v1->p = edge->p1;
+        v1->cheapest_cost = INFINITY;
+      }
+
+      push_vertex_if_unique(scratch.arena, &v0->neighbors, v1);
+      push_vertex_if_unique(scratch.arena, &v1->neighbors, v0);
     }
 
     // Begin algorithm
@@ -307,19 +325,21 @@ main (void) {
   }
 
   Triangle super = make_triangle(v2(-10000, -10000), v2(0, 10000), v2(10000, -10000));
-  Triangle_Mesh bw_result = bowyer_watson_triangulate(arena, test_points, num_points, super);
+  Edge_List bw_result = bowyer_watson_triangulate(arena, test_points, num_points, super);
   Edge_List mst = prim_mst(arena, bw_result, test_points, num_points);
 
   while (!WindowShouldClose())
   {
     BeginDrawing();
     ClearBackground(RAYWHITE);
-    foreach (triangle, &bw_result) {
-      DrawTriangleLines(v2raylib(triangle->p[0]), v2raylib(triangle->p[1]), v2raylib(triangle->p[2]), GREEN);
+    foreach (edge, &bw_result) {
+      DrawLineV(v2raylib(edge->p0), v2raylib(edge->p1), GREEN);
     }
+
     foreach (edge, &mst) {
       DrawLineV(v2raylib(edge->p0), v2raylib(edge->p1), RED);
     }
+
     for (u64 i = 0; i < num_points; ++i) {
       DrawCircle(test_points[i].x, test_points[i].y, 5.f, GRAY);
     }
