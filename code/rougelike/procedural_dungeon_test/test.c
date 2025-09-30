@@ -311,6 +311,7 @@ prim_mst (Arena *arena, Edge_List bw_result, u64 num_points) {
 int
 main (void) {
   InitWindow(window_width, window_height, "Procedural dungeon generation workshop");
+  SetWindowState(FLAG_WINDOW_RESIZABLE);
   srand(time(0));
 
   Arena *arena = arena_alloc();
@@ -333,7 +334,7 @@ main (void) {
   {
     Vector2 mouse_world_pos = GetScreenToWorld2D(GetMousePosition(), cam);
 
-    if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT))
+    if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT) || IsMouseButtonDown(MOUSE_BUTTON_MIDDLE))
     {
       Vec2 delta = v2(GetMouseDelta().x, GetMouseDelta().y);
       delta = v2muls(delta, -1.0f/cam.zoom);
