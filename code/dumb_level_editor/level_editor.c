@@ -13,21 +13,21 @@
 #include "raygui.h"
 #include "base/memory.c"
 
-/* @todo: 
-Split intersecting lines 
+/* @todo:
+Split intersecting lines
   Shade completed sectors
 Get rid of all the magic numbers!
-*/ 
+*/
 
 #define MAX_EDGES 4096
 
-/* @note: 
+/* @note:
 I'm kind-of experimenting with a new way of storage and memory layout than I usually do things here (while procrastinating my math final)
  Instead of using a linked-list or a large edge structure with every piece of data which can possibly pertain to the edge,
  I like storing it in an array with every edge stored continuously. It feels clean, trivially looping through either
  the points or edges in a simple for loop. Preventing fragmentation has been pretty easy too. The `next_free_edge` field indexes
  the edge that was most recently freed, and if `next_free_edge` > -1 next time we free an edge, we tuck this old index in the x value of
- p0 of this edge and overwrite it. Thus creating a chain through the array to get our memory back. This means though, that all extreneous 
+ p0 of this edge and overwrite it. Thus creating a chain through the array to get our memory back. This means though, that all extreneous
 edge data must be stored in a parallel array. Whether this is the most optimal way to do things in my situation, time will tell, but it has
 been a fun outside-the-box thinking exercise.
 */
@@ -59,7 +59,7 @@ draw_grid (Camera2D cam, int spacing) {
     f32 cam_spacing = spacing*cam.zoom;
     int render_width = GetRenderWidth();
     int render_height = GetRenderHeight();
-    
+
     int num_columns = render_width/cam_spacing;
     int onside_columns = floorf((render_width-origin.x)/cam_spacing);
     int num_rows = render_height/cam_spacing;
@@ -88,7 +88,7 @@ add_edge (Edge_Array *a, Vector2 p0, Vector2 p1) {
     }
     *new_edge = (Edge){p0, p1};
     memory_zero_struct(&a->data[new_index]);
-    
+
     return new_index;
 }
 
@@ -110,41 +110,41 @@ dump_edge_list (Edge_Array *a) {
     printf("End Edge Dump\n");
 }
 
-int 
+int
 main()
 {
     //- Init
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(1280, 720, "Dumb Level Editor");
     SetExitKey(0);
-    
+
     Camera2D cam = {0};
     cam.zoom = 10.f;
     cam.offset = (Vector2){GetRenderWidth()/2, GetRenderHeight()/2};
-    
+
     Arena *arena = arena_alloc();
     Edge_Array edges = {0};
     edges.e = arena_pushn(arena, Edge, MAX_EDGES);
     edges.data = arena_pushn(arena, Edge_Data, MAX_EDGES);
     edges.next_free_edge = -1;
-    
+
     Vector2 active_point = Vector2_Inf;
     Vector2 cursor = {0};
-    
+
     int ideal_grid_spacing = 10;
     while (!WindowShouldClose())
     {
         //- Update
-        Vector2 mouse_world_pos = GetScreenToWorld2D(GetMousePosition(), cam); 
-        
+        Vector2 mouse_world_pos = GetScreenToWorld2D(GetMousePosition(), cam);
+
         // Camera
         if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT))
         {
-            Vector2 delta = GetMouseDelta(); 
+            Vector2 delta = GetMouseDelta();
             delta = Vector2Scale(delta, -1.0f/cam.zoom);
             cam.target = Vector2Add(cam.target, delta);
         }
-        
+
         f32 wheel = GetMouseWheelMove();
         if (wheel != 0)
         {
@@ -153,12 +153,12 @@ main()
             f32 scale = 0.2f*wheel;
             cam.zoom = Clamp(expf(logf(cam.zoom)+scale), 2.f, 64);
         }
-        
-        // Editor 
+
+        // Editor
         if (IsKeyPressed(KEY_ESCAPE)) {
             active_point = Vector2_Inf;
         }
-        
+
         if (IsKeyPressed(KEY_P)) {
             for (int i = 0; i < edges.count; ++i) {
                 Edge *e = &edges.e[i];
@@ -168,12 +168,12 @@ main()
                 }
             }
         }
-        
-        if (IsKeyPressed(KEY_T)) 
+
+        if (IsKeyPressed(KEY_T))
             dump_edge_list(&edges);
-        
+
         //- Grid control
-        if (IsKeyDown(KEY_LEFT_SHIFT)) { 
+        if (IsKeyDown(KEY_LEFT_SHIFT)) {
             Vector2 norm_cursor = Vector2Scale(mouse_world_pos, 1.f/ideal_grid_spacing);
             norm_cursor.x = roundf(norm_cursor.x);
             norm_cursor.y = roundf(norm_cursor.y);
@@ -193,7 +193,7 @@ main()
             if (!snapped)
                 cursor = mouse_world_pos;
         }
-        
+
         //- Edge handling
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             if (IsKeyDown(KEY_LEFT_CONTROL)) {
@@ -202,16 +202,16 @@ main()
                     if (CheckCollisionPointLine(mouse_world_pos, e->p0, e->p1, 1)) {
                         remove_edge(&edges, i);
                         break;
-                    } 
+                    }
                 }
-            } else { 
-                if (active_point.y == INFINITY) { 
+            } else {
+                if (active_point.y == INFINITY) {
                     active_point = cursor;
                 } else if (!Vector2Equals(cursor, active_point)) {
                     Vector2 new_point = cursor;
                     int new_edge_idx = add_edge(&edges, active_point, new_point);
                     active_point = Vector2_Inf;
-                    
+
                     // Handle intersecting edges
                     Temp_Arena temp = temp_arena(arena);
                     Vector3 *intersections = arena_pushn(temp.arena, Vector3, 0);
@@ -221,11 +221,11 @@ main()
                         Edge edge = edges.e[i];
                         if (i == new_edge_idx || edge.p0.y == INFINITY)
                             continue;
-                        
+
                         Vector2 p;
-                        if (CheckCollisionLines(new_edge.p0, new_edge.p1, edge.p0, edge.p1, &p) && !(Vector2Equals(p, new_edge.p0) 
-                                                                                                     || Vector2Equals(p, new_edge.p1) 
-                                                                                                     || Vector2Equals(p, edge.p0) 
+                        if (CheckCollisionLines(new_edge.p0, new_edge.p1, edge.p0, edge.p1, &p) && !(Vector2Equals(p, new_edge.p0)
+                                                                                                     || Vector2Equals(p, new_edge.p1)
+                                                                                                     || Vector2Equals(p, edge.p0)
                                                                                                      || Vector2Equals(p, edge.p1))) {
                             Vector3 *np = arena_pushn(temp.arena, Vector3, 1);
                             int insert = 0;
@@ -244,12 +244,12 @@ main()
                             np->z = i;
                         }
                     }
-                    
+
                     if (num_intersections > 0) {
                         Vector2 minp = new_edge.p0, maxp = new_edge.p1;
                         if (minp.x > maxp.x || (minp.x == maxp.x && minp.y > maxp.y))
                             swap(Vector2, minp, maxp);
-                        
+
                         Vector2 current = minp;
                         remove_edge(&edges, new_edge_idx);
                         for (int i = 0; i < num_intersections; ++i) {
@@ -273,14 +273,14 @@ main()
                 }
             }
         }
-        
+
         //- Render
         BeginDrawing();
         {
             // Background
             ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
             draw_grid(cam, ideal_grid_spacing);
-            
+
             // HUD
             DrawFPS(0,0);
             DrawText(TextFormat("[%f, %f]", cursor.x, cursor.y), GetMouseX() + 15, GetMouseY(), 20, BLACK);
@@ -297,16 +297,16 @@ main()
                     DrawCircleV(edges.e[i].p0, 5/cam.zoom, GRAY);
                     DrawCircleV(edges.e[i].p1, 5/cam.zoom, GRAY);
                 }
-                
-                DrawCircle(0, 0, 10/cam.zoom, BLACK);  
+
+                DrawCircle(0, 0, 10/cam.zoom, BLACK);
                 DrawCircleV(cursor, 8/cam.zoom, DARKBLUE);
             }
             EndMode2D();
-            
+
         }
         EndDrawing();
     }
-    
+
     CloseWindow();
     return 0;
 }

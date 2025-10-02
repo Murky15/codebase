@@ -5,6 +5,8 @@
 #include <time.h>
 #include "raylib/include/raylib.h"
 
+#define RAYGUI_IMPLEMENTATION
+#include "raylib/include/raygui.h"
 #define BASE_MEMORY_MINIMAL
 #include "../../base/include.h"
 #include "../../base/include.c"
@@ -12,6 +14,11 @@
 /*
   Simple workshop for building a dungeon generation algorithm b/c my D3D11 renderer is still in its infancy and
   too specialized to conviniently display this. Oops.
+
+  A* pathfinding links:
+  https://en.wikipedia.org/wiki/A*_search_algorithm
+  https://en.wikipedia.org/wiki/Priority_queue
+  https://en.wikipedia.org/wiki/Taxicab_geometry
 
   For when I go 3D, here are some links relating to extending the bowyer-watson algorithm:
   https://en.wikipedia.org/wiki/Tetrahedron# (Circumradius & circumcenter for the circumsphere are defined in this article)
@@ -64,11 +71,45 @@ struct Vertex {
   Vertex_Neighborhood neighbors;
 };
 
+typedef struct Room {
+  struct Room *next;
+  Vec2 pos;
+  Vec2 size;
+} Room;
+
+typedef struct Dungeon {
+  Room *first, *last;
+  u64 num_rooms;
+} Dungeon;
+
 global u64 window_width = 1280, window_height = 720;
 
 function Vector2
 v2raylib (Vec2 v) {
   return (Vector2){v.x, v.y};
+}
+
+function void
+raylib_draw_grid (Camera2D cam, Vec2 dim, s64 spacing) {
+  Vec2 full_dim = v2muls(dim, 2.f);
+  f32 num_columns = full_dim.x / spacing;
+  f32 onside_columns = num_columns / 2.f;
+  f32 num_rows = full_dim.y / spacing;
+  f32 onside_rows = num_rows / 2.f;
+  for (s64 x = -onside_columns; x <= onside_columns; ++x) {
+    f32 px = x * spacing;
+    f32 thick = x == 0 ? 3.f : 1.f;
+    Vector2 p0 = {px, -dim.y};
+    Vector2 p1 = {px,  dim.y};
+    DrawLineEx(p0, p1, thick/cam.zoom, BLACK);
+  }
+  for (s64 y = -onside_rows; y <= onside_rows; ++y) {
+    f32 py = y * spacing;
+    f32 thick = y == 0 ? 3.f : 1.f;
+    Vector2 p0 = {-dim.x, py};
+    Vector2 p1 = { dim.x,  py};
+    DrawLineEx(p0, p1, thick/cam.zoom, BLACK);
+  }
 }
 
 function b32
@@ -308,7 +349,7 @@ prim_mst (Arena *arena, Edge_List bw_result, u64 num_points) {
   return result;
 }
 
-int
+s64
 main (void) {
   InitWindow(window_width, window_height, "Procedural dungeon generation workshop");
   SetWindowState(FLAG_WINDOW_RESIZABLE);
@@ -318,6 +359,7 @@ main (void) {
 
   Camera2D cam = {0};
   cam.zoom = 1.f;
+  cam.offset = v2raylib(v2(window_width/2.f, window_height/2.f));
 
   Vec2 test_points[50];
   u64 num_points = array_count(test_points);
@@ -347,12 +389,18 @@ main (void) {
       cam.offset = GetMousePosition();
       cam.target = mouse_world_pos;
       f32 scale = 0.2f*wheel;
-      cam.zoom = clamp(expf(logf(cam.zoom)+scale), 0.1f, 64);
+      cam.zoom = clamp(expf(logf(cam.zoom)+scale), 0.5f, 64);
     }
 
     BeginDrawing();
-    BeginMode2D(cam);
     ClearBackground(RAYWHITE);
+    Vector2 cursor = GetScreenToWorld2D(GetMousePosition(), cam);
+    DrawText(TextFormat("[%f, %f]", cursor.x, cursor.y), GetMouseX() + 15, GetMouseY(), 20, BLACK);
+
+    BeginMode2D(cam);
+    raylib_draw_grid(cam, v2(1000,1000), 16);
+
+    /*
     foreach (edge, &bw_result) {
       DrawLineV(v2raylib(edge->p0), v2raylib(edge->p1), GREEN);
     }
@@ -364,6 +412,8 @@ main (void) {
     for (u64 i = 0; i < num_points; ++i) {
       DrawCircle(test_points[i].x, test_points[i].y, 5.f/cam.zoom, GRAY);
     }
+    */
+
     EndMode2D();
     EndDrawing();
   }
