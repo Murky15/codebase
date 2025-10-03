@@ -694,6 +694,8 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     } else if (player.dir & WEST) {
       player.end_angle = M_PI32;
     }
+
+#if 0
     if (player.dir & NORTH && player.end_angle == 0) {
       player.end_angle = 2.f * M_PI32;
     }
@@ -702,6 +704,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     } else if (player.end_angle == 2.f * M_PI32 && player.rotation_angle == 0) {
       player.rotation_angle = 2.f * M_PI32;
     }
+#endif
 
     if (!almost_equal(player.rotation_angle, player.end_angle)) {
       if (!player.started_rotating_at) {

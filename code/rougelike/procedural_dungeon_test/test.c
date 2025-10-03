@@ -73,8 +73,11 @@ struct Vertex {
 
 typedef struct Room {
   struct Room *next;
-  Vec2 pos;
-  Vec2 size;
+  Vec2 grid_pos;
+  Vec2 grid_size;
+
+  Vec2 world_pos;
+  Vec2 world_size;
 } Room;
 
 typedef struct Dungeon {
@@ -349,7 +352,53 @@ prim_mst (Arena *arena, Edge_List bw_result, u64 num_points) {
   return result;
 }
 
-s64
+// @todo: Rand doesn't work very well, I should add my own rng to the codebase.
+function f64
+gaussian_next (f64 mu, f64 sigma) {
+  f64 U;
+  while (true) {
+    U = (f64)rand() / RAND_MAX;
+    if (U > 0) break;
+  }
+  f64 V = (f64)rand() / RAND_MAX;
+  f64 R = sqrt(-2 * log(U));
+  f64 Z = R * cos(2*M_PI*V);
+
+  return mu + sigma*Z;
+}
+
+struct Dungeon_Creation_Params {
+  u64 target_num_rooms;
+  u64 grid_size;
+
+  // The following values are interpreted as multiples of 'grid_size'.
+  u64 map_half_width;
+  u64 map_half_height;
+
+  u64 room_width_mean;
+  u64 room_width_deviation;
+  u64 room_height_mean;
+  u64 room_height_deviation;
+
+#if 0 // Not sure if I want these yet
+  u64 room_width_floor;
+  u64 room_width_ceil;
+  u64 room_height_floor;
+  u64 room_height_ceil;
+#endif
+};
+
+function Dungeon
+dungeon_create_(Arena *arena, struct Dungeon_Creation_Params *p) {
+  Dungeon result = {0};
+  for (u64 i = 0; i < p->target_num_rooms; ++i) {
+
+  }
+
+  return result;
+}
+
+int
 main (void) {
   InitWindow(window_width, window_height, "Procedural dungeon generation workshop");
   SetWindowState(FLAG_WINDOW_RESIZABLE);
@@ -371,6 +420,18 @@ main (void) {
   Triangle super = make_triangle(v2(-10000, -10000), v2(0, 10000), v2(10000, -10000));
   Edge_List bw_result = bowyer_watson_triangulate(arena, test_points, num_points, super);
   Edge_List mst = prim_mst(arena, bw_result, num_points);
+
+  u64 num_rooms = 8;
+  u64 grid_size = 16;
+  u64 map_half_width  = 64;
+  u64 map_half_height = 64;
+  u64 room_min_width  = 5;
+  u64 room_min_height = 5;
+  u64 room_max_width  = 10;
+  u64 room_max_height = 10;
+  Dungeon dungeon = {0};
+
+
 
   while (!WindowShouldClose())
   {
@@ -398,7 +459,7 @@ main (void) {
     DrawText(TextFormat("[%f, %f]", cursor.x, cursor.y), GetMouseX() + 15, GetMouseY(), 20, BLACK);
 
     BeginMode2D(cam);
-    raylib_draw_grid(cam, v2(1000,1000), 16);
+    //raylib_draw_grid(cam, v2(map_half_width,map_half_height), 16);
 
     /*
     foreach (edge, &bw_result) {
