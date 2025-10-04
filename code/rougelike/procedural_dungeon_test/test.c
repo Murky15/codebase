@@ -71,17 +71,17 @@ struct Vertex {
   Vertex_Neighborhood neighbors;
 };
 
-typedef struct Room {
-  struct Room *next;
+typedef struct Dungeon_Room {
+  struct Dungeon_Room *next;
   Vec2 grid_pos;
   Vec2 grid_size;
 
   Vec2 world_pos;
   Vec2 world_size;
-} Room;
+} Dungeon_Room;
 
 typedef struct Dungeon {
-  Room *first, *last;
+  Dungeon_Room *first, *last;
   u64 num_rooms;
 } Dungeon;
 
@@ -369,16 +369,18 @@ gaussian_next (f64 mu, f64 sigma) {
 
 struct Dungeon_Creation_Params {
   u64 target_num_rooms;
-  u64 grid_size;
+  u64 grid_dim;
 
-  // The following values are interpreted as multiples of 'grid_size'.
-  u64 map_half_width;
-  u64 map_half_height;
+  u64 map_width;
+  u64 map_height;
 
   u64 room_width_mean;
   u64 room_width_deviation;
   u64 room_height_mean;
   u64 room_height_deviation;
+
+  u64 room_width_border;
+  u64 room_height_border;
 
 #if 0 // Not sure if I want these yet
   u64 room_width_floor;
@@ -388,14 +390,20 @@ struct Dungeon_Creation_Params {
 #endif
 };
 
-function Dungeon
-dungeon_create_(Arena *arena, struct Dungeon_Creation_Params *p) {
-  Dungeon result = {0};
-  for (u64 i = 0; i < p->target_num_rooms; ++i) {
+function void
+dungeon_push_room (Arena *arena, Dungeon *dungeon, Dungeon_Room room) {
+  Dungeon_Room *node = arena_pushn(arena, Dungeon_Room, 1);
+  *node = room;
+  sll_queue_push(dungeon->first, dungeon->last, node);
+  dungeon->num_rooms++;
+}
 
-  }
-
-  return result;
+function b32
+rects_intersect (Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1) {
+  return  (p0.x + s0.x > p1.x) &&
+          (p1.x + s1.x > p0.x) &&
+          (p0.y + s0.y > p1.y) &&
+          (p1.y + s1.y > p0.y);
 }
 
 int
@@ -421,16 +429,61 @@ main (void) {
   Edge_List bw_result = bowyer_watson_triangulate(arena, test_points, num_points, super);
   Edge_List mst = prim_mst(arena, bw_result, num_points);
 
-  u64 num_rooms = 8;
-  u64 grid_size = 16;
-  u64 map_half_width  = 64;
-  u64 map_half_height = 64;
-  u64 room_min_width  = 5;
-  u64 room_min_height = 5;
-  u64 room_max_width  = 10;
-  u64 room_max_height = 10;
-  Dungeon dungeon = {0};
+  u64 target_num_rooms = 500;
+  u64 grid_dim = 16;
+  u64 map_width = 256;
+  u64 map_height = 256;
+  u64 room_width_mean = 16;
+  u64 room_width_deviation = 4;
+  u64 room_height_mean = 8;
+  u64 room_height_deviation = 2;
+  u64 room_width_border = 1;
+  u64 room_height_border = 1;
 
+  Dungeon dungeon = {0};
+  f32 half_width = (f32)map_width / 2.f;
+  f32 half_height = (f32)map_height / 2.f;
+  for (u64 i = 0; i < target_num_rooms; ++i) {
+    Dungeon_Room new_room = {0};
+    f32 width  = roundf(gaussian_next(room_width_mean,  room_width_deviation));
+    f32 height = roundf(gaussian_next(room_height_mean, room_height_deviation));
+    Vec2 grid_size = v2(width, height);
+    u64 max_tries = 15;
+    u64 attempt = 0;
+    while (true) {
+      if (attempt > max_tries) {
+        break;
+      }
+
+      f32 x = (f32)(rand() % map_width)  - half_width;
+      f32 y = (f32)(rand() % map_height) - half_height;
+      Vec2 grid_pos = v2(x,y);
+
+      if (grid_pos.x + grid_size.x > half_width || grid_pos.y + grid_size.y > half_height) continue;
+
+      b32 overlap = false;
+      foreach (room, &dungeon) {
+        Vec2 border = v2(room_width_border, room_height_border);
+        Vec2 new_pos = v2sub(grid_pos, border);
+        Vec2 new_size = v2add(grid_size, border);
+        Vec2 room_pos = v2sub(room->grid_pos, border);
+        Vec2 room_size = v2add(room->grid_size, border);
+        if (rects_intersect(new_pos, new_size, room_pos, room_size)) {
+          overlap = true;
+          break;
+        }
+        ++attempt;
+      }
+      if (overlap) continue;
+
+      new_room.grid_pos   = grid_pos;
+      new_room.grid_size  = grid_size;
+      new_room.world_pos  = v2muls(grid_pos, grid_dim);
+      new_room.world_size = v2muls(grid_size, grid_dim);
+      dungeon_push_room(arena, &dungeon, new_room);
+      break;
+    }
+  }
 
 
   while (!WindowShouldClose())
@@ -450,7 +503,7 @@ main (void) {
       cam.offset = GetMousePosition();
       cam.target = mouse_world_pos;
       f32 scale = 0.2f*wheel;
-      cam.zoom = clamp(expf(logf(cam.zoom)+scale), 0.5f, 64);
+      cam.zoom = clamp(expf(logf(cam.zoom)+scale), 0.1f, 64);
     }
 
     BeginDrawing();
@@ -459,7 +512,6 @@ main (void) {
     DrawText(TextFormat("[%f, %f]", cursor.x, cursor.y), GetMouseX() + 15, GetMouseY(), 20, BLACK);
 
     BeginMode2D(cam);
-    //raylib_draw_grid(cam, v2(map_half_width,map_half_height), 16);
 
     /*
     foreach (edge, &bw_result) {
@@ -474,6 +526,11 @@ main (void) {
       DrawCircle(test_points[i].x, test_points[i].y, 5.f/cam.zoom, GRAY);
     }
     */
+
+    foreach (room, &dungeon) {
+      DrawRectangleV(v2raylib(room->world_pos), v2raylib(room->world_size), RED);
+    }
+    raylib_draw_grid(cam, v2muls(v2(map_width,map_height), 0.5f * grid_dim), grid_dim);
 
     EndMode2D();
     EndDrawing();
