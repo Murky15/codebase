@@ -367,29 +367,6 @@ gaussian_next (f64 mu, f64 sigma) {
   return mu + sigma*Z;
 }
 
-struct Dungeon_Creation_Params {
-  u64 target_num_rooms;
-  u64 grid_dim;
-
-  u64 map_width;
-  u64 map_height;
-
-  u64 room_width_mean;
-  u64 room_width_deviation;
-  u64 room_height_mean;
-  u64 room_height_deviation;
-
-  u64 room_width_border;
-  u64 room_height_border;
-
-#if 0 // Not sure if I want these yet
-  u64 room_width_floor;
-  u64 room_width_ceil;
-  u64 room_height_floor;
-  u64 room_height_ceil;
-#endif
-};
-
 function void
 dungeon_push_room (Arena *arena, Dungeon *dungeon, Dungeon_Room room) {
   Dungeon_Room *node = arena_pushn(arena, Dungeon_Room, 1);
@@ -406,6 +383,90 @@ rects_intersect (Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1) {
           (p1.y + s1.y > p0.y);
 }
 
+typedef struct Dungeon_Create_Params {
+  u64 target_room_count;
+  u64 grid_dim;
+
+  u64 map_width;
+  u64 map_height;
+
+  u64 room_width_mean;
+  u64 room_width_deviation;
+  u64 room_height_mean;
+  u64 room_height_deviation;
+
+  u64 room_width_border;
+  u64 room_height_border;
+
+  u64 room_width_floor;
+  u64 room_width_ceil;
+  u64 room_height_floor;
+  u64 room_height_ceil;
+} Dungeon_Create_Params;
+
+#define dungeon_create(arena, ...) dungeon_create_((arena), &(Dungeon_Create_Params){ \
+  .room_width_deviation = 1,   \
+  .room_height_deviation = 1,  \
+  .room_width_floor = 1,       \
+  .room_width_ceil = u64_max,  \
+  .room_height_floor = 1,      \
+  .room_height_ceil = u64_max, \
+  __VA_ARGS__                  \
+  })
+
+// This can 100% be improved, it just feels so jank and messy.
+function Dungeon
+dungeon_create_ (Arena *arena, Dungeon_Create_Params *p) {
+  Dungeon result = {0};
+
+  f32 half_width = (f32)p->map_width / 2.f;
+  f32 half_height = (f32)p->map_height / 2.f;
+  for (u64 i = 0; i < p->target_room_count; ++i) {
+    Dungeon_Room new_room = {0};
+    f32 width  = roundf(gaussian_next(p->room_width_mean,  p->room_width_deviation));
+    f32 height = roundf(gaussian_next(p->room_height_mean, p->room_height_deviation));
+    f32 clamped_width  = clamp(width,  p->room_width_floor,  p->room_width_ceil);
+    f32 clamped_height = clamp(height, p->room_height_floor, p->room_height_ceil);
+    Vec2 grid_size = v2(clamped_width, clamped_height);
+    u64 max_tries = 2;
+    u64 attempt = 0;
+    while (attempt < max_tries) {
+      f32 x = (f32)(rand() % p->map_width)  - half_width;
+      f32 y = (f32)(rand() % p->map_height) - half_height;
+      Vec2 grid_pos = v2(x,y);
+
+      b32 clear = true;
+      if (grid_pos.x + grid_size.x > half_width || grid_pos.y + grid_size.y > half_height) {
+        clear = false;
+      } else {
+        foreach (room, &result) {
+          Vec2 border = v2(p->room_width_border, p->room_height_border);
+          Vec2 new_pos = v2sub(grid_pos, border);
+          Vec2 new_size = v2add(grid_size, border);
+          Vec2 room_pos = v2sub(room->grid_pos, border);
+          Vec2 room_size = v2add(room->grid_size, border);
+          if (rects_intersect(new_pos, new_size, room_pos, room_size)) {
+            clear = false;
+            break;
+          }
+        }
+      }
+      if (clear) {
+        new_room.grid_pos   = grid_pos;
+        new_room.grid_size  = grid_size;
+        new_room.world_pos  = v2muls(grid_pos, p->grid_dim);
+        new_room.world_size = v2muls(grid_size, p->grid_dim);
+        dungeon_push_room(arena, &result, new_room);
+        break;
+      }
+
+      attempt++;
+    }
+  }
+
+  return result;
+}
+
 int
 main (void) {
   InitWindow(window_width, window_height, "Procedural dungeon generation workshop");
@@ -418,73 +479,27 @@ main (void) {
   cam.zoom = 1.f;
   cam.offset = v2raylib(v2(window_width/2.f, window_height/2.f));
 
-  Vec2 test_points[50];
-  u64 num_points = array_count(test_points);
-  for (u64 i = 0; i < num_points; ++i) {
-    test_points[i].x = rand() % window_width;
-    test_points[i].y = rand() % window_height;
+  u64 map_width = 512, map_height = 256;
+  u64 grid_dim = 16;
+  Dungeon dungeon = dungeon_create(arena,
+    .target_room_count = 5000,
+    .grid_dim   = grid_dim,
+    .map_width  = map_width,
+    .map_height = map_height,
+    .room_width_mean = 16,
+    .room_width_deviation = 3,
+    .room_height_mean = 8,
+    .room_height_deviation = 2);
+
+  Vec2 *room_midpoints = arena_pushn(arena, Vec2, dungeon.num_rooms);
+  foreach (room, &dungeon) {
+    u64 i = room - dungeon.first; // @note: This is not garunteed to work outside this simple test!!
+    room_midpoints[i] = v2add(room->world_pos, v2muls(room->world_size, 0.5f));
   }
 
   Triangle super = make_triangle(v2(-10000, -10000), v2(0, 10000), v2(10000, -10000));
-  Edge_List bw_result = bowyer_watson_triangulate(arena, test_points, num_points, super);
-  Edge_List mst = prim_mst(arena, bw_result, num_points);
-
-  u64 target_num_rooms = 500;
-  u64 grid_dim = 16;
-  u64 map_width = 256;
-  u64 map_height = 256;
-  u64 room_width_mean = 16;
-  u64 room_width_deviation = 4;
-  u64 room_height_mean = 8;
-  u64 room_height_deviation = 2;
-  u64 room_width_border = 1;
-  u64 room_height_border = 1;
-
-  Dungeon dungeon = {0};
-  f32 half_width = (f32)map_width / 2.f;
-  f32 half_height = (f32)map_height / 2.f;
-  for (u64 i = 0; i < target_num_rooms; ++i) {
-    Dungeon_Room new_room = {0};
-    f32 width  = roundf(gaussian_next(room_width_mean,  room_width_deviation));
-    f32 height = roundf(gaussian_next(room_height_mean, room_height_deviation));
-    Vec2 grid_size = v2(width, height);
-    u64 max_tries = 15;
-    u64 attempt = 0;
-    while (true) {
-      if (attempt > max_tries) {
-        break;
-      }
-
-      f32 x = (f32)(rand() % map_width)  - half_width;
-      f32 y = (f32)(rand() % map_height) - half_height;
-      Vec2 grid_pos = v2(x,y);
-
-      if (grid_pos.x + grid_size.x > half_width || grid_pos.y + grid_size.y > half_height) continue;
-
-      b32 overlap = false;
-      foreach (room, &dungeon) {
-        Vec2 border = v2(room_width_border, room_height_border);
-        Vec2 new_pos = v2sub(grid_pos, border);
-        Vec2 new_size = v2add(grid_size, border);
-        Vec2 room_pos = v2sub(room->grid_pos, border);
-        Vec2 room_size = v2add(room->grid_size, border);
-        if (rects_intersect(new_pos, new_size, room_pos, room_size)) {
-          overlap = true;
-          break;
-        }
-        ++attempt;
-      }
-      if (overlap) continue;
-
-      new_room.grid_pos   = grid_pos;
-      new_room.grid_size  = grid_size;
-      new_room.world_pos  = v2muls(grid_pos, grid_dim);
-      new_room.world_size = v2muls(grid_size, grid_dim);
-      dungeon_push_room(arena, &dungeon, new_room);
-      break;
-    }
-  }
-
+  Edge_List bw_result = bowyer_watson_triangulate(arena, room_midpoints, dungeon.num_rooms, super);
+  Edge_List mst = prim_mst(arena, bw_result, dungeon.num_rooms);
 
   while (!WindowShouldClose())
   {
@@ -508,31 +523,25 @@ main (void) {
 
     BeginDrawing();
     ClearBackground(RAYWHITE);
+    BeginMode2D(cam);
+
+    foreach (room, &dungeon) {
+      DrawRectangleV(v2raylib(room->world_pos), v2raylib(room->world_size), BLUE);
+    }
+    raylib_draw_grid(cam, v2muls(v2(map_width,map_height), 0.5f * grid_dim), grid_dim);
+#if 0
+    foreach (edge, &bw_result) {
+      DrawLineEx(v2raylib(edge->p0), v2raylib(edge->p1), 2.f/cam.zoom, GREEN);
+    }
+#endif
+    foreach (edge, &mst) {
+      DrawLineEx(v2raylib(edge->p0), v2raylib(edge->p1), 2.f/cam.zoom, RED);
+    }
+
+    EndMode2D();
     Vector2 cursor = GetScreenToWorld2D(GetMousePosition(), cam);
     DrawText(TextFormat("[%f, %f]", cursor.x, cursor.y), GetMouseX() + 15, GetMouseY(), 20, BLACK);
 
-    BeginMode2D(cam);
-
-    /*
-    foreach (edge, &bw_result) {
-      DrawLineV(v2raylib(edge->p0), v2raylib(edge->p1), GREEN);
-    }
-
-    foreach (edge, &mst) {
-      DrawLineV(v2raylib(edge->p0), v2raylib(edge->p1), RED);
-    }
-
-    for (u64 i = 0; i < num_points; ++i) {
-      DrawCircle(test_points[i].x, test_points[i].y, 5.f/cam.zoom, GRAY);
-    }
-    */
-
-    foreach (room, &dungeon) {
-      DrawRectangleV(v2raylib(room->world_pos), v2raylib(room->world_size), RED);
-    }
-    raylib_draw_grid(cam, v2muls(v2(map_width,map_height), 0.5f * grid_dim), grid_dim);
-
-    EndMode2D();
     EndDrawing();
   }
 
