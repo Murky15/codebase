@@ -80,10 +80,14 @@ typedef struct Dungeon_Room {
   Vec2 world_size;
 } Dungeon_Room;
 
-typedef struct Dungeon {
+typedef struct Proto_Dungeon {
   Dungeon_Room *first, *last;
+
+  u64 width, height;
+  u64 grid_dim;
+  b32 *tile_occupied;
   u64 num_rooms;
-} Dungeon;
+} Proto_Dungeon;
 
 global u64 window_width = 1280, window_height = 720;
 
@@ -368,7 +372,7 @@ gaussian_next (f64 mu, f64 sigma) {
 }
 
 function void
-dungeon_push_room (Arena *arena, Dungeon *dungeon, Dungeon_Room room) {
+dungeon_push_room (Arena *arena, Proto_Dungeon *dungeon, Dungeon_Room room) {
   Dungeon_Room *node = arena_pushn(arena, Dungeon_Room, 1);
   *node = room;
   sll_queue_push(dungeon->first, dungeon->last, node);
@@ -415,9 +419,13 @@ typedef struct Dungeon_Create_Params {
   })
 
 // This can 100% be improved, it just feels so jank and messy.
-function Dungeon
+function Proto_Dungeon
 dungeon_create_ (Arena *arena, Dungeon_Create_Params *p) {
-  Dungeon result = {0};
+  Proto_Dungeon result = {0};
+  result.width = p->map_width;
+  result.height = p->map_height;
+  result.grid_dim = p->grid_dim;
+  result.tile_occupied = arena_pushn(arena, b32, result.width * result.height);
 
   f32 half_width = (f32)p->map_width / 2.f;
   f32 half_height = (f32)p->map_height / 2.f;
@@ -431,7 +439,7 @@ dungeon_create_ (Arena *arena, Dungeon_Create_Params *p) {
     u64 max_tries = 2;
     u64 attempt = 0;
     while (attempt < max_tries) {
-      f32 x = (f32)(rand() % p->map_width)  - half_width;
+      f32 x = (f32)(rand() % p->map_width) - half_width;
       f32 y = (f32)(rand() % p->map_height) - half_height;
       Vec2 grid_pos = v2(x,y);
 
@@ -457,6 +465,15 @@ dungeon_create_ (Arena *arena, Dungeon_Create_Params *p) {
         new_room.world_pos  = v2muls(grid_pos, p->grid_dim);
         new_room.world_size = v2muls(grid_size, p->grid_dim);
         dungeon_push_room(arena, &result, new_room);
+/*
+        for (u64 h = 0; h < grid_size.y; ++h) {
+          for (u64 w = 0; w < grid_size.x; ++w) {
+            u64 x = grid_pos.x + w;
+            u64 y = grid_pos.y + h;
+            result.tile_occupied[y * result.width + x] = true;
+          }
+        }
+*/
         break;
       }
 
@@ -481,7 +498,7 @@ main (void) {
 
   u64 map_width = 512, map_height = 256;
   u64 grid_dim = 16;
-  Dungeon dungeon = dungeon_create(arena,
+  Proto_Dungeon dungeon = dungeon_create(arena,
     .target_room_count = 5000,
     .grid_dim   = grid_dim,
     .map_width  = map_width,
@@ -493,13 +510,25 @@ main (void) {
 
   Vec2 *room_midpoints = arena_pushn(arena, Vec2, dungeon.num_rooms);
   foreach (room, &dungeon) {
-    u64 i = room - dungeon.first; // @note: This is not garunteed to work outside this simple test!!
+    u64 i = room - dungeon.first;
     room_midpoints[i] = v2add(room->world_pos, v2muls(room->world_size, 0.5f));
   }
 
   Triangle super = make_triangle(v2(-10000, -10000), v2(0, 10000), v2(10000, -10000));
   Edge_List bw_result = bowyer_watson_triangulate(arena, room_midpoints, dungeon.num_rooms, super);
-  Edge_List mst = prim_mst(arena, bw_result, dungeon.num_rooms);
+  Edge_List pathway = prim_mst(arena, bw_result, dungeon.num_rooms);
+
+  // TODO: add a few edges from the delaunay back into the pathway
+
+  // A* algorithm to create paths between rooms
+  Temp_Arena scratch;
+  ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+
+
+    foreach (edge, &pathway) {
+
+    }
+  }
 
   while (!WindowShouldClose())
   {
@@ -529,12 +558,12 @@ main (void) {
       DrawRectangleV(v2raylib(room->world_pos), v2raylib(room->world_size), BLUE);
     }
     raylib_draw_grid(cam, v2muls(v2(map_width,map_height), 0.5f * grid_dim), grid_dim);
-#if 0
+#if 1
     foreach (edge, &bw_result) {
       DrawLineEx(v2raylib(edge->p0), v2raylib(edge->p1), 2.f/cam.zoom, GREEN);
     }
 #endif
-    foreach (edge, &mst) {
+    foreach (edge, &pathway) {
       DrawLineEx(v2raylib(edge->p0), v2raylib(edge->p1), 2.f/cam.zoom, RED);
     }
 

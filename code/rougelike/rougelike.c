@@ -472,16 +472,16 @@ r_update_transform (Mat4 m) {
 }
 
 // We might be able to auto-generate this through metaprogramming
-struct Quad_Param_Data {
+typedef struct Push_Quad_Params {
   Vec3 pos;
   Vec2 scale;
   Vec3 col;
   Quat rot;
   Atlas_Coords atlas_coords;
-};
-#define r_push_quad(...) r_push_quad_(&(struct Quad_Param_Data){.scale = (Vec2){1,1}, .col = (Vec3){1,1,1}, .rot = (Quat){0,0,0,1}, __VA_ARGS__})
+} Push_Quad_Params;
+#define r_push_quad(...) r_push_quad_(&(Push_Quad_Params){.scale = (Vec2){1,1}, .col = (Vec3){1,1,1}, .rot = (Quat){0,0,0,1}, __VA_ARGS__})
 function void
-r_push_quad_ (struct Quad_Param_Data *p) {
+r_push_quad_ (Push_Quad_Params *p) {
   Instance_Data *next_inst = &quads[num_quads++];
   Mat4 T = m4translate(p->pos);
   Mat4 R = m4rotate(p->rot);
