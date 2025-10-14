@@ -126,7 +126,7 @@ r_draw_vert (f32 x, f32 y0, f32 y1, Color c) {
 function void
 r_draw_hori (f32 y, f32 x0, f32 x1, Range bounds, Color c) {
     if (x0 > x1)
-        swap(f32, x0, x1);
+        swap(x0, x1);
     f32 start_x = max(bounds.first, x0);
     f32 end_x = min(x1, bounds.last);
     if (start_x != end_x) {
@@ -161,7 +161,7 @@ r_draw_vert_textured (f32 x, f32 y0, f32 y1, f32 actual_height, PNG_Bitmap_RGBA 
 function void
 r_draw_hori_textured (f32 y, f32 x0, f32 x1, Range bounds, Rect world_region, Entity *cam, f32 cam_dist, PNG_Bitmap_RGBA texture, Texture_Map_Type map_type, f32 ycam) {
     if (x0 > x1)
-        swap(f32, x0, x1);
+        swap(x0, x1);
     Color c;
     s32 texx;
     s32 texy;
@@ -179,10 +179,10 @@ r_draw_hori_textured (f32 y, f32 x0, f32 x1, Range bounds, Rect world_region, En
     f32 t = -cam->rotation_angle + DIR_FORWARD;
     if (start_x != end_x) {
         /*
-         1. Obtain x in camera space
-                 2. Now that we have both xcam and ycam, we can transform them back to world
-                 3. Sample texture coordinates
-                */
+            1. Obtain x in camera space
+            2. Now that we have both xcam and ycam, we can transform them back to world
+            3. Sample texture coordinates
+        */
         Vec2 w0, w1;
         {
             f32 xcam = (ycam*ASPECT_W*(start_x-width_middle))/(canvas_width*cam_dist);
