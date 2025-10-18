@@ -547,7 +547,7 @@ main (void) {
   cam.zoom = 1.f;
   cam.offset = v2raylib(v2(window_width/2.f, window_height/2.f));
 
-  u64 map_width = 512, map_height = 256;
+  u64 map_width = 512, map_height = 512;
   u64 grid_dim = 16;
   Dungeon dungeon = dungeon_create(arena,
     .target_room_count = 500,
@@ -557,9 +557,7 @@ main (void) {
     .room_width_mean = 16,
     .room_width_deviation = 3,
     .room_height_mean = 8,
-    .room_height_deviation = 2,
-    .room_width_border = 2,
-    .room_height_border = 1);
+    .room_height_deviation = 2);
 
   Vec2 *room_midpoints = arena_pushn(arena, Vec2, dungeon.num_rooms);
   foreach (room, &dungeon) {
@@ -567,7 +565,7 @@ main (void) {
     room_midpoints[i] = v2add(room->world_pos, v2muls(room->world_size, 0.5f));
   }
 
-  Triangle super = make_triangle(v2(-10000, -10000), v2(0, 10000), v2(10000, -10000));
+  Triangle super = make_triangle(v2(-100000, -100000), v2(0, 100000), v2(100000, -100000));
   Edge_List bw_result = bowyer_watson_triangulate(arena, room_midpoints, dungeon.num_rooms, super);
   Edge_List pathway = prim_mst(arena, bw_result, dungeon.num_rooms);
 
@@ -596,10 +594,8 @@ main (void) {
         swap(r1, r2);
       Vec2 min = v2add(r1->world_pos, r1->world_size);
       Vec2 max = r2->world_pos;
-      min = world_to_grid(&dungeon, min);
-      max = world_to_grid(&dungeon, max);
-      for (u64 y = min.y; y < max.y; ++y) {
-        Dungeon_Tile *tile = &dungeon.tiles[y * dungeon.width + (u64)mp_grid.x];
+      for (f32 y = min.y; y < max.y; ++y) {
+        Dungeon_Tile *tile = index_tile_from_world(&dungeon, v2(mp.x, y));
         tile->flags |= DUNGEON_TILE_HALLWAY;
       }
     } else if (y_is_close) {
@@ -607,14 +603,13 @@ main (void) {
         swap(r1, r2);
       Vec2 min = v2add(r1->world_pos, r1->world_size);
       Vec2 max = r2->world_pos;
-      min = world_to_grid(&dungeon, min);
-      max = world_to_grid(&dungeon, max);
-      for (u64 x = min.x; x < max.x; ++x) {
-        Dungeon_Tile *tile = &dungeon.tiles[(u64)mp_grid.y * dungeon.width + x];
+      for (f32 x = min.x; x < max.x; ++x) {
+        Dungeon_Tile *tile = index_tile_from_world(&dungeon, v2(x, mp.y));
         tile->flags |= DUNGEON_TILE_HALLWAY;
       }
     } else {
       // Otherwise, we need to create an L-shaped path connecting the room midpoints
+      /* TODO: Is this way faster?
       Vec2 p0 = world_to_grid(&dungeon, path->p0);
       Vec2 p1 = world_to_grid(&dungeon, path->p1);
 
@@ -632,6 +627,27 @@ main (void) {
 
       for (u64 y = miny; y <= maxy; ++y) {
         Dungeon_Tile *tile = &dungeon.tiles[y * dungeon.width + maxx];
+        if ((tile->flags & DUNGEON_TILE_ROOM) == 0)
+          tile->flags |= DUNGEON_TILE_HALLWAY;
+      }
+      */
+      Vec2 p0 = path->p0;
+      Vec2 p1 = path->p1;
+
+      f32 minx = min(p0.x, p1.x);
+      f32 maxx = max(p0.x, p1.x);
+      f32 miny = min(p0.y, p1.y);
+      f32 maxy = max(p0.y, p1.y);
+
+      f32 hy = p0.x == minx ? p0.y : p1.y;
+      for (f32 x = minx; x <= maxx; ++x) {
+        Dungeon_Tile *tile = index_tile_from_world(&dungeon, v2(x, hy));
+        if ((tile->flags & DUNGEON_TILE_ROOM) == 0)
+          tile->flags |= DUNGEON_TILE_HALLWAY;
+      }
+
+      for (f32 y = miny; y <= maxy; ++y) {
+        Dungeon_Tile *tile = index_tile_from_world(&dungeon, v2(maxx, y));
         if ((tile->flags & DUNGEON_TILE_ROOM) == 0)
           tile->flags |= DUNGEON_TILE_HALLWAY;
       }
