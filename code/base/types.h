@@ -76,10 +76,10 @@ typedef union Vec2 {
 typedef Vec2 Range, Pair;
 
 typedef union Vec2i {
-  struct { u32 x, y; };
-  struct { u32 width, height; };
-  struct { u32 first, last; };
-  u32 e[2];
+  struct { s32 x, y; };
+  struct { s32 width, height; };
+  struct { s32 first, last; };
+  s32 e[2];
 } Vec2i;
 typedef Vec2i Rangei, Pairi;
 
@@ -90,9 +90,9 @@ typedef union Vec3 {
 } Vec3;
 
 typedef union Vec3i {
-  struct { u32 x, y, z; };
+  struct { s32 x, y, z; };
   Vec2i xy;
-  u32 e[2];
+  s32 e[2];
 } Vec3i;
 
 typedef union Vec4 {
@@ -135,12 +135,12 @@ read_only Vec2 V2_Right = { 1,  0};
 
 //- @note: Constructors
 core_function Vec2  v2(f32 x, f32 y);
-core_function Vec2i v2i(u32 x, u32 y);
+core_function Vec2i v2i(s32 x, s32 y);
 core_function Vec2i v2i_from_v2(Vec2 v);
 core_function Vec2  dv3(Vec3 v); // demote v3
 
 core_function Vec3  v3(f32 x, f32 y, f32 z);
-core_function Vec3i v3i(u32 x, u32 y, u32 z);
+core_function Vec3i v3i(s32 x, s32 y, s32 z);
 core_function Vec3i v3i_from_v3(Vec3 v);
 core_function Vec3  pv2(Vec2 v, f32 z); // promote v2
 

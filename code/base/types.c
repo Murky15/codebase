@@ -6,13 +6,13 @@ v2 (f32 x, f32 y) {
 }
 
 core_function Vec2i
-v2i (u32 x, u32 y) {
+v2i (s32 x, s32 y) {
   return comp_lit(Vec2i, {x, y});
 }
 
 core_function Vec2i
 v2i_from_v2 (Vec2 v) {
-  return v2i((u32)floor(v.x), (u32)floor(v.y));
+  return v2i((s32)floor(v.x), (s32)floor(v.y));
 }
 
 core_function Vec2
@@ -26,13 +26,13 @@ v3 (f32 x, f32 y, f32 z) {
 }
 
 core_function Vec3i
-v3i (u32 x, u32 y, u32 z) {
+v3i (s32 x, s32 y, s32 z) {
   return comp_lit(Vec3i, {x, y, z});
 }
 
 core_function Vec3i
 v3i_from_v3 (Vec3 v) {
-  return v3i((u32)floor(v.x), (u32)floor(v.y), (u32)floor(v.z));
+  return v3i((s32)floor(v.x), (s32)floor(v.y), (s32)floor(v.z));
 }
 
 core_function Vec3

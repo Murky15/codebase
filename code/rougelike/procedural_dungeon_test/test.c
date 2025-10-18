@@ -15,14 +15,18 @@
   Simple workshop for building a dungeon generation algorithm b/c my D3D11 renderer is still in its infancy and
   too specialized to conviniently display this. Oops.
 
-  A* pathfinding links:
-  https://en.wikipedia.org/wiki/A*_search_algorithm
-  https://en.wikipedia.org/wiki/Priority_queue
-  https://en.wikipedia.org/wiki/Taxicab_geometry
-
   For when I go 3D, here are some links relating to extending the bowyer-watson algorithm:
   https://en.wikipedia.org/wiki/Tetrahedron# (Circumradius & circumcenter for the circumsphere are defined in this article)
 */
+
+#define DUNGEON_ROOM_MAX_CONNECTIONS 3
+
+typedef u32 Dungeon_Tile_Flags;
+enum {
+  DUNGEON_TILE_EMPTY = (1 << 0),
+  DUNGEON_TILE_ROOM = (1 << 1),
+  DUNGEON_TILE_HALLWAY = (1 << 2),
+};
 
 typedef struct Edge {
   struct Edge *next;
@@ -73,21 +77,28 @@ struct Vertex {
 
 typedef struct Dungeon_Room {
   struct Dungeon_Room *next;
-  Vec2 grid_pos;
-  Vec2 grid_size;
+
+  struct Dungeon_Room *connections[DUNGEON_ROOM_MAX_CONNECTIONS];
+  u64 num_connections;
 
   Vec2 world_pos;
   Vec2 world_size;
 } Dungeon_Room;
 
-typedef struct Proto_Dungeon {
-  Dungeon_Room *first, *last;
+typedef struct Dungeon_Tile {
+  Dungeon_Tile_Flags flags;
+  Dungeon_Room *room; // TODO: Pointer or ID?
+} Dungeon_Tile;
 
+typedef struct Dungeon {
   u64 width, height;
   u64 grid_dim;
-  b32 *tile_occupied;
+
+  Dungeon_Room *first, *last;
   u64 num_rooms;
-} Proto_Dungeon;
+
+  Dungeon_Tile *tiles;
+} Dungeon;
 
 global u64 window_width = 1280, window_height = 720;
 
@@ -371,12 +382,14 @@ gaussian_next (f64 mu, f64 sigma) {
   return mu + sigma*Z;
 }
 
-function void
-dungeon_push_room (Arena *arena, Proto_Dungeon *dungeon, Dungeon_Room room) {
+function Dungeon_Room*
+dungeon_push_room (Arena *arena, Dungeon *dungeon, Dungeon_Room room) {
   Dungeon_Room *node = arena_pushn(arena, Dungeon_Room, 1);
   *node = room;
   sll_queue_push(dungeon->first, dungeon->last, node);
   dungeon->num_rooms++;
+
+  return node;
 }
 
 function b32
@@ -385,6 +398,43 @@ rects_intersect (Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1) {
           (p1.x + s1.x > p0.x) &&
           (p0.y + s0.y > p1.y) &&
           (p1.y + s1.y > p0.y);
+}
+
+// TODO: These should be prefixed
+function Dungeon_Tile*
+index_tile_from_world (Dungeon *dungeon, Vec2 p) {
+  p = v2muls(p, 1.f/dungeon->grid_dim);
+  u64 x = p.x + dungeon->width/2;
+  u64 y = p.y + dungeon->height/2;
+
+  return &dungeon->tiles[y * dungeon->width + x];
+}
+
+function Vec2
+grid_to_world (Dungeon *dungeon, Vec2 index) {
+  Vec2 result;
+  result.x = index.x - dungeon->width/2;
+  result.y = index.y - dungeon->height/2;
+  result = v2muls(result, dungeon->grid_dim);
+
+  return result;
+}
+
+function Vec2
+world_to_grid (Dungeon *dungeon, Vec2 p) {
+  Vec2 result;
+  p = v2muls(p, 1.f/dungeon->grid_dim);
+  result.x = p.x + dungeon->width/2;
+  result.y = p.y + dungeon->height/2;
+
+  return result;
+}
+
+function Dungeon_Room*
+get_room_at_pos (Dungeon *dungeon, Vec2 p) {
+  Dungeon_Tile *tile = index_tile_from_world(dungeon, p);
+
+  return tile->room;
 }
 
 typedef struct Dungeon_Create_Params {
@@ -419,13 +469,13 @@ typedef struct Dungeon_Create_Params {
   })
 
 // This can 100% be improved, it just feels so jank and messy.
-function Proto_Dungeon
+function Dungeon
 dungeon_create_ (Arena *arena, Dungeon_Create_Params *p) {
-  Proto_Dungeon result = {0};
+  Dungeon result = {0};
   result.width = p->map_width;
   result.height = p->map_height;
   result.grid_dim = p->grid_dim;
-  result.tile_occupied = arena_pushn(arena, b32, result.width * result.height);
+  result.tiles = arena_pushn(arena, Dungeon_Tile, result.width * result.height);
 
   f32 half_width = (f32)p->map_width / 2.f;
   f32 half_height = (f32)p->map_height / 2.f;
@@ -436,23 +486,25 @@ dungeon_create_ (Arena *arena, Dungeon_Create_Params *p) {
     f32 clamped_width  = clamp(width,  p->room_width_floor,  p->room_width_ceil);
     f32 clamped_height = clamp(height, p->room_height_floor, p->room_height_ceil);
     Vec2 grid_size = v2(clamped_width, clamped_height);
+    Vec2 world_size = v2muls(grid_size, p->grid_dim);
     u64 max_tries = 2;
     u64 attempt = 0;
     while (attempt < max_tries) {
       f32 x = (f32)(rand() % p->map_width) - half_width;
       f32 y = (f32)(rand() % p->map_height) - half_height;
       Vec2 grid_pos = v2(x,y);
+      Vec2 world_pos = v2muls(grid_pos, p->grid_dim);
 
       b32 clear = true;
       if (grid_pos.x + grid_size.x > half_width || grid_pos.y + grid_size.y > half_height) {
         clear = false;
       } else {
         foreach (room, &result) {
-          Vec2 border = v2(p->room_width_border, p->room_height_border);
-          Vec2 new_pos = v2sub(grid_pos, border);
-          Vec2 new_size = v2add(grid_size, border);
-          Vec2 room_pos = v2sub(room->grid_pos, border);
-          Vec2 room_size = v2add(room->grid_size, border);
+          Vec2 border = v2muls(v2(p->room_width_border, p->room_height_border), p->grid_dim);
+          Vec2 new_pos = v2sub(world_pos, border);
+          Vec2 new_size = v2add(world_size, border);
+          Vec2 room_pos = v2sub(room->world_pos, border);
+          Vec2 room_size = v2add(room->world_size, border);
           if (rects_intersect(new_pos, new_size, room_pos, room_size)) {
             clear = false;
             break;
@@ -460,20 +512,19 @@ dungeon_create_ (Arena *arena, Dungeon_Create_Params *p) {
         }
       }
       if (clear) {
-        new_room.grid_pos   = grid_pos;
-        new_room.grid_size  = grid_size;
-        new_room.world_pos  = v2muls(grid_pos, p->grid_dim);
-        new_room.world_size = v2muls(grid_size, p->grid_dim);
-        dungeon_push_room(arena, &result, new_room);
-/*
-        for (u64 h = 0; h < grid_size.y; ++h) {
-          for (u64 w = 0; w < grid_size.x; ++w) {
-            u64 x = grid_pos.x + w;
-            u64 y = grid_pos.y + h;
-            result.tile_occupied[y * result.width + x] = true;
+        new_room.world_pos  = world_pos;
+        new_room.world_size = world_size;
+        Dungeon_Room *new_room_ptr = dungeon_push_room(arena, &result, new_room);
+
+        grid_pos = v2add(grid_pos, v2(half_width, half_height));
+        for (u64 y = grid_pos.y; y < grid_pos.y + grid_size.y; ++y) {
+          for (u64 x = grid_pos.x; x < grid_pos.x + grid_size.x; ++x) {
+            Dungeon_Tile *tile = &result.tiles[y * result.width + x];
+            tile->flags |= DUNGEON_TILE_ROOM;
+            tile->room = new_room_ptr;
           }
         }
-*/
+
         break;
       }
 
@@ -498,15 +549,17 @@ main (void) {
 
   u64 map_width = 512, map_height = 256;
   u64 grid_dim = 16;
-  Proto_Dungeon dungeon = dungeon_create(arena,
-    .target_room_count = 5000,
+  Dungeon dungeon = dungeon_create(arena,
+    .target_room_count = 500,
     .grid_dim   = grid_dim,
     .map_width  = map_width,
     .map_height = map_height,
     .room_width_mean = 16,
     .room_width_deviation = 3,
     .room_height_mean = 8,
-    .room_height_deviation = 2);
+    .room_height_deviation = 2,
+    .room_width_border = 2,
+    .room_height_border = 1);
 
   Vec2 *room_midpoints = arena_pushn(arena, Vec2, dungeon.num_rooms);
   foreach (room, &dungeon) {
@@ -520,13 +573,68 @@ main (void) {
 
   // TODO: add a few edges from the delaunay back into the pathway
 
-  // A* algorithm to create paths between rooms
-  Temp_Arena scratch;
-  ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+  foreach (path, &pathway) {
+    Dungeon_Room *r1 = get_room_at_pos(&dungeon, path->p0);
+    Dungeon_Room *r2 = get_room_at_pos(&dungeon, path->p1);
+    r1->connections[r1->num_connections++] = r2;
+    r2->connections[r2->num_connections++] = r1;
 
+    Vec2 mp = v2muls(v2add(path->p0, path->p1), 0.5f);
+    Vec2 mp_grid = world_to_grid(&dungeon, mp);
+    Vec2 r1_p0 = r1->world_pos;
+    Vec2 r1_p1 = v2add(r1->world_pos, r1->world_size);
+    Vec2 r2_p0 = r2->world_pos;
+    Vec2 r2_p1 = v2add(r2->world_pos, r2->world_size);
+    b32 x_is_close = mp.x > r1_p0.x && mp.x < r1_p1.x && mp.x > r2_p0.x && mp.x < r2_p1.x;
+    b32 y_is_close = mp.y > r1_p0.y && mp.y < r1_p1.y && mp.y > r2_p0.y && mp.y < r2_p1.y;
 
-    foreach (edge, &pathway) {
+    // TODO: I think there is a way to condense/simplify this process.
 
+    // First we check if we can reach the room through the midpoint, and connect with a straight line.
+    if (x_is_close) {
+      if (r1->world_pos.y > r2->world_pos.y)
+        swap(r1, r2);
+      Vec2 min = v2add(r1->world_pos, r1->world_size);
+      Vec2 max = r2->world_pos;
+      min = world_to_grid(&dungeon, min);
+      max = world_to_grid(&dungeon, max);
+      for (u64 y = min.y; y < max.y; ++y) {
+        Dungeon_Tile *tile = &dungeon.tiles[y * dungeon.width + (u64)mp_grid.x];
+        tile->flags |= DUNGEON_TILE_HALLWAY;
+      }
+    } else if (y_is_close) {
+      if (r1->world_pos.x > r2->world_pos.x)
+        swap(r1, r2);
+      Vec2 min = v2add(r1->world_pos, r1->world_size);
+      Vec2 max = r2->world_pos;
+      min = world_to_grid(&dungeon, min);
+      max = world_to_grid(&dungeon, max);
+      for (u64 x = min.x; x < max.x; ++x) {
+        Dungeon_Tile *tile = &dungeon.tiles[(u64)mp_grid.y * dungeon.width + x];
+        tile->flags |= DUNGEON_TILE_HALLWAY;
+      }
+    } else {
+      // Otherwise, we need to create an L-shaped path connecting the room midpoints
+      Vec2 p0 = world_to_grid(&dungeon, path->p0);
+      Vec2 p1 = world_to_grid(&dungeon, path->p1);
+
+      u64 minx = min(p0.x, p1.x);
+      u64 maxx = max(p0.x, p1.x);
+      u64 miny = min(p0.y, p1.y);
+      u64 maxy = max(p0.y, p1.y);
+
+      u64 hy = (u64)p0.x == minx ? p0.y : p1.y;
+      for (u64 x = minx; x <= maxx; ++x) {
+        Dungeon_Tile *tile = &dungeon.tiles[hy * dungeon.width + x];
+        if ((tile->flags & DUNGEON_TILE_ROOM) == 0)
+          tile->flags |= DUNGEON_TILE_HALLWAY;
+      }
+
+      for (u64 y = miny; y <= maxy; ++y) {
+        Dungeon_Tile *tile = &dungeon.tiles[y * dungeon.width + maxx];
+        if ((tile->flags & DUNGEON_TILE_ROOM) == 0)
+          tile->flags |= DUNGEON_TILE_HALLWAY;
+      }
     }
   }
 
@@ -554,18 +662,32 @@ main (void) {
     ClearBackground(RAYWHITE);
     BeginMode2D(cam);
 
+    for (u64 y = 0; y < dungeon.height; ++y) {
+      for (u64 x = 0; x < dungeon.width; ++x) {
+        Dungeon_Tile tile = dungeon.tiles[y * dungeon.width + x];
+        Vec2 world_pos = grid_to_world(&dungeon, v2(x,y));
+        if (tile.flags) {
+          Color c;
+          if (tile.flags & DUNGEON_TILE_ROOM)
+            c = BLUE;
+          if (tile.flags & DUNGEON_TILE_HALLWAY)
+            c = RED;
+          DrawRectangleV(v2raylib(world_pos), v2raylib(v2(dungeon.grid_dim, dungeon.grid_dim)), c);
+        }
+      }
+    }
+    raylib_draw_grid(cam, v2muls(v2(map_width,map_height), 0.5f * grid_dim), grid_dim);
+#if 0
     foreach (room, &dungeon) {
       DrawRectangleV(v2raylib(room->world_pos), v2raylib(room->world_size), BLUE);
     }
-    raylib_draw_grid(cam, v2muls(v2(map_width,map_height), 0.5f * grid_dim), grid_dim);
-#if 1
     foreach (edge, &bw_result) {
       DrawLineEx(v2raylib(edge->p0), v2raylib(edge->p1), 2.f/cam.zoom, GREEN);
     }
-#endif
     foreach (edge, &pathway) {
       DrawLineEx(v2raylib(edge->p0), v2raylib(edge->p1), 2.f/cam.zoom, RED);
     }
+#endif
 
     EndMode2D();
     Vector2 cursor = GetScreenToWorld2D(GetMousePosition(), cam);
