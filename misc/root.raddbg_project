@@ -1,7 +1,7 @@
 // raddbg 0.9.21 project file
 
-recent_file: path: "../code/rougelike/procedural_dungeon_test/test.c"
 recent_file: path: "../code/rougelike/rougelike.c"
+recent_file: path: "../code/rougelike/procedural_dungeon_test/test.c"
 recent_file: path: "../code/base/strings.c"
 recent_file: path: "../code/os/win32/io.c"
 recent_file: path: "../code/base/memory.c"
@@ -38,16 +38,6 @@ target:
 {
   executable: "../build/rougelike.exe"
   working_directory: "../build"
-}
-type_view
-target:
-{
-  executable: "../code/rougelike/procedural_dungeon_test/test.exe"
-  working_directory: "../code/rougelike/procedural_dungeon_test/"
   enabled: 1
 }
-breakpoint:
-{
-  source_location: "../code/rougelike/procedural_dungeon_test/test.c:262:1"
-  hit_count: 1
-}
+type_view

@@ -42,12 +42,12 @@ window:
     0.483263: selected getting_started text:
     {
       selected
-      expression: "file:\"W:/code/rougelike/procedural_dungeon_test/test.c\".data"
+      expression: "file:\"W:/code/rougelike/rougelike.c\".data"
       auto: 1
       query: input: ""
-      cursor_line: 264
+      cursor_line: 574
       cursor_column: 1
-      mark_line: 264
+      mark_line: 574
       mark_column: 1
     }
     0.350070:
@@ -57,12 +57,11 @@ window:
         watch: expression: "query:locals"
         watch:
         {
-          selected
           expression: ""
           normal: 0.350000 0.339024 0.310976
           watch: vertices
         }
-        watch: expression: "query:type_views"
+        watch: selected expression: "query:type_views"
       }
       0.352231: watch: selected expression: "query:targets"
     }
@@ -70,6 +69,7 @@ window:
   split_x
   pos: 484 312
   monitor: "\\\\.\\DISPLAY1"
+  maximized
 }
 keybindings:
 {
