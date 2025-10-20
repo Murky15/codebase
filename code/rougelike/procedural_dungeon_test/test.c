@@ -19,7 +19,7 @@
   https://en.wikipedia.org/wiki/Tetrahedron# (Circumradius & circumcenter for the circumsphere are defined in this article)
 */
 
-#define DUNGEON_ROOM_MAX_CONNECTIONS 3
+#define DUNGEON_ROOM_MAX_CONNECTIONS 10
 
 typedef u32 Dungeon_Tile_Flags;
 enum {
@@ -78,6 +78,7 @@ struct Vertex {
 typedef struct Dungeon_Room {
   struct Dungeon_Room *next;
 
+  // This should probably be a linked list
   struct Dungeon_Room *connections[DUNGEON_ROOM_MAX_CONNECTIONS];
   u64 num_connections;
 
@@ -301,6 +302,8 @@ push_vertex_if_unique (Arena *arena, Vertex_Neighborhood *n, Vertex *v) {
   }
 }
 
+// TODO: We could use taxicab distance instead of euclidean for edge weights, it might make the
+// hallway generation smarter because diagonal lines will generate L paths.
 function Edge_List
 prim_mst (Arena *arena, Edge_List bw_result, u64 num_points) {
   Edge_List result = {0};
@@ -456,6 +459,9 @@ typedef struct Dungeon_Create_Params {
   u64 room_width_ceil;
   u64 room_height_floor;
   u64 room_height_ceil;
+
+  u64 hallway_width;
+  f32 percent_edges_included;
 } Dungeon_Create_Params;
 
 #define dungeon_create(arena, ...) dungeon_create_((arena), &(Dungeon_Create_Params){ \
@@ -465,6 +471,7 @@ typedef struct Dungeon_Create_Params {
   .room_width_ceil = u64_max,  \
   .room_height_floor = 1,      \
   .room_height_ceil = u64_max, \
+  .hallway_width = 3,          \
   __VA_ARGS__                  \
   })
 
@@ -554,10 +561,10 @@ main (void) {
     .grid_dim   = grid_dim,
     .map_width  = map_width,
     .map_height = map_height,
-    .room_width_mean = 16,
-    .room_width_deviation = 3,
-    .room_height_mean = 8,
-    .room_height_deviation = 2);
+    .room_width_mean = 48,
+    .room_width_deviation = 10,
+    .room_height_mean = 48,
+    .room_height_deviation = 10);
 
   Vec2 *room_midpoints = arena_pushn(arena, Vec2, dungeon.num_rooms);
   foreach (room, &dungeon) {
@@ -569,8 +576,18 @@ main (void) {
   Edge_List bw_result = bowyer_watson_triangulate(arena, room_midpoints, dungeon.num_rooms, super);
   Edge_List pathway = prim_mst(arena, bw_result, dungeon.num_rooms);
 
-  // TODO: add a few edges from the delaunay back into the pathway
+   // TODO: Add this to the create params struct
+  u64 hallway_width = 5;
+  f32 percent_edges_included = 18;
 
+  foreach (edge, &bw_result) {
+    f32 val = (f32)((rand() % 100) + 1);
+    if (val < percent_edges_included || almost_equal(val, percent_edges_included)) {
+      push_edge_if_unique(arena, &pathway, *edge);
+    }
+  }
+
+  f32 onside_width = floorf(hallway_width / 2.f) * dungeon.grid_dim;
   foreach (path, &pathway) {
     Dungeon_Room *r1 = get_room_at_pos(&dungeon, path->p0);
     Dungeon_Room *r2 = get_room_at_pos(&dungeon, path->p1);
@@ -578,59 +595,42 @@ main (void) {
     r2->connections[r2->num_connections++] = r1;
 
     Vec2 mp = v2muls(v2add(path->p0, path->p1), 0.5f);
-    Vec2 mp_grid = world_to_grid(&dungeon, mp);
     Vec2 r1_p0 = r1->world_pos;
     Vec2 r1_p1 = v2add(r1->world_pos, r1->world_size);
     Vec2 r2_p0 = r2->world_pos;
     Vec2 r2_p1 = v2add(r2->world_pos, r2->world_size);
-    b32 x_is_close = mp.x > r1_p0.x && mp.x < r1_p1.x && mp.x > r2_p0.x && mp.x < r2_p1.x;
-    b32 y_is_close = mp.y > r1_p0.y && mp.y < r1_p1.y && mp.y > r2_p0.y && mp.y < r2_p1.y;
+    b32 x_is_close = mp.x - onside_width > r1_p0.x && mp.x + onside_width < r1_p1.x && mp.x - onside_width > r2_p0.x && mp.x + onside_width < r2_p1.x;
+    b32 y_is_close = mp.y - onside_width > r1_p0.y && mp.y + onside_width < r1_p1.y && mp.y - onside_width > r2_p0.y && mp.y + onside_width < r2_p1.y;
 
     // TODO: I think there is a way to condense/simplify this process.
 
     // First we check if we can reach the room through the midpoint, and connect with a straight line.
     if (x_is_close) {
-      if (r1->world_pos.y > r2->world_pos.y)
-        swap(r1, r2);
-      Vec2 min = v2add(r1->world_pos, r1->world_size);
-      Vec2 max = r2->world_pos;
-      for (f32 y = min.y; y < max.y; ++y) {
-        Dungeon_Tile *tile = index_tile_from_world(&dungeon, v2(mp.x, y));
-        tile->flags |= DUNGEON_TILE_HALLWAY;
+      if (r1_p0.y > r2_p0.y) {
+        swap(r1_p0, r2_p0);
+      }
+      for (f32 y = r1_p0.y; y < r2_p0.y; y += dungeon.grid_dim) {
+        for (f32 x = mp.x - onside_width; x <= mp.x + onside_width; x += dungeon.grid_dim) {
+          Dungeon_Tile *tile = index_tile_from_world(&dungeon, v2(x, y));
+          if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
+            tile->flags |= DUNGEON_TILE_HALLWAY;
+          }
+        }
       }
     } else if (y_is_close) {
-      if (r1->world_pos.x > r2->world_pos.x)
-        swap(r1, r2);
-      Vec2 min = v2add(r1->world_pos, r1->world_size);
-      Vec2 max = r2->world_pos;
-      for (f32 x = min.x; x < max.x; ++x) {
-        Dungeon_Tile *tile = index_tile_from_world(&dungeon, v2(x, mp.y));
-        tile->flags |= DUNGEON_TILE_HALLWAY;
+      if (r1_p0.x > r2_p0.x) {
+        swap(r1_p0, r2_p0);
+      }
+      for (f32 x = r1_p0.x; x < r2_p0.x; x += dungeon.grid_dim) {
+        for (f32 y = mp.y - onside_width; y <= mp.y + onside_width; y += dungeon.grid_dim) {
+          Dungeon_Tile *tile = index_tile_from_world(&dungeon, v2(x, y));
+          if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
+            tile->flags |= DUNGEON_TILE_HALLWAY;
+          }
+        }
       }
     } else {
       // Otherwise, we need to create an L-shaped path connecting the room midpoints
-      /* TODO: Is this way faster?
-      Vec2 p0 = world_to_grid(&dungeon, path->p0);
-      Vec2 p1 = world_to_grid(&dungeon, path->p1);
-
-      u64 minx = min(p0.x, p1.x);
-      u64 maxx = max(p0.x, p1.x);
-      u64 miny = min(p0.y, p1.y);
-      u64 maxy = max(p0.y, p1.y);
-
-      u64 hy = (u64)p0.x == minx ? p0.y : p1.y;
-      for (u64 x = minx; x <= maxx; ++x) {
-        Dungeon_Tile *tile = &dungeon.tiles[hy * dungeon.width + x];
-        if ((tile->flags & DUNGEON_TILE_ROOM) == 0)
-          tile->flags |= DUNGEON_TILE_HALLWAY;
-      }
-
-      for (u64 y = miny; y <= maxy; ++y) {
-        Dungeon_Tile *tile = &dungeon.tiles[y * dungeon.width + maxx];
-        if ((tile->flags & DUNGEON_TILE_ROOM) == 0)
-          tile->flags |= DUNGEON_TILE_HALLWAY;
-      }
-      */
       Vec2 p0 = path->p0;
       Vec2 p1 = path->p1;
 
@@ -640,16 +640,23 @@ main (void) {
       f32 maxy = max(p0.y, p1.y);
 
       f32 hy = p0.x == minx ? p0.y : p1.y;
-      for (f32 x = minx; x <= maxx; ++x) {
-        Dungeon_Tile *tile = index_tile_from_world(&dungeon, v2(x, hy));
-        if ((tile->flags & DUNGEON_TILE_ROOM) == 0)
-          tile->flags |= DUNGEON_TILE_HALLWAY;
+      // NOTE: We do this check on the outer loop as well to handle the corners, but it still isn't perfect.
+      for (f32 x = floorf(minx - onside_width); x <= ceilf(maxx + onside_width); x += dungeon.grid_dim) {
+        for (f32 y = hy - onside_width; y <= hy + onside_width; y += dungeon.grid_dim) {
+          Dungeon_Tile *tile = index_tile_from_world(&dungeon, v2(x, y));
+          if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
+            tile->flags |= DUNGEON_TILE_HALLWAY;
+          }
+        }
       }
 
-      for (f32 y = miny; y <= maxy; ++y) {
-        Dungeon_Tile *tile = index_tile_from_world(&dungeon, v2(maxx, y));
-        if ((tile->flags & DUNGEON_TILE_ROOM) == 0)
-          tile->flags |= DUNGEON_TILE_HALLWAY;
+      for (f32 y = floorf(miny - onside_width); y <= ceilf(maxy + onside_width); y += dungeon.grid_dim) {
+        for (f32 x = maxx - onside_width; x <= maxx + onside_width; x += dungeon.grid_dim) {
+          Dungeon_Tile *tile = index_tile_from_world(&dungeon, v2(x, y));
+          if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
+            tile->flags |= DUNGEON_TILE_HALLWAY;
+          }
+        }
       }
     }
   }
@@ -692,8 +699,8 @@ main (void) {
         }
       }
     }
-    raylib_draw_grid(cam, v2muls(v2(map_width,map_height), 0.5f * grid_dim), grid_dim);
 #if 0
+    // raylib_draw_grid(cam, v2muls(v2(map_width,map_height), 0.5f * grid_dim), grid_dim);
     foreach (room, &dungeon) {
       DrawRectangleV(v2raylib(room->world_pos), v2raylib(room->world_size), BLUE);
     }
