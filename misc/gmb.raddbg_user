@@ -45,10 +45,10 @@ window:
       expression: "file:\"W:/code/rougelike/rougelike.c\".data"
       auto: 1
       query: input: ""
-      cursor_line: 574
-      cursor_column: 1
-      mark_line: 574
-      mark_column: 1
+      cursor_line: 798
+      cursor_column: 67
+      mark_line: 798
+      mark_column: 67
     }
     0.350070:
     {
