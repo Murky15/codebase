@@ -42,26 +42,30 @@ window:
     0.483263: selected getting_started text:
     {
       selected
-      expression: "file:\"W:/code/rougelike/rougelike.c\".data"
+      expression: "file:\"W:/code/rougelike/dungeon.c\".data"
       auto: 1
-      query: input: ""
-      cursor_line: 798
-      cursor_column: 67
-      mark_line: 798
-      mark_column: 67
+      query:
+      {
+        input: ""
+        cmd: search
+      }
+      cursor_line: 406
+      cursor_column: 55
+      mark_line: 406
+      mark_column: 55
     }
     0.350070:
     {
       0.647769:
       {
-        watch: expression: "query:locals"
+        watch: selected expression: "query:locals"
         watch:
         {
           expression: ""
           normal: 0.350000 0.339024 0.310976
           watch: vertices
         }
-        watch: selected expression: "query:type_views"
+        watch: expression: "query:type_views"
       }
       0.352231: watch: selected expression: "query:targets"
     }

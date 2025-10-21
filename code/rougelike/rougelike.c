@@ -650,9 +650,9 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     .grid_dim   = 16,
     .map_width  = 512,
     .map_height = 512,
-    .room_width_mean = 32,
+    .room_width_mean = 48,
     .room_width_deviation = 10,
-    .room_height_mean = 32,
+    .room_height_mean = 48,
     .room_height_deviation = 10,
     .hallway_width = 5,
     .percent_edges_included = 18);
@@ -671,7 +671,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
   Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 1.f, 1000.f);
   Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
   Camera cam = {0};
-  f32 cam_zoom = 150.f;
+  f32 cam_zoom = 450.f;
   //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
   //cam.pos = v3(0, -cam_zoom, 1);
   cam.pos = v3(0, cam_zoom - 30, -cam_zoom);

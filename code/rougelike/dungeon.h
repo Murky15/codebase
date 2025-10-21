@@ -1,8 +1,6 @@
 #ifndef DUNGEON_H
 #define DUNGEON_H
 
-#define DUNGEON_ROOM_MAX_CONNECTIONS 10
-
 typedef u32 Dungeon_Tile_Flags;
 enum {
   DUNGEON_TILE_EMPTY = (1 << 0),
@@ -61,11 +59,14 @@ typedef struct Dungeon_Room {
   struct Dungeon_Room *next;
 
   // This should probably be a linked list
-  struct Dungeon_Room *connections[DUNGEON_ROOM_MAX_CONNECTIONS];
+  //struct Dungeon_Room *connections[DUNGEON_ROOM_MAX_CONNECTIONS];
   u64 num_connections;
 
   Vec2 world_pos;
   Vec2 world_size;
+
+  Vec2 grid_pos;
+  Vec2 grid_size;
 } Dungeon_Room;
 
 typedef struct Dungeon_Tile {

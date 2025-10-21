@@ -267,6 +267,14 @@ rects_intersect (Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1) {
 }
 
 function Dungeon_Tile*
+d_index_tile (Dungeon *dungeon, Vec2 index) {
+  u64 x = index.x + dungeon->width/2;
+  u64 y = index.y + dungeon->height/2;
+
+  return &dungeon->tiles[y * dungeon->width + x];
+}
+
+function Dungeon_Tile*
 d_index_tile_from_world (Dungeon *dungeon, Vec2 p) {
   p = v2muls(p, 1.f/dungeon->grid_dim);
   u64 x = p.x + dungeon->width/2;
@@ -277,22 +285,18 @@ d_index_tile_from_world (Dungeon *dungeon, Vec2 p) {
 
 function Vec2
 d_grid_to_world (Dungeon *dungeon, Vec2 index) {
-  Vec2 result;
-  result.x = index.x - dungeon->width/2;
-  result.y = index.y - dungeon->height/2;
-  result = v2muls(result, dungeon->grid_dim);
+  index = v2muls(index, dungeon->grid_dim);
 
-  return result;
+  return index;
 }
 
 function Vec2
 d_world_to_grid (Dungeon *dungeon, Vec2 p) {
-  Vec2 result;
   p = v2muls(p, 1.f/dungeon->grid_dim);
-  result.x = p.x + dungeon->width/2;
-  result.y = p.y + dungeon->height/2;
+  p.x = roundf(p.x);
+  p.y = roundf(p.y);
 
-  return result;
+  return p;
 }
 
 function Dungeon_Room*
@@ -349,6 +353,8 @@ d_create_ (Arena *arena, Dungeon_Create_Params *p) {
         if (clear) {
           new_room.world_pos  = world_pos;
           new_room.world_size = world_size;
+          new_room.grid_pos   = grid_pos;
+          new_room.grid_size  = grid_size;
           Dungeon_Room *new_room_ptr = d_push_room(arena, &result, new_room);
 
           grid_pos = v2add(grid_pos, v2(half_width, half_height));
@@ -387,18 +393,19 @@ d_create_ (Arena *arena, Dungeon_Create_Params *p) {
     }
 
     // NOTE: Step three: Connect rooms based on MST.
-    f32 onside_width = floorf(p->hallway_width / 2.f) * result.grid_dim;
+    s64 onside_width = p->hallway_width / 2;
     foreach (path, &pathway) {
       Dungeon_Room *r1 = d_get_room_at_pos(&result, path->p0);
       Dungeon_Room *r2 = d_get_room_at_pos(&result, path->p1);
-      r1->connections[r1->num_connections++] = r2;
-      r2->connections[r2->num_connections++] = r1;
+      // We don't need this yet
+      //r1->connections[r1->num_connections++] = r2;
+      //r2->connections[r2->num_connections++] = r1;
 
-      Vec2 mp = v2muls(v2add(path->p0, path->p1), 0.5f);
-      Vec2 r1_p0 = r1->world_pos;
-      Vec2 r1_p1 = v2add(r1->world_pos, r1->world_size);
-      Vec2 r2_p0 = r2->world_pos;
-      Vec2 r2_p1 = v2add(r2->world_pos, r2->world_size);
+      Vec2 mp = d_world_to_grid(&result, v2muls(v2add(path->p0, path->p1), 0.5f));
+      Vec2 r1_p0 = r1->grid_pos;
+      Vec2 r1_p1 = v2add(r1->grid_pos, r1->grid_size);
+      Vec2 r2_p0 = r2->grid_pos;
+      Vec2 r2_p1 = v2add(r2->grid_pos, r2->grid_size);
       b32 x_is_close = mp.x - onside_width > r1_p0.x && mp.x + onside_width < r1_p1.x && mp.x - onside_width > r2_p0.x && mp.x + onside_width < r2_p1.x;
       b32 y_is_close = mp.y - onside_width > r1_p0.y && mp.y + onside_width < r1_p1.y && mp.y - onside_width > r2_p0.y && mp.y + onside_width < r2_p1.y;
 
@@ -407,9 +414,9 @@ d_create_ (Arena *arena, Dungeon_Create_Params *p) {
         if (r1_p0.y > r2_p0.y) {
           swap(r1_p0, r2_p0);
         }
-        for (f32 y = r1_p0.y; y < r2_p0.y; y += result.grid_dim) {
-          for (f32 x = mp.x - onside_width; x <= mp.x + onside_width; x += result.grid_dim) {
-            Dungeon_Tile *tile = d_index_tile_from_world(&result, v2(x, y));
+        for (s64 y = r1_p0.y; y < r2_p0.y; ++y) {
+          for (s64 x = mp.x - onside_width; x <= mp.x + onside_width; ++x) {
+            Dungeon_Tile *tile = d_index_tile(&result, v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
             }
@@ -419,9 +426,9 @@ d_create_ (Arena *arena, Dungeon_Create_Params *p) {
         if (r1_p0.x > r2_p0.x) {
           swap(r1_p0, r2_p0);
         }
-        for (f32 x = r1_p0.x; x < r2_p0.x; x += result.grid_dim) {
-          for (f32 y = mp.y - onside_width; y <= mp.y + onside_width; y += result.grid_dim) {
-            Dungeon_Tile *tile = d_index_tile_from_world(&result, v2(x, y));
+        for (s64 x = r1_p0.x; x < r2_p0.x; ++x) {
+          for (s64 y = mp.y - onside_width; y <= mp.y + onside_width; ++y) {
+            Dungeon_Tile *tile = d_index_tile(&result, v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
             }
@@ -429,28 +436,38 @@ d_create_ (Arena *arena, Dungeon_Create_Params *p) {
         }
       } else {
         // Otherwise, we need to create an L-shaped path connecting the room midpoints
-        Vec2 p0 = path->p0;
-        Vec2 p1 = path->p1;
+        Vec2 p0 = d_world_to_grid(&result, path->p0);
+        Vec2 p1 = d_world_to_grid(&result, path->p1);
 
-        f32 minx = min(p0.x, p1.x);
-        f32 maxx = max(p0.x, p1.x);
-        f32 miny = min(p0.y, p1.y);
-        f32 maxy = max(p0.y, p1.y);
+        s64 minx = min(p0.x, p1.x);
+        s64 maxx = max(p0.x, p1.x);
+        s64 miny = min(p0.y, p1.y);
+        s64 maxy = max(p0.y, p1.y);
 
-        f32 hy = p0.x == minx ? p0.y : p1.y;
-        // NOTE: We do this check on the outer loop as well to handle the corners, but it still isn't perfect.
-        for (f32 x = floorf(minx - onside_width); x <= ceilf(maxx + onside_width); x += result.grid_dim) {
-          for (f32 y = hy - onside_width; y <= hy + onside_width; y += result.grid_dim) {
-            Dungeon_Tile *tile = d_index_tile_from_world(&result, v2(x, y));
+        // TODO: Maybe this shouldn't be a random value? It would be a lot more work, but we could try and determine
+        // which L-path is the shortest and use that. But this also has its own endearing qualities. I think...
+        s64 alternate_start_y = rand() % 2;
+        s64 hy, hx;
+        if (alternate_start_y) {
+          hy = p0.x == minx ? p0.y : p1.y;
+          hx = maxx;
+        } else {
+          hx = p0.y == miny ? p0.x : p1.x;
+          hy = maxy;
+        }
+
+        for (s64 x = minx; x <= maxx + onside_width; ++x) {
+          for (s64 y = hy - onside_width; y <= hy + onside_width; ++y) {
+            Dungeon_Tile *tile = d_index_tile(&result, v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
             }
           }
         }
 
-        for (f32 y = floorf(miny - onside_width); y <= ceilf(maxy + onside_width); y += result.grid_dim) {
-          for (f32 x = maxx - onside_width; x <= maxx + onside_width; x += result.grid_dim) {
-            Dungeon_Tile *tile = d_index_tile_from_world(&result, v2(x, y));
+        for (s64 y = miny; y <= maxy + onside_width; ++y) {
+          for (s64 x = hx - onside_width; x <= hx + onside_width; ++x) {
+            Dungeon_Tile *tile = d_index_tile(&result, v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
             }
