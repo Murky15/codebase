@@ -40,8 +40,6 @@ read_only s64 s64_max = 0x7fffffffffffffff;
 #ifndef BASE_TYPES_ESSENTIAL_ONLY
 // @todo: Fixed-point implementation
 
-//- @note: Array Types (this was a dumb idea)
-
 #define make_array_type(T) typedef struct {T *array; u64 count;} glue(T,Array)
 
 make_array_type(s8);
