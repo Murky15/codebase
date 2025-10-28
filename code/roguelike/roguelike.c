@@ -216,7 +216,7 @@ win32_create_window (HINSTANCE hInstance) {
   HWND hwnd = CreateWindowEx(
     0,
     TEXT("MainWindowClass"),
-    TEXT("Rougelike"),
+    TEXT("Roguelike"),
     WS_OVERLAPPEDWINDOW | WS_VISIBLE,
     CW_USEDEFAULT,
     CW_USEDEFAULT,
@@ -283,8 +283,8 @@ r_init (HWND hwnd) {
   // Compile & create shaders
   ID3DBlob *vs_code_blob, *ps_code_blob;
   ID3DBlob *vs_errors_blob, *ps_errors_blob;
-  D3DCompileFromFile(L"W:/code/rougelike/shaders.hlsl", 0, 0, "vs_main", "vs_5_0", D3DCOMPILE_DEBUG, 0, &vs_code_blob, &vs_errors_blob);
-  D3DCompileFromFile(L"W:/code/rougelike/shaders.hlsl", 0, 0, "ps_main", "ps_5_0", D3DCOMPILE_DEBUG, 0, &ps_code_blob, &ps_errors_blob);
+  D3DCompileFromFile(L"W:/code/roguelike/shaders.hlsl", 0, 0, "vs_main", "vs_5_0", D3DCOMPILE_DEBUG, 0, &vs_code_blob, &vs_errors_blob);
+  D3DCompileFromFile(L"W:/code/roguelike/shaders.hlsl", 0, 0, "ps_main", "ps_5_0", D3DCOMPILE_DEBUG, 0, &ps_code_blob, &ps_errors_blob);
   String8 vs_code, ps_code, vs_errors, ps_errors;
   vs_code = d3d11_buffer_from_blob(vs_code_blob);
   ps_code = d3d11_buffer_from_blob(ps_code_blob);
@@ -645,7 +645,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
   f32 render_width = render_dim.width;
   f32 render_height = render_dim.height;
 
-  Texture_Atlas sprites = load_textures(perm, str8_lit("W:/assets/rougelike/0x72_DungeonTilesetII_v1.7"));
+  Texture_Atlas sprites = load_textures(perm, str8_lit("W:/assets/roguelike/0x72_DungeonTilesetII_v1.7"));
   r_create_and_bind_texture(sprites.raw_texture_data);
 
   Dungeon dungeon = d_create(perm,
@@ -674,7 +674,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
   Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 1.f, 1000.f);
   Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
   Camera cam = {0};
-  f32 cam_zoom = 450.f;
+  f32 cam_zoom = 150.f;
   //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
   //cam.pos = v3(0, -cam_zoom, 1);
   cam.pos = v3(0, cam_zoom - 30, -cam_zoom);
