@@ -141,7 +141,7 @@ enum {
     OS_Linux,
     OS_Emscripten,
     OS_Bsd,
-    
+
     OS_Count
 };
 
@@ -153,7 +153,7 @@ enum {
     Arch_X86,
     Arch_X64,
     Arch_RISCV,
-    
+
     Arch_Count
 };
 
@@ -164,31 +164,9 @@ enum {
     Compiler_GCC,
     Compiler_CL,
     Compiler_TCC,
-    
+
     Compiler_Count
 };
-
-void
-ctx_print (void) {
-    puts("--- CONTEXT REPORT ---");
-    printf("Clang: %d\n", COMPILER_CLANG);
-    printf("GCC: %d\n", COMPILER_GCC);
-    printf("MSVC: %d\n", COMPILER_CL);
-    printf("TCC: %d\n", COMPILER_TCC);
-    printf("BSD: %d\n", OS_BSD);
-    printf("Emscripten: %d\n", OS_EMSCRIPTEN);
-    printf("Linux: %d\n", OS_LINUX);
-    printf("Mac: %d\n", OS_MAC);
-    printf("Unix-like: %d\n", OS_UNIX_LIKE);
-    printf("Windows: %d\n", OS_WINDOWS);
-    printf("Arm 32bit: %d\n", ARCH_ARM32);
-    printf("Arm 64bit: %d\n", ARCH_ARM64);
-    printf("x86: %d\n", ARCH_X86);
-    printf("x64: %d\n", ARCH_X64);
-    printf("riscv: %d\n", ARCH_RISCV);
-    printf("cpp: %d\n", LANG_CPP);
-    printf("c: %d\n\n", LANG_C);
-}
 
 OS_Type
 ctx_get_os (void) {
@@ -202,7 +180,7 @@ ctx_get_os (void) {
     return OS_Mac;
 #elif OS_WINDOWS
     return OS_Windows;
-#else 
+#else
     return OS_Null;
 #endif
 }
@@ -234,9 +212,31 @@ ctx_get_compiler (void) {
     return Compiler_CL;
 #elif COMPILER_TCC
     return Compiler_TCC;
-#else 
+#else
     return Compiler_Null;
 #endif
+}
+
+void
+ctx_print (void) {
+    puts("--- CONTEXT REPORT ---");
+    printf("Clang: %d\n", COMPILER_CLANG);
+    printf("GCC: %d\n", COMPILER_GCC);
+    printf("MSVC: %d\n", COMPILER_CL);
+    printf("TCC: %d\n", COMPILER_TCC);
+    printf("BSD: %d\n", OS_BSD);
+    printf("Emscripten: %d\n", OS_EMSCRIPTEN);
+    printf("Linux: %d\n", OS_LINUX);
+    printf("Mac: %d\n", OS_MAC);
+    printf("Unix-like: %d\n", OS_UNIX_LIKE);
+    printf("Windows: %d\n", OS_WINDOWS);
+    printf("Arm 32bit: %d\n", ARCH_ARM32);
+    printf("Arm 64bit: %d\n", ARCH_ARM64);
+    printf("x86: %d\n", ARCH_X86);
+    printf("x64: %d\n", ARCH_X64);
+    printf("riscv: %d\n", ARCH_RISCV);
+    printf("cpp: %d\n", LANG_CPP);
+    printf("c: %d\n\n", LANG_C);
 }
 
 #endif // BASE_CONTEXT_H

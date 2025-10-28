@@ -25,7 +25,7 @@ push_edge (Arena *arena, Edge_List *edges, Edge e) {
 function void
 push_edge_if_unique (Arena *arena, Edge_List *edges, Edge e) {
   b32 unique = true;
-  foreach (edge, edges) {
+  for each_in_list (edge, edges) {
     if (edges_are_equal(e, *edge)) {
       unique = false;
       break;
@@ -93,7 +93,7 @@ bowyer_watson_triangulate (Arena *arena, Vec2 *points, u64 num_points, Triangle 
     for (u64 i = 0; i < num_points; ++i) {
       Vec2 p = points[i];
       Edge_List edges = {0};
-      foreach (triangle, &delaunay) {
+      for each_in_list (triangle, &delaunay) {
         if (!triangle->marked_for_delete) {
           f32 dist = v2dist(p, triangle->circum_center);
           if (dist < triangle->circum_radius) {
@@ -102,9 +102,9 @@ bowyer_watson_triangulate (Arena *arena, Vec2 *points, u64 num_points, Triangle 
           }
         }
       }
-      foreach (e1, &edges) {
+      for each_in_list (e1, &edges) {
         b32 is_unique = true;
-        foreach (e2, &edges) {
+        for each_in_list (e2, &edges) {
           if (e1 != e2 && edges_are_equal(*e1, *e2)) {
             is_unique = false;
             break;
@@ -117,7 +117,7 @@ bowyer_watson_triangulate (Arena *arena, Vec2 *points, u64 num_points, Triangle 
       }
     }
 
-    foreach (triangle, &delaunay) {
+    for each_in_list (triangle, &delaunay) {
       if (!triangle->marked_for_delete && !shared_vertex(*triangle, super)) {
         push_edge_if_unique(arena, &result, triangle->e[0]);
         push_edge_if_unique(arena, &result, triangle->e[1]);
@@ -154,7 +154,7 @@ get_vertex (Vertex *vertices, u64 num_vertices, Vec2 v) {
 function void
 push_vertex_if_unique (Arena *arena, Vertex_Neighborhood *n, Vertex *v) {
   b32 unique = true;
-  foreach (neighbor, n) {
+  for each_in_list (neighbor, n) {
     if (neighbor->v == v) {
       unique = false;
       break;
@@ -175,7 +175,7 @@ prim_mst (Arena *arena, Edge_List bw_result, u64 num_points) {
   Temp_Arena scratch;
   ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
     Vertex *vertices = arena_pushn(scratch.arena, Vertex, num_points);
-    foreach (edge, &bw_result) {
+    for each_in_list (edge, &bw_result) {
       Vertex *v0 = get_vertex(vertices, num_points, edge->p0);
       Vertex *v1 = get_vertex(vertices, num_points, edge->p1);
       if (!v0->slot_filled) {
@@ -210,7 +210,7 @@ prim_mst (Arena *arena, Edge_List bw_result, u64 num_points) {
       v->explored = true;
       processed_vertices++;
 
-      foreach (neighbor, &v->neighbors) {
+      for each_in_list (neighbor, &v->neighbors) {
         Vertex *n = neighbor->v;
         if (!n->explored) {
           f32 cost = v2dist(v->p, n->p);
@@ -338,7 +338,7 @@ d_create_ (Arena *arena, Dungeon_Create_Params *p) {
         if (grid_pos.x + grid_size.x > half_width || grid_pos.y + grid_size.y > half_height) {
           clear = false;
         } else {
-          foreach (room, &result) {
+          for each_in_list (room, &result) {
             Vec2 border = v2muls(v2(p->room_width_border, p->room_height_border), p->grid_dim);
             Vec2 new_pos = v2sub(world_pos, border);
             Vec2 new_size = v2add(world_size, border);
@@ -375,7 +375,7 @@ d_create_ (Arena *arena, Dungeon_Create_Params *p) {
 
     // NOTE: Step two: Triangulate and obtain mst.
     Vec2 *room_midpoints = arena_pushn(scratch.arena, Vec2, result.num_rooms);
-    foreach (room, &result) {
+    for each_in_list (room, &result) {
       u64 i = room - result.first;
       room_midpoints[i] = v2add(room->world_pos, v2muls(room->world_size, 0.5f));
     }
@@ -385,7 +385,7 @@ d_create_ (Arena *arena, Dungeon_Create_Params *p) {
     Edge_List pathway = prim_mst(scratch.arena, bw_result, result.num_rooms);
 
     // Add some edges back to improve dungeon quality
-    foreach (edge, &bw_result) {
+    for each_in_list (edge, &bw_result) {
       f32 val = (f32)((rand() % 100) + 1);
       if (val < p->percent_edges_included || almost_equal(val, p->percent_edges_included)) {
         push_edge_if_unique(scratch.arena, &pathway, *edge);
@@ -394,7 +394,7 @@ d_create_ (Arena *arena, Dungeon_Create_Params *p) {
 
     // NOTE: Step three: Connect rooms based on MST.
     s64 onside_width = p->hallway_width / 2;
-    foreach (path, &pathway) {
+    for each_in_list (path, &pathway) {
       Dungeon_Room *r1 = d_get_room_at_pos(&result, path->p0);
       Dungeon_Room *r2 = d_get_room_at_pos(&result, path->p1);
       // We don't need this yet

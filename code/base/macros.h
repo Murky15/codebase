@@ -144,9 +144,10 @@
 #define memory_copy(d,s,sz) memmove((d),(s),(sz))
 
 //- @note: Syntax helpers
-
 #define ldefer(start, end) for(int _i_ = ((start), 0); _i_ == 0; (_i_ += 1, (end)))
-#define foreach(i,lp) for(typeof((lp)->first)(i)=(lp)->first;(i);(i)=(i)->next)
+
+// for...
+#define each_in_list(i,lp) (typeof((lp)->first)(i)=(lp)->first;(i);(i)=(i)->next)
 
 //- @note: Linked list macros
 

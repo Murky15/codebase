@@ -556,7 +556,7 @@ make_atlas_coords_from_string (String8 coords) {
     String8List numbers = str8_split(scratch.arena, coords, 1, " ");
     Vec4 coords = {0};
     u64 i = 0;
-    foreach (num, &numbers) {
+    for each_in_list (num, &numbers) {
       coords.e[i++] = f64_from_str8(num->string);
     }
     result.scale = coords.zw;
@@ -577,7 +577,7 @@ load_textures (Arena *arena, String8 absolute_path_to_asset_dir) {
     String8List atlas_lines = str8_split(scratch.arena, atlas_txt, 1, "\n");
     result.num_sprites = atlas_lines.num_nodes;
     result.sprites = arena_pushn(arena, Sprite, result.num_sprites);
-    foreach(line, &atlas_lines) {
+    for each_in_list(line, &atlas_lines) {
       u64 sep_pos = str8_find(line->string, str8_lit(" "), 0, 0);
       String8 name = str8_prefix(line->string, sep_pos);
       String8 coords = str8_skip(line->string, sep_pos+1);

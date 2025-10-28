@@ -9,14 +9,14 @@ json_token_list_push (Arena *arena, Json_Token_List *list, Json_Token token) {
 core_function Json_Token_List
 json_lex (Arena *arena, String8 json) {
     Json_Token_List tokens = zero_struct;
-    
+
     Json_Token_Type active_token_type = JSON_TOKEN_NULL;
     u64 word_idx = 0;
     b32 token_ready = false;
     for (u64 i = 0, j = 1; i < json.len; ++i, ++j) {
         u8 c = json.str[i];
         u8 nc = j < json.len ? json.str[j] : 0;
-        
+
         if (active_token_type == JSON_TOKEN_NULL) {
             if (char_is_alpha(c)) {
                 active_token_type = JSON_TOKEN_KEYWORD;
@@ -29,8 +29,8 @@ json_lex (Arena *arena, String8 json) {
                     active_token_type = JSON_TOKEN_STRING;
                     word_idx = i + 1;
                     continue;
-                } else if (c == '{' || c == '}' 
-                           || c == '[' || c == ']' 
+                } else if (c == '{' || c == '}'
+                           || c == '[' || c == ']'
                            || c == ','
                            || c == ':') {
                     Json_Token new_token = {JSON_TOKEN_PUNCTUATOR, str8_sub(json, i, j)};
@@ -43,26 +43,26 @@ json_lex (Arena *arena, String8 json) {
                 continue;
             }
         }
-        
+
         if (active_token_type == JSON_TOKEN_STRING) {
             if (c == 34) { // (")
                 // @todo: Handle escaped-string processing
                 token_ready = true;
             }
         }
-        
+
         if (active_token_type == JSON_TOKEN_NUMBER) {
-            b32 cond = char_is_digit(nc) || 
+            b32 cond = char_is_digit(nc) ||
                 nc == 'E' ||
-                nc == 'e' || 
-                nc == '.' || 
-                nc == '+' || 
+                nc == 'e' ||
+                nc == '.' ||
+                nc == '+' ||
                 nc == '-';
             if (!cond) {
                 token_ready = true;
             }
         }
-        
+
         if (active_token_type == JSON_TOKEN_KEYWORD) {
             if (!char_is_alpha(nc)) {
                 String8 keyword = str8_sub(json, word_idx, j);
@@ -75,8 +75,8 @@ json_lex (Arena *arena, String8 json) {
                     return comp_zero(Json_Token_List);
                 }
             }
-        } 
-        
+        }
+
         if (active_token_type != JSON_TOKEN_NULL && token_ready) {
             u64 end_idx = active_token_type == JSON_TOKEN_STRING ? i : j;
             Json_Token new_token = {active_token_type, str8_sub(json, word_idx, end_idx)};
@@ -85,7 +85,7 @@ json_lex (Arena *arena, String8 json) {
             token_ready = false;
         }
     }
-    
+
     return tokens;
 }
 
@@ -115,7 +115,7 @@ json_object_fetch (Json_Object *object, String8 key) {
         hash++;
         hash %= object->total_slots;
     }
-    
+
     return found == true ? object->table[hash].value : comp_zero(Json_Value);
 }
 
@@ -131,19 +131,19 @@ core_function Json_Object
 json_process_object (Arena *arena, Json_Token_Node **token) {
     Temp_Arena scratch = get_scratch(&arena, 1);
     Json_Object result = zero_struct;
-    
+
     if ((*token)->token.value.str[0] == '{') {
         Json_Set *object_sets = 0;
         u64 num_sets = 0;
         Json_Token_Node *next = (*token);
         for (Json_Token_Node *key = (*token)->next; next->token.value.str[0] != '}'; key = next) {
-            
+
             if (key->token.type == JSON_TOKEN_STRING) {
                 Json_Set *new_set = arena_pushn(scratch.arena, Json_Set, 1);
                 num_sets++;
                 if (object_sets == 0)
                     object_sets = new_set;
-                
+
                 new_set->key = key->token.value;
                 Json_Token_Node *seperator = key->next;
                 if (seperator->token.value.str[0] == ':') {
@@ -167,7 +167,7 @@ json_process_object (Arena *arena, Json_Token_Node **token) {
                 goto end;
             }
         }
-        
+
         *token = next;
         result.count = num_sets;
         result.total_slots = num_sets; // num_sets * 1.5f;
@@ -183,11 +183,11 @@ json_process_object (Arena *arena, Json_Token_Node **token) {
             }
             result.table[hash] = new_set;
         }
-        
+
     } else {
         fprintf(stderr, "Json parse error: Unrecognized token!\n");
     }
-    
+
     end:
     release_scratch(scratch);
     return result;
@@ -219,7 +219,7 @@ json_process_array (Arena *arena, Json_Token_Node **token) {
     } else {
         fprintf(stderr, "Json parse error: Unrecognized token!\n");
     }
-    
+
     end:
     return result;
 }
@@ -233,12 +233,12 @@ json_process_token (Arena *arena, Json_Token_Node **token_stream) {
             value.type = JSON_STRING;
             value.string = token.value;
         } break;
-        
-        case JSON_TOKEN_NUMBER: { 
+
+        case JSON_TOKEN_NUMBER: {
             value.type = JSON_NUMBER;
             value.number = f64_from_str8(token.value);
         } break;
-        
+
         case JSON_TOKEN_KEYWORD: {
             value.type = JSON_KEYWORD;
             if (token.value.str[0] == 't') {
@@ -247,7 +247,7 @@ json_process_token (Arena *arena, Json_Token_Node **token_stream) {
                 value.keyword = JSON_KEYWORD_FALSE;
             }
         } break;
-        
+
         case JSON_TOKEN_PUNCTUATOR: {
             if (token.value.str[0] == '{') {
                 Json_Object obj = json_process_object(arena, token_stream);
@@ -261,10 +261,10 @@ json_process_token (Arena *arena, Json_Token_Node **token_stream) {
                 fprintf(stderr, "Json parse error: Unexpected symbol: %.*s\n", str8_expand(token.value));
             }
         } break;
-        
+
         default: fprintf(stderr, "Json parse error: Invalid token found!\n"); break;
     }
-    
+
     *token_stream = (*token_stream)->next;
     return value;
 }
@@ -274,8 +274,8 @@ json_print (Json_Value value, int depth) {
 #define print_depth() \
 for (int j = 0; j < depth; ++j) { \
 printf("  "); \
-} 
-    
+}
+
     switch (value.type) {
         case JSON_OBJECT: {
             Json_Object *object = &value.object;
@@ -292,12 +292,12 @@ printf("  "); \
             }
             depth--;
         } break;
-        
+
         case JSON_ARRAY: {
             Json_Array *array = &value.array;
             printf("[");
             u64 i = 1;
-            for (Json_Value_Node *value_node = array->values.first; 
+            for (Json_Value_Node *value_node = array->values.first;
                  value_node; value_node = value_node->next, ++i) {
                 json_print(value_node->value, depth+1);
                 if (i < array->values.count)
@@ -305,15 +305,15 @@ printf("  "); \
             }
             printf("]\n");
         } break;
-        
+
         case JSON_STRING: {
             printf("\"%.*s\"", str8_expand(value.string));
         } break;
-        
+
         case JSON_NUMBER: {
             printf("%f", value.number);
         } break;
-        
+
         case JSON_KEYWORD: {
             printf("%d", value.keyword);
         } break;
@@ -326,13 +326,13 @@ core_function Json_Value
 json_parse (Arena *arena, String8 json) {
     Json_Value result = zero_struct;
     Temp_Arena scratch = get_scratch(&arena, 1);
-    
+
     Json_Token_List tokens = json_lex(scratch.arena, json);
     Json_Token_Node *token_stream = tokens.first;
     if (tokens.first != 0) {
         result = json_process_token(arena, &token_stream);
     }
-    
+
     release_scratch(scratch);
     return result;
 }
@@ -342,9 +342,11 @@ json_parse (Arena *arena, String8 json) {
 
 #include "base/include.h"
 #include "os/include.h"
+#include "file/json.h"
+
 #include "base/include.c"
 #include "os/include.c"
-#include "file/json.h"
+#include "file/json.c"
 
 int main (void) {
     Temp_Arena scratch = get_scratch(0,0);

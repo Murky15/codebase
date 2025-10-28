@@ -42,7 +42,7 @@ peek_bits (Bit_Stream *stream, u32 count) {
         stream->buffer |= (u32)*stream->cursor++ << stream->count;
         stream->count += 8;
     }
-    
+
     return stream->buffer & ((1u << count)-1);
 }
 
@@ -51,7 +51,7 @@ consume_bits (Bit_Stream *stream, u32 count) {
     u32 result = peek_bits(stream, count);
     stream->buffer >>= count;
     stream->count -= count;
-    
+
     return result;
 }
 
@@ -63,7 +63,7 @@ reverse_bits (u32 val, u32 count) {
         flipped |= (val & 0x1) << --bit_idx;
         val >>= 1;
     }
-    
+
     return flipped;
 }
 
@@ -75,7 +75,7 @@ validate_adler32 (u32 adler, String8 inflated) {
         b = (b + a) % ADLER32_BASE;
     }
     u32 computed_adler = (b << 16) | a;
-    
+
     return computed_adler == adler;
 }
 
@@ -83,51 +83,51 @@ validate_adler32 (u32 adler, String8 inflated) {
 core_function Huffman_Dict
 huffman_make (Arena *arena, u32Array lengths, u32 max_code_length) {
     assert (max_code_length <= HUFFMAN_PRIMARY_TABLE_SIZE_THRESHOLD + HUFFMAN_SECONDARY_TABLE_SIZE_THRESHOLD);
-    
+
     Temp_Arena scratch = get_scratch(&arena, 1);
     Huffman_Dict result = zero_struct;
-    
+
     u32 *offsets = arena_pushn(scratch.arena, u32, max_code_length+1);
     result.lengths = lengths;
     result.max_code_length = max_code_length;
     result.codes_per_length = arena_pushn(arena, u32, max_code_length+1);
     result.table.count = (1ull << (u64)max_code_length);
     result.table.array = arena_pushn(arena, s32, result.table.count);
-    
+
     for (u32 sym = 0; sym < lengths.count; ++sym)
         result.codes_per_length[lengths.array[sym]]++;
     assert(result.codes_per_length[0] < lengths.count);
-    
+
     result.sorted_symbols.count = lengths.count - result.codes_per_length[0];
     result.sorted_symbols.array = arena_pushn(arena, u32, result.sorted_symbols.count);
-    
+
     offsets[1] = 0;
     for (u32 len = 1; len < max_code_length; ++len)
         offsets[len+1] = offsets[len] + result.codes_per_length[len];
-    
+
     for (u32 sym = 0; sym < lengths.count; ++sym) {
         if (lengths.array[sym] != 0)
             result.sorted_symbols.array[offsets[lengths.array[sym]]++] = sym;
     }
-    
+
     // @todo: Fine for a first pass, but is an unreal memory hog.
     // I need to switch to multi-level huffman tables, and I would except I have a ton
     // of homework this weekend and I need to get the ball rolling.
-    
+
     // Quick psuedocode:
     // x = Take current bit length - primary threshold
     // create a second-level lookup table with 2^x entries
     // populate it
     // code += x
     // repeat!
-    
+
     u32 code = 0;
     for (u32 i = 0; i < result.sorted_symbols.count; ++i) {
         u32 sym = result.sorted_symbols.array[i];
         u32 next_sym = result.sorted_symbols.array[i+1 < result.sorted_symbols.count ? i+1 : i];
         u32 length = lengths.array[sym];
         u32 next_length = lengths.array[next_sym];
-        
+
         u32 len_diff = max_code_length - length;
         u32 entry_count = (1 << len_diff);
         for (u32 e = 0; e < entry_count; ++e) {
@@ -150,13 +150,13 @@ huffman_decode_next (Bit_Stream *stream, Huffman_Dict huff) {
         code |= consume_bits(stream, 1);
         if (code - count < first)
             return huff.sorted_symbols.array[index + (code - first)];
-        
+
         index += count;
         first += count;
         first <<= 1;
         code  <<= 1;
     }
-    
+
     return -1;
 }
 #else
@@ -167,7 +167,7 @@ huffman_decode_next (Bit_Stream *stream, Huffman_Dict huff) {
     index = reverse_bits(index, huff.max_code_length);
     sym = huff.table.array[index];
     consume_bits(stream, huff.lengths.array[sym]);
-    
+
     return sym;
 }
 #endif
@@ -178,22 +178,22 @@ huffman_decode_next (Bit_Stream *stream, Huffman_Dict huff) {
 core_function String8
 png_zlib_inflate (Arena *arena, String8 deflated) {
     Temp_Arena scratch = get_scratch(&arena, 1);
-    
+
     String8 inflated = zero_struct;
     inflated.str = arena_pushn(arena, u8, 0);
-    
+
     Zlib_Header zlib = *(Zlib_Header*)deflated.str;
     u8 method = (zlib.cmf & 0xF);
     u8 info = ((zlib.cmf & 0xF0) >> 4); // base-2 logarithm of the LZ77 window size, minus eight
     if (method == 8 && info <= 7 && !check_bit(zlib.flg, 5)) {
         Bit_Stream compression_stream = zero_struct;
         compression_stream.cursor = deflated.str + sizeof(Zlib_Header);
-        
+
         u8 final = 0, type = 0;
         while (!final) {
             final = consume_bits(&compression_stream, 1);
             type = consume_bits(&compression_stream, 2);
-            
+
             Huffman_Dict litlen_dict, dist_dict;
             if (type == Zlib_No_Compression) {
                 u16 len = consume_bits(&compression_stream, 16);
@@ -208,7 +208,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 u32 hlit  = consume_bits(&compression_stream, 5) + 257;
                 u32 hdist = consume_bits(&compression_stream, 5) + 1;
                 u32 hclen = consume_bits(&compression_stream, 4) + 4;
-                
+
                 local_persist read_only u32 huffman_code_length_sequences[] = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
                 u32Array code_lengths_swizzled;
                 code_lengths_swizzled.count = array_count(huffman_code_length_sequences);
@@ -217,13 +217,13 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                     code_lengths_swizzled.array[huffman_code_length_sequences[i]] = consume_bits(&compression_stream, 3);
                 }
                 Huffman_Dict code_length_dict = huffman_make(scratch.arena, code_lengths_swizzled, HUFFMAN_CODE_LENGTH_MAX_CODE_SIZE);
-                
+
                 u32 num_code_lengths = hlit + hdist;
                 u32 *code_lengths = arena_pushn(scratch.arena, u32, num_code_lengths);
                 u32 rep_count;
                 for (u32 i = 0; i < num_code_lengths;) {
                     s32 sym = huffman_decode_next(&compression_stream, code_length_dict);
-                    
+
                     assert(sym != -1);
                     switch (sym) {
                         case 16: {
@@ -231,23 +231,23 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                             rep_count = 3 + consume_bits(&compression_stream, 2);
                             sym = code_lengths[i-1];
                         } break;
-                        
+
                         case 17: {
                             rep_count = 3 + consume_bits(&compression_stream, 3);
                             sym = 0;
                         } break;
-                        
+
                         case 18: {
                             rep_count = 11 + consume_bits(&compression_stream, 7);
                             sym = 0;
                         } break;
-                        
+
                         default: {
                             assert(sym >= 0 && sym <= 15);
                             rep_count = 1;
                         } break;
                     }
-                    
+
                     assert(i + rep_count <= num_code_lengths);
                     for (u32 j = 0; j < rep_count; ++j) {
                         if (i + j < num_code_lengths)
@@ -256,7 +256,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                     i += rep_count;
                 }
                 assert (code_lengths[256] != 0);
-                
+
                 u32Array litlen_data = comp_lit(u32Array, .count = hlit, .array = code_lengths);
                 u32Array dist_data = comp_lit(u32Array, .count = hdist, .array = code_lengths + hlit);
                 litlen_dict = huffman_make(scratch.arena, litlen_data, HUFFMAN_MAX_CODE_SIZE);
@@ -265,7 +265,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 fputs("I have yet to come across a png with static huffman codes. If you come across this message, you've got some work to do!\n", stderr);
                 goto exit;
             }
-            
+
             while (true) {
                 s32 value = huffman_decode_next(&compression_stream, litlen_dict);
                 assert(value != -1);
@@ -279,13 +279,13 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                     u64 length = lz77_length_map[length_code];
                     u64 extra_length_bits = lz77_extra_length_bits[length_code];
                     length += consume_bits(&compression_stream, extra_length_bits);
-                    
+
                     s32 dist_code = huffman_decode_next(&compression_stream, dist_dict);
                     assert(dist_code != -1);
                     u64 dist = lz77_dist_map[dist_code];
                     u64 extra_dist_bits = lz77_extra_distance_bits[dist_code];
                     dist += consume_bits(&compression_stream, extra_dist_bits);
-                    
+
                     // Copy length bytes from this position to output stream
                     u64 range_start = inflated.len - dist;
                     String8 data = str8_sub(inflated, range_start, range_start + length);
@@ -300,7 +300,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 }
             }
         }
-        
+
 #if VALIDATE_ADLER32
         u8 *adler_addr = deflated.str + (deflated.len - 4);
         u32 adler = be_to_le32(adler_addr);
@@ -309,7 +309,7 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
     } else {
         fputs("Invalid compression configuration!\n", stderr);
     }
-    
+
     exit:
     release_scratch(scratch);
     return inflated;
@@ -325,29 +325,29 @@ png_paeth_predictor (s32 a, s32 b, s32 c) {
         return a;
     else if (pb <= pc)
         return b;
-    else 
+    else
         return c;
 }
 
 // @slow
 core_function String8
 png_reverse_filters (Arena *arena, PNG_Critical_Data *png, String8 filtered) {
-    String8 result = zero_struct;    
+    String8 result = zero_struct;
     u64 bytes_per_sample = (png->bit_depth / 8);
     u64 bytes_per_pixel = bytes_per_sample * png_sample_count[png->color_type];
     u64 scanline_step = png->width * bytes_per_pixel;
     result.str = arena_pushn(arena, u8, scanline_step*png->height);
     result.len = scanline_step*png->height;
-    
+
     u8 *scanline = result.str;
     u8 *filter_method = filtered.str;
     while ((u64)(filter_method - filtered.str) < (u64)filtered.len) {
         u8 filter_byte = *filter_method;
-        
+
         // @todo: Lot of repetition here, definitely a way to make this cleaner.
         switch (filter_byte) {
             case 0: /*none*/ memory_copy(scanline, filter_method+1, scanline_step); scanline+=scanline_step; break;
-            case 1: /*sub*/ { 
+            case 1: /*sub*/ {
                 for (s32 x = 0; x < scanline_step; ++x) {
                     u8 prev = (x - (s32)bytes_per_pixel < 0) ? 0 : scanline[x - bytes_per_pixel];
                     u8 reversed = filter_method[x+1] + prev;
@@ -355,8 +355,8 @@ png_reverse_filters (Arena *arena, PNG_Critical_Data *png, String8 filtered) {
                 }
                 scanline += scanline_step;
             } break;
-            
-            case 2: /*up*/ { 
+
+            case 2: /*up*/ {
                 u32 scanidx = scanline - result.str;
                 b32 first = scanidx < scanline_step;
                 for (s32 x = 0; x < scanline_step; ++x) {
@@ -366,7 +366,7 @@ png_reverse_filters (Arena *arena, PNG_Critical_Data *png, String8 filtered) {
                 }
                 scanline += scanline_step;
             } break;
-            
+
             case 3: /*avg*/ {
                 u32 scanidx = scanline - result.str;
                 b32 first = scanidx < scanline_step;
@@ -379,7 +379,7 @@ png_reverse_filters (Arena *arena, PNG_Critical_Data *png, String8 filtered) {
                 }
                 scanline += scanline_step;
             } break;
-            
+
             case 4: /*paeth*/ {
                 u32 scanidx = scanline - result.str;
                 b32 first = scanidx < scanline_step;
@@ -396,7 +396,7 @@ png_reverse_filters (Arena *arena, PNG_Critical_Data *png, String8 filtered) {
         }
         filter_method += scanline_step+1;
     }
-    
+
     return result;
 }
 
@@ -413,7 +413,7 @@ png_decode (Arena *arena, String8 png_data) {
     PNG_Bitmap_RGBA result = zero_struct;
     Temp_Arena scratch = get_scratch(&arena, 1);
     u8 *c = png_data.str;
-    
+
     // Parse file
     local_persist read_only u8 png_header[8] = { 137, 80, 78, 71, 13, 10, 26, 10 };
     if (memory_match(png_header, png_data.str, 8)) {
@@ -426,15 +426,15 @@ png_decode (Arena *arena, String8 png_data) {
             chunk.ancillary = check_bit(chunk.type.c[0], 5);
             chunk.data = c;
             png_chunk_list_push(scratch.arena, &chunks, chunk);
-            
+
             c += chunk.length;
             c += sizeof(u32); // Because this decoder is local, we can skip the CRC
         }
-        
+
         // Process chunks
         PNG_Critical_Data critical_data = zero_struct;
         critical_data.compressed_data = arena_pushn(scratch.arena, u8, 0);
-        
+
         // @todo: Is all of this error checking unnecessary? What are the odds we get fed an invalid PNG file anyway?
         for (PNG_Chunk_Node *n = chunks.first; n; n = n->next) {
             PNG_Chunk chunk = n->chunk;
@@ -444,7 +444,7 @@ png_decode (Arena *arena, String8 png_data) {
                         fputs("PNG decode error! IHDR is not first!\n", stderr);
                         goto exit;
                     }
-                    
+
                     u8 *c = chunk.data;
                     critical_data.width = be_to_le32(c);  c += sizeof(u32);
                     critical_data.height = be_to_le32(c); c += sizeof(u32);
@@ -453,12 +453,12 @@ png_decode (Arena *arena, String8 png_data) {
                     critical_data.compression = *c++;
                     critical_data.filter      = *c++;
                     critical_data.interlace   = *c;
-                    
+
                     if (!png_valid_color_config[critical_data.color_type][critical_data.bit_depth]) {
                         fputs("PNG decode error! Invalid color configuration!\n", stderr);
                         goto exit;
                     }
-                    
+
                     if (critical_data.interlace != PNG_Interlace_Null) {
                         fputs("It's 2024, who is still using interlace in a png!\n", stderr);
                         goto exit;
@@ -466,12 +466,12 @@ png_decode (Arena *arena, String8 png_data) {
                 } else if (chunk.type.code == fourcc("PLTE")) {
                     critical_data.palette_entry_count = chunk.length / 3;
                     critical_data.palette_entries = (PNG_Palette_Entry*)chunk.data;
-                    
+
                     if (critical_data.bit_depth == 0 || critical_data.compressed_data_size != 0) {
                         fputs("PNG decode error! Incorrect ordering of palette chunk!\n", stderr);
                         goto exit;
                     }
-                    
+
                     if (critical_data.color_type == PNG_Grayscale || critical_data.color_type == PNG_Grayscale_Alpha || critical_data.palette_present) {
                         fputs("PNG decode error! Unnecessary palette chunk!\n", stderr);
                         goto exit;
@@ -503,35 +503,43 @@ png_decode (Arena *arena, String8 png_data) {
                     fputs("PNG decode error! Unrecognized critical chunk!\n", stderr);
                     goto exit;
                 };
-                
+
             } else {
                 //printf("PNG: No ancillary chunks are supported yet!\n");
             }
         }
-        
+
         String8 inflated_pixel_data = png_zlib_inflate(scratch.arena, str8(critical_data.compressed_data, critical_data.compressed_data_size));
         String8 unfiltered_pixel_data = png_reverse_filters(arena, &critical_data, inflated_pixel_data);
-        
+
         result.width = critical_data.width;
         result.height = critical_data.height;
         result.pixels = (u32*)unfiltered_pixel_data.str;
-        
+
     } else {
         fprintf(stderr, "Supplied data is not a valid PNG!\n");
     }
-    
+
     exit:
     release_scratch(scratch);
     return result;
 }
 
 #if 0
+#include "base/include.h"
+#include "os/include.h"
+#include "file/png.h"
+
+#include "base/include.c"
+#include "os/include.c"
+#include "file/png.c"
+
 int
 main (void) {
     Temp_Arena scratch = get_scratch(0,0);
     String8 png_data = os_read_file(scratch.arena, str8_lit("W:/code/file/png_tests/guy.png"), false);
     PNG_Bitmap_RGBA parsed_data = png_decode(scratch.arena, png_data);
-    
+
     release_scratch(scratch);
     return 0;
 }
