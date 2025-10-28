@@ -74,8 +74,11 @@ main (void) {
     .room_width_mean = 48,
     .room_width_deviation = 10,
     .room_height_mean = 48,
+    .room_height_deviation = 18,
     .hallway_width = 5,
-    .room_height_deviation = 18);
+    .room_width_floor = 15,
+    .room_height_floor = 15,
+    .percent_edges_included = 10);
 
 
   while (!WindowShouldClose())

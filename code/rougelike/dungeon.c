@@ -444,8 +444,7 @@ d_create_ (Arena *arena, Dungeon_Create_Params *p) {
         s64 miny = min(p0.y, p1.y);
         s64 maxy = max(p0.y, p1.y);
 
-        // TODO: Maybe this shouldn't be a random value? It would be a lot more work, but we could try and determine
-        // which L-path is the shortest and use that. But this also has its own endearing qualities, I think...
+        // TODO: We should determine which L-path is the shortest and use that (based on taxicab distance).
         s64 alternate_start_y = rand() % 2;
         s64 hy, hx;
         if (alternate_start_y) {

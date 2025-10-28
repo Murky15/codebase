@@ -41,7 +41,11 @@
 */
 
 /*
-What if instead of header files we just had source files and the metaprogram 
+    For polygon scanline rendering, that system should work exclusively with ints, not floats.
+*/
+
+/*
+What if instead of header files we just had source files and the metaprogram
 would travel to every source file in a dir/project and generate
 DIR_FORWARD declarations for structs and functions into one huge "project.inc"
 that you would include. That way you don't need to fret about ordering, you could write
@@ -57,13 +61,13 @@ struct name {
 typedef struct Game_State {
     Map test_level;
     Range view_bounds;
-    
+
     Asset_Group level_textures;
-    
+
     // @todo: Can start to see how we will have a list of "old" entities and new ones...
     Entity player;
     Entity old_player;
-    
+
     Arena *permanent;
     Arena *frame;
     Arena *level;
@@ -81,7 +85,7 @@ asset_group_fetch (Asset_Group *assets, String8 name) {
         hash++;
         hash %= assets->count;
     }
-    
+
     return found == true ? assets->table[hash] : comp_zero(Asset);
 }
 
@@ -91,7 +95,7 @@ create_asset_group_from_directory (Arena *arena, Asset_Group_Type type, Director
     result.count = dir.count;
     result.type = type;
     result.table = arena_pushn(arena, Asset, result.count);
-    
+
     for (Directory_Search_Result_Node *node = dir.first; node; node = node->next) {
         Directory_Search_Result raw_asset = node->result;
         Asset to_add = {0};
@@ -108,17 +112,17 @@ create_asset_group_from_directory (Arena *arena, Asset_Group_Type type, Director
         }
         result.table[hash] = to_add;
     }
-    
+
     return result;
 }
 
-function Entity 
+function Entity
 entity_lerp (Entity a, Entity b, f32 amount) {
     Entity l = b;
     l.pos.x = lerp(a.pos.x, b.pos.x, amount);
     l.pos.y = lerp(a.pos.y, b.pos.y, amount);
     l.rotation_angle = lerp(a.rotation_angle, a.rotation_angle - b.rotation_diff, amount);
-    
+
     return l;
 }
 
@@ -127,9 +131,9 @@ game_init (Game_Memory_Package memory, Range view_bounds) {
     assert(memory.size >= sizeof(Game_State));
     u64 remaining_size = memory.size - sizeof(Game_State);
     assert (remaining_size >= MIN_EXCESS_MEMORY);
-    
+
     Temp_Arena scratch = get_scratch(0,0);
-    
+
     // @todo: Need to revisit and come up with a better memory partitioning scheme
     Game_State *gs = (Game_State*)memory.memory;
     u64 arena_size = remaining_size / 3;
@@ -145,27 +149,27 @@ game_init (Game_Memory_Package memory, Range view_bounds) {
     gs->old_player = gs->player;
     gs->view_bounds = view_bounds;
     gs->test_level = map_load(gs->level, str8_lit("w:/code/dumb/level.json"));
-    
+
     // Load textures
     Directory_Search_Results raw_textures = os_search_directory_and_read_files(scratch.arena, str8_lit("W:/assets/dumb/art/RETRO_TEXTURE_PACK_V17/TEXTURES"), str8_lit("*.PNG"));
     gs->level_textures = create_asset_group_from_directory(gs->permanent, ASSET_GROUP_IMAGES, raw_textures);
-    
+
     release_scratch(scratch);
 }
 
 function void
 game_tick (Game_Memory_Package memory, Game_Input_Package input, f32 dt) {
     Game_State *gs = (Game_State*)memory.memory;
-    
+
     arena_clear(gs->frame);
-    
+
     gs->old_player = gs->player;
     Entity *player = &gs->player;
-    
+
     player->rotation_diff = input.turn_amount * dt;
     player->rotation_angle -= player->rotation_diff;
     player->rotation_angle = fmod_cycling(player->rotation_angle, 2 * M_PI32);
-    
+
     Vec2 dir;
     f32 x = 0, y = 0;
     if (input.move_DIR_FORWARD)   x +=  1;
@@ -177,7 +181,7 @@ game_tick (Game_Memory_Package memory, Game_Input_Package input, f32 dt) {
     if (v2len(dir) > 1)
         dir = v2norm(dir);
     player->pos = v2add(player->pos, v2muls(dir, PLAYER_MOVE_SPEED * dt));
-    
+
     // @note: Player sector is updated in game_render! (Otherwise we get a nasty flicker which we can't solve through approximation)
     // We just reuse the "lerped player's" current sector to avoid calling the `update_current_sector` function more than we need to
     // This is a good thing to share for my MIT portfolio, how I mastered the debugger to try and find this thing.
@@ -187,11 +191,11 @@ function void
 game_render (Game_Memory_Package memory, f32 lerp_amount) {
     Game_State *gs = (Game_State*)memory.memory;
     Entity lerped_player = entity_lerp(gs->old_player, gs->player, lerp_amount);
-    
+
     update_current_sector(&lerped_player, &gs->test_level);
     Sector *player_sector = &gs->test_level.sectors[lerped_player.curr_sector];
     gs->player.curr_sector = lerped_player.curr_sector;
-    
+
     r_clear();
     r_sector(&gs->test_level, player_sector, gs->level_textures, &lerped_player, -1, 0, gs->view_bounds);
 }
