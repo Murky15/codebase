@@ -439,7 +439,7 @@ r_create_and_bind_texture (PNG_Bitmap_RGBA raw_texture_data) {
   ID3D11DeviceContext_PSSetShaderResources(ctx, 0, 1, &tex_view);
 
   D3D11_SAMPLER_DESC sampler_desc;
-  sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT; // Anisotropic filtering also looks kinda good, but blurry.
+  sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
   sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
   sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
   sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -488,6 +488,7 @@ typedef struct Push_Quad_Params {
   Atlas_Coords atlas_coords;
 } Push_Quad_Params;
 #define r_push_quad(...) r_push_quad_(&(Push_Quad_Params){.scale = (Vec2){1,1}, .col = (Vec3){1,1,1}, .rot = (Quat){0,0,0,1}, __VA_ARGS__})
+
 function void
 r_push_quad_ (Push_Quad_Params *p) {
   Instance_Data *next_inst = &quads[num_quads++];
@@ -571,7 +572,8 @@ load_textures (Arena *arena, String8 absolute_path_to_asset_dir) {
   Texture_Atlas result = {0};
   Temp_Arena scratch;
   ldefer(scratch=get_scratch(&arena, 1),release_scratch(scratch)) {
-    String8 path_to_atlas_data = str8_pushf(scratch.arena, "%.*s/tile_list_v1.7", str8_expand(absolute_path_to_asset_dir));
+    String8 path_to_atlas_data = str8_pushf(scratch.arena,
+      "%.*s/tile_list_v1.7", str8_expand(absolute_path_to_asset_dir));
     String8 atlas_txt = os_read_file(arena, path_to_atlas_data, false);
 
     String8List atlas_lines = str8_split(scratch.arena, atlas_txt, 1, "\n");
@@ -593,7 +595,8 @@ load_textures (Arena *arena, String8 absolute_path_to_asset_dir) {
       sprite->coords[sprite->num_frames++] = make_atlas_coords_from_string(coords);
     }
 
-    String8 path_to_texture_data = str8_pushf(scratch.arena, "%.*s/0x72_DungeonTilesetII_v1.7.png", str8_expand(absolute_path_to_asset_dir));
+    String8 path_to_texture_data = str8_pushf(scratch.arena,
+      "%.*s/0x72_DungeonTilesetII_v1.7.png", str8_expand(absolute_path_to_asset_dir));
     String8 texture_png_data = os_read_file(scratch.arena, path_to_texture_data, false);
     result.raw_texture_data = png_decode(arena, texture_png_data);
   }
@@ -710,7 +713,6 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     cam.focus = v3add(cam.focus, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
     player.pos = v3add(player.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
 
-    // This section is very messy. I'll need to come back to this and clean it up somehow.
     player.dir = to_cardinal(move_dir);
     if (player.dir & EAST) {
       player.end_angle = 0;
