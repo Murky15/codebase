@@ -3,9 +3,9 @@
 
 typedef u32 Dungeon_Tile_Flags;
 enum {
-  DUNGEON_TILE_EMPTY = (1 << 0),
-  DUNGEON_TILE_ROOM = (1 << 1),
-  DUNGEON_TILE_HALLWAY = (1 << 2),
+  DUNGEON_TILE_EMPTY = 0,
+  DUNGEON_TILE_ROOM = (1 << 0),
+  DUNGEON_TILE_HALLWAY = (1 << 1),
 };
 
 typedef struct Edge {
@@ -72,11 +72,13 @@ typedef struct Dungeon_Room {
 typedef struct Dungeon_Tile {
   Dungeon_Tile_Flags flags;
   Dungeon_Room *room; // TODO: Pointer or ID?
+  Vec2 grid_pos;
 } Dungeon_Tile;
 
 typedef struct Dungeon {
-  u64 width, height;
-  u64 grid_dim;
+  // NOTE: Centered around (0,0) (This is very confusing, I should change it)
+  s64 width, height;
+  s64 grid_dim;
 
   Dungeon_Room *first, *last;
   u64 num_rooms;
@@ -86,7 +88,8 @@ typedef struct Dungeon {
 
 // NOTE: Helpers
 function u64 v2hash (Vec2 v);
-function b32 rects_intersect (Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1);
+function b32 rects_intersect_expanded (Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1);
+function b32 rects_intersect (Rect r0, Rect r1);
 function f64 gaussian_next (f64 mu, f64 sigma);
 
 // NOTE: Edge Manipulation

@@ -42,17 +42,13 @@ window:
     0.483263: selected getting_started text:
     {
       selected
-      expression: "file:\"W:/code/rougelike/dungeon.c\".data"
+      expression: "file:\"W:/code/roguelike/roguelike.c\".data"
       auto: 1
-      query:
-      {
-        input: ""
-        cmd: search
-      }
-      cursor_line: 406
-      cursor_column: 55
-      mark_line: 406
-      mark_column: 55
+      query: input: ""
+      cursor_line: 536
+      cursor_column: 1
+      mark_line: 536
+      mark_column: 1
     }
     0.350070:
     {
@@ -72,7 +68,7 @@ window:
   }
   split_x
   pos: 484 312
-  monitor: "\\\\.\\DISPLAY1"
+  monitor: "\\\\.\\DISPLAY6"
   maximized
 }
 keybindings:
@@ -194,3 +190,8 @@ keybindings:
   { toggle_dev_menu d ctrl shift alt }
 }
 current_path: "W:"
+file_path_map:
+{
+  source: "W:/code/rougelike/dungeon.c"
+  dest: "W:/code/roguelike/roguelike.c"
+}

@@ -54,6 +54,11 @@ vs_main (Vertex_Data vert, Instance_Data inst) {
   return result;
 }
 
+/*
+  I'm going to need to implement my own texture sampling to make this art style look good
+  in a 3D perspective.
+*/
+
 float4
 ps_main (PS_Input input) : SV_TARGET {
   return atlas.Sample(atlas_sampler, input.uv);

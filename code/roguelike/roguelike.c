@@ -1,6 +1,9 @@
 /* TODO
   - View frustum culling
+  - Get consistent with u64 v.s s64
 */
+
+// NOTE: Headers
 
 //#define UNICODE
 #define D3D11_NO_HELPERS
@@ -19,6 +22,8 @@
 #include <file/png.h>
 
 #include "dungeon.h"
+
+// NOTE: Source
 
 #include <base/include.c>
 #include <os/include.c>
@@ -110,6 +115,34 @@ typedef struct Entity {
   Sprite run;
 } Entity;
 
+typedef struct Tile_Node {
+  struct Tile_Node *next;
+  Dungeon_Tile tile;
+} Tile_Node;
+
+typedef struct Tile_List {
+  Tile_Node *first, *last;
+  u64 count;
+} Tile_List;
+
+typedef struct World_Slice {
+  b32 is_leaf;
+  Rect bounds;
+  union {
+    union {
+      struct {
+        struct World_Slice *south_west;
+        struct World_Slice *south_east;
+        struct World_Slice *north_east;
+        struct World_Slice *north_west;
+      };
+      struct World_Slice *c[4];
+    };
+
+    Tile_List tiles;
+  };
+} World_Slice;
+
 global ID3D11Device *device;
 global ID3D11DeviceContext *ctx;
 global IDXGISwapChain *swap_chain;
@@ -176,6 +209,8 @@ d3d11_buffer_from_blob (ID3DBlob *blob) {
   return result;
 }
 
+global b32 toggle_frustum_cull;
+
 function LRESULT
 WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
   switch (uMsg) {
@@ -194,6 +229,10 @@ WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
       }
       if (wParam == 'D') {
         strafe_right = key_down;
+      }
+
+      if (wParam == 'T' && key_down) {
+        toggle_frustum_cull = !toggle_frustum_cull;
       }
       return 0;
     }
@@ -633,6 +672,103 @@ r_draw_entity (Entity *e) {
   r_push_quad(.pos = e->pos, .scale = texcoord.scale, .rot = rot, .atlas_coords = texcoord);
 }
 
+function void
+tile_list_push (Arena *arena, Tile_List *list, Dungeon_Tile tile) {
+  Tile_Node *node = arena_pushn(arena, Tile_Node, 1);
+  node->tile = tile;
+  sll_queue_push(list->first, list->last, node);
+  list->count++;
+}
+
+function b32
+point_in_rect (Vec2 p, Rect r) {
+  f32 x0 = r.x;
+  f32 x1 = x0 + r.width;
+  f32 y0 = r.y;
+  f32 y1 = y0 + r.height;
+
+  return (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1);
+}
+
+function World_Slice*
+world_partition_dungeon (Arena *arena, Dungeon *d, u64 max_tiles_per_slice, Rect bounds) {
+  World_Slice *slice = arena_pushn(arena, World_Slice, 1);
+  slice->bounds = bounds;
+  slice->is_leaf = true;
+
+  u64 arena_restore_pos = arena_pos(arena);
+  for (s64 y = bounds.y; y <= bounds.y + bounds.height; ++y) {
+    for (s64 x = bounds.x; x <= bounds.x + bounds.width; ++x) {
+      Dungeon_Tile *tile = d_index_tile(d, v2(x,y));
+      if (tile->flags) {
+        if (slice->tiles.count < max_tiles_per_slice) {
+          tile_list_push(arena, &slice->tiles, *tile);
+        } else {
+          slice->is_leaf = false;
+          goto overflow;
+        }
+      }
+    }
+  }
+
+  overflow:
+  if (!slice->is_leaf) {
+    arena_pop_to(arena, arena_restore_pos);
+    Vec2 new_size = v2muls(bounds.zw, 0.5f);
+    Rect b0 = {.xy = bounds.xy, .zw = new_size};
+    Rect b1 = {.xy = v2add(bounds.xy, v2(new_size.x,0)), .zw = new_size};
+    Rect b2 = {.xy = v2add(bounds.xy, new_size), .zw = new_size};
+    Rect b3 = {.xy = v2add(bounds.xy, v2(0,new_size.y)), .zw = new_size};
+    slice->south_west = world_partition_dungeon(arena, d, max_tiles_per_slice, b0);
+    slice->south_east = world_partition_dungeon(arena, d, max_tiles_per_slice, b1);
+    slice->north_east = world_partition_dungeon(arena, d, max_tiles_per_slice, b2);
+    slice->north_west = world_partition_dungeon(arena, d, max_tiles_per_slice, b3);
+  }
+
+  return slice;
+}
+
+function World_Slice*
+world_index_at (World_Slice *slice, Vec2 grid_pos) {
+  if (!slice->is_leaf) {
+    World_Slice *south_west = slice->south_west;
+    World_Slice *south_east = slice->south_east;
+    World_Slice *north_east = slice->north_east;
+    World_Slice *north_west = slice->north_west;
+
+    if (point_in_rect(grid_pos, south_west->bounds)) return world_index_at(south_west, grid_pos);
+    if (point_in_rect(grid_pos, south_east->bounds)) return world_index_at(south_east, grid_pos);
+    if (point_in_rect(grid_pos, north_east->bounds)) return world_index_at(north_east, grid_pos);
+    if (point_in_rect(grid_pos, north_west->bounds)) return world_index_at(north_west, grid_pos);
+  }
+
+  assert (point_in_rect(grid_pos, slice->bounds));
+  return slice;
+}
+
+function void
+world_query_range (Arena *arena, World_Slice *slice, Rect grid_range, Tile_List *out_tiles) {
+  if (slice->is_leaf) {
+    for each_in_list (tile_node, &slice->tiles) {
+      Dungeon_Tile tile = tile_node->tile;
+      Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
+      if (rects_intersect(r0, grid_range)) {
+        tile_list_push(arena, out_tiles, tile);
+      }
+    }
+  } else {
+    World_Slice *south_west = slice->south_west;
+    World_Slice *south_east = slice->south_east;
+    World_Slice *north_east = slice->north_east;
+    World_Slice *north_west = slice->north_west;
+
+    if (rects_intersect(south_west->bounds, grid_range)) world_query_range(arena, south_west, grid_range, out_tiles);
+    if (rects_intersect(south_east->bounds, grid_range)) world_query_range(arena, south_east, grid_range, out_tiles);
+    if (rects_intersect(north_east->bounds, grid_range)) world_query_range(arena, north_east, grid_range, out_tiles);
+    if (rects_intersect(north_west->bounds, grid_range)) world_query_range(arena, north_west, grid_range, out_tiles);
+  }
+}
+
 int
 WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
   Arena *perm = arena_alloc();
@@ -659,6 +795,10 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     .room_height_deviation = 10,
     .hallway_width = 5,
     .percent_edges_included = 18);
+
+  f32 half_width = dungeon.width / 2.f;
+  f32 half_height = dungeon.height / 2.f;
+  World_Slice *world_tree_root = world_partition_dungeon(perm, &dungeon, 512, (Vec4){-half_width, -half_height, dungeon.width, dungeon.height});
 
   Sprite room_floor = get_sprite(sprites, str8_lit("floor_1"));
   Sprite hallway_floor = get_sprite(sprites, str8_lit("floor_2"));
@@ -737,15 +877,33 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     Mat4 view = m4lookat(cam.pos, cam.focus, v3(0,1,0));
     Mat4 VP = m4mul(proj, view);
 
-    for (u64 tile_y = 0; tile_y < dungeon.height; ++tile_y) {
-      for (u64 tile_x = 0; tile_x < dungeon.width; ++tile_x) {
-        Dungeon_Tile tile = dungeon.tiles[tile_y * dungeon.width + tile_x];
-        Vec2 world = d_grid_to_world(&dungeon, v2(tile_x, tile_y));
+    if (toggle_frustum_cull) {
+      Tile_List visible_tiles = {0};
+      // TODO: Must be replaced! We should calculate what the intersection points are between the view
+      // frustum and the world plane and use that range.
+      Rect player_visible_range = {.xy = v2sub(v2(player.pos.x, player.pos.z), v2(256, 256)), .zw = v2(512, 512)};
+      player_visible_range.xy = d_world_to_grid(&dungeon, player_visible_range.xy);
+      player_visible_range.zw = d_world_to_grid(&dungeon, player_visible_range.zw);
+      world_query_range(frame, world_tree_root, player_visible_range, &visible_tiles);
+      for each_in_list (tile_node, &visible_tiles) {
+        Dungeon_Tile tile = tile_node->tile;
+        Vec2 world = d_grid_to_world(&dungeon, tile.grid_pos);
         Vec3 pos = v3(world.x, 1, world.y);
         Sprite sprite = {0};
-        if (tile.flags) {
-          sprite = tile.flags & DUNGEON_TILE_ROOM ? room_floor : hallway_floor;
-          r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = tile_rot);
+        sprite = tile.flags & DUNGEON_TILE_ROOM ? room_floor : hallway_floor;
+        r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = tile_rot);
+      }
+    } else {
+      for (s64 tile_y = -dungeon.height/2; tile_y < dungeon.height/2; ++tile_y) {
+        for (s64 tile_x = -dungeon.width/2; tile_x < dungeon.width/2; ++tile_x) {
+          Dungeon_Tile *tile = d_index_tile(&dungeon, v2(tile_x, tile_y));
+          Vec2 world = d_grid_to_world(&dungeon, tile->grid_pos);
+          Vec3 pos = v3(world.x, 1, world.y);
+          Sprite sprite = {0};
+          if (tile->flags) {
+            sprite = tile->flags & DUNGEON_TILE_ROOM ? room_floor : hallway_floor;
+            r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = tile_rot);
+          }
         }
       }
     }

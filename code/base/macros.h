@@ -148,6 +148,8 @@
 
 // for...
 #define each_in_list(i,lp) (typeof((lp)->first)(i)=(lp)->first;(i);(i)=(i)->next)
+#define each_in_array_raw(i,a,c) (typeof(a)(i)=(a);(i)-(a)<(c);(i)+=1)
+#define each_in_array(i,a) each_in_array_raw(i,a,array_count(a))
 
 //- @note: Linked list macros
 

@@ -40,6 +40,11 @@ pv2 (Vec2 v, f32 z) {
   return v3(v.x, v.y, z);
 }
 
+core_function Vec4
+v4 (f32 x, f32 y, f32 z, f32 w) {
+  return comp_lit(Vec4, {x, y, z, w});
+}
+
 core_function b32
 v2exact (Vec2 a, Vec2 b) {
   return (a.x == b.x) && (a.y == b.y);

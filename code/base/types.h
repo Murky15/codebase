@@ -124,13 +124,7 @@ typedef struct Quad3D {
   Vec3 p0, p1, p2, p3;
 } Quad3D;
 
-//- @note: Vector constants
-read_only Vec2 V2_Up    = { 0,  1};
-read_only Vec2 V2_Down  = { 0, -1};
-read_only Vec2 V2_Left  = {-1,  0};
-read_only Vec2 V2_Right = { 1,  0};
-
-//- @note: Constructors
+//- @note: Constructors (Deprecated, use compound literals instead)
 core_function Vec2  v2(f32 x, f32 y);
 core_function Vec2i v2i(s32 x, s32 y);
 core_function Vec2i v2i_from_v2(Vec2 v);
@@ -140,6 +134,8 @@ core_function Vec3  v3(f32 x, f32 y, f32 z);
 core_function Vec3i v3i(s32 x, s32 y, s32 z);
 core_function Vec3i v3i_from_v3(Vec3 v);
 core_function Vec3  pv2(Vec2 v, f32 z); // promote v2
+
+core_function Vec4 v4(f32 x, f32 y, f32 z, f32 w);
 
 //- @note: Vectors
 core_function b32  v2exact(Vec2 a, Vec2 b);
