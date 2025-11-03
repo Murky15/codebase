@@ -209,8 +209,6 @@ d3d11_buffer_from_blob (ID3DBlob *blob) {
   return result;
 }
 
-global b32 toggle_frustum_cull;
-
 function LRESULT
 WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
   switch (uMsg) {
@@ -231,9 +229,6 @@ WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
         strafe_right = key_down;
       }
 
-      if (wParam == 'T' && key_down) {
-        toggle_frustum_cull = !toggle_frustum_cull;
-      }
       return 0;
     }
   }
@@ -747,13 +742,17 @@ world_index_at (World_Slice *slice, Vec2 grid_pos) {
 }
 
 function void
-world_query_range (Arena *arena, World_Slice *slice, Rect grid_range, Tile_List *out_tiles) {
+world_query_range (Arena *arena, World_Slice *slice, Rect grid_range, b32 include_full_chunk, Tile_List *out_tiles) {
   if (slice->is_leaf) {
     for each_in_list (tile_node, &slice->tiles) {
       Dungeon_Tile tile = tile_node->tile;
-      Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
-      if (rects_intersect(r0, grid_range)) {
+      if (include_full_chunk) {
         tile_list_push(arena, out_tiles, tile);
+      } else {
+        Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
+        if (rects_intersect(r0, grid_range)) {
+          tile_list_push(arena, out_tiles, tile);
+        }
       }
     }
   } else {
@@ -762,10 +761,10 @@ world_query_range (Arena *arena, World_Slice *slice, Rect grid_range, Tile_List 
     World_Slice *north_east = slice->north_east;
     World_Slice *north_west = slice->north_west;
 
-    if (rects_intersect(south_west->bounds, grid_range)) world_query_range(arena, south_west, grid_range, out_tiles);
-    if (rects_intersect(south_east->bounds, grid_range)) world_query_range(arena, south_east, grid_range, out_tiles);
-    if (rects_intersect(north_east->bounds, grid_range)) world_query_range(arena, north_east, grid_range, out_tiles);
-    if (rects_intersect(north_west->bounds, grid_range)) world_query_range(arena, north_west, grid_range, out_tiles);
+    if (rects_intersect(south_west->bounds, grid_range)) world_query_range(arena, south_west, grid_range, include_full_chunk, out_tiles);
+    if (rects_intersect(south_east->bounds, grid_range)) world_query_range(arena, south_east, grid_range, include_full_chunk, out_tiles);
+    if (rects_intersect(north_east->bounds, grid_range)) world_query_range(arena, north_east, grid_range, include_full_chunk, out_tiles);
+    if (rects_intersect(north_west->bounds, grid_range)) world_query_range(arena, north_west, grid_range, include_full_chunk, out_tiles);
   }
 }
 
@@ -877,35 +876,20 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
     Mat4 view = m4lookat(cam.pos, cam.focus, v3(0,1,0));
     Mat4 VP = m4mul(proj, view);
 
-    if (toggle_frustum_cull) {
-      Tile_List visible_tiles = {0};
-      // TODO: Must be replaced! We should calculate what the intersection points are between the view
-      // frustum and the world plane and use that range.
-      Rect player_visible_range = {.xy = v2sub(v2(player.pos.x, player.pos.z), v2(256, 256)), .zw = v2(512, 512)};
-      player_visible_range.xy = d_world_to_grid(&dungeon, player_visible_range.xy);
-      player_visible_range.zw = d_world_to_grid(&dungeon, player_visible_range.zw);
-      world_query_range(frame, world_tree_root, player_visible_range, &visible_tiles);
-      for each_in_list (tile_node, &visible_tiles) {
-        Dungeon_Tile tile = tile_node->tile;
-        Vec2 world = d_grid_to_world(&dungeon, tile.grid_pos);
-        Vec3 pos = v3(world.x, 1, world.y);
-        Sprite sprite = {0};
-        sprite = tile.flags & DUNGEON_TILE_ROOM ? room_floor : hallway_floor;
-        r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = tile_rot);
-      }
-    } else {
-      for (s64 tile_y = -dungeon.height/2; tile_y < dungeon.height/2; ++tile_y) {
-        for (s64 tile_x = -dungeon.width/2; tile_x < dungeon.width/2; ++tile_x) {
-          Dungeon_Tile *tile = d_index_tile(&dungeon, v2(tile_x, tile_y));
-          Vec2 world = d_grid_to_world(&dungeon, tile->grid_pos);
-          Vec3 pos = v3(world.x, 1, world.y);
-          Sprite sprite = {0};
-          if (tile->flags) {
-            sprite = tile->flags & DUNGEON_TILE_ROOM ? room_floor : hallway_floor;
-            r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = tile_rot);
-          }
-        }
-      }
+    Tile_List visible_tiles = {0};
+    // TODO: Must be replaced! We should calculate what the intersection points are between the view
+    // frustum and the world plane and use that range.
+    Rect player_visible_range = {.xy = v2sub(v2(player.pos.x, player.pos.z), v2(256, 256)), .zw = v2(512, 512)};
+    player_visible_range.xy = d_world_to_grid(&dungeon, player_visible_range.xy);
+    player_visible_range.zw = d_world_to_grid(&dungeon, player_visible_range.zw);
+    world_query_range(frame, world_tree_root, player_visible_range, true, &visible_tiles);
+    for each_in_list (tile_node, &visible_tiles) {
+      Dungeon_Tile tile = tile_node->tile;
+      Vec2 world = d_grid_to_world(&dungeon, tile.grid_pos);
+      Vec3 pos = v3(world.x, 1, world.y);
+      Sprite sprite = {0};
+      sprite = tile.flags & DUNGEON_TILE_ROOM ? room_floor : hallway_floor;
+      r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = tile_rot);
     }
 
     r_draw_entity(&player);
