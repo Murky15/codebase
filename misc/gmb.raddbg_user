@@ -44,11 +44,15 @@ window:
       selected
       expression: "file:\"W:/code/roguelike/roguelike.c\".data"
       auto: 1
-      query: input: ""
-      cursor_line: 536
-      cursor_column: 1
-      mark_line: 536
-      mark_column: 1
+      query:
+      {
+        input: ""
+        cmd: search
+      }
+      cursor_line: 671
+      cursor_column: 68
+      mark_line: 671
+      mark_column: 68
     }
     0.350070:
     {
@@ -69,7 +73,6 @@ window:
   split_x
   pos: 484 312
   monitor: "\\\\.\\DISPLAY6"
-  maximized
 }
 keybindings:
 {

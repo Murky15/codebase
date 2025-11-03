@@ -675,6 +675,21 @@ tile_list_push (Arena *arena, Tile_List *list, Dungeon_Tile tile) {
   list->count++;
 }
 
+function void
+tile_list_concat (Tile_List *base, Tile_List *appended) {
+  if (appended->count > 0) {
+    if (base->first == 0) {
+      base->first = appended->first;
+      base->last = appended->last;
+    } else {
+      base->last->next = appended->first;
+      base->last = appended->last;
+    }
+
+    base->count += appended->count;
+  }
+}
+
 function b32
 point_in_rect (Vec2 p, Rect r) {
   f32 x0 = r.x;
@@ -744,11 +759,11 @@ world_index_at (World_Slice *slice, Vec2 grid_pos) {
 function void
 world_query_range (Arena *arena, World_Slice *slice, Rect grid_range, b32 include_full_chunk, Tile_List *out_tiles) {
   if (slice->is_leaf) {
-    for each_in_list (tile_node, &slice->tiles) {
-      Dungeon_Tile tile = tile_node->tile;
-      if (include_full_chunk) {
-        tile_list_push(arena, out_tiles, tile);
-      } else {
+    if (include_full_chunk) {
+      tile_list_concat(out_tiles, &slice->tiles);
+    } else {
+      for each_in_list (tile_node, &slice->tiles) {
+        Dungeon_Tile tile = tile_node->tile;
         Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
         if (rects_intersect(r0, grid_range)) {
           tile_list_push(arena, out_tiles, tile);
