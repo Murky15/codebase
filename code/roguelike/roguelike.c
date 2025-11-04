@@ -1,6 +1,7 @@
 /* TODO
   - View frustum culling
   - Get consistent with u64 v.s s64
+  - How can we make clear what can be called from multiple threads and what can't?
 */
 
 // NOTE: Headers
@@ -142,6 +143,19 @@ typedef struct World_Slice {
     Tile_List tiles;
   };
 } World_Slice;
+
+typedef struct Game_State {
+  Arena *perm, *frame;
+  Texture_Atlas sprites;
+  Dungeon dungeon;
+  Mat4 proj;
+  Quat tile_rot;
+  Entity player;
+  Camera cam;
+  Sprite room_floor;
+  Sprite hallway_floor;
+  World_Slice *world_tree_root;
+} Game_State;
 
 global ID3D11Device *device;
 global ID3D11DeviceContext *ctx;
@@ -525,7 +539,7 @@ typedef struct Push_Quad_Params {
 
 function void
 r_push_quad_ (Push_Quad_Params *p) {
-  Instance_Data *next_inst = &quads[num_quads++];
+  Instance_Data *next_inst = &quads[InterlockedIncrement64(&num_quads)-1];
   Mat4 T = m4translate(p->pos);
   Mat4 R = m4rotate(p->rot);
   Mat4 S = m4scale(v3(p->scale.x, p->scale.y, 0));
@@ -675,21 +689,6 @@ tile_list_push (Arena *arena, Tile_List *list, Dungeon_Tile tile) {
   list->count++;
 }
 
-function void
-tile_list_concat (Tile_List *base, Tile_List *appended) {
-  if (appended->count > 0) {
-    if (base->first == 0) {
-      base->first = appended->first;
-      base->last = appended->last;
-    } else {
-      base->last->next = appended->first;
-      base->last = appended->last;
-    }
-
-    base->count += appended->count;
-  }
-}
-
 function b32
 point_in_rect (Vec2 p, Rect r) {
   f32 x0 = r.x;
@@ -756,18 +755,15 @@ world_index_at (World_Slice *slice, Vec2 grid_pos) {
   return slice;
 }
 
+// TODO: Take a look at this: https://en.wikipedia.org/wiki/Non-blocking_linked_list
 function void
 world_query_range (Arena *arena, World_Slice *slice, Rect grid_range, b32 include_full_chunk, Tile_List *out_tiles) {
   if (slice->is_leaf) {
-    if (include_full_chunk) {
-      tile_list_concat(out_tiles, &slice->tiles);
-    } else {
-      for each_in_list (tile_node, &slice->tiles) {
-        Dungeon_Tile tile = tile_node->tile;
-        Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
-        if (rects_intersect(r0, grid_range)) {
-          tile_list_push(arena, out_tiles, tile);
-        }
+    for each_in_list (tile_node, &slice->tiles) {
+      Dungeon_Tile tile = tile_node->tile;
+      Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
+      if (include_full_chunk || rects_intersect(r0, grid_range)) {
+        tile_list_push(arena, out_tiles, tile);
       }
     }
   } else {
@@ -783,134 +779,184 @@ world_query_range (Arena *arena, World_Slice *slice, Rect grid_range, b32 includ
   }
 }
 
-int
-WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
-  Arena *perm = arena_alloc();
-  Arena *frame = arena_alloc();
+s32
+entry (void *params) {
+  Entry_Params *entry_params = (Entry_Params*)params;
+  os_select_thread_context(entry_params->tctx);
 
-  srand(win32_query_clock());
+  // NOTE: Initialization, some aspects, like dungeon creation/partitioning can potentially be parallelized if
+  // they become performance problems.
+  Game_State *gs;
 
-  HWND hwnd = win32_create_window(hInstance);
-  Vec2i render_dim = r_init(hwnd);
-  f32 render_width = render_dim.width;
-  f32 render_height = render_dim.height;
+  if (runner_id() == 0) {
+    Arena *perm = arena_alloc();
+    Arena *frame = arena_alloc();
+    srand(win32_query_clock());
 
-  Texture_Atlas sprites = load_textures(perm, str8_lit("W:/assets/roguelike/0x72_DungeonTilesetII_v1.7"));
-  r_create_and_bind_texture(sprites.raw_texture_data);
+    gs = arena_pushn(perm, Game_State, 1);
+    gs->perm = perm;
+    gs->frame = frame;
 
-  Dungeon dungeon = d_create(perm,
-    .target_room_count = 500,
-    .grid_dim   = 16,
-    .map_width  = 512,
-    .map_height = 512,
-    .room_width_mean = 48,
-    .room_width_deviation = 10,
-    .room_height_mean = 48,
-    .room_height_deviation = 10,
-    .hallway_width = 5,
-    .percent_edges_included = 18);
+    HINSTANCE hInstance = GetModuleHandle(NULL);
+    HWND hwnd = win32_create_window(hInstance);
+    Vec2i render_dim = r_init(hwnd);
+    f32 render_width = render_dim.width;
+    f32 render_height = render_dim.height;
 
-  f32 half_width = dungeon.width / 2.f;
-  f32 half_height = dungeon.height / 2.f;
-  World_Slice *world_tree_root = world_partition_dungeon(perm, &dungeon, 512, (Vec4){-half_width, -half_height, dungeon.width, dungeon.height});
+    Texture_Atlas sprites = load_textures(perm, str8_lit("W:/assets/roguelike/0x72_DungeonTilesetII_v1.7"));
+    r_create_and_bind_texture(sprites.raw_texture_data);
 
-  Sprite room_floor = get_sprite(sprites, str8_lit("floor_1"));
-  Sprite hallway_floor = get_sprite(sprites, str8_lit("floor_2"));
+    Dungeon dungeon = d_create(perm,
+      .target_room_count = 500,
+      .grid_dim   = 16,
+      .map_width  = 512,
+      .map_height = 512,
+      .room_width_mean = 48,
+      .room_width_deviation = 10,
+      .room_height_mean = 48,
+      .room_height_deviation = 10,
+      .hallway_width = 5,
+      .percent_edges_included = 18);
 
-  Entity player = {0};
-  player.pos = v3(0,1,0);
-  player.seconds_to_rotate = 0.12f;
-  player.idle = get_sprite(sprites, str8_lit("doc_idle_anim"));
-  player.idle.seconds_to_complete = 0.5f;
-  player.run  = get_sprite(sprites, str8_lit("doc_run_anim"));
-  player.run.seconds_to_complete = 0.5f;
+    f32 half_width = dungeon.width / 2.f;
+    f32 half_height = dungeon.height / 2.f;
+    World_Slice *world_tree_root = world_partition_dungeon(perm, &dungeon, 512, (Vec4){-half_width, -half_height, dungeon.width, dungeon.height});
 
-  Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 1.f, 1000.f);
-  Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
-  Camera cam = {0};
-  f32 cam_zoom = 150.f;
-  //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
-  //cam.pos = v3(0, -cam_zoom, 1);
-  cam.pos = v3(0, cam_zoom - 30, -cam_zoom);
-  cam.focus = v3(0,0,0);
-  cam.follow_dist = v3sub(cam.pos,cam.focus);
+    Sprite room_floor = get_sprite(sprites, str8_lit("floor_1"));
+    Sprite hallway_floor = get_sprite(sprites, str8_lit("floor_2"));
+
+    Entity player = (Entity){0};
+    player.pos = v3(0,1,0);
+    player.seconds_to_rotate = 0.12f;
+    player.idle = get_sprite(sprites, str8_lit("doc_idle_anim"));
+    player.idle.seconds_to_complete = 0.5f;
+    player.run  = get_sprite(sprites, str8_lit("doc_run_anim"));
+    player.run.seconds_to_complete = 0.5f;
+
+    Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 1.f, 1000.f);
+    Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
+    Camera cam = (Camera){0};
+    f32 cam_zoom = 150.f;
+    //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
+    //cam.pos = v3(0, -cam_zoom, 1);
+    cam.pos = v3(0, cam_zoom - 30, -cam_zoom);
+    cam.focus = v3(0,0,0);
+    cam.follow_dist = v3sub(cam.pos,cam.focus);
+
+    gs->sprites = sprites;
+    gs->dungeon = dungeon;
+    gs->proj = proj;
+    gs->tile_rot = tile_rot;
+    gs->player = player;
+    gs->cam = cam;
+    gs->room_floor = room_floor;
+    gs->hallway_floor = hallway_floor;
+    gs->world_tree_root = world_tree_root;
+  }
+
+  os_heat_sync_u64((u64*)&gs, 0);
 
   u64 last = win32_query_clock();
-  b32 game_running = true;
-  for (;game_running;) {
-    arena_clear(frame);
+  for (;;) {
+    if (runner_id() == 0) { // TODO: Can we parallelize *anything* in the message loop?
+      arena_clear(gs->frame);
 
-    // Input
-    for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
-      if (msg.message == WM_QUIT) {
-        game_running = false;
+      // Input
+      for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
+        if (msg.message == WM_QUIT) {
+          ExitProcess(0);
+        }
+
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
       }
 
-      TranslateMessage(&msg);
-      DispatchMessage(&msg);
-    }
+      // Update TODO: Parallelize
+      u64 now = win32_query_clock();
+      f32 dt = win32_get_elapsed_ms(last, now);
+      last = now;
 
-    // Update
-    u64 now = win32_query_clock();
-    f32 dt = win32_get_elapsed_ms(last, now);
-    last = now;
+      //Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_clock_seconds(), 2 * M_PI))
+      //cam_pos = m4mulv(m4rotate(cam_rot), cam_pos);
+      Vec2 move_dir = {0};
+      if (move_forward) move_dir.y += 1;
+      if (strafe_left)  move_dir.x -= 1;
+      if (move_back)    move_dir.y -= 1;
+      if (strafe_right) move_dir.x += 1;
+      if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
+      gs->cam.pos = v3add(gs->cam.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
+      gs->cam.focus = v3add(gs->cam.focus, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
+      gs->player.pos = v3add(gs->player.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
 
-    //Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_clock_seconds(), 2 * M_PI))
-    //cam_pos = m4mulv(m4rotate(cam_rot), cam_pos);
-    Vec2 move_dir = {0};
-    if (move_forward) move_dir.y += 1;
-    if (strafe_left)  move_dir.x -= 1;
-    if (move_back)    move_dir.y -= 1;
-    if (strafe_right) move_dir.x += 1;
-    if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
-    cam.pos = v3add(cam.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
-    cam.focus = v3add(cam.focus, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
-    player.pos = v3add(player.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
-
-    player.dir = to_cardinal(move_dir);
-    if (player.dir & EAST) {
-      player.end_angle = 0;
-    } else if (player.dir & WEST) {
-      player.end_angle = M_PI32;
-    }
-
-    if (!almost_equal(player.rotation_angle, player.end_angle)) {
-      if (!player.started_rotating_at) {
-        player.started_rotating_at = win32_clock_seconds();
+      gs->player.dir = to_cardinal(move_dir);
+      if (gs->player.dir & EAST) {
+        gs->player.end_angle = 0;
+      } else if (gs->player.dir & WEST) {
+        gs->player.end_angle = M_PI32;
       }
-      f64 current_time = win32_clock_seconds();
-      f64 rot_amt = cnorm(current_time, player.started_rotating_at, player.started_rotating_at + player.seconds_to_rotate);
-      player.rotation_angle = lerp(player.start_angle, player.end_angle, rot_amt);
-    } else {
-      player.start_angle = player.end_angle;
-      player.started_rotating_at = 0;
+
+      if (!almost_equal(gs->player.rotation_angle, gs->player.end_angle)) {
+        if (!gs->player.started_rotating_at) {
+          gs->player.started_rotating_at = win32_clock_seconds();
+        }
+        f64 current_time = win32_clock_seconds();
+        f64 rot_amt = cnorm(current_time, gs->player.started_rotating_at, gs->player.started_rotating_at + gs->player.seconds_to_rotate);
+        gs->player.rotation_angle = lerp(gs->player.start_angle, gs->player.end_angle, rot_amt);
+      } else {
+        gs->player.start_angle = gs->player.end_angle;
+        gs->player.started_rotating_at = 0;
+      }
     }
 
-    // Render
-    r_prep();
-    Mat4 view = m4lookat(cam.pos, cam.focus, v3(0,1,0));
-    Mat4 VP = m4mul(proj, view);
+    // Render TODO: Paralellize
+    os_heat_sync();
 
-    Tile_List visible_tiles = {0};
-    // TODO: Must be replaced! We should calculate what the intersection points are between the view
-    // frustum and the world plane and use that range.
-    Rect player_visible_range = {.xy = v2sub(v2(player.pos.x, player.pos.z), v2(256, 256)), .zw = v2(512, 512)};
-    player_visible_range.xy = d_world_to_grid(&dungeon, player_visible_range.xy);
-    player_visible_range.zw = d_world_to_grid(&dungeon, player_visible_range.zw);
-    world_query_range(frame, world_tree_root, player_visible_range, true, &visible_tiles);
-    for each_in_list (tile_node, &visible_tiles) {
-      Dungeon_Tile tile = tile_node->tile;
-      Vec2 world = d_grid_to_world(&dungeon, tile.grid_pos);
+    Mat4 view = m4lookat(gs->cam.pos, gs->cam.focus, v3(0,1,0));
+    Mat4 VP = m4mul(gs->proj, view);
+
+    if (runner_id() == 0) {
+      r_prep();
+    }
+
+    Dungeon_Tile *visible_tiles;
+    u64 num_visible_tiles;
+    if (runner_id() == 0) {
+      Tile_List visible_tile_list = {0};
+      // TODO: Must be replaced! We should calculate what the intersection points are between the view
+      // frustum and the world plane and use that range.
+      Rect player_visible_range = {.xy = v2sub(v2(gs->player.pos.x, gs->player.pos.z), v2(256, 256)), .zw = v2(512, 512)};
+      player_visible_range.xy = d_world_to_grid(&gs->dungeon, player_visible_range.xy);
+      player_visible_range.zw = d_world_to_grid(&gs->dungeon, player_visible_range.zw);
+      world_query_range(gs->frame, gs->world_tree_root, player_visible_range, true, &visible_tile_list);
+
+      visible_tiles = arena_pushn(gs->frame, Dungeon_Tile, visible_tile_list.count);
+      num_visible_tiles = visible_tile_list.count;
+      u64 i = 0;
+      for each_in_list (tile_node, &visible_tile_list) {
+        visible_tiles[i] = tile_node->tile;
+        ++i;
+      }
+    }
+    os_heat_sync_u64((u64*)&visible_tiles, 0);
+    os_heat_sync_u64(&num_visible_tiles, 0);
+
+
+    Rangei visible_snippet = os_heat_distribute(num_visible_tiles);
+    for each_in_range (tile, visible_tiles, visible_snippet) {
+      Vec2 world = d_grid_to_world(&gs->dungeon, tile->grid_pos);
       Vec3 pos = v3(world.x, 1, world.y);
       Sprite sprite = {0};
-      sprite = tile.flags & DUNGEON_TILE_ROOM ? room_floor : hallway_floor;
-      r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = tile_rot);
+      sprite = tile->flags & DUNGEON_TILE_ROOM ? gs->room_floor : gs->hallway_floor;
+      r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = gs->tile_rot);
     }
 
-    r_draw_entity(&player);
+    os_heat_sync();
+    if (runner_id() == 0) {
+      r_draw_entity(&gs->player);
 
-    r_update_transform(VP);
-    r_present(false);
+      r_update_transform(VP);
+      r_present(false);
+    }
   }
 
   return 0;

@@ -3,3 +3,5 @@
 #else
 # error "This OS is not supported! (No OS functions found)"
 #endif
+
+#include "thread.c"

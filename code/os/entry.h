@@ -3,25 +3,14 @@
 
 /*
 NOTE: Entry options
-
-We should be able to control the number of threads created
-
+Define: OS_NO_ENTRY to avoid bootstrapping the entry point entirely
+Define: OS_NUM_THREADS to control how many threads the bootstrap entry launches for execution
 */
 
-typedef struct Thread_Heat {
-  u64 runner_id;
-  u64 num_runners;
-} Thread_Heat;
-
-typedef struct Thread_Context {
-  Thread_Heat heat;
-} Thread_Context;
-
 typedef struct Entry_Params {
-  int cmd_line;
-  int thread_context;
+  Thread_Context tctx;
 } Entry_Params;
 
-void entry(Entry_Params params);
+s32 entry(void *params);
 
 #endif // OS_ENTRY_H

@@ -1,6 +1,11 @@
 // raddbg 0.9.21 project file
 
 recent_file: path: "../code/roguelike/roguelike.c"
+recent_file: path: "d:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm"
+recent_file: path: "../code/os/thread.c"
+recent_file: path: "../code/os/win32/thread.c"
+recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memcpy.asm"
+recent_file: path: "../code/os/win32/entry.c"
 recent_file: path: "../code/rougelike/rougelike.c"
 recent_file: path: "../code/rougelike/dungeon.c"
 recent_file: path: "../code/base/types.c"
@@ -8,7 +13,6 @@ recent_file: path: "../code/rougelike/procedural_dungeon_test/test.c"
 recent_file: path: "../code/base/strings.c"
 recent_file: path: "../code/os/win32/io.c"
 recent_file: path: "../code/base/memory.c"
-recent_file: path: "d:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm"
 recent_file: path: "../build/rougelike.exe"
 recent_file: path: path
 recent_file: path: path
@@ -37,4 +41,23 @@ target:
   working_directory: "../build"
   enabled: 1
 }
-type_view
+type_view:
+{
+  type: visible_tiles
+  expr: array
+}
+breakpoint:
+{
+  source_location: "../code/roguelike/roguelike.c:705:1"
+  hit_count: 4
+}
+breakpoint:
+{
+  source_location: "../code/roguelike/roguelike.c:962:1"
+  hit_count: 1
+}
+breakpoint:
+{
+  source_location: "../code/roguelike/roguelike.c:976:1"
+  hit_count: 143
+}

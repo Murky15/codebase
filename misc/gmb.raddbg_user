@@ -10,16 +10,16 @@ window:
   size: 1536.000000 816.000000
   panels:
   {
-    0.166667:
+    0.323192:
     {
-      0.25: watch: selected expression: "query:types"
-      0.25:
+      0.132224: watch: selected expression: "query:types"
+      0.560900:
       {
         watch: selected expression: "query:threads"
         watch: expression: "query:breakpoints"
         watch: expression: "query:watch_pins"
       }
-      0.25:
+      0.056876:
       {
         disasm:
         {
@@ -39,31 +39,64 @@ window:
         watch: expression: "query:modules"
       }
     }
-    0.483263: selected getting_started text:
+    0.360765:
     {
       selected
-      expression: "file:\"W:/code/roguelike/roguelike.c\".data"
-      auto: 1
-      query:
+      getting_started
+      text:
       {
-        input: ""
-        cmd: search
+        expression: "file:\"D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm\".data"
+        auto: 1
+        query: input: ""
+        cursor_line: 1
+        cursor_column: 1
+        mark_line: 1
+        mark_column: 1
       }
-      cursor_line: 671
-      cursor_column: 68
-      mark_line: 671
-      mark_column: 68
+      text:
+      {
+        selected
+        expression: "file:\"W:/code/roguelike/roguelike.c\".data"
+        project: "W:/misc/root.raddbg_project"
+        query: input: ""
+        cursor_line: 976
+        cursor_column: 1
+        mark_line: 976
+        mark_column: 1
+      }
+      text:
+      {
+        expression: "file:\"W:/code/os/win32/thread.c\".data"
+        project: "W:/misc/root.raddbg_project"
+        query: input: ""
+        cursor_line: 14
+        cursor_column: 2
+        mark_line: 14
+        mark_column: 2
+      }
+      text:
+      {
+        expression: "file:\"W:/code/os/thread.c\".data"
+        project: "W:/misc/root.raddbg_project"
+        query: input: ""
+        cursor_line: 24
+        cursor_column: 4
+        mark_line: 24
+        mark_column: 4
+      }
     }
-    0.350070:
+    0.316043:
     {
       0.647769:
       {
-        watch: selected expression: "query:locals"
+        watch: expression: "query:locals"
         watch:
         {
+          selected
           expression: ""
           normal: 0.350000 0.339024 0.310976
-          watch: vertices
+          watch: visible_snippet
+          watch: tile
         }
         watch: expression: "query:type_views"
       }
@@ -72,7 +105,8 @@ window:
   }
   split_x
   pos: 484 312
-  monitor: "\\\\.\\DISPLAY6"
+  monitor: "\\\\.\\DISPLAY1"
+  maximized
 }
 keybindings:
 {
@@ -192,7 +226,7 @@ keybindings:
   { log_marker m ctrl shift alt }
   { toggle_dev_menu d ctrl shift alt }
 }
-current_path: "W:"
+current_path: "W:/code/os"
 file_path_map:
 {
   source: "W:/code/rougelike/dungeon.c"

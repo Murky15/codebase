@@ -1,6 +1,7 @@
 //- @note: Headers
 #include <stdio.h>
 
+#define OS_NO_ENTRY
 #include "base/include.h"
 #include "os/include.h"
 #include "file/json.h"

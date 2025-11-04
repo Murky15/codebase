@@ -1,0 +1,44 @@
+#ifndef OS_THREAD_H
+#define OS_THREAD_H
+
+typedef struct Thread_Barrier {
+  u64 opaque_data;
+} Thread_Barrier;
+
+typedef struct Thread_Heat {
+  u64 runner_id;
+  u64 num_runners;
+  Thread_Barrier barrier;
+  u64 *broadcast_buffer;
+} Thread_Heat;
+
+typedef struct Thread_Context {
+  Thread_Heat heat;
+} Thread_Context;
+
+/*
+TODO: I want to implement platform-independent threading here
+But like the good programmer I am I will wait to see what kind of patterns emerge
+from my game code before making the API.
+
+-[ ] Mutexes
+-[ ] Barriers
+-[ ] Semaphores
+-[ ] Interlocked variable access
+*/
+
+core_function Thread_Barrier os_barrier_create(Arena *arena, u64 num_threads);
+core_function void os_barrier_wait(Thread_Barrier barrier);
+core_function void os_barrier_invalidate(Thread_Barrier barrier);
+
+core_function void os_select_thread_context(Thread_Context ctx);
+core_function Thread_Context* os_get_thread_context(void);
+#define runner_id() (os_get_thread_context()->heat.runner_id)
+#define num_runners() (os_get_thread_context()->heat.num_runners)
+
+core_function void os_heat_sync(void);
+core_function void os_heat_sync_u64(u64 *value, u64 broadcaster_id);
+
+core_function Rangei os_heat_distribute(u64 num_items);
+
+#endif // OS_THREAD_H
