@@ -38,6 +38,7 @@
 #define global static
 #define local_persist static
 #define function static
+#define thread_shared static
 #define fallthrough
 #define core_function function // @note: For base functions so we can build a dll/lib
 

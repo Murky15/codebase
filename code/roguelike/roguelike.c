@@ -776,31 +776,101 @@ world_index_at (World_Slice *slice, Vec2 grid_pos) {
 
 // TODO: Take a look at this: https://en.wikipedia.org/wiki/Non-blocking_linked_list
 function void
-world_collect_from_slice (Arena *arena, World_Slice *slice, Rect grid_range, b32 include_full_chunk, Tile_List *out_tiles) {
-  if (slice->is_leaf) {
-    for each_in_list (tile_node, &slice->tiles) {
-      Dungeon_Tile tile = tile_node->tile;
-      Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
-      if (include_full_chunk || rects_intersect(r0, grid_range)) {
-        tile_list_push(arena, out_tiles, tile);
-      }
-    }
-  } else {
-    World_Slice *south_west = slice->south_west;
-    World_Slice *south_east = slice->south_east;
-    World_Slice *north_east = slice->north_east;
-    World_Slice *north_west = slice->north_west;
+world_collect_from_slice (
+  Arena *arena,
+  World_Slice *slice,
+  Rect grid_range,
+  b32 include_full_chunk,
+  Tile_List *out_tiles,
+  World_Slice **slices_to_check,
+  u64 *last_filled_slice_idx) {
 
-    if (rects_intersect(south_west->bounds, grid_range)) world_collect_from_slice(arena, south_west, grid_range, include_full_chunk, out_tiles);
-    if (rects_intersect(south_east->bounds, grid_range)) world_collect_from_slice(arena, south_east, grid_range, include_full_chunk, out_tiles);
-    if (rects_intersect(north_east->bounds, grid_range)) world_collect_from_slice(arena, north_east, grid_range, include_full_chunk, out_tiles);
-    if (rects_intersect(north_west->bounds, grid_range)) world_collect_from_slice(arena, north_west, grid_range, include_full_chunk, out_tiles);
+  if (rects_intersect(slice->bounds, grid_range)) {
+    if (slice->is_leaf) {
+      for each_in_list (tile_node, &slice->tiles) {
+        Dungeon_Tile tile = tile_node->tile;
+        Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
+        if (include_full_chunk || rects_intersect(r0, grid_range)) {
+          os_heat_begin_critical_section();
+          tile_list_push(arena, out_tiles, tile);
+          os_heat_end_critical_section();
+        }
+      }
+    } else {
+      World_Slice *south_west = slice->south_west;
+      World_Slice *south_east = slice->south_east;
+      World_Slice *north_east = slice->north_east;
+      World_Slice *north_west = slice->north_west;
+
+      u64 first  = InterlockedIncrement64(last_filled_slice_idx)-1;
+      u64 second = InterlockedIncrement64(last_filled_slice_idx)-1;
+      u64 third  = InterlockedIncrement64(last_filled_slice_idx)-1;
+      u64 fourth = InterlockedIncrement64(last_filled_slice_idx)-1;
+      slices_to_check[first]  = south_west;
+      slices_to_check[second] = south_east;
+      slices_to_check[third]  = north_east;
+      slices_to_check[fourth] = north_west;
+    }
   }
 }
 
 function Tile_List
 world_query_range (Arena *arena, World_Tree tree, Rect grid_range, b32 include_full_chunk) {
-  
+  assert(tree.num_slices > 0);
+  Tile_List *result;
+
+  Temp_Arena scratch = get_scratch(&arena, 1);
+
+  World_Slice **next_slice_to_check;
+  b32 *threads_finished;
+  thread_shared u64 last_checked_slice_idx;
+  thread_shared u64 last_filled_slice_idx;
+  last_checked_slice_idx = 0;
+  last_filled_slice_idx = 0;
+  if (runner_id() == 0) {
+    result = arena_pushn(arena, Tile_List, 1);
+
+    next_slice_to_check = arena_pushn(scratch.arena, World_Slice*, tree.num_slices);
+    next_slice_to_check[0] = tree.root;
+    last_filled_slice_idx++;
+
+    threads_finished = arena_pushn(scratch.arena, b32, num_runners());
+  }
+  os_heat_sync_u64((u64*)&result, 0);
+  os_heat_sync_u64((u64*)&next_slice_to_check, 0);
+  os_heat_sync_u64((u64*)&threads_finished, 0);
+
+  while (true) {
+    u64 slice_idx = InterlockedIncrement64(&last_checked_slice_idx)-1;
+    threads_finished[runner_id()] = true;
+    while (next_slice_to_check[slice_idx] == 0) {
+      b32 all_threads_finished = true;
+      for (u64 i = 0; i < num_runners(); ++i) {
+        if (!threads_finished[i]) {
+          all_threads_finished = false;
+          break;
+        }
+      }
+
+      if (all_threads_finished) {
+        os_heat_sync();
+        goto done;
+      }
+    }
+
+    threads_finished[runner_id()] = false;
+    world_collect_from_slice(arena,
+      next_slice_to_check[slice_idx],
+      grid_range,
+      include_full_chunk,
+      result,
+      next_slice_to_check,
+      &last_filled_slice_idx);
+  }
+
+  done:
+  release_scratch(scratch);
+  return *result;
 }
 
 void
@@ -939,15 +1009,13 @@ os_entry (void) {
 
     Dungeon_Tile *visible_tiles;
     u64 num_visible_tiles;
+    // TODO: Must be replaced! We should calculate what the intersection points are between the view
+    // frustum and the world plane and use that range.
+    Rect player_visible_range = {.xy = v2sub(v2(gs->player.pos.x, gs->player.pos.z), v2(256, 256)), .zw = v2(512, 512)};
+    player_visible_range.xy = d_world_to_grid(&gs->dungeon, player_visible_range.xy);
+    player_visible_range.zw = d_world_to_grid(&gs->dungeon, player_visible_range.zw);
+    Tile_List visible_tile_list = world_query_range(gs->frame, gs->world_tree, player_visible_range, true);
     if (runner_id() == 0) {
-      Tile_List visible_tile_list = {0};
-      // TODO: Must be replaced! We should calculate what the intersection points are between the view
-      // frustum and the world plane and use that range.
-      Rect player_visible_range = {.xy = v2sub(v2(gs->player.pos.x, gs->player.pos.z), v2(256, 256)), .zw = v2(512, 512)};
-      player_visible_range.xy = d_world_to_grid(&gs->dungeon, player_visible_range.xy);
-      player_visible_range.zw = d_world_to_grid(&gs->dungeon, player_visible_range.zw);
-      world_query_range(gs->frame, gs->world_tree.root, player_visible_range, true, &visible_tile_list);
-
       visible_tiles = arena_pushn(gs->frame, Dungeon_Tile, visible_tile_list.count);
       num_visible_tiles = visible_tile_list.count;
       u64 i = 0;

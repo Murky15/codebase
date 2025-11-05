@@ -30,6 +30,16 @@ os_heat_sync_u64 (u64 *value, u64 broadcaster_id) {
   os_heat_sync();
 }
 
+core_function void
+os_heat_begin_critical_section (void) {
+  os_mutex_claim(os_get_thread_context()->heat.mutex);
+}
+
+core_function void
+os_heat_end_critical_section (void) {
+  os_mutex_release(os_get_thread_context()->heat.mutex);
+}
+
 core_function Rangei
 os_heat_distribute(u64 num_items) {
   u64 work_per_thread = num_items / num_runners();
