@@ -144,6 +144,11 @@ typedef struct World_Slice {
   };
 } World_Slice;
 
+typedef struct World_Tree {
+  World_Slice *root;
+  u64 num_slices;
+} World_Tree;
+
 typedef struct Game_State {
   Arena *perm, *frame;
   Texture_Atlas sprites;
@@ -154,7 +159,7 @@ typedef struct Game_State {
   Camera cam;
   Sprite room_floor;
   Sprite hallway_floor;
-  World_Slice *world_tree_root;
+  World_Tree world_tree;
 } Game_State;
 
 global ID3D11Device *device;
@@ -700,7 +705,7 @@ point_in_rect (Vec2 p, Rect r) {
 }
 
 function World_Slice*
-world_partition_dungeon (Arena *arena, Dungeon *d, u64 max_tiles_per_slice, Rect bounds) {
+world_process_slice (Arena *arena, World_Tree *tree, Dungeon *d, u64 max_tiles_per_slice, Rect bounds) {
   World_Slice *slice = arena_pushn(arena, World_Slice, 1);
   slice->bounds = bounds;
   slice->is_leaf = true;
@@ -728,13 +733,27 @@ world_partition_dungeon (Arena *arena, Dungeon *d, u64 max_tiles_per_slice, Rect
     Rect b1 = {.xy = v2add(bounds.xy, v2(new_size.x,0)), .zw = new_size};
     Rect b2 = {.xy = v2add(bounds.xy, new_size), .zw = new_size};
     Rect b3 = {.xy = v2add(bounds.xy, v2(0,new_size.y)), .zw = new_size};
-    slice->south_west = world_partition_dungeon(arena, d, max_tiles_per_slice, b0);
-    slice->south_east = world_partition_dungeon(arena, d, max_tiles_per_slice, b1);
-    slice->north_east = world_partition_dungeon(arena, d, max_tiles_per_slice, b2);
-    slice->north_west = world_partition_dungeon(arena, d, max_tiles_per_slice, b3);
+    slice->south_west = world_process_slice(arena, tree, d, max_tiles_per_slice, b0);
+    slice->south_east = world_process_slice(arena, tree, d, max_tiles_per_slice, b1);
+    slice->north_east = world_process_slice(arena, tree, d, max_tiles_per_slice, b2);
+    slice->north_west = world_process_slice(arena, tree, d, max_tiles_per_slice, b3);
   }
+  tree->num_slices++;
 
   return slice;
+}
+
+function World_Tree
+world_partition_dungeon (Arena *arena, Dungeon *d, u64 max_tiles_per_slice) {
+  World_Tree result = {0};
+  if (runner_id() == 0) {
+    f32 half_width = d->width / 2.f;
+    f32 half_height = d->height / 2.f;
+    Rect initial_bounds = {-half_width, -half_height, d->width, d->height};
+    result.root = world_process_slice(arena, &result, d, max_tiles_per_slice, initial_bounds);
+  }
+
+  return result;
 }
 
 function World_Slice*
@@ -757,7 +776,7 @@ world_index_at (World_Slice *slice, Vec2 grid_pos) {
 
 // TODO: Take a look at this: https://en.wikipedia.org/wiki/Non-blocking_linked_list
 function void
-world_query_range (Arena *arena, World_Slice *slice, Rect grid_range, b32 include_full_chunk, Tile_List *out_tiles) {
+world_collect_from_slice (Arena *arena, World_Slice *slice, Rect grid_range, b32 include_full_chunk, Tile_List *out_tiles) {
   if (slice->is_leaf) {
     for each_in_list (tile_node, &slice->tiles) {
       Dungeon_Tile tile = tile_node->tile;
@@ -772,18 +791,20 @@ world_query_range (Arena *arena, World_Slice *slice, Rect grid_range, b32 includ
     World_Slice *north_east = slice->north_east;
     World_Slice *north_west = slice->north_west;
 
-    if (rects_intersect(south_west->bounds, grid_range)) world_query_range(arena, south_west, grid_range, include_full_chunk, out_tiles);
-    if (rects_intersect(south_east->bounds, grid_range)) world_query_range(arena, south_east, grid_range, include_full_chunk, out_tiles);
-    if (rects_intersect(north_east->bounds, grid_range)) world_query_range(arena, north_east, grid_range, include_full_chunk, out_tiles);
-    if (rects_intersect(north_west->bounds, grid_range)) world_query_range(arena, north_west, grid_range, include_full_chunk, out_tiles);
+    if (rects_intersect(south_west->bounds, grid_range)) world_collect_from_slice(arena, south_west, grid_range, include_full_chunk, out_tiles);
+    if (rects_intersect(south_east->bounds, grid_range)) world_collect_from_slice(arena, south_east, grid_range, include_full_chunk, out_tiles);
+    if (rects_intersect(north_east->bounds, grid_range)) world_collect_from_slice(arena, north_east, grid_range, include_full_chunk, out_tiles);
+    if (rects_intersect(north_west->bounds, grid_range)) world_collect_from_slice(arena, north_west, grid_range, include_full_chunk, out_tiles);
   }
 }
 
-s32
-entry (void *params) {
-  Entry_Params *entry_params = (Entry_Params*)params;
-  os_select_thread_context(entry_params->tctx);
+function Tile_List
+world_query_range (Arena *arena, World_Tree tree, Rect grid_range, b32 include_full_chunk) {
+  
+}
 
+void
+os_entry (void) {
   // NOTE: Initialization, some aspects, like dungeon creation/partitioning can potentially be parallelized if
   // they become performance problems.
   Game_State *gs;
@@ -818,9 +839,7 @@ entry (void *params) {
       .hallway_width = 5,
       .percent_edges_included = 18);
 
-    f32 half_width = dungeon.width / 2.f;
-    f32 half_height = dungeon.height / 2.f;
-    World_Slice *world_tree_root = world_partition_dungeon(perm, &dungeon, 512, (Vec4){-half_width, -half_height, dungeon.width, dungeon.height});
+    World_Tree world_tree = world_partition_dungeon(perm, &dungeon, 512);
 
     Sprite room_floor = get_sprite(sprites, str8_lit("floor_1"));
     Sprite hallway_floor = get_sprite(sprites, str8_lit("floor_2"));
@@ -851,7 +870,7 @@ entry (void *params) {
     gs->cam = cam;
     gs->room_floor = room_floor;
     gs->hallway_floor = hallway_floor;
-    gs->world_tree_root = world_tree_root;
+    gs->world_tree = world_tree;
   }
 
   os_heat_sync_u64((u64*)&gs, 0);
@@ -927,7 +946,7 @@ entry (void *params) {
       Rect player_visible_range = {.xy = v2sub(v2(gs->player.pos.x, gs->player.pos.z), v2(256, 256)), .zw = v2(512, 512)};
       player_visible_range.xy = d_world_to_grid(&gs->dungeon, player_visible_range.xy);
       player_visible_range.zw = d_world_to_grid(&gs->dungeon, player_visible_range.zw);
-      world_query_range(gs->frame, gs->world_tree_root, player_visible_range, true, &visible_tile_list);
+      world_query_range(gs->frame, gs->world_tree.root, player_visible_range, true, &visible_tile_list);
 
       visible_tiles = arena_pushn(gs->frame, Dungeon_Tile, visible_tile_list.count);
       num_visible_tiles = visible_tile_list.count;
@@ -958,6 +977,4 @@ entry (void *params) {
       r_present(false);
     }
   }
-
-  return 0;
 }
