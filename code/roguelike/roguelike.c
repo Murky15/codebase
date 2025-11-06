@@ -517,20 +517,24 @@ r_create_and_bind_texture (PNG_Bitmap_RGBA raw_texture_data) {
 
 function void
 r_prep (void) {
-  local_persist read_only f32 clear_color[4] = {0.1f, 0.2f, 0.3f, 1.f};
-  memory_zero(quads, num_quads);
-  num_quads = 0;
-  ID3D11DeviceContext_ClearDepthStencilView(ctx, depth_stencil_view, D3D11_CLEAR_DEPTH, 1.f, 0);
-  ID3D11DeviceContext_ClearRenderTargetView(ctx, render_target_view, clear_color);
+  if (runner_id() == 0) {
+    local_persist read_only f32 clear_color[4] = {0.1f, 0.2f, 0.3f, 1.f};
+    memory_zero(quads, num_quads);
+    num_quads = 0;
+    ID3D11DeviceContext_ClearDepthStencilView(ctx, depth_stencil_view, D3D11_CLEAR_DEPTH, 1.f, 0);
+    ID3D11DeviceContext_ClearRenderTargetView(ctx, render_target_view, clear_color);
+  }
 }
 
 function void
 r_update_transform (Mat4 m) {
-  D3D11_MAPPED_SUBRESOURCE constant_buffer = {0};
-  Uniforms new_transform_data = {m};
-  ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)uniforms, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer);
-  memcpy(constant_buffer.pData, &new_transform_data, sizeof(Uniforms));
-  ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)uniforms, 0);
+  if (runner_id() == 0) {
+    D3D11_MAPPED_SUBRESOURCE constant_buffer = {0};
+    Uniforms new_transform_data = {m};
+    ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)uniforms, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer);
+    memcpy(constant_buffer.pData, &new_transform_data, sizeof(Uniforms));
+    ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)uniforms, 0);
+  }
 }
 
 // We might be able to auto-generate this through metaprogramming
@@ -559,13 +563,15 @@ r_push_quad_ (Push_Quad_Params *p) {
 
 function void
 r_present (b32 enable_vsync) {
-  D3D11_MAPPED_SUBRESOURCE instances = {0};
-  ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instances);
-  memcpy(instances.pData, quads, sizeof(Instance_Data) * num_quads);
-  ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)instance_buffer, 0);
+  if (runner_id() == 0) {
+    D3D11_MAPPED_SUBRESOURCE instances = {0};
+    ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instances);
+    memcpy(instances.pData, quads, sizeof(Instance_Data) * num_quads);
+    ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)instance_buffer, 0);
 
-  ID3D11DeviceContext_DrawIndexedInstanced(ctx, 6, num_quads, 0, 0, 0);
-  IDXGISwapChain_Present(swap_chain, enable_vsync, 0);
+    ID3D11DeviceContext_DrawIndexedInstanced(ctx, 6, num_quads, 0, 0, 0);
+    IDXGISwapChain_Present(swap_chain, enable_vsync, 0);
+  }
 }
 
 function Cardinal_Dir
@@ -852,7 +858,6 @@ world_query_range (Arena *arena, World_Tree tree, Rect grid_range, b32 include_f
       }
 
       if (all_threads_finished) {
-        os_heat_sync();
         goto done;
       }
     }
@@ -921,15 +926,36 @@ os_entry (void) {
     player.run  = get_sprite(sprites, str8_lit("doc_run_anim"));
     player.run.seconds_to_complete = 0.5f;
 
-    Mat4 proj = m4perspective(M_PI32/4.f, render_width/render_height, 1.f, 1000.f);
+    f32 fov_h = M_PI32/4.f;
+    f32 aspect_ratio = render_width/render_height;
+    f32 znear = 1.f;
+    f32 zfar = 1000.f;
+
+    Mat4 proj = m4perspective(fov_h, aspect_ratio, znear, zfar);
     Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
-    Camera cam = (Camera){0};
+    Camera cam = {0};
     f32 cam_zoom = 150.f;
     //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
     //cam.pos = v3(0, -cam_zoom, 1);
     cam.pos = v3(0, cam_zoom - 30, -cam_zoom);
     cam.focus = v3(0,0,0);
     cam.follow_dist = v3sub(cam.pos,cam.focus);
+
+    // Calculate corners of the near plane
+    f32 near_height = 2.f * tanf(fov_h*0.5f) * znear;
+    f32 near_width = near_height * aspect_ratio;
+
+    // Man I wish we had operator overloading...
+    Vec2 half_near = v2muls(v2(near_width, near_height), 0.5f);
+    Vec3 camera_dir = v3norm(v3sub(cam.focus, cam.pos));
+    Vec3 camera_right = v3norm(v3cross(v3(0,1,0), camera_dir));
+    Vec3 camera_up = v3norm(v3cross(camera_dir, camera_right));
+    Vec3 near_center = v3add(cam.pos, v3muls(camera_dir, znear));
+    Vec3 ntl = v3sub(v3add(near_center, v3muls(camera_up, half_near.height)), v3muls(camera_right, half_near.width));
+    Vec3 ntr = v3add(v3add(near_center, v3muls(camera_up, half_near.height)), v3muls(camera_right, half_near.width));
+    Vec3 nbl = v3sub(v3sub(near_center, v3muls(camera_up, half_near.height)), v3muls(camera_right, half_near.width));
+    Vec3 nbr = v3add(v3sub(near_center, v3muls(camera_up, half_near.height)), v3muls(camera_right, half_near.width));
+
 
     gs->sprites = sprites;
     gs->dungeon = dungeon;
@@ -996,15 +1022,11 @@ os_entry (void) {
       }
     }
 
-    // Render TODO: Paralellize
     os_heat_sync();
+    r_prep();
 
     Mat4 view = m4lookat(gs->cam.pos, gs->cam.focus, v3(0,1,0));
     Mat4 VP = m4mul(gs->proj, view);
-
-    if (runner_id() == 0) {
-      r_prep();
-    }
 
     Dungeon_Tile *visible_tiles;
     u64 num_visible_tiles;
@@ -1038,9 +1060,9 @@ os_entry (void) {
     os_heat_sync();
     if (runner_id() == 0) {
       r_draw_entity(&gs->player);
-
-      r_update_transform(VP);
-      r_present(false);
     }
+
+    r_update_transform(VP);
+    r_present(false);
   }
 }
