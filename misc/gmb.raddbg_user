@@ -1,4 +1,4 @@
-// raddbg 0.9.23 user file
+// raddbg 0.9.21 user file
 
 recent_project: path: "root.raddbg_project"
 recent_project: path: path
@@ -15,8 +15,8 @@ window:
       0.132224: watch: selected expression: "query:types"
       0.560900:
       {
-        watch: expression: "query:threads"
-        watch: selected expression: "query:breakpoints"
+        watch: selected expression: "query:threads"
+        watch: expression: "query:breakpoints"
         watch: expression: "query:watch_pins"
       }
       0.056876:
@@ -39,7 +39,7 @@ window:
         watch: expression: "query:modules"
       }
     }
-    0.382209:
+    0.324163:
     {
       selected
       getting_started
@@ -59,10 +59,10 @@ window:
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 861
-        cursor_column: 37
-        mark_line: 861
-        mark_column: 37
+        cursor_line: 841
+        cursor_column: 21
+        mark_line: 841
+        mark_column: 21
       }
       text:
       {
@@ -85,7 +85,7 @@ window:
         mark_column: 4
       }
     }
-    0.294599:
+    0.352645:
     {
       0.647769:
       {
@@ -95,8 +95,7 @@ window:
           selected
           expression: ""
           normal: 0.350000 0.339024 0.310976
-          watch: visible_snippet
-          watch: tile
+          watch: "next_slice_to_check,last_checked_slice_idx"
         }
         watch: expression: "query:type_views"
       }
@@ -104,7 +103,7 @@ window:
     }
   }
   split_x
-  pos: 192 162
+  pos: 484 312
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }

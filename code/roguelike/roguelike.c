@@ -147,6 +147,7 @@ typedef struct World_Slice {
 typedef struct World_Tree {
   World_Slice *root;
   u64 num_slices;
+  u64 num_leaves;
 } World_Tree;
 
 typedef struct Game_State {
@@ -737,6 +738,8 @@ world_process_slice (Arena *arena, World_Tree *tree, Dungeon *d, u64 max_tiles_p
     slice->south_east = world_process_slice(arena, tree, d, max_tiles_per_slice, b1);
     slice->north_east = world_process_slice(arena, tree, d, max_tiles_per_slice, b2);
     slice->north_west = world_process_slice(arena, tree, d, max_tiles_per_slice, b3);
+  } else {
+    tree->num_leaves++;
   }
   tree->num_slices++;
 
@@ -774,7 +777,6 @@ world_index_at (World_Slice *slice, Vec2 grid_pos) {
   return slice;
 }
 
-// TODO: Take a look at this: https://en.wikipedia.org/wiki/Non-blocking_linked_list
 function void
 world_collect_from_slice (
   Arena *arena,
@@ -791,7 +793,7 @@ world_collect_from_slice (
         Dungeon_Tile tile = tile_node->tile;
         Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
         if (include_full_chunk || rects_intersect(r0, grid_range)) {
-          os_heat_begin_critical_section();
+          os_heat_begin_critical_section(); // TODO: Would this be more performant if I moved it to outside the for?
           tile_list_push(arena, out_tiles, tile);
           os_heat_end_critical_section();
         }
@@ -826,15 +828,12 @@ world_query_range (Arena *arena, World_Tree tree, Rect grid_range, b32 include_f
   thread_shared u64 last_checked_slice_idx;
   thread_shared u64 last_filled_slice_idx;
   last_checked_slice_idx = 0;
-  last_filled_slice_idx = 0;
+  last_filled_slice_idx = 1;
   if (runner_id() == 0) {
-    result = arena_pushn(arena, Tile_List, 1);
-
+    result = arena_pushn(scratch.arena, Tile_List, 1);
+    threads_finished = arena_pushn(scratch.arena, b32, num_runners());
     next_slice_to_check = arena_pushn(scratch.arena, World_Slice*, tree.num_slices);
     next_slice_to_check[0] = tree.root;
-    last_filled_slice_idx++;
-
-    threads_finished = arena_pushn(scratch.arena, b32, num_runners());
   }
   os_heat_sync_u64((u64*)&result, 0);
   os_heat_sync_u64((u64*)&next_slice_to_check, 0);
@@ -1026,7 +1025,6 @@ os_entry (void) {
     }
     os_heat_sync_u64((u64*)&visible_tiles, 0);
     os_heat_sync_u64(&num_visible_tiles, 0);
-
 
     Rangei visible_snippet = os_heat_distribute(num_visible_tiles);
     for each_in_range (tile, visible_tiles, visible_snippet) {
