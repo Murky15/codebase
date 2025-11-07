@@ -48,6 +48,6 @@ type_view:
 }
 breakpoint:
 {
-  source_location: "../code/roguelike/roguelike.c:858:1"
+  source_location: "../code/roguelike/roguelike.c:975:1"
   hit_count: 1
 }

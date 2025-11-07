@@ -97,6 +97,7 @@ typedef struct Camera {
   Vec3 pos;
   Vec3 focus;
   Vec3 follow_dist;
+  Rect visible_range;
 } Camera;
 
 typedef struct Entity {
@@ -783,45 +784,6 @@ world_index_at (World_Slice *slice, Vec2 grid_pos) {
   return slice;
 }
 
-function void
-world_collect_from_slice (
-  Arena *arena,
-  World_Slice *slice,
-  Rect grid_range,
-  b32 include_full_chunk,
-  Tile_List *out_tiles,
-  World_Slice **slices_to_check,
-  u64 *last_filled_slice_idx) {
-
-  if (rects_intersect(slice->bounds, grid_range)) {
-    if (slice->is_leaf) {
-      for each_in_list (tile_node, &slice->tiles) {
-        Dungeon_Tile tile = tile_node->tile;
-        Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
-        if (include_full_chunk || rects_intersect(r0, grid_range)) {
-          os_heat_begin_critical_section(); // TODO: Would this be more performant if I moved it to outside the for?
-          tile_list_push(arena, out_tiles, tile);
-          os_heat_end_critical_section();
-        }
-      }
-    } else {
-      World_Slice *south_west = slice->south_west;
-      World_Slice *south_east = slice->south_east;
-      World_Slice *north_east = slice->north_east;
-      World_Slice *north_west = slice->north_west;
-
-      u64 first  = InterlockedIncrement64(last_filled_slice_idx)-1;
-      u64 second = InterlockedIncrement64(last_filled_slice_idx)-1;
-      u64 third  = InterlockedIncrement64(last_filled_slice_idx)-1;
-      u64 fourth = InterlockedIncrement64(last_filled_slice_idx)-1;
-      slices_to_check[first]  = south_west;
-      slices_to_check[second] = south_east;
-      slices_to_check[third]  = north_east;
-      slices_to_check[fourth] = north_west;
-    }
-  }
-}
-
 function Tile_List
 world_query_range (Arena *arena, World_Tree tree, Rect grid_range, b32 include_full_chunk) {
   assert(tree.num_slices > 0);
@@ -863,18 +825,81 @@ world_query_range (Arena *arena, World_Tree tree, Rect grid_range, b32 include_f
     }
 
     threads_finished[runner_id()] = false;
-    world_collect_from_slice(arena,
-      next_slice_to_check[slice_idx],
-      grid_range,
-      include_full_chunk,
-      result,
-      next_slice_to_check,
-      &last_filled_slice_idx);
+    World_Slice *slice = next_slice_to_check[slice_idx];
+    if (rects_intersect(slice->bounds, grid_range)) {
+      if (slice->is_leaf) {
+        for each_in_list (tile_node, &slice->tiles) {
+          Dungeon_Tile tile = tile_node->tile;
+          Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
+          if (include_full_chunk || rects_intersect(r0, grid_range)) {
+            os_heat_begin_critical_section(); // TODO: Would this be more performant if I moved it to outside the for?
+            tile_list_push(arena, result, tile);
+            os_heat_end_critical_section();
+          }
+        }
+      } else {
+        World_Slice *south_west = slice->south_west;
+        World_Slice *south_east = slice->south_east;
+        World_Slice *north_east = slice->north_east;
+        World_Slice *north_west = slice->north_west;
+
+        u64 first  = InterlockedIncrement64(&last_filled_slice_idx)-1;
+        u64 second = InterlockedIncrement64(&last_filled_slice_idx)-1;
+        u64 third  = InterlockedIncrement64(&last_filled_slice_idx)-1;
+        u64 fourth = InterlockedIncrement64(&last_filled_slice_idx)-1;
+        next_slice_to_check[first]  = south_west;
+        next_slice_to_check[second] = south_east;
+        next_slice_to_check[third]  = north_east;
+        next_slice_to_check[fourth] = north_west;
+      }
+    }
   }
 
   done:
   release_scratch(scratch);
   return *result;
+}
+
+function Rect
+cam_calculate_visible_range (Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear) {
+  // Calculate corners of the near plane
+  f32 near_height = 2.f * tanf(fov_h*0.5f) * znear;
+  f32 near_width = near_height * aspect_ratio;
+
+  // Man I wish we had operator overloading...
+  Vec3 camera_dir = v3norm(v3sub(cam.focus, cam.pos));
+  Vec3 camera_right = v3norm(v3cross(v3(0,1,0), camera_dir));
+  Vec3 camera_up = v3norm(v3cross(camera_dir, camera_right));
+
+  Vec2 half_near = v2muls(v2(near_width, near_height), 0.5f);
+  Vec3 near_center = v3add(cam.pos, v3muls(camera_dir, znear));
+
+  Vec3 ntl = v3sub(v3add(near_center, v3muls(camera_up, half_near.height)), v3muls(camera_right, half_near.width));
+  Vec3 ntr = v3add(v3add(near_center, v3muls(camera_up, half_near.height)), v3muls(camera_right, half_near.width));
+  Vec3 nbl = v3sub(v3sub(near_center, v3muls(camera_up, half_near.height)), v3muls(camera_right, half_near.width));
+  Vec3 nbr = v3add(v3sub(near_center, v3muls(camera_up, half_near.height)), v3muls(camera_right, half_near.width));
+
+  Vec3 line_top_left = v3sub(ntl, cam.pos);
+  Vec3 line_top_right = v3sub(ntr, cam.pos);
+  Vec3 line_bottom_left = v3sub(nbl, cam.pos);
+  Vec3 line_bottom_right = v3sub(nbr, cam.pos);
+
+  f32 t0 = -cam.pos.y / line_top_left.y;
+  f32 t1 = -cam.pos.y / line_top_right.y;
+  f32 t2 = -cam.pos.y / line_bottom_left.y;
+  f32 t3 = -cam.pos.y / line_bottom_right.y;
+
+  Vec2 top_left = v2(cam.pos.x + line_top_left.x * t0, cam.pos.z + line_top_left.z * t0);
+  Vec2 top_right = v2(cam.pos.x + line_top_right.x * t1, cam.pos.z + line_top_right.z * t1);
+  Vec2 bottom_left = v2(cam.pos.x + line_bottom_left.x * t2, cam.pos.z + line_bottom_left.z * t2);
+  Vec2 bottom_right = v2(cam.pos.x + line_bottom_right.x * t3, cam.pos.z + line_bottom_right.z * t3);
+
+  f32 min_x = min(top_left.x, bottom_left.x);
+  f32 max_x = max(top_right.x, bottom_right.x);
+  f32 x_diff = max_x - min_x;
+  f32 y_diff = top_left.y - bottom_left.y;
+
+  return (Rect){.xy=v2(min_x, bottom_left.y), .zw=v2(x_diff, y_diff)};
 }
 
 void
@@ -913,7 +938,7 @@ os_entry (void) {
       .hallway_width = 5,
       .percent_edges_included = 18);
 
-    World_Tree world_tree = world_partition_dungeon(perm, &dungeon, 512);
+    World_Tree world_tree = world_partition_dungeon(perm, &dungeon, 128);
 
     Sprite room_floor = get_sprite(sprites, str8_lit("floor_1"));
     Sprite hallway_floor = get_sprite(sprites, str8_lit("floor_2"));
@@ -940,22 +965,7 @@ os_entry (void) {
     cam.pos = v3(0, cam_zoom - 30, -cam_zoom);
     cam.focus = v3(0,0,0);
     cam.follow_dist = v3sub(cam.pos,cam.focus);
-
-    // Calculate corners of the near plane
-    f32 near_height = 2.f * tanf(fov_h*0.5f) * znear;
-    f32 near_width = near_height * aspect_ratio;
-
-    // Man I wish we had operator overloading...
-    Vec2 half_near = v2muls(v2(near_width, near_height), 0.5f);
-    Vec3 camera_dir = v3norm(v3sub(cam.focus, cam.pos));
-    Vec3 camera_right = v3norm(v3cross(v3(0,1,0), camera_dir));
-    Vec3 camera_up = v3norm(v3cross(camera_dir, camera_right));
-    Vec3 near_center = v3add(cam.pos, v3muls(camera_dir, znear));
-    Vec3 ntl = v3sub(v3add(near_center, v3muls(camera_up, half_near.height)), v3muls(camera_right, half_near.width));
-    Vec3 ntr = v3add(v3add(near_center, v3muls(camera_up, half_near.height)), v3muls(camera_right, half_near.width));
-    Vec3 nbl = v3sub(v3sub(near_center, v3muls(camera_up, half_near.height)), v3muls(camera_right, half_near.width));
-    Vec3 nbr = v3add(v3sub(near_center, v3muls(camera_up, half_near.height)), v3muls(camera_right, half_near.width));
-
+    cam.visible_range = cam_calculate_visible_range(cam, fov_h, aspect_ratio, znear);
 
     gs->sprites = sprites;
     gs->dungeon = dungeon;
@@ -1000,6 +1010,8 @@ os_entry (void) {
       if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
       gs->cam.pos = v3add(gs->cam.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
       gs->cam.focus = v3add(gs->cam.focus, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
+      gs->cam.visible_range.xy = v2add(gs->cam.visible_range.xy, v2muls(move_dir, dt * PLAYER_MOVE_SPEED));
+
       gs->player.pos = v3add(gs->player.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
 
       gs->player.dir = to_cardinal(move_dir);
@@ -1030,11 +1042,13 @@ os_entry (void) {
 
     Dungeon_Tile *visible_tiles;
     u64 num_visible_tiles;
-    // TODO: Must be replaced! We should calculate what the intersection points are between the view
-    // frustum and the world plane and use that range.
-    Rect player_visible_range = {.xy = v2sub(v2(gs->player.pos.x, gs->player.pos.z), v2(256, 256)), .zw = v2(512, 512)};
-    player_visible_range.xy = d_world_to_grid(&gs->dungeon, player_visible_range.xy);
-    player_visible_range.zw = d_world_to_grid(&gs->dungeon, player_visible_range.zw);
+    Rect player_visible_range;
+    player_visible_range.xy = d_world_to_grid(&gs->dungeon, gs->cam.visible_range.xy);
+    player_visible_range.zw = d_world_to_grid(&gs->dungeon, gs->cam.visible_range.zw);
+    // Apply buffer
+    player_visible_range.xy = v2sub(player_visible_range.xy, v2(1,1));
+    player_visible_range.zw = v2add(player_visible_range.zw, v2(1,1));
+
     Tile_List visible_tile_list = world_query_range(gs->frame, gs->world_tree, player_visible_range, true);
     if (runner_id() == 0) {
       visible_tiles = arena_pushn(gs->frame, Dungeon_Tile, visible_tile_list.count);
