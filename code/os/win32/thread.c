@@ -22,7 +22,7 @@ core_function Thread_Mutex
 os_mutex_create (Arena *arena) {
   Thread_Mutex result;
   CRITICAL_SECTION *mutex = arena_pushn(arena, CRITICAL_SECTION, 1);
-  InitializeCriticalSection(mutex);
+  InitializeCriticalSectionAndSpinCount(mutex, 2000);
   result.opaque_data = int_from_ptr(mutex);
 
   return result;

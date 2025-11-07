@@ -1,4 +1,4 @@
-// raddbg 0.9.21 user file
+// raddbg 0.9.23 user file
 
 recent_project: path: "root.raddbg_project"
 recent_project: path: path
@@ -59,10 +59,10 @@ window:
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 959
-        cursor_column: 46
-        mark_line: 959
-        mark_column: 46
+        cursor_line: 826
+        cursor_column: 44
+        mark_line: 826
+        mark_column: 44
       }
       text:
       {
@@ -95,11 +95,9 @@ window:
           selected
           expression: ""
           normal: 0.350000 0.339024 0.310976
-          watch: top_left
-          watch: top_right
-          watch: bottom_left
-          watch: bottom_right
-          watch: cam
+          watch: num_leaves_processed
+          watch: tree
+          watch: "next_slice_to_check,tree.num_slices"
         }
         watch: expression: "query:type_views"
       }
@@ -107,7 +105,7 @@ window:
     }
   }
   split_x
-  pos: 484 312
+  pos: 192 162
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }

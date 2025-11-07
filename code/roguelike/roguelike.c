@@ -792,42 +792,31 @@ world_query_range (Arena *arena, World_Tree tree, Rect grid_range, b32 include_f
   Temp_Arena scratch = get_scratch(&arena, 1);
 
   World_Slice **next_slice_to_check;
-  b32 *threads_finished;
   thread_shared u64 last_checked_slice_idx;
   thread_shared u64 last_filled_slice_idx;
+  thread_shared u64 num_leaves_processed;
+  num_leaves_processed = 0;
   last_checked_slice_idx = 0;
   last_filled_slice_idx = 1;
   if (runner_id() == 0) {
     result = arena_pushn(scratch.arena, Tile_List, 1);
-    threads_finished = arena_pushn(scratch.arena, b32, num_runners());
     next_slice_to_check = arena_pushn(scratch.arena, World_Slice*, tree.num_slices);
     next_slice_to_check[0] = tree.root;
   }
   os_heat_sync_u64((u64*)&result, 0);
   os_heat_sync_u64((u64*)&next_slice_to_check, 0);
-  os_heat_sync_u64((u64*)&threads_finished, 0);
 
   while (true) {
     u64 slice_idx = InterlockedIncrement64(&last_checked_slice_idx)-1;
-    threads_finished[runner_id()] = true;
-    while (next_slice_to_check[slice_idx] == 0) {
-      b32 all_threads_finished = true;
-      for (u64 i = 0; i < num_runners(); ++i) {
-        if (!threads_finished[i]) {
-          all_threads_finished = false;
-          break;
-        }
-      }
-
-      if (all_threads_finished) {
+    while (next_slice_to_check[slice_idx] == 0 || slice_idx >= tree.num_slices) {
+      if (num_leaves_processed >= tree.num_leaves) {
         goto done;
       }
     }
 
-    threads_finished[runner_id()] = false;
     World_Slice *slice = next_slice_to_check[slice_idx];
-    if (rects_intersect(slice->bounds, grid_range)) {
-      if (slice->is_leaf) {
+    if (slice->is_leaf) {
+      if (rects_intersect(slice->bounds, grid_range)) {
         for each_in_list (tile_node, &slice->tiles) {
           Dungeon_Tile tile = tile_node->tile;
           Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
@@ -837,25 +826,27 @@ world_query_range (Arena *arena, World_Tree tree, Rect grid_range, b32 include_f
             os_heat_end_critical_section();
           }
         }
-      } else {
-        World_Slice *south_west = slice->south_west;
-        World_Slice *south_east = slice->south_east;
-        World_Slice *north_east = slice->north_east;
-        World_Slice *north_west = slice->north_west;
-
-        u64 first  = InterlockedIncrement64(&last_filled_slice_idx)-1;
-        u64 second = InterlockedIncrement64(&last_filled_slice_idx)-1;
-        u64 third  = InterlockedIncrement64(&last_filled_slice_idx)-1;
-        u64 fourth = InterlockedIncrement64(&last_filled_slice_idx)-1;
-        next_slice_to_check[first]  = south_west;
-        next_slice_to_check[second] = south_east;
-        next_slice_to_check[third]  = north_east;
-        next_slice_to_check[fourth] = north_west;
       }
+      InterlockedIncrement64(&num_leaves_processed);
+    } else {
+      World_Slice *south_west = slice->south_west;
+      World_Slice *south_east = slice->south_east;
+      World_Slice *north_east = slice->north_east;
+      World_Slice *north_west = slice->north_west;
+
+      u64 first  = InterlockedIncrement64(&last_filled_slice_idx)-1;
+      u64 second = InterlockedIncrement64(&last_filled_slice_idx)-1;
+      u64 third  = InterlockedIncrement64(&last_filled_slice_idx)-1;
+      u64 fourth = InterlockedIncrement64(&last_filled_slice_idx)-1;
+      next_slice_to_check[first]  = south_west;
+      next_slice_to_check[second] = south_east;
+      next_slice_to_check[third]  = north_east;
+      next_slice_to_check[fourth] = north_west;
     }
   }
 
   done:
+  os_heat_sync();
   release_scratch(scratch);
   return *result;
 }
@@ -943,7 +934,7 @@ os_entry (void) {
     Sprite room_floor = get_sprite(sprites, str8_lit("floor_1"));
     Sprite hallway_floor = get_sprite(sprites, str8_lit("floor_2"));
 
-    Entity player = (Entity){0};
+    Entity player = {0};
     player.pos = v3(0,1,0);
     player.seconds_to_rotate = 0.12f;
     player.idle = get_sprite(sprites, str8_lit("doc_idle_anim"));
@@ -1053,10 +1044,9 @@ os_entry (void) {
     if (runner_id() == 0) {
       visible_tiles = arena_pushn(gs->frame, Dungeon_Tile, visible_tile_list.count);
       num_visible_tiles = visible_tile_list.count;
-      u64 i = 0;
       for each_in_list (tile_node, &visible_tile_list) {
+        u64 i = (tile_node - visible_tile_list.first);
         visible_tiles[i] = tile_node->tile;
-        ++i;
       }
     }
     os_heat_sync_u64((u64*)&visible_tiles, 0);
