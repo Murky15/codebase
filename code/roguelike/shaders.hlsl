@@ -16,7 +16,8 @@ struct Instance_Data {
 struct PS_Input {
   float4 pos : SV_POSITION;
   float4 col : COLOR;
-  float2 uv  : TEXCOORD;
+  float2 uv  : TEXCOORD0;
+  float2 tex_dim : TEXCOORD1;
 };
 
 cbuffer Uniforms : register(b0) {
@@ -49,17 +50,34 @@ vs_main (Vertex_Data vert, Instance_Data inst) {
   float2 uv = ((vert.uv * scale) + offset) / tex_dim;
 
   result.uv = uv;
+  result.tex_dim = tex_dim;
   result.col = float4(inst.col, 1.0);
 
   return result;
 }
 
-/*
-  I'm going to need to implement my own texture sampling to make this art style look good
-  in a 3D perspective.
-*/
+float2
+uv_nearest (float2 uv, float2 tex_dim) {
+  float2 texel = uv * tex_dim;
+  texel = floor(texel) + 0.5;
+
+  return texel / tex_dim;
+}
+
+// NOTE: One solution that seems to work, should I use floor(texel) or ceil(texel)?
+// I also want to try generating mipmaps and trying this with/without anisotropic filtering.
+// Or, I should combine mipmaps with the new filter algorithm.
+float2
+uv_filter (float2 uv, float2 tex_dim) {
+  float2 texel = uv * tex_dim;
+  float2 a = 0.4 * fwidth(texel);
+  float2 fr = frac(texel);
+  float2 sample_loc = clamp(0.5/a*fr, 0, 0.5) + clamp(0.5/a*(fr - 1)+0.5, 0, 0.5);
+
+  return (ceil(texel) + sample_loc) / tex_dim;
+}
 
 float4
 ps_main (PS_Input input) : SV_TARGET {
-  return atlas.Sample(atlas_sampler, input.uv);
+  return atlas.Sample(atlas_sampler, uv_nearest(input.uv, input.tex_dim));
 }

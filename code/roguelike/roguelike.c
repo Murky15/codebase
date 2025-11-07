@@ -457,14 +457,6 @@ r_init (HWND hwnd) {
   com_release(ps_code_blob);
   com_release(vs_errors_blob);
   com_release(ps_errors_blob);
-  com_release(vertex_shader);
-  com_release(pixel_shader);
-  com_release(vbuffer);
-  com_release(ibuffer);
-  com_release(rstate);
-  com_release(depth_stencil_texture);
-  com_release(depth_stencil_state);
-  com_release(blend_state);
 
   return (Vec2i){render_width, render_height};
 }
@@ -494,14 +486,14 @@ r_create_and_bind_texture (PNG_Bitmap_RGBA raw_texture_data) {
   ID3D11DeviceContext_PSSetShaderResources(ctx, 0, 1, &tex_view);
 
   D3D11_SAMPLER_DESC sampler_desc;
-  sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+  sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
   sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
   sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
   sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
   sampler_desc.MinLOD = 0;
   sampler_desc.MaxLOD = 0;
   sampler_desc.MipLODBias = 0.f;
-  sampler_desc.MaxAnisotropy = 8;
+  sampler_desc.MaxAnisotropy = 16;
   sampler_desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
   sampler_desc.BorderColor[0] = 1.f;
   sampler_desc.BorderColor[1] = 1.f;
@@ -510,10 +502,56 @@ r_create_and_bind_texture (PNG_Bitmap_RGBA raw_texture_data) {
   ID3D11SamplerState *sampler;
   ID3D11Device_CreateSamplerState(device, &sampler_desc, &sampler);
   ID3D11DeviceContext_PSSetSamplers(ctx, 0, 1, &sampler);
+}
 
-  com_release(tex);
-  com_release(tex_view);
-  com_release(sampler);
+// TODO: Merge this with the above function
+function void
+r_create_and_bind_texture_with_mipmaps (PNG_Bitmap_RGBA raw_texture_data) {
+  D3D11_TEXTURE2D_DESC tex_desc = {0};
+  tex_desc.Width = raw_texture_data.width;
+  tex_desc.Height = raw_texture_data.height;
+  tex_desc.MipLevels = 0;
+  tex_desc.ArraySize = 1;
+  tex_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  tex_desc.SampleDesc.Count = 1;
+  tex_desc.SampleDesc.Quality = 0;
+  tex_desc.Usage = D3D11_USAGE_DEFAULT;
+  tex_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+  tex_desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
+
+  D3D11_SHADER_RESOURCE_VIEW_DESC tex_srv = {0};
+  tex_srv.Format = tex_desc.Format;
+  tex_srv.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+  tex_srv.Texture2D.MipLevels = -1;
+  tex_srv.Texture2D.MostDetailedMip = 0;
+
+  ID3D11Texture2D *tex;
+  ID3D11ShaderResourceView *tex_view;
+  ID3D11Device_CreateTexture2D(device, &tex_desc, NULL, &tex);
+  ID3D11DeviceContext_UpdateSubresource(ctx, (ID3D11Resource*)tex, 0, NULL, raw_texture_data.pixels, raw_texture_data.width * sizeof(u32), 0);
+
+  ID3D11Device_CreateShaderResourceView(device, (ID3D11Resource*)tex, &tex_srv, &tex_view);
+  ID3D11DeviceContext_GenerateMips(ctx, tex_view);
+  ID3D11DeviceContext_VSSetShaderResources(ctx, 0, 1, &tex_view);
+  ID3D11DeviceContext_PSSetShaderResources(ctx, 0, 1, &tex_view);
+
+  D3D11_SAMPLER_DESC sampler_desc;
+  sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+  sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+  sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+  sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+  sampler_desc.MinLOD = 0;
+  sampler_desc.MaxLOD = D3D11_FLOAT32_MAX;
+  sampler_desc.MipLODBias = 0.03f;
+  sampler_desc.MaxAnisotropy = 16;
+  sampler_desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+  sampler_desc.BorderColor[0] = 1.f;
+  sampler_desc.BorderColor[1] = 1.f;
+  sampler_desc.BorderColor[2] = 1.f;
+  sampler_desc.BorderColor[3] = 1.f;
+  ID3D11SamplerState *sampler;
+  ID3D11Device_CreateSamplerState(device, &sampler_desc, &sampler);
+  ID3D11DeviceContext_PSSetSamplers(ctx, 0, 1, &sampler);
 }
 
 function void
@@ -915,7 +953,7 @@ os_entry (void) {
     f32 render_height = render_dim.height;
 
     Texture_Atlas sprites = load_textures(perm, str8_lit("W:/assets/roguelike/0x72_DungeonTilesetII_v1.7"));
-    r_create_and_bind_texture(sprites.raw_texture_data);
+    r_create_and_bind_texture_with_mipmaps(sprites.raw_texture_data);
 
     Dungeon dungeon = d_create(perm,
       .target_room_count = 500,
