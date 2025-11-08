@@ -14,10 +14,10 @@ struct Instance_Data {
 };
 
 struct PS_Input {
-  float4 pos : SV_POSITION;
-  float4 col : COLOR;
-  float2 uv  : TEXCOORD0;
-  float2 tex_dim : TEXCOORD1;
+  float4 pos    : SV_POSITION;
+  float4 col    : COLOR;
+  float4 coords : TEXCOORD0;
+  float2 uv     : TEXCOORD1;
 };
 
 cbuffer Uniforms : register(b0) {
@@ -40,18 +40,11 @@ vs_main (Vertex_Data vert, Instance_Data inst) {
 
   float4 pos = float4(vert.pos, 1.0);
   matrix wvp = mul(view_proj, world);
+
   result.pos = mul(wvp, pos);
-
-  float2 tex_dim;
-  atlas.GetDimensions(tex_dim.x, tex_dim.y);
-
-  float2 scale  = inst.coords.xy;
-  float2 offset = inst.coords.zw;
-  float2 uv = ((vert.uv * scale) + offset) / tex_dim;
-
-  result.uv = uv;
-  result.tex_dim = tex_dim;
   result.col = float4(inst.col, 1.0);
+  result.coords = inst.coords;
+  result.uv = vert.uv;
 
   return result;
 }
@@ -64,20 +57,28 @@ uv_nearest (float2 uv, float2 tex_dim) {
   return texel / tex_dim;
 }
 
-// NOTE: One solution that seems to work, should I use floor(texel) or ceil(texel)?
-// I also want to try generating mipmaps and trying this with/without anisotropic filtering.
-// Or, I should combine mipmaps with the new filter algorithm.
 float2
-uv_filter (float2 uv, float2 tex_dim) {
-  float2 texel = uv * tex_dim;
-  float2 a = 0.4 * fwidth(texel);
+texel_filter (float2 texel) {
+  float2 a = 0.75 * fwidth(texel);
   float2 fr = frac(texel);
   float2 sample_loc = clamp(0.5/a*fr, 0, 0.5) + clamp(0.5/a*(fr - 1)+0.5, 0, 0.5);
 
-  return (ceil(texel) + sample_loc) / tex_dim;
+  return (floor(texel) + sample_loc);
 }
 
 float4
 ps_main (PS_Input input) : SV_TARGET {
-  return atlas.Sample(atlas_sampler, uv_nearest(input.uv, input.tex_dim));
+  float2 tex_dim;
+  atlas.GetDimensions(tex_dim.x, tex_dim.y);
+
+  float2 scale  = input.coords.xy;
+  float2 offset = input.coords.zw;
+  float2 texel = ((input.uv * scale) + offset);
+  float2 uv = texel_filter(texel);
+  // NOTE: There is a little bit of "bleed" into other textures on the atlas,
+  // this hack is just so we don't see it. I know it's a little janky.
+  uv = clamp(uv, offset + .5, offset + scale);
+  uv /= tex_dim;
+
+  return atlas.Sample(atlas_sampler, uv);
 }

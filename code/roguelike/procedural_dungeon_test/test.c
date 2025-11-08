@@ -274,7 +274,7 @@ d_push_room (Arena *arena, Dungeon *dungeon, Dungeon_Room room) {
 }
 
 function b32
-rects_intersect (Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1) {
+rects_intersect_raw (Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1) {
   return  (p0.x + s0.x > p1.x) &&
           (p1.x + s1.x > p0.x) &&
           (p0.y + s0.y > p1.y) &&
@@ -362,7 +362,7 @@ d_create_ (Arena *arena, Dungeon_Create_Params *p) {
             Vec2 new_size = v2add(world_size, border);
             Vec2 room_pos = v2sub(room->world_pos, border);
             Vec2 room_size = v2add(room->world_size, border);
-            if (rects_intersect(new_pos, new_size, room_pos, room_size)) {
+            if (rects_intersect_raw(new_pos, new_size, room_pos, room_size)) {
               clear = false;
               break;
             }

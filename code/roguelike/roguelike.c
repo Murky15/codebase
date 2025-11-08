@@ -462,55 +462,11 @@ r_init (HWND hwnd) {
 }
 
 function void
-r_create_and_bind_texture (PNG_Bitmap_RGBA raw_texture_data) {
+r_create_and_bind_texture (PNG_Bitmap_RGBA raw_texture_data, b32 generate_mipmaps) {
   D3D11_TEXTURE2D_DESC tex_desc = {0};
   tex_desc.Width = raw_texture_data.width;
   tex_desc.Height = raw_texture_data.height;
-  tex_desc.MipLevels = 1;
-  tex_desc.ArraySize = 1;
-  tex_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-  tex_desc.SampleDesc.Count = 1;
-  tex_desc.SampleDesc.Quality = 0;
-  tex_desc.Usage = D3D11_USAGE_DEFAULT;
-  tex_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-
-  D3D11_SUBRESOURCE_DATA pixels = {0};
-  pixels.pSysMem = raw_texture_data.pixels;
-  pixels.SysMemPitch = (u32)sizeof(u32) * raw_texture_data.width;
-
-  ID3D11Texture2D *tex;
-  ID3D11ShaderResourceView *tex_view;
-  ID3D11Device_CreateTexture2D(device, &tex_desc, &pixels, &tex);
-  ID3D11Device_CreateShaderResourceView(device, (ID3D11Resource*)tex, 0, &tex_view);
-  ID3D11DeviceContext_VSSetShaderResources(ctx, 0, 1, &tex_view);
-  ID3D11DeviceContext_PSSetShaderResources(ctx, 0, 1, &tex_view);
-
-  D3D11_SAMPLER_DESC sampler_desc;
-  sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-  sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-  sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-  sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-  sampler_desc.MinLOD = 0;
-  sampler_desc.MaxLOD = 0;
-  sampler_desc.MipLODBias = 0.f;
-  sampler_desc.MaxAnisotropy = 16;
-  sampler_desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-  sampler_desc.BorderColor[0] = 1.f;
-  sampler_desc.BorderColor[1] = 1.f;
-  sampler_desc.BorderColor[2] = 1.f;
-  sampler_desc.BorderColor[3] = 1.f;
-  ID3D11SamplerState *sampler;
-  ID3D11Device_CreateSamplerState(device, &sampler_desc, &sampler);
-  ID3D11DeviceContext_PSSetSamplers(ctx, 0, 1, &sampler);
-}
-
-// TODO: Merge this with the above function
-function void
-r_create_and_bind_texture_with_mipmaps (PNG_Bitmap_RGBA raw_texture_data) {
-  D3D11_TEXTURE2D_DESC tex_desc = {0};
-  tex_desc.Width = raw_texture_data.width;
-  tex_desc.Height = raw_texture_data.height;
-  tex_desc.MipLevels = 0;
+  tex_desc.MipLevels = !generate_mipmaps;
   tex_desc.ArraySize = 1;
   tex_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
   tex_desc.SampleDesc.Count = 1;
@@ -542,7 +498,7 @@ r_create_and_bind_texture_with_mipmaps (PNG_Bitmap_RGBA raw_texture_data) {
   sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
   sampler_desc.MinLOD = 0;
   sampler_desc.MaxLOD = D3D11_FLOAT32_MAX;
-  sampler_desc.MipLODBias = 0.03f;
+  sampler_desc.MipLODBias = 0.f;
   sampler_desc.MaxAnisotropy = 16;
   sampler_desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
   sampler_desc.BorderColor[0] = 1.f;
@@ -953,19 +909,19 @@ os_entry (void) {
     f32 render_height = render_dim.height;
 
     Texture_Atlas sprites = load_textures(perm, str8_lit("W:/assets/roguelike/0x72_DungeonTilesetII_v1.7"));
-    r_create_and_bind_texture_with_mipmaps(sprites.raw_texture_data);
+    r_create_and_bind_texture(sprites.raw_texture_data, true);
 
     Dungeon dungeon = d_create(perm,
       .target_room_count = 500,
       .grid_dim   = 16,
       .map_width  = 512,
       .map_height = 512,
-      .room_width_mean = 48,
-      .room_width_deviation = 10,
-      .room_height_mean = 48,
-      .room_height_deviation = 10,
+      .room_width_mean = 30,
+      .room_width_deviation = 5,
+      .room_height_mean = 30,
+      .room_height_deviation = 5,
       .hallway_width = 5,
-      .percent_edges_included = 18);
+      .percent_edges_included = 12);
 
     World_Tree world_tree = world_partition_dungeon(perm, &dungeon, 128);
 
@@ -991,7 +947,7 @@ os_entry (void) {
     f32 cam_zoom = 150.f;
     //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
     //cam.pos = v3(0, -cam_zoom, 1);
-    cam.pos = v3(0, cam_zoom - 30, -cam_zoom);
+    cam.pos = v3(0, cam_zoom, -cam_zoom);
     cam.focus = v3(0,0,0);
     cam.follow_dist = v3sub(cam.pos,cam.focus);
     cam.visible_range = cam_calculate_visible_range(cam, fov_h, aspect_ratio, znear);
