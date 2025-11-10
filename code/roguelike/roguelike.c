@@ -22,6 +22,28 @@
 #include <os/include.h>
 #include <file/png.h>
 
+// TODO: Need `roguelike.h`
+typedef struct Atlas_Coords {
+  Vec2 scale;
+  Vec2 offset;
+} Atlas_Coords;
+
+#define MAX_FRAMES 4
+typedef struct Sprite {
+  String8 name;
+  Atlas_Coords coords[MAX_FRAMES];
+  u64 num_frames;
+  u64 current_frame;
+  f32 started_at;
+  f32 seconds_to_complete;
+} Sprite;
+
+typedef struct Texture_Atlas {
+  PNG_Bitmap_RGBA raw_texture_data;
+  Sprite *sprites;
+  u64 num_sprites;
+} Texture_Atlas;
+
 #include "dungeon.h"
 
 // NOTE: Source
@@ -51,26 +73,6 @@ enum {
   SOUTHWEST = SOUTH | WEST,
 };
 
-typedef struct Atlas_Coords {
-  Vec2 scale;
-  Vec2 offset;
-} Atlas_Coords;
-
-#define MAX_FRAMES 4
-typedef struct Sprite {
-  String8 name;
-  Atlas_Coords coords[MAX_FRAMES];
-  u64 num_frames;
-  u64 current_frame;
-  f32 started_at;
-  f32 seconds_to_complete;
-} Sprite;
-
-typedef struct Texture_Atlas {
-  PNG_Bitmap_RGBA raw_texture_data;
-  Sprite *sprites;
-  u64 num_sprites;
-} Texture_Atlas;
 
 typedef struct R_Vertex {
   Vec3 pos;
@@ -117,40 +119,6 @@ typedef struct Entity {
   Sprite run;
 } Entity;
 
-typedef struct Tile_Node {
-  struct Tile_Node *next;
-  Dungeon_Tile tile;
-} Tile_Node;
-
-typedef struct Tile_List {
-  Tile_Node *first, *last;
-  u64 count;
-} Tile_List;
-
-typedef struct World_Slice {
-  b32 is_leaf;
-  Rect bounds;
-  union {
-    union {
-      struct {
-        struct World_Slice *south_west;
-        struct World_Slice *south_east;
-        struct World_Slice *north_east;
-        struct World_Slice *north_west;
-      };
-      struct World_Slice *c[4];
-    };
-
-    Tile_List tiles;
-  };
-} World_Slice;
-
-typedef struct World_Tree {
-  World_Slice *root;
-  u64 num_slices;
-  u64 num_leaves;
-} World_Tree;
-
 typedef struct Game_State {
   Arena *perm, *frame;
   Texture_Atlas sprites;
@@ -161,7 +129,6 @@ typedef struct Game_State {
   Camera cam;
   Sprite room_floor;
   Sprite hallway_floor;
-  World_Tree world_tree;
 } Game_State;
 
 global ID3D11Device *device;
@@ -688,163 +655,6 @@ r_draw_entity (Entity *e) {
   r_push_quad(.pos = e->pos, .scale = texcoord.scale, .rot = rot, .atlas_coords = texcoord);
 }
 
-function void
-tile_list_push (Arena *arena, Tile_List *list, Dungeon_Tile tile) {
-  Tile_Node *node = arena_pushn(arena, Tile_Node, 1);
-  node->tile = tile;
-  sll_queue_push(list->first, list->last, node);
-  list->count++;
-}
-
-function b32
-point_in_rect (Vec2 p, Rect r) {
-  f32 x0 = r.x;
-  f32 x1 = x0 + r.width;
-  f32 y0 = r.y;
-  f32 y1 = y0 + r.height;
-
-  return (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1);
-}
-
-function World_Slice*
-world_process_slice (Arena *arena, World_Tree *tree, Dungeon *d, u64 max_tiles_per_slice, Rect bounds) {
-  World_Slice *slice = arena_pushn(arena, World_Slice, 1);
-  slice->bounds = bounds;
-  slice->is_leaf = true;
-
-  u64 arena_restore_pos = arena_pos(arena);
-  for (s64 y = bounds.y; y <= bounds.y + bounds.height; ++y) {
-    for (s64 x = bounds.x; x <= bounds.x + bounds.width; ++x) {
-      Dungeon_Tile *tile = d_index_tile(d, v2(x,y));
-      if (tile->flags) {
-        if (slice->tiles.count < max_tiles_per_slice) {
-          tile_list_push(arena, &slice->tiles, *tile);
-        } else {
-          slice->is_leaf = false;
-          goto overflow;
-        }
-      }
-    }
-  }
-
-  overflow:
-  if (!slice->is_leaf) {
-    arena_pop_to(arena, arena_restore_pos);
-    Vec2 new_size = v2muls(bounds.zw, 0.5f);
-    Rect b0 = {.xy = bounds.xy, .zw = new_size};
-    Rect b1 = {.xy = v2add(bounds.xy, v2(new_size.x,0)), .zw = new_size};
-    Rect b2 = {.xy = v2add(bounds.xy, new_size), .zw = new_size};
-    Rect b3 = {.xy = v2add(bounds.xy, v2(0,new_size.y)), .zw = new_size};
-    slice->south_west = world_process_slice(arena, tree, d, max_tiles_per_slice, b0);
-    slice->south_east = world_process_slice(arena, tree, d, max_tiles_per_slice, b1);
-    slice->north_east = world_process_slice(arena, tree, d, max_tiles_per_slice, b2);
-    slice->north_west = world_process_slice(arena, tree, d, max_tiles_per_slice, b3);
-  } else {
-    tree->num_leaves++;
-  }
-  tree->num_slices++;
-
-  return slice;
-}
-
-function World_Tree
-world_partition_dungeon (Arena *arena, Dungeon *d, u64 max_tiles_per_slice) {
-  World_Tree result = {0};
-  if (runner_id() == 0) {
-    f32 half_width = d->width / 2.f;
-    f32 half_height = d->height / 2.f;
-    Rect initial_bounds = {-half_width, -half_height, d->width, d->height};
-    result.root = world_process_slice(arena, &result, d, max_tiles_per_slice, initial_bounds);
-  }
-
-  return result;
-}
-
-function World_Slice*
-world_index_at (World_Slice *slice, Vec2 grid_pos) {
-  if (!slice->is_leaf) {
-    World_Slice *south_west = slice->south_west;
-    World_Slice *south_east = slice->south_east;
-    World_Slice *north_east = slice->north_east;
-    World_Slice *north_west = slice->north_west;
-
-    if (point_in_rect(grid_pos, south_west->bounds)) return world_index_at(south_west, grid_pos);
-    if (point_in_rect(grid_pos, south_east->bounds)) return world_index_at(south_east, grid_pos);
-    if (point_in_rect(grid_pos, north_east->bounds)) return world_index_at(north_east, grid_pos);
-    if (point_in_rect(grid_pos, north_west->bounds)) return world_index_at(north_west, grid_pos);
-  }
-
-  assert (point_in_rect(grid_pos, slice->bounds));
-  return slice;
-}
-
-function Tile_List
-world_query_range (Arena *arena, World_Tree tree, Rect grid_range, b32 include_full_chunk) {
-  assert(tree.num_slices > 0);
-  Tile_List *result;
-
-  Temp_Arena scratch = get_scratch(&arena, 1);
-
-  World_Slice **next_slice_to_check;
-  thread_shared u64 last_checked_slice_idx;
-  thread_shared u64 last_filled_slice_idx;
-  thread_shared u64 num_leaves_processed;
-  num_leaves_processed = 0;
-  last_checked_slice_idx = 0;
-  last_filled_slice_idx = 1;
-  if (runner_id() == 0) {
-    result = arena_pushn(scratch.arena, Tile_List, 1);
-    next_slice_to_check = arena_pushn(scratch.arena, World_Slice*, tree.num_slices);
-    next_slice_to_check[0] = tree.root;
-  }
-  os_heat_sync_u64((u64*)&result, 0);
-  os_heat_sync_u64((u64*)&next_slice_to_check, 0);
-
-  while (true) {
-    u64 slice_idx = InterlockedIncrement64(&last_checked_slice_idx)-1;
-    while (next_slice_to_check[slice_idx] == 0 || slice_idx >= tree.num_slices) {
-      if (num_leaves_processed >= tree.num_leaves) {
-        goto done;
-      }
-    }
-
-    World_Slice *slice = next_slice_to_check[slice_idx];
-    if (slice->is_leaf) {
-      if (rects_intersect(slice->bounds, grid_range)) {
-        for each_in_list (tile_node, &slice->tiles) {
-          Dungeon_Tile tile = tile_node->tile;
-          Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
-          if (include_full_chunk || rects_intersect(r0, grid_range)) {
-            os_heat_begin_critical_section(); // TODO: Would this be more performant if I moved it to outside the for?
-            tile_list_push(arena, result, tile);
-            os_heat_end_critical_section();
-          }
-        }
-      }
-      InterlockedIncrement64(&num_leaves_processed);
-    } else {
-      World_Slice *south_west = slice->south_west;
-      World_Slice *south_east = slice->south_east;
-      World_Slice *north_east = slice->north_east;
-      World_Slice *north_west = slice->north_west;
-
-      u64 first  = InterlockedIncrement64(&last_filled_slice_idx)-1;
-      u64 second = InterlockedIncrement64(&last_filled_slice_idx)-1;
-      u64 third  = InterlockedIncrement64(&last_filled_slice_idx)-1;
-      u64 fourth = InterlockedIncrement64(&last_filled_slice_idx)-1;
-      next_slice_to_check[first]  = south_west;
-      next_slice_to_check[second] = south_east;
-      next_slice_to_check[third]  = north_east;
-      next_slice_to_check[fourth] = north_west;
-    }
-  }
-
-  done:
-  os_heat_sync();
-  release_scratch(scratch);
-  return *result;
-}
-
 function Rect
 cam_calculate_visible_range (Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear) {
   // Calculate corners of the near plane
@@ -923,8 +733,6 @@ os_entry (void) {
       .hallway_width = 5,
       .percent_edges_included = 12);
 
-    World_Tree world_tree = world_partition_dungeon(perm, &dungeon, 128);
-
     Sprite room_floor = get_sprite(sprites, str8_lit("floor_1"));
     Sprite hallway_floor = get_sprite(sprites, str8_lit("floor_2"));
 
@@ -960,7 +768,6 @@ os_entry (void) {
     gs->cam = cam;
     gs->room_floor = room_floor;
     gs->hallway_floor = hallway_floor;
-    gs->world_tree = world_tree;
   }
 
   os_heat_sync_u64((u64*)&gs, 0);
@@ -1032,9 +839,8 @@ os_entry (void) {
     player_visible_range.zw = d_world_to_grid(&gs->dungeon, gs->cam.visible_range.zw);
     // Apply buffer
     player_visible_range.xy = v2sub(player_visible_range.xy, v2(1,1));
-    player_visible_range.zw = v2add(player_visible_range.zw, v2(1,1));
-
-    Tile_List visible_tile_list = world_query_range(gs->frame, gs->world_tree, player_visible_range, true);
+    player_visible_range.zw = v2add(player_visible_range.zw, v2(2,2));
+    Dungeon_Tile_List visible_tile_list = d_query_range(gs->frame, gs->dungeon.map, player_visible_range, true);
     if (runner_id() == 0) {
       visible_tiles = arena_pushn(gs->frame, Dungeon_Tile, visible_tile_list.count);
       num_visible_tiles = visible_tile_list.count;
