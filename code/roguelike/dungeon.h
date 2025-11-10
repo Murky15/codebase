@@ -185,7 +185,7 @@ typedef struct Dungeon_Create_Params {
   u64 max_tiles_per_map_slice;
 
   u64 percent_edges_included;
-  u64 percent_tile_cracked;
+  u64 percent_tiles_cracked;
 } Dungeon_Create_Params;
 
 #define d_create(arena, atlas, ...) d_create_((arena), (atlas), &(Dungeon_Create_Params){ \

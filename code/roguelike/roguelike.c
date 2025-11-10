@@ -659,12 +659,13 @@ os_entry (void) {
       .grid_dim   = 16,
       .map_width  = 512,
       .map_height = 512,
-      .room_width_mean = 30,
+      .room_width_mean = 15,
       .room_width_deviation = 5,
-      .room_height_mean = 30,
+      .room_height_mean = 15,
       .room_height_deviation = 5,
-      .hallway_width = 5,
-      .percent_edges_included = 12);
+      .hallway_width = 3,
+      .percent_edges_included = 12,
+      .percent_tiles_cracked = 5);
 
     Entity player = {0};
     player.pos = v3(0,1,0);
@@ -768,7 +769,7 @@ os_entry (void) {
     // Apply buffer
     player_visible_range.xy = v2sub(player_visible_range.xy, v2(1,1));
     player_visible_range.zw = v2add(player_visible_range.zw, v2(2,2));
-    Dungeon_Tile_List visible_tile_list = d_query_range(gs->frame, gs->dungeon.map, player_visible_range, true);
+    Dungeon_Tile_List visible_tile_list = d_query_range(gs->frame, gs->dungeon.map, player_visible_range, false);
     if (runner_id() == 0) {
       visible_tiles = arena_pushn(gs->frame, Dungeon_Tile, visible_tile_list.count);
       num_visible_tiles = visible_tile_list.count;

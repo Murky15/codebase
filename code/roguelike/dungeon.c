@@ -654,7 +654,9 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         if (tile->flags) {
           u64 val = (rand() % 100) + 1;
           u64 sprite_idx = 0;
-          if (val <= p->percent_tile_cracked) {
+          if (val <= p->percent_tiles_cracked) {
+            // TODO: Maybe I could add some way to rotate the tile to increase
+            // variation.
             sprite_idx = (rand() % (array_count(floors)-1)) + 1;
           }
           tile->sprite = floors[sprite_idx];
