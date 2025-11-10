@@ -1,6 +1,7 @@
 // raddbg 0.9.23 project file
 
 recent_file: path: "../code/roguelike/roguelike.c"
+recent_file: path: "../code/roguelike/dungeon.c"
 recent_file: path: "d:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm"
 recent_file: path: "../code/os/thread.c"
 recent_file: path: "../code/os/win32/thread.c"
@@ -45,4 +46,9 @@ type_view:
 {
   type: visible_tiles
   expr: array
+}
+breakpoint:
+{
+  source_location: "../code/roguelike/roguelike.c:788:1"
+  hit_count: 1
 }

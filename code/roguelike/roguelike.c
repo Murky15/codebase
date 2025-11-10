@@ -22,28 +22,7 @@
 #include <os/include.h>
 #include <file/png.h>
 
-// TODO: Need `roguelike.h`
-typedef struct Atlas_Coords {
-  Vec2 scale;
-  Vec2 offset;
-} Atlas_Coords;
-
-#define MAX_FRAMES 4
-typedef struct Sprite {
-  String8 name;
-  Atlas_Coords coords[MAX_FRAMES];
-  u64 num_frames;
-  u64 current_frame;
-  f32 started_at;
-  f32 seconds_to_complete;
-} Sprite;
-
-typedef struct Texture_Atlas {
-  PNG_Bitmap_RGBA raw_texture_data;
-  Sprite *sprites;
-  u64 num_sprites;
-} Texture_Atlas;
-
+#include "roguelike.h"
 #include "dungeon.h"
 
 // NOTE: Source
@@ -60,19 +39,15 @@ typedef struct Texture_Atlas {
 #define MAX_OBJECTS_ON_SCREEN 512 * 512
 #define PLAYER_MOVE_SPEED 0.15f
 
-typedef u32 Cardinal_Dir;
-enum {
-  NORTH = (1 << 0),
-  SOUTH = (1 << 1),
-  EAST  = (1 << 2),
-  WEST  = (1 << 3),
-
-  NORTHEAST = NORTH | EAST,
-  NORTHWEST = NORTH | WEST,
-  SOUTHEAST = SOUTH | EAST,
-  SOUTHWEST = SOUTH | WEST,
-};
-
+typedef struct Game_State {
+  Arena *perm, *frame;
+  Texture_Atlas sprites;
+  Dungeon dungeon;
+  Mat4 proj;
+  Quat tile_rot;
+  Entity player;
+  Camera cam;
+} Game_State;
 
 typedef struct R_Vertex {
   Vec3 pos;
@@ -88,48 +63,6 @@ typedef struct Instance_Data {
   Atlas_Coords atlas_coords;
   Vec3 color;
 } Instance_Data;
-
-/*
-  We can have a 'tween' function type here that takes two Vector3s
-  which is then packed in the Camera struct for camera_update_tracking
-  to modify how the camera changes position
-*/
-
-typedef struct Camera {
-  Vec3 pos;
-  Vec3 focus;
-  Vec3 follow_dist;
-  Rect visible_range;
-} Camera;
-
-typedef struct Entity {
-  // General info
-  Vec3 pos;
-  f32 rotation_angle;
-
-  // Rotation animation
-  Cardinal_Dir dir;
-  f32 start_angle;
-  f32 end_angle;
-  f32 seconds_to_rotate;
-  f32 started_rotating_at;
-
-  // Sprites
-  Sprite idle;
-  Sprite run;
-} Entity;
-
-typedef struct Game_State {
-  Arena *perm, *frame;
-  Texture_Atlas sprites;
-  Dungeon dungeon;
-  Mat4 proj;
-  Quat tile_rot;
-  Entity player;
-  Camera cam;
-  Sprite room_floor;
-  Sprite hallway_floor;
-} Game_State;
 
 global ID3D11Device *device;
 global ID3D11DeviceContext *ctx;
@@ -721,7 +654,7 @@ os_entry (void) {
     Texture_Atlas sprites = load_textures(perm, str8_lit("W:/assets/roguelike/0x72_DungeonTilesetII_v1.7"));
     r_create_and_bind_texture(sprites.raw_texture_data, true);
 
-    Dungeon dungeon = d_create(perm,
+    Dungeon dungeon = d_create(perm, sprites,
       .target_room_count = 500,
       .grid_dim   = 16,
       .map_width  = 512,
@@ -732,9 +665,6 @@ os_entry (void) {
       .room_height_deviation = 5,
       .hallway_width = 5,
       .percent_edges_included = 12);
-
-    Sprite room_floor = get_sprite(sprites, str8_lit("floor_1"));
-    Sprite hallway_floor = get_sprite(sprites, str8_lit("floor_2"));
 
     Entity player = {0};
     player.pos = v3(0,1,0);
@@ -766,8 +696,6 @@ os_entry (void) {
     gs->tile_rot = tile_rot;
     gs->player = player;
     gs->cam = cam;
-    gs->room_floor = room_floor;
-    gs->hallway_floor = hallway_floor;
   }
 
   os_heat_sync_u64((u64*)&gs, 0);
@@ -856,8 +784,7 @@ os_entry (void) {
     for each_in_range (tile, visible_tiles, visible_snippet) {
       Vec2 world = d_grid_to_world(&gs->dungeon, tile->grid_pos);
       Vec3 pos = v3(world.x, 1, world.y);
-      Sprite sprite = {0};
-      sprite = tile->flags & DUNGEON_TILE_ROOM ? gs->room_floor : gs->hallway_floor;
+      Sprite sprite = tile->sprite;
       r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = gs->tile_rot);
     }
 

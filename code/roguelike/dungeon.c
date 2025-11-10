@@ -85,43 +85,44 @@ d_make_triangle (Vec2 p0, Vec2 p1, Vec2 p2) {
 function D_Edge_List
 d_bowyer_watson_triangulate (Arena *arena, Vec2 *points, u64 num_points, D_Triangle super) {
   D_Edge_List result = {0};
+  if (runner_id() == 0) {
+    Temp_Arena scratch;
+    ldefer(scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+      D_Triangle_Mesh delaunay = {0};
+      d_mesh_push_triangle(scratch.arena, &delaunay, super);
+      for (u64 i = 0; i < num_points; ++i) {
+        Vec2 p = points[i];
+        D_Edge_List edges = {0};
+        for each_in_list (triangle, &delaunay) {
+          if (!triangle->marked_for_delete) {
+            f32 dist = v2dist(p, triangle->circum_center);
+            if (dist < triangle->circum_radius) {
+              triangle->marked_for_delete = true;
+              d_polygon_push_triangle_edges(scratch.arena, &edges, *triangle);
+            }
+          }
+        }
+        for each_in_list (e1, &edges) {
+          b32 is_unique = true;
+          for each_in_list (e2, &edges) {
+            if (e1 != e2 && d_edges_are_equal(*e1, *e2)) {
+              is_unique = false;
+              break;
+            }
+          }
+          if (is_unique) {
+            D_Triangle new_triangle = d_make_triangle(p, e1->p0, e1->p1);
+            d_mesh_push_triangle(scratch.arena, &delaunay, new_triangle);
+          }
+        }
+      }
 
-  Temp_Arena scratch;
-  ldefer(scratch=get_scratch(&arena,1),release_scratch(scratch)) {
-    D_Triangle_Mesh delaunay = {0};
-    d_mesh_push_triangle(scratch.arena, &delaunay, super);
-    for (u64 i = 0; i < num_points; ++i) {
-      Vec2 p = points[i];
-      D_Edge_List edges = {0};
       for each_in_list (triangle, &delaunay) {
-        if (!triangle->marked_for_delete) {
-          f32 dist = v2dist(p, triangle->circum_center);
-          if (dist < triangle->circum_radius) {
-            triangle->marked_for_delete = true;
-            d_polygon_push_triangle_edges(scratch.arena, &edges, *triangle);
-          }
+        if (!triangle->marked_for_delete && !d_shared_vertex(*triangle, super)) {
+          d_push_edge_if_unique(arena, &result, triangle->e[0]);
+          d_push_edge_if_unique(arena, &result, triangle->e[1]);
+          d_push_edge_if_unique(arena, &result, triangle->e[2]);
         }
-      }
-      for each_in_list (e1, &edges) {
-        b32 is_unique = true;
-        for each_in_list (e2, &edges) {
-          if (e1 != e2 && d_edges_are_equal(*e1, *e2)) {
-            is_unique = false;
-            break;
-          }
-        }
-        if (is_unique) {
-          D_Triangle new_triangle = d_make_triangle(p, e1->p0, e1->p1);
-          d_mesh_push_triangle(scratch.arena, &delaunay, new_triangle);
-        }
-      }
-    }
-
-    for each_in_list (triangle, &delaunay) {
-      if (!triangle->marked_for_delete && !d_shared_vertex(*triangle, super)) {
-        d_push_edge_if_unique(arena, &result, triangle->e[0]);
-        d_push_edge_if_unique(arena, &result, triangle->e[1]);
-        d_push_edge_if_unique(arena, &result, triangle->e[2]);
       }
     }
   }
@@ -171,66 +172,66 @@ d_push_vertex_if_unique (Arena *arena, D_Vertex_Neighborhood *n, D_Vertex *v) {
 function D_Edge_List
 d_prim_mst (Arena *arena, D_Edge_List bw_result, u64 num_points) {
   D_Edge_List result = {0};
-
-  Temp_Arena scratch;
-  ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
-    D_Vertex *vertices = arena_pushn(scratch.arena, D_Vertex, num_points);
-    for each_in_list (edge, &bw_result) {
-      D_Vertex *v0 = d_get_vertex(vertices, num_points, edge->p0);
-      D_Vertex *v1 = d_get_vertex(vertices, num_points, edge->p1);
-      if (!v0->slot_filled) {
-        v0->slot_filled = true;
-        v0->p = edge->p0;
-        v0->cheapest_cost = INFINITY;
-      }
-      if (!v1->slot_filled) {
-        v1->slot_filled = true;
-        v1->p = edge->p1;
-        v1->cheapest_cost = INFINITY;
-      }
-
-      d_push_vertex_if_unique(scratch.arena, &v0->neighbors, v1);
-      d_push_vertex_if_unique(scratch.arena, &v1->neighbors, v0);
-    }
-
-    // Begin algorithm
-    vertices[0].cheapest_cost = 0;
-    u64 processed_vertices = 0;
-    while (processed_vertices < num_points) {
-      u64 next_vertex = 0;
-      f32 cheapest_cost = INFINITY;
-      for (u64 i = 0; i < num_points; ++i) {
-        if (!vertices[i].explored && vertices[i].cheapest_cost < cheapest_cost) {
-          next_vertex = i;
-          cheapest_cost = vertices[i].cheapest_cost;
+  if (runner_id() == 0) {
+    Temp_Arena scratch;
+    ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+      D_Vertex *vertices = arena_pushn(scratch.arena, D_Vertex, num_points);
+      for each_in_list (edge, &bw_result) {
+        D_Vertex *v0 = d_get_vertex(vertices, num_points, edge->p0);
+        D_Vertex *v1 = d_get_vertex(vertices, num_points, edge->p1);
+        if (!v0->slot_filled) {
+          v0->slot_filled = true;
+          v0->p = edge->p0;
+          v0->cheapest_cost = INFINITY;
         }
+        if (!v1->slot_filled) {
+          v1->slot_filled = true;
+          v1->p = edge->p1;
+          v1->cheapest_cost = INFINITY;
+        }
+
+        d_push_vertex_if_unique(scratch.arena, &v0->neighbors, v1);
+        d_push_vertex_if_unique(scratch.arena, &v1->neighbors, v0);
       }
 
-      D_Vertex *v = &vertices[next_vertex];
-      v->explored = true;
-      processed_vertices++;
+      // Begin algorithm
+      vertices[0].cheapest_cost = 0;
+      u64 processed_vertices = 0;
+      while (processed_vertices < num_points) {
+        u64 next_vertex = 0;
+        f32 cheapest_cost = INFINITY;
+        for (u64 i = 0; i < num_points; ++i) {
+          if (!vertices[i].explored && vertices[i].cheapest_cost < cheapest_cost) {
+            next_vertex = i;
+            cheapest_cost = vertices[i].cheapest_cost;
+          }
+        }
 
-      for each_in_list (neighbor, &v->neighbors) {
-        D_Vertex *n = neighbor->v;
-        if (!n->explored) {
-          f32 cost = v2dist(v->p, n->p);
-          if (cost < n->cheapest_cost) {
-            n->cheapest_cost = cost;
-            n->neighbors.cheapest_connection = v;
+        D_Vertex *v = &vertices[next_vertex];
+        v->explored = true;
+        processed_vertices++;
+
+        for each_in_list (neighbor, &v->neighbors) {
+          D_Vertex *n = neighbor->v;
+          if (!n->explored) {
+            f32 cost = v2dist(v->p, n->p);
+            if (cost < n->cheapest_cost) {
+              n->cheapest_cost = cost;
+              n->neighbors.cheapest_connection = v;
+            }
           }
         }
       }
-    }
 
-    for (u64 i = 0; i < num_points; ++i) {
-      D_Vertex *vertex = &vertices[i];
-      D_Vertex *closest = vertex->neighbors.cheapest_connection;
-      if (closest != 0) {
-        d_push_edge(arena, &result, (D_Edge){.p0=vertex->p, .p1=closest->p});
+      for (u64 i = 0; i < num_points; ++i) {
+        D_Vertex *vertex = &vertices[i];
+        D_Vertex *closest = vertex->neighbors.cheapest_connection;
+        if (closest != 0) {
+          d_push_edge(arena, &result, (D_Edge){.p0=vertex->p, .p1=closest->p});
+        }
       }
     }
   }
-
   return result;
 }
 
@@ -373,10 +374,12 @@ d_process_slice (Arena *arena, Dungeon_Map *tree, Dungeon *d, u64 max_tiles_per_
 function Dungeon_Map
 d_partition_dungeon (Arena *arena, Dungeon *d, u64 max_tiles_per_slice) {
   Dungeon_Map result = {0};
-  f32 half_width = d->width / 2.f;
-  f32 half_height = d->height / 2.f;
-  Rect initial_bounds = {-half_width, -half_height, d->width, d->height};
-  result.root = d_process_slice(arena, &result, d, max_tiles_per_slice, initial_bounds);
+  if (runner_id() == 0) {
+    f32 half_width = d->width / 2.f;
+    f32 half_height = d->height / 2.f;
+    Rect initial_bounds = {-half_width, -half_height, d->width, d->height};
+    result.root = d_process_slice(arena, &result, d, max_tiles_per_slice, initial_bounds);
+  }
 
   return result;
 }
@@ -467,7 +470,7 @@ d_query_range (Arena *arena, Dungeon_Map tree, Rect grid_range, b32 include_full
 }
 
 function Dungeon
-d_create_ (Arena *arena, Dungeon_Create_Params *p) {
+d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
   Dungeon result = {0};
     if (runner_id() == 0) {
     result.width = p->map_width;
@@ -548,8 +551,8 @@ d_create_ (Arena *arena, Dungeon_Create_Params *p) {
 
       // Add some edges back to improve dungeon quality
       for each_in_list (edge, &bw_result) {
-        f32 val = (f32)((rand() % 100) + 1);
-        if (val < p->percent_edges_included || almost_equal(val, p->percent_edges_included)) {
+        u64 val = (rand() % 100) + 1;
+        if (val <= p->percent_edges_included) {
           d_push_edge_if_unique(scratch.arena, &pathway, *edge);
         }
       }
@@ -641,7 +644,24 @@ d_create_ (Arena *arena, Dungeon_Create_Params *p) {
         }
       }
 
-      // NOTE: Step four: Create dungeon map
+      // NOTE: Step four: Make it pretty
+      Sprite floors[8];
+      for (u64 sprite_idx = 0; sprite_idx < array_count(floors); ++sprite_idx) {
+        floors[sprite_idx] = get_sprite(textures, str8_pushf(scratch.arena, "floor_%d", sprite_idx+1));
+      }
+
+      for each_in_arrayc(tile, result.tiles, result.width * result.height) {
+        if (tile->flags) {
+          u64 val = (rand() % 100) + 1;
+          u64 sprite_idx = 0;
+          if (val <= p->percent_tile_cracked) {
+            sprite_idx = (rand() % (array_count(floors)-1)) + 1;
+          }
+          tile->sprite = floors[sprite_idx];
+        }
+      }
+
+      // NOTE: Step five: Create dungeon map
       result.map = d_partition_dungeon(arena, &result, p->max_tiles_per_map_slice);
     }
   }

@@ -156,6 +156,7 @@ function Dungeon_Tile*     d_index_tile_from_world(Dungeon *dungeon, Vec2 p);
 function Vec2              d_grid_to_world(Dungeon *dungeon, Vec2 index);
 function Vec2              d_world_to_grid(Dungeon *dungeon, Vec2 p);
 function Dungeon_Room*     d_get_room_at_pos(Dungeon *dungeon, Vec2 p);
+
 function Dungeon_Slice*    d_process_slice(Arena *arena, Dungeon_Map *tree, Dungeon *d, u64 max_tiles_per_slice, Rect bounds);
 function Dungeon_Map       d_partition_dungeon(Arena *arena, Dungeon *d, u64 max_tiles_per_slice);
 function Dungeon_Slice*    d_index_at(Dungeon_Slice *slice, Vec2 grid_pos);
@@ -164,7 +165,6 @@ function Dungeon_Tile_List d_query_range(Arena *arena, Dungeon_Map tree, Rect gr
 typedef struct Dungeon_Create_Params {
   u64 target_room_count;
   u64 grid_dim;
-
   u64 map_width;
   u64 map_height;
 
@@ -172,6 +172,7 @@ typedef struct Dungeon_Create_Params {
   u64 room_width_deviation;
   u64 room_height_mean;
   u64 room_height_deviation;
+  u64 hallway_width;
 
   u64 room_width_border;
   u64 room_height_border;
@@ -181,13 +182,13 @@ typedef struct Dungeon_Create_Params {
   u64 room_height_floor;
   u64 room_height_ceil;
 
-  u64 hallway_width;
-  f32 percent_edges_included;
-
   u64 max_tiles_per_map_slice;
+
+  u64 percent_edges_included;
+  u64 percent_tile_cracked;
 } Dungeon_Create_Params;
 
-#define d_create(arena, ...) d_create_((arena), &(Dungeon_Create_Params){ \
+#define d_create(arena, atlas, ...) d_create_((arena), (atlas), &(Dungeon_Create_Params){ \
   .room_width_deviation = 1,      \
   .room_height_deviation = 1,     \
   .room_width_floor = 1,          \
@@ -199,6 +200,6 @@ typedef struct Dungeon_Create_Params {
   __VA_ARGS__                     \
   })
 
-function Dungeon d_create_ (Arena *arena, Dungeon_Create_Params *p);
+function Dungeon d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p);
 
 #endif // DUNGEON_H

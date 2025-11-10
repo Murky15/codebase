@@ -41,7 +41,6 @@ window:
     }
     0.380208:
     {
-      selected
       getting_started
       text:
       {
@@ -59,10 +58,10 @@ window:
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 826
-        cursor_column: 44
-        mark_line: 826
-        mark_column: 44
+        cursor_line: 788
+        cursor_column: 1
+        mark_line: 788
+        mark_column: 1
       }
       text:
       {
@@ -84,20 +83,30 @@ window:
         mark_line: 24
         mark_column: 4
       }
+      text:
+      {
+        expression: "file:\"W:/code/roguelike/dungeon.c\".data"
+        project: "W:/misc/root.raddbg_project"
+        query: input: ""
+        cursor_line: 633
+        cursor_column: 12
+        mark_line: 633
+        mark_column: 12
+      }
     }
     0.296600:
     {
       0.647769:
       {
+        selected
         watch: expression: "query:locals"
         watch:
         {
           selected
           expression: ""
           normal: 0.350000 0.339024 0.310976
-          watch: num_leaves_processed
-          watch: tree
-          watch: "next_slice_to_check,tree.num_slices"
+          watch: sprite
+          watch: tile
         }
         watch: expression: "query:type_views"
       }
@@ -227,7 +236,7 @@ keybindings:
   { log_marker m ctrl shift alt }
   { toggle_dev_menu d ctrl shift alt }
 }
-current_path: "W:/code/os"
+current_path: "W:/code/roguelike"
 file_path_map:
 {
   source: "W:/code/rougelike/dungeon.c"
