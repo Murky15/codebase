@@ -74,6 +74,13 @@ typedef struct Dungeon_Tile {
   Dungeon_Room *room;
   Sprite sprite;
   Vec2 grid_pos;
+  // NOTE: To encourage better work distribution, corner tiles should be added twice
+  // once for x, and another for y.
+  b32 long_perimeter;
+  b32 lat_perimeter;
+  Vec2 local_longp_offset;
+  Vec2 local_latp_offset;
+
 } Dungeon_Tile;
 
 typedef struct Dungeon_Tile_Node {
@@ -84,6 +91,7 @@ typedef struct Dungeon_Tile_Node {
 typedef struct Dungeon_Tile_List {
   Dungeon_Tile_Node *first, *last;
   u64 count;
+  u64 num_perimeter;
 } Dungeon_Tile_List;
 
 typedef struct Dungeon_Slice {

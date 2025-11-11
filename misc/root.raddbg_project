@@ -1,4 +1,4 @@
-// raddbg 0.9.23 project file
+// raddbg 0.9.21 project file
 
 recent_file: path: "../code/roguelike/roguelike.c"
 recent_file: path: "../code/roguelike/dungeon.c"
@@ -46,9 +46,4 @@ type_view:
 {
   type: visible_tiles
   expr: array
-}
-breakpoint:
-{
-  source_location: "../code/roguelike/roguelike.c:788:1"
-  hit_count: 1
 }

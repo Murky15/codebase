@@ -439,6 +439,12 @@ d_query_range (Arena *arena, Dungeon_Map tree, Rect grid_range, b32 include_full
           Dungeon_Tile tile = tile_node->tile;
           Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
           if (include_full_chunk || d_rects_intersect(r0, grid_range)) {
+            if (tile.long_perimeter) {
+              InterlockedIncrement64(&result->num_perimeter);
+            }
+            if (tile.lat_perimeter) {
+              InterlockedIncrement64(&result->num_perimeter);
+            }
             os_heat_begin_critical_section(); // TODO: Would this be more performant if I moved it to outside the for?
             d_tile_list_push(arena, result, tile);
             os_heat_end_critical_section();
@@ -503,6 +509,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
             clear = false;
           } else {
             for each_in_list (room, &result) {
+              // TODO: Sloppy and lazy, could be made much better
               Vec2 border = v2muls(v2(p->room_width_border, p->room_height_border), p->grid_dim);
               Vec2 new_pos = v2sub(world_pos, border);
               Vec2 new_size = v2add(world_size, border);
@@ -663,7 +670,44 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         }
       }
 
-      // NOTE: Step five: Create dungeon map
+      // NOTE: Step five: Determine perimeter (good enough first pass)
+
+      for (s64 y = 0; y < result.height; ++y) {
+        b32 inside_polygon = false;
+        for (s64 x = 0; x < result.width; ++x) {
+          Dungeon_Tile *tile = &result.tiles[y * result.width + x];
+          Dungeon_Tile *prev_tile = &result.tiles[y * result.width + (x-1)];
+          if (tile->flags && !inside_polygon) {
+            tile->long_perimeter = true;
+            tile->local_longp_offset = v2(0, 1);
+            inside_polygon = true;
+          } else if (tile->flags == 0 && inside_polygon) {
+            prev_tile->long_perimeter = true;
+            prev_tile->local_longp_offset = v2(1, 1);
+            inside_polygon = false;
+          }
+        }
+      }
+
+      for (s64 x = 0; x < result.width; ++x) {
+        b32 inside_polygon = false;
+        for (s64 y = 0; y < result.height; ++y) {
+          Dungeon_Tile *tile = &result.tiles[y * result.width + x];
+          Dungeon_Tile *prev_tile = &result.tiles[(y-1) * result.width + x];
+          if (tile->flags && !inside_polygon) {
+            tile->lat_perimeter = true;
+            tile->local_latp_offset = v2(0, 0);
+            inside_polygon = true;
+          }
+          if (tile->flags == 0 && inside_polygon) {
+            prev_tile->lat_perimeter = true;
+            prev_tile->local_latp_offset = v2(0, 1);
+            inside_polygon = false;
+          }
+        }
+      }
+
+      // NOTE: Final step: Create dungeon map
       result.map = d_partition_dungeon(arena, &result, p->max_tiles_per_map_slice);
     }
   }

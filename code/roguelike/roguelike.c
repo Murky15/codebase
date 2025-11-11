@@ -1,7 +1,12 @@
 /* TODO
-  - View frustum culling
-  - Get consistent with u64 v.s s64
-  - How can we make clear what can be called from multiple threads and what can't?
+  - Hot Reloading (seperate game & platform)
+  - Profiling (probably a codebase addition)
+  - Operator overloading for vector types when using CPP?
+  - Deprecate vector construction functions in favor of compound literals
+      and also typedef all vectors to be their construction name
+      (e.g. Vec2 -> v2). This will make writing compound literals easier
+      OR BETTER YET #define v2 as a macro over (Vec2) compound lit!
+
 */
 
 // NOTE: Headers
@@ -44,7 +49,6 @@ typedef struct Game_State {
   Texture_Atlas sprites;
   Dungeon dungeon;
   Mat4 proj;
-  Quat tile_rot;
   Entity player;
   Camera cam;
 } Game_State;
@@ -188,10 +192,10 @@ win32_create_window (HINSTANCE hInstance) {
 function Vec2i
 r_init (HWND hwnd) {
   local_persist read_only struct R_Vertex quad_vertices[4] = {
-    {{-.5, 0, 0}, {0, 1}},
-    {{.5, 0, 0}, {1, 1}},
-    {{.5, 1, 0}, {1, 0}},
-    {{-.5, 1, 0}, {0, 0}},
+    {{0, 0, 0}, {0, 1}},
+    {{1, 0, 0}, {1, 1}},
+    {{1, 1, 0}, {1, 0}},
+    {{0, 1, 0}, {0, 0}},
   };
   local_persist read_only u32 quad_indices[6] = {0, 1, 2, 2, 3, 0};
 
@@ -677,11 +681,10 @@ os_entry (void) {
 
     f32 fov_h = M_PI32/4.f;
     f32 aspect_ratio = render_width/render_height;
-    f32 znear = 1.f;
+    f32 znear = 10.f;
     f32 zfar = 1000.f;
 
     Mat4 proj = m4perspective(fov_h, aspect_ratio, znear, zfar);
-    Quat tile_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
     Camera cam = {0};
     f32 cam_zoom = 150.f;
     //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
@@ -694,12 +697,18 @@ os_entry (void) {
     gs->sprites = sprites;
     gs->dungeon = dungeon;
     gs->proj = proj;
-    gs->tile_rot = tile_rot;
     gs->player = player;
     gs->cam = cam;
   }
 
   os_heat_sync_u64((u64*)&gs, 0);
+
+  Quat floor_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
+  Quat side_wall_rot = axis_angle(v3(0,0,1), M_PI32/2.f);
+  side_wall_rot = qmul(side_wall_rot, axis_angle(v3(0,0,1), -M_PI32/2.f));
+  Quat forward_wall_rot = axis_angle(v3(0,1,0), M_PI32/2.f);
+
+  Sprite test_wall = get_sprite(gs->sprites, str8_lit("wall_mid"));
 
   u64 last = win32_query_clock();
   for (;;) {
@@ -761,33 +770,64 @@ os_entry (void) {
     Mat4 view = m4lookat(gs->cam.pos, gs->cam.focus, v3(0,1,0));
     Mat4 VP = m4mul(gs->proj, view);
 
-    Dungeon_Tile *visible_tiles;
-    u64 num_visible_tiles;
     Rect player_visible_range;
     player_visible_range.xy = d_world_to_grid(&gs->dungeon, gs->cam.visible_range.xy);
     player_visible_range.zw = d_world_to_grid(&gs->dungeon, gs->cam.visible_range.zw);
     // Apply buffer
-    player_visible_range.xy = v2sub(player_visible_range.xy, v2(1,1));
-    player_visible_range.zw = v2add(player_visible_range.zw, v2(2,2));
-    Dungeon_Tile_List visible_tile_list = d_query_range(gs->frame, gs->dungeon.map, player_visible_range, false);
+    f32 buff_amt_tiles = 3;
+    player_visible_range.xy = v2sub(player_visible_range.xy, v2(buff_amt_tiles,buff_amt_tiles));
+    player_visible_range.zw = v2add(player_visible_range.zw, v2(buff_amt_tiles*2,buff_amt_tiles*2));
+    Dungeon_Tile_List visible_tile_list = d_query_range(gs->frame, gs->dungeon.map, player_visible_range, true);
+
+    Dungeon_Tile *visible_tiles;
+    Vec4 *perimeter;
     if (runner_id() == 0) {
       visible_tiles = arena_pushn(gs->frame, Dungeon_Tile, visible_tile_list.count);
-      num_visible_tiles = visible_tile_list.count;
+      perimeter = arena_pushn(gs->frame, Vec4, visible_tile_list.num_perimeter);
+
+      u64 pidx = 0;
       for each_in_list (tile_node, &visible_tile_list) {
         u64 i = (tile_node - visible_tile_list.first);
-        visible_tiles[i] = tile_node->tile;
+        Dungeon_Tile tile = tile_node->tile;
+        visible_tiles[i] = tile;
+        if (tile.long_perimeter) {
+          Vec4 *perim = &perimeter[pidx++];
+          *perim = (Vec4){.xy = tile.grid_pos, .zw = v2add(tile.grid_pos, v2(1,0))};
+          perim->xy = v2add(perim->xy, tile.local_longp_offset);
+          perim->zw = v2add(perim->zw, tile.local_longp_offset);
+        }
+        if (tile.lat_perimeter) {
+          Vec4 *perim = &perimeter[pidx++];
+          *perim = (Vec4){.xy = tile.grid_pos, .zw = v2add(tile.grid_pos, v2(0,1))};
+          perim->xy = v2add(perim->xy, tile.local_latp_offset);
+          perim->zw = v2add(perim->zw, tile.local_latp_offset);
+        }
       }
     }
     os_heat_sync_u64((u64*)&visible_tiles, 0);
-    os_heat_sync_u64(&num_visible_tiles, 0);
+    os_heat_sync_u64((u64*)&perimeter, 0);
 
-    Rangei visible_snippet = os_heat_distribute(num_visible_tiles);
+    Rangei visible_snippet = os_heat_distribute(visible_tile_list.count);
     for each_in_range (tile, visible_tiles, visible_snippet) {
       Vec2 world = d_grid_to_world(&gs->dungeon, tile->grid_pos);
       Vec3 pos = v3(world.x, 1, world.y);
       Sprite sprite = tile->sprite;
-      r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = gs->tile_rot);
+      r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = floor_rot);
     }
+
+    u64 wall_height = 3;
+    Rangei perimeter_snippet = os_heat_distribute(visible_tile_list.num_perimeter);
+    for each_in_range (p, perimeter, perimeter_snippet) {
+      Vec2 p0 = d_grid_to_world(&gs->dungeon, p->xy);
+      Vec2 p1 = d_grid_to_world(&gs->dungeon, p->zw);
+      Quat rot = (p0.x == p1.x) ? side_wall_rot : forward_wall_rot;
+      for (u64 i = 0; i < wall_height; ++i) {
+        f32 y = i * gs->dungeon.grid_dim;
+        Vec3 world_pos = v3(p0.x, y, p0.y);
+        r_push_quad(.pos = world_pos, .atlas_coords = test_wall.coords[0], .scale = test_wall.coords[0].scale, .rot = rot);
+      }
+    }
+
 
     os_heat_sync();
     if (runner_id() == 0) {
@@ -795,6 +835,6 @@ os_entry (void) {
     }
 
     r_update_transform(VP);
-    r_present(false);
+    r_present(true);
   }
 }

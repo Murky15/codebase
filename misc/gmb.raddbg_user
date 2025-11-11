@@ -1,4 +1,4 @@
-// raddbg 0.9.23 user file
+// raddbg 0.9.21 user file
 
 recent_project: path: "root.raddbg_project"
 recent_project: path: path
@@ -41,6 +41,7 @@ window:
     }
     0.380208:
     {
+      selected
       getting_started
       text:
       {
@@ -58,9 +59,9 @@ window:
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 788
+        cursor_line: 805
         cursor_column: 1
-        mark_line: 788
+        mark_line: 805
         mark_column: 1
       }
       text:
@@ -88,17 +89,16 @@ window:
         expression: "file:\"W:/code/roguelike/dungeon.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 633
-        cursor_column: 12
-        mark_line: 633
-        mark_column: 12
+        cursor_line: 487
+        cursor_column: 49
+        mark_line: 487
+        mark_column: 49
       }
     }
     0.296600:
     {
       0.647769:
       {
-        selected
         watch: expression: "query:locals"
         watch:
         {
@@ -114,7 +114,7 @@ window:
     }
   }
   split_x
-  pos: 192 162
+  pos: 484 312
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }
