@@ -25,6 +25,8 @@ main (int argc, char **argv) {
   u64 num_threads = OS_NUM_THREADS;
 #endif
 
+  timeBeginPeriod(1);
+
   Temp_Arena scratch;
   ldefer(scratch = get_scratch(0,0),release_scratch(scratch)) {
     HANDLE *threads = arena_pushn(scratch.arena, HANDLE, num_threads);

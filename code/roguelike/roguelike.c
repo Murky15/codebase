@@ -764,8 +764,8 @@ os_entry (void) {
       }
     }
 
-    os_heat_sync();
     r_prep();
+    os_heat_sync();
 
     Mat4 view = m4lookat(gs->cam.pos, gs->cam.focus, v3(0,1,0));
     Mat4 VP = m4mul(gs->proj, view);
@@ -835,6 +835,6 @@ os_entry (void) {
     }
 
     r_update_transform(VP);
-    r_present(true);
+    r_present(false);
   }
 }
