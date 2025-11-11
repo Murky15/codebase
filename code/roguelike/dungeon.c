@@ -340,13 +340,11 @@ d_process_slice (Arena *arena, Dungeon_Map *tree, Dungeon *d, u64 max_tiles_per_
   for (s64 y = bounds.y; y <= bounds.y + bounds.height; ++y) {
     for (s64 x = bounds.x; x <= bounds.x + bounds.width; ++x) {
       Dungeon_Tile *tile = d_index_tile(d, v2(x,y));
-      if (tile->flags) {
-        if (slice->tiles.count < max_tiles_per_slice) {
-          d_tile_list_push(arena, &slice->tiles, *tile);
-        } else {
-          slice->is_leaf = false;
-          goto overflow;
-        }
+      if (slice->tiles.count < max_tiles_per_slice) {
+        d_tile_list_push(arena, &slice->tiles, *tile);
+      } else {
+        slice->is_leaf = false;
+        goto overflow;
       }
     }
   }
@@ -671,6 +669,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
       }
 
       // NOTE: Step five: Determine perimeter (good enough first pass)
+      // While we're at it, we can set the grid positions of all empty tiles.
 
       for (s64 y = 0; y < result.height; ++y) {
         b32 inside_polygon = false;
@@ -681,10 +680,13 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
             tile->long_perimeter = true;
             tile->local_longp_offset = v2(0, 1);
             inside_polygon = true;
-          } else if (tile->flags == 0 && inside_polygon) {
-            prev_tile->long_perimeter = true;
-            prev_tile->local_longp_offset = v2(1, 1);
-            inside_polygon = false;
+          } else if (tile->flags == 0) {
+            if (inside_polygon) {
+              prev_tile->long_perimeter = true;
+              prev_tile->local_longp_offset = v2(1, 1);
+              inside_polygon = false;
+            }
+            tile->grid_pos = v2(x - half_width, y - half_height);
           }
         }
       }

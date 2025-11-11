@@ -11,6 +11,7 @@
 
 // NOTE: Headers
 
+
 //#define UNICODE
 #define D3D11_NO_HELPERS
 #define CINTERFACE
@@ -65,7 +66,7 @@ typedef struct Uniforms {
 typedef struct Instance_Data {
   Mat4 world;
   Atlas_Coords atlas_coords;
-  Vec3 color;
+  Vec4 color;
 } Instance_Data;
 
 global ID3D11Device *device;
@@ -208,7 +209,7 @@ r_init (HWND hwnd) {
     {"MATRIX",   2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D11_INPUT_PER_INSTANCE_DATA, 1},
     {"MATRIX",   3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1},
     {"TEXCOORD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 64, D3D11_INPUT_PER_INSTANCE_DATA, 1},
-    {"COLOR",    0, DXGI_FORMAT_R32G32B32_FLOAT,    1, 80, D3D11_INPUT_PER_INSTANCE_DATA, 1}
+    {"COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 80, D3D11_INPUT_PER_INSTANCE_DATA, 1}
   };
 
   DXGI_SWAP_CHAIN_DESC sd = {0};
@@ -440,18 +441,26 @@ r_update_transform (Mat4 m) {
 typedef struct Push_Quad_Params {
   Vec3 pos;
   Vec2 scale;
-  Vec3 col;
+  Vec2 rot_offset;
+  Vec4 col;
   Quat rot;
   Atlas_Coords atlas_coords;
 } Push_Quad_Params;
-#define r_push_quad(...) r_push_quad_(&(Push_Quad_Params){.scale = (Vec2){1,1}, .col = (Vec3){1,1,1}, .rot = (Quat){0,0,0,1}, __VA_ARGS__})
+#define r_push_quad(...) r_push_quad_(&(Push_Quad_Params){ \
+  .scale = (Vec2){1,1}, \
+  .col = (Vec4){1,1,1,1}, \
+  .rot = qi(), \
+  __VA_ARGS__ \
+  })
 
 function void
 r_push_quad_ (Push_Quad_Params *p) {
   Instance_Data *next_inst = &quads[InterlockedIncrement64(&num_quads)-1];
   Mat4 T = m4translate(p->pos);
   Mat4 R = m4rotate(p->rot);
-  Mat4 S = m4scale(v3(p->scale.x, p->scale.y, 0));
+  R = m4mul(m4translate(pv2(p->rot_offset, 0)), R);
+  R = m4mul(R, m4translate(v3(-p->rot_offset.x, -p->rot_offset.y, 0)));
+  Mat4 S = m4scale(pv2(p->scale, 0));
   Mat4 world = m4mul(T,R);
   world = m4mul(world,S);
 
@@ -589,7 +598,7 @@ r_draw_entity (Entity *e) {
 
   Quat rot = axis_angle(v3(0,1,0), e->rotation_angle);
   Atlas_Coords texcoord = anim->coords[anim->current_frame];
-  r_push_quad(.pos = e->pos, .scale = texcoord.scale, .rot = rot, .atlas_coords = texcoord);
+  r_push_quad(.pos = e->pos, .scale = texcoord.scale, .rot = rot, .rot_offset = v2(texcoord.scale.x/2.f, 0), .atlas_coords = texcoord);
 }
 
 function Rect
@@ -689,8 +698,8 @@ os_entry (void) {
     f32 cam_zoom = 150.f;
     //cam.pos = v3(-cam_zoom/sqrtf(2.f), cam_zoom*sinf(atanf(1.f/sqrtf(2.f))), -cam_zoom/sqrtf(2.f));
     //cam.pos = v3(0, -cam_zoom, 1);
-    cam.pos = v3(0, cam_zoom, -cam_zoom);
-    cam.focus = v3(0,0,0);
+    cam.pos = v3(player.idle.coords[0].scale.x/2.f, cam_zoom, -cam_zoom);
+    cam.focus = v3(cam.pos.x, player.pos.y, 0);
     cam.follow_dist = v3sub(cam.pos,cam.focus);
     cam.visible_range = cam_calculate_visible_range(cam, fov_h, aspect_ratio, znear);
 
@@ -710,7 +719,8 @@ os_entry (void) {
 
   Sprite test_wall = get_sprite(gs->sprites, str8_lit("wall_mid"));
 
-  u64 last = win32_query_clock();
+  u64 last = win32_query_clock(), now = 0;
+  f32 dt = 0;
   for (;;) {
     if (runner_id() == 0) { // TODO: Can we parallelize *anything* in the message loop?
       arena_clear(gs->frame);
@@ -726,8 +736,8 @@ os_entry (void) {
       }
 
       // Update TODO: Parallelize
-      u64 now = win32_query_clock();
-      f32 dt = win32_get_elapsed_ms(last, now);
+      now = win32_query_clock();
+      dt = win32_get_elapsed_ms(last, now);
       last = now;
 
       //Quat cam_rot = axis_angle(v3(0,1,0), fmod_cycling(win32_clock_seconds(), 2 * M_PI))
@@ -763,9 +773,9 @@ os_entry (void) {
         gs->player.started_rotating_at = 0;
       }
     }
+    os_heat_sync();
 
     r_prep();
-    os_heat_sync();
 
     Mat4 view = m4lookat(gs->cam.pos, gs->cam.focus, v3(0,1,0));
     Mat4 VP = m4mul(gs->proj, view);
@@ -807,15 +817,23 @@ os_entry (void) {
     os_heat_sync_u64((u64*)&visible_tiles, 0);
     os_heat_sync_u64((u64*)&perimeter, 0);
 
+    u64 wall_height = 3;
+
     Rangei visible_snippet = os_heat_distribute(visible_tile_list.count);
     for each_in_range (tile, visible_tiles, visible_snippet) {
       Vec2 world = d_grid_to_world(&gs->dungeon, tile->grid_pos);
       Vec3 pos = v3(world.x, 1, world.y);
       Sprite sprite = tile->sprite;
-      r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = floor_rot);
+      if (tile->flags == DUNGEON_TILE_EMPTY) {
+        f32 y = wall_height * gs->dungeon.grid_dim;
+        pos = v3(pos.x, y, pos.z);
+        Vec2 scale = v2(gs->dungeon.grid_dim,gs->dungeon.grid_dim);
+        r_push_quad(.pos = pos, .col = v4(0.13f,0.13f,0.13f,1), .scale = scale, .rot = floor_rot);
+      } else {
+        r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = floor_rot);
+      }
     }
 
-    u64 wall_height = 3;
     Rangei perimeter_snippet = os_heat_distribute(visible_tile_list.num_perimeter);
     for each_in_range (p, perimeter, perimeter_snippet) {
       Vec2 p0 = d_grid_to_world(&gs->dungeon, p->xy);
@@ -828,13 +846,13 @@ os_entry (void) {
       }
     }
 
-
     os_heat_sync();
+
     if (runner_id() == 0) {
       r_draw_entity(&gs->player);
     }
 
     r_update_transform(VP);
-    r_present(false);
+    r_present(true);
   }
 }

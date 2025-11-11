@@ -10,7 +10,7 @@ struct Instance_Data {
   float4 row3  : MATRIX3;
 
   float4 coords : TEXCOORD1;
-  float3 col    : COLOR;
+  float4 col    : COLOR;
 };
 
 struct PS_Input {
@@ -42,7 +42,7 @@ vs_main (Vertex_Data vert, Instance_Data inst) {
   matrix wvp = mul(view_proj, world);
 
   result.pos = mul(wvp, pos);
-  result.col = float4(inst.col, 1.0);
+  result.col = inst.col;
   result.coords = inst.coords;
   result.uv = vert.uv;
 
@@ -80,5 +80,13 @@ ps_main (PS_Input input) : SV_TARGET {
   uv = clamp(uv, offset + .5, offset + scale);
   uv /= tex_dim;
 
-  return atlas.Sample(atlas_sampler, uv);
+  float4 tex_col = atlas.Sample(atlas_sampler, uv);
+  float4 output_col;
+  if (any(scale == float2(0,0))) {
+    output_col = input.col;
+  } else {
+    output_col = tex_col * input.col;
+  }
+
+  return output_col;
 }
