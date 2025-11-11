@@ -6,7 +6,7 @@
       and also typedef all vectors to be their construction name
       (e.g. Vec2 -> v2). This will make writing compound literals easier
       OR BETTER YET #define v2 as a macro over (Vec2) compound lit!
-
+  - Clean up build script (https://steve-jansen.github.io/guides/windows-batch-scripting/)
 */
 
 // NOTE: Headers
