@@ -670,7 +670,6 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         b32 inside_polygon = false;
         for (s64 x = 0; x < result.width; ++x) {
           Dungeon_Tile *tile = &result.tiles[y * result.width + x];
-          Dungeon_Tile *prev_tile = &result.tiles[y * result.width + (x-1)];
           if (tile->flags && !inside_polygon) {
             Dungeon_Perimeter *p = tile->perim;
             p->offset = v2(0, 1);
@@ -680,11 +679,11 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
             inside_polygon = true;
           } else if (tile->flags == 0) {
             if (inside_polygon) {
-              Dungeon_Perimeter *p = prev_tile->perim;
-              p->offset = v2(1, 1);
+              Dungeon_Perimeter *p = tile->perim;
+              p->offset = v2(0, 1);
               p->lateral = false;
               p->right_side = true;
-              prev_tile->on_perimeter++;
+              tile->on_perimeter++;
               inside_polygon = false;
             }
             tile->grid_pos = v2(x - half_width, y - half_height);
@@ -696,7 +695,6 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         b32 inside_polygon = false;
         for (s64 y = 0; y < result.height; ++y) {
           Dungeon_Tile *tile = &result.tiles[y * result.width + x];
-          Dungeon_Tile *prev_tile = &result.tiles[(y-1) * result.width + x];
           if (tile->flags && !inside_polygon) {
             Dungeon_Perimeter *p = &tile->perim[tile->on_perimeter++];
             p->offset = v2(0, 0);
@@ -705,8 +703,8 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
             inside_polygon = true;
           }
           if (tile->flags == 0 && inside_polygon) {
-            Dungeon_Perimeter *p = &prev_tile->perim[prev_tile->on_perimeter++];
-            p->offset = v2(0, 1);
+            Dungeon_Perimeter *p = &tile->perim[tile->on_perimeter++];
+            p->offset = v2(0, 0);
             p->lateral = true;
             p->right_side = true;
             inside_polygon = false;
