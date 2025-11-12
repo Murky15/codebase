@@ -10,6 +10,8 @@
   - [ ] Clean up build script (https://steve-jansen.github.io/guides/windows-batch-scripting/)
   - [ ] It looks like the game is most performant with spin count = 0 for barriers?
     Verify this. Also, what is a good spin count for Critical sections?
+  - [ ] Instead of a simple AABB check for determining the visible range, I should
+    instead use a point-in-polygon function to support angles rotated around y-axis.
 */
 
 // NOTE: Headers
@@ -719,7 +721,9 @@ os_entry (void) {
   side_wall_rot = qmul(side_wall_rot, axis_angle(v3(0,0,1), -M_PI32/2.f));
   Quat forward_wall_rot = axis_angle(v3(0,1,0), M_PI32/2.f);
 
-  Sprite test_wall = get_sprite(gs->sprites, str8_lit("wall_mid"));
+  Sprite spr_wall_mid = get_sprite(gs->sprites, str8_lit("wall_mid"));
+  Sprite spr_wall_left = get_sprite(gs->sprites, str8_lit("floor_1"));
+  Sprite spr_wall_right = get_sprite(gs->sprites, str8_lit("floor_2"));
   Vec4 ceil_color = v4(0.13f,0.13f,0.13f,1);
 
 
@@ -794,27 +798,49 @@ os_entry (void) {
     Dungeon_Tile_List visible_tile_list = d_query_range(gs->frame, gs->dungeon.map, player_visible_range, true);
 
     Dungeon_Tile *visible_tiles;
-    Vec4 *perimeter;
+    Dungeon_Perimeter_Tile *perimeter;
     if (runner_id() == 0) {
       visible_tiles = arena_pushn(gs->frame, Dungeon_Tile, visible_tile_list.count);
-      perimeter = arena_pushn(gs->frame, Vec4, visible_tile_list.num_perimeter);
+      perimeter = arena_pushn(gs->frame, Dungeon_Perimeter_Tile, visible_tile_list.num_perimeter);
 
       u64 pidx = 0;
       for each_in_list (tile_node, &visible_tile_list) {
         u64 i = (tile_node - visible_tile_list.first);
         Dungeon_Tile tile = tile_node->tile;
         visible_tiles[i] = tile;
-        if (tile.long_perimeter) {
-          Vec4 *perim = &perimeter[pidx++];
-          *perim = (Vec4){.xy = tile.grid_pos, .zw = v2add(tile.grid_pos, v2(1,0))};
-          perim->xy = v2add(perim->xy, tile.local_longp_offset);
-          perim->zw = v2add(perim->zw, tile.local_longp_offset);
-        }
-        if (tile.lat_perimeter) {
-          Vec4 *perim = &perimeter[pidx++];
-          *perim = (Vec4){.xy = tile.grid_pos, .zw = v2add(tile.grid_pos, v2(0,1))};
-          perim->xy = v2add(perim->xy, tile.local_latp_offset);
-          perim->zw = v2add(perim->zw, tile.local_latp_offset);
+        if (tile.on_perimeter == 1) {
+          Dungeon_Perimeter_Tile *perim = &perimeter[pidx++];
+          perim->grid_pos = v2add(tile.grid_pos, tile.perim[0].offset);
+          perim->lateral = tile.perim[0].lateral;
+          perim->sprite = spr_wall_mid;
+        } else if (tile.on_perimeter == 2) {
+          Dungeon_Perimeter_Tile *perim0 = &perimeter[pidx++];
+          b32 l0 = tile.perim[0].left_side;
+          b32 r0 = tile.perim[0].right_side;
+          perim0->grid_pos = v2add(tile.grid_pos, tile.perim[0].offset);
+          perim0->lateral = tile.perim[0].lateral;
+          Dungeon_Perimeter_Tile *perim1 = &perimeter[pidx++];
+          b32 l1 = tile.perim[1].left_side;
+          b32 r1 = tile.perim[1].right_side;
+          perim1->grid_pos = v2add(tile.grid_pos, tile.perim[1].offset);
+          perim1->lateral = tile.perim[1].lateral;
+
+          if (l0) {
+            perim0->sprite = spr_wall_right;
+            perim1->sprite = spr_wall_left;
+          }
+          if (r1) {
+            perim0->sprite = spr_wall_left;
+            perim1->sprite = spr_wall_left;
+          }
+          if (r0) {
+            perim0->sprite = spr_wall_left;
+            perim1->sprite = spr_wall_right;
+          }
+          if (l1) {
+            perim0->sprite = spr_wall_right;
+            perim1->sprite = spr_wall_right;
+          }
         }
       }
     }
@@ -839,15 +865,13 @@ os_entry (void) {
     }
 
     Rangei perimeter_snippet = os_heat_distribute(visible_tile_list.num_perimeter);
-    for each_in_range (p, perimeter, perimeter_snippet) {
-      Vec2 p0 = d_grid_to_world(&gs->dungeon, p->xy);
-      Vec2 p1 = d_grid_to_world(&gs->dungeon, p->zw);
-      Quat rot = (p0.x == p1.x) ? side_wall_rot : forward_wall_rot;
+    for each_in_range (tile, perimeter, perimeter_snippet) {
+      Vec2 p0 = d_grid_to_world(&gs->dungeon, tile->grid_pos);
+      Quat rot = tile->lateral ? side_wall_rot : forward_wall_rot;
       for (u64 i = 0; i < wall_height; ++i) {
         f32 y = i * gs->dungeon.grid_dim;
         Vec3 world_pos = v3(p0.x, y, p0.y);
-        // NOTE: A wall is a corner if both  perimeter_x & y are true
-        r_push_quad(.pos = world_pos, .atlas_coords = test_wall.coords[0], .scale = test_wall.coords[0].scale, .rot = rot);
+        r_push_quad(.pos = world_pos, .atlas_coords = tile->sprite.coords[0], .scale = tile->sprite.coords[0].scale, .rot = rot);
       }
     }
 

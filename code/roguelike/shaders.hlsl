@@ -59,7 +59,7 @@ uv_nearest (float2 uv, float2 tex_dim) {
 
 float2
 texel_filter (float2 texel) {
-  float2 a = 0.75 * fwidth(texel);
+  float2 a = 0.70 * fwidth(texel);
   float2 fr = frac(texel);
   float2 sample_loc = clamp(0.5/a*fr, 0, 0.5) + clamp(0.5/a*(fr - 1)+0.5, 0, 0.5);
 

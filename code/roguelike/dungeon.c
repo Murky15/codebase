@@ -437,12 +437,7 @@ d_query_range (Arena *arena, Dungeon_Map tree, Rect grid_range, b32 include_full
           Dungeon_Tile tile = tile_node->tile;
           Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
           if (include_full_chunk || d_rects_intersect(r0, grid_range)) {
-            if (tile.long_perimeter) {
-              InterlockedIncrement64(&result->num_perimeter);
-            }
-            if (tile.lat_perimeter) {
-              InterlockedIncrement64(&result->num_perimeter);
-            }
+            InterlockedAdd64(&result->num_perimeter, tile.on_perimeter);
             os_heat_begin_critical_section(); // TODO: Would this be more performant if I moved it to outside the for?
             d_tile_list_push(arena, result, tile);
             os_heat_end_critical_section();
@@ -677,13 +672,19 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
           Dungeon_Tile *tile = &result.tiles[y * result.width + x];
           Dungeon_Tile *prev_tile = &result.tiles[y * result.width + (x-1)];
           if (tile->flags && !inside_polygon) {
-            tile->long_perimeter = true;
-            tile->local_longp_offset = v2(0, 1);
+            Dungeon_Perimeter *p = tile->perim;
+            p->offset = v2(0, 1);
+            p->lateral = false;
+            p->left_side = true;
+            tile->on_perimeter++;
             inside_polygon = true;
           } else if (tile->flags == 0) {
             if (inside_polygon) {
-              prev_tile->long_perimeter = true;
-              prev_tile->local_longp_offset = v2(1, 1);
+              Dungeon_Perimeter *p = prev_tile->perim;
+              p->offset = v2(1, 1);
+              p->lateral = false;
+              p->right_side = true;
+              prev_tile->on_perimeter++;
               inside_polygon = false;
             }
             tile->grid_pos = v2(x - half_width, y - half_height);
@@ -697,13 +698,17 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
           Dungeon_Tile *tile = &result.tiles[y * result.width + x];
           Dungeon_Tile *prev_tile = &result.tiles[(y-1) * result.width + x];
           if (tile->flags && !inside_polygon) {
-            tile->lat_perimeter = true;
-            tile->local_latp_offset = v2(0, 0);
+            Dungeon_Perimeter *p = &tile->perim[tile->on_perimeter++];
+            p->offset = v2(0, 0);
+            p->lateral = true;
+            p->left_side = true;
             inside_polygon = true;
           }
           if (tile->flags == 0 && inside_polygon) {
-            prev_tile->lat_perimeter = true;
-            prev_tile->local_latp_offset = v2(0, 1);
+            Dungeon_Perimeter *p = &prev_tile->perim[prev_tile->on_perimeter++];
+            p->offset = v2(0, 1);
+            p->lateral = true;
+            p->right_side = true;
             inside_polygon = false;
           }
         }
