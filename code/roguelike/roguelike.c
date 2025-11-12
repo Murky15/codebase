@@ -1,16 +1,18 @@
 /* TODO
-  - Hot Reloading (seperate game & platform)
-  - Profiling (probably a codebase addition)
-  - Operator overloading for vector types when using CPP?
-  - Deprecate vector construction functions in favor of compound literals
+  - [ ] Hot Reloading (seperate game & platform)
+  - [ ] Profiling (probably a codebase addition)
+  - [ ] Operator overloading for vector types when using CPP?
+  - [ ] Deprecate vector construction functions in favor of compound literals
       and also typedef all vectors to be their construction name
       (e.g. Vec2 -> v2). This will make writing compound literals easier
       OR BETTER YET #define v2 as a macro over (Vec2) compound lit!
-  - Clean up build script (https://steve-jansen.github.io/guides/windows-batch-scripting/)
+      I should also remove `pv2` and `dv3`
+  - [ ] Clean up build script (https://steve-jansen.github.io/guides/windows-batch-scripting/)
+  - [ ] It looks like the game is most performant with spin count = 0 for barriers?
+    Verify this. Also, what is a good spin count for Critical sections?
 */
 
 // NOTE: Headers
-
 
 //#define UNICODE
 #define D3D11_NO_HELPERS
@@ -176,7 +178,7 @@ win32_create_window (HINSTANCE hInstance) {
   HWND hwnd = CreateWindowEx(
     0,
     TEXT("MainWindowClass"),
-    TEXT("Roguelike"),
+    TEXT("Halfway Heroes"),
     WS_OVERLAPPEDWINDOW | WS_VISIBLE,
     CW_USEDEFAULT,
     CW_USEDEFAULT,
@@ -718,6 +720,8 @@ os_entry (void) {
   Quat forward_wall_rot = axis_angle(v3(0,1,0), M_PI32/2.f);
 
   Sprite test_wall = get_sprite(gs->sprites, str8_lit("wall_mid"));
+  Vec4 ceil_color = v4(0.13f,0.13f,0.13f,1);
+
 
   u64 last = win32_query_clock(), now = 0;
   f32 dt = 0;
@@ -828,7 +832,7 @@ os_entry (void) {
         f32 y = wall_height * gs->dungeon.grid_dim;
         pos = v3(pos.x, y, pos.z);
         Vec2 scale = v2(gs->dungeon.grid_dim,gs->dungeon.grid_dim);
-        r_push_quad(.pos = pos, .col = v4(0.13f,0.13f,0.13f,1), .scale = scale, .rot = floor_rot);
+        r_push_quad(.pos = pos, .col = ceil_color, .scale = scale, .rot = floor_rot);
       } else {
         r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = floor_rot);
       }
@@ -842,6 +846,7 @@ os_entry (void) {
       for (u64 i = 0; i < wall_height; ++i) {
         f32 y = i * gs->dungeon.grid_dim;
         Vec3 world_pos = v3(p0.x, y, p0.y);
+        // NOTE: A wall is a corner if both  perimeter_x & y are true
         r_push_quad(.pos = world_pos, .atlas_coords = test_wall.coords[0], .scale = test_wall.coords[0].scale, .rot = rot);
       }
     }

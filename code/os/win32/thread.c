@@ -2,7 +2,7 @@ core_function Thread_Barrier
 os_barrier_create (Arena *arena, u64 num_threads) {
   Thread_Barrier result;
   SYNCHRONIZATION_BARRIER *barrier = arena_pushn(arena, SYNCHRONIZATION_BARRIER, 1);
-  InitializeSynchronizationBarrier(barrier, num_threads, -1);
+  InitializeSynchronizationBarrier(barrier, num_threads, 0);
   result.opaque_data = int_from_ptr(barrier);
 
   return result;
@@ -22,7 +22,7 @@ core_function Thread_Mutex
 os_mutex_create (Arena *arena) {
   Thread_Mutex result;
   CRITICAL_SECTION *mutex = arena_pushn(arena, CRITICAL_SECTION, 1);
-  InitializeCriticalSectionAndSpinCount(mutex, 2000);
+  InitializeCriticalSectionAndSpinCount(mutex, 200);
   result.opaque_data = int_from_ptr(mutex);
 
   return result;
