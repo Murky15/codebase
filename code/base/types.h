@@ -167,6 +167,7 @@ core_function Quat qi(void);
 core_function Quat axis_angle(Vec3 v, f32 t);
 core_function Quat qnorm(Quat q);
 core_function Quat qmul(Quat a, Quat b);
+core_function Quat qinv(Quat q);
 
 //- @note: Matricies
 core_function Mat4 m4i(void);

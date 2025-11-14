@@ -12,11 +12,15 @@
     Verify this. Also, what is a good spin count for Critical sections?
   - [ ] Instead of a simple AABB check for determining the visible range, I should
     instead use a point-in-polygon function to support angles rotated around y-axis.
+  - [ ] Make wall hight a property per room / hallway for more interesting visuals
+  - [ ] The current method of drawing floors, walls, ceilings (empty space), and decals is terrible.
+    The process is being split up into various stages to combat Z-fighting, and empty tiles are being drawn
+    to make up the "ceiling." This is a waste of resources, the stencil test can solve both of these issues,
+    I need to implement it ASAP.
+  - [ ] Audio
 */
 
 // NOTE: Headers
-
-#define OS_NUM_THREADS 1
 
 //#define UNICODE
 #define D3D11_NO_HELPERS
@@ -726,8 +730,6 @@ os_entry (void) {
   os_heat_sync_u64((u64*)&gs, 0);
 
   Quat floor_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
-  Quat side_wall_rot = axis_angle(v3(0,0,1), M_PI32/2.f);
-  side_wall_rot = qmul(side_wall_rot, axis_angle(v3(0,0,1), -M_PI32/2.f));
   Quat forward_wall_rot = axis_angle(v3(0,1,0), M_PI32/2.f);
 
   // NOTE: This sprite pack comes with a variety of sprites, but we can only use a few of them because of the 3D perspective
@@ -850,7 +852,7 @@ os_entry (void) {
     Rangei perimeter_snippet = os_heat_distribute(visible_tile_list.num_perimeter);
     for each_in_range (tile, perimeter, perimeter_snippet) {
       Vec2 p0 = d_grid_to_world(&gs->dungeon, tile->grid_pos);
-      Quat rot = tile->lateral ? side_wall_rot : forward_wall_rot;
+      Quat rot = tile->lateral ? qi() : forward_wall_rot;
       for (u64 i = 0; i < wall_height; ++i) {
         f32 y = i * gs->dungeon.grid_dim;
         Vec3 world_pos = v3(p0.x, y, p0.y);
@@ -864,27 +866,38 @@ os_entry (void) {
       r_draw_entity(&gs->player);
     }
 
+    // NOTE: We need to make decaling into its own step because transparent objects must be rendered
+    // after opaque ones.
+
+    for each_in_range (tile, perimeter, perimeter_snippet) {
+      if (tile->lateral) {
+        Vec2 p0 = d_grid_to_world(&gs->dungeon, tile->grid_pos);
+        Quat rot = qi();
+        Vec3 ceil_pos = v3(p0.x, ceil_height+0.001, p0.y);
+        if (tile->requires_ceil_adjustment) {
+          rot = axis_angle(v3(0,1,0), M_PI32);
+          ceil_pos.x += gs->dungeon.grid_dim;
+        }
+
+        r_push_quad(.pos = ceil_pos, .sprite = spr_ceil, .rot = qmul(rot, floor_rot));
+      }
+    }
+
     os_heat_sync();
 
-    // NOTE: We need to separate this into its own step because transparent objects must be rendered
-    // after opaque ones.
     for each_in_range (tile, perimeter, perimeter_snippet) {
-      u64 i = tile - perimeter;
-      Vec2 p0 = d_grid_to_world(&gs->dungeon, tile->grid_pos);
-      Quat rot = tile->lateral ? side_wall_rot : forward_wall_rot;
-      Vec3 ceil_pos = v3(p0.x, ceil_height+1, p0.y);
-      f32 shift_amt = gs->dungeon.grid_dim / 4;
-      if (tile->requires_ceil_adjustment) {
-        if (tile->lateral) {
-          ceil_pos.z -= shift_amt;
-        } else {
-          ceil_pos.x -= shift_amt;
+      if (!tile->lateral) {
+        Vec2 p0 = d_grid_to_world(&gs->dungeon, tile->grid_pos);
+        Quat rot = forward_wall_rot;
+        Vec3 ceil_pos = v3(p0.x, ceil_height+0.001, p0.y);
+        if (tile->requires_ceil_adjustment) {
+          rot = qinv(rot);
+          ceil_pos.z -= gs->dungeon.grid_dim;
         }
-      }
 
-      // TODO: Rotation must be flipped for correct visuals on "left" walls!
-      ceil_pos.y += i * 0.001f;
-      r_push_quad(.pos = ceil_pos, .sprite = spr_ceil, .rot = qmul(rot, floor_rot));
+        ceil_pos.y += 0.001f;
+        r_push_quad(.pos = ceil_pos, .sprite = spr_ceil, .rot = qmul(rot, floor_rot));
+      }
     }
 
     os_heat_sync();

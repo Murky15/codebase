@@ -203,6 +203,11 @@ qmul (Quat a, Quat b) {
   return comp_lit(Quat, v.x,v.y,v.z,w);
 }
 
+core_function Quat
+qinv (Quat q) {
+  return comp_lit(Quat, -q.x, -q.y, -q.z, q.w);
+}
+
 core_function Mat4
 m4i (void) {
   local_persist read_only Mat4 r = {
