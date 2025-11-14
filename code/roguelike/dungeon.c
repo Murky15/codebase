@@ -527,7 +527,6 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
                 Dungeon_Tile *tile = &result.tiles[y * result.width + x];
                 tile->flags |= DUNGEON_TILE_ROOM;
                 tile->room = new_room_ptr;
-                tile->grid_pos = v2sub(v2(x,y), v2(half_width, half_height));
               }
             }
 
@@ -584,7 +583,6 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
               Dungeon_Tile *tile = d_index_tile(&result, v2(x, y));
               if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
                 tile->flags |= DUNGEON_TILE_HALLWAY;
-                tile->grid_pos = v2(x,y);
               }
             }
           }
@@ -597,7 +595,6 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
               Dungeon_Tile *tile = d_index_tile(&result, v2(x, y));
               if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
                 tile->flags |= DUNGEON_TILE_HALLWAY;
-                tile->grid_pos = v2(x,y);
               }
             }
           }
@@ -627,7 +624,6 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
               Dungeon_Tile *tile = d_index_tile(&result, v2(x, y));
               if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
                 tile->flags |= DUNGEON_TILE_HALLWAY;
-                tile->grid_pos = v2(x,y);
               }
             }
           }
@@ -637,7 +633,6 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
               Dungeon_Tile *tile = d_index_tile(&result, v2(x, y));
               if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
                 tile->flags |= DUNGEON_TILE_HALLWAY;
-                tile->grid_pos = v2(x,y);
               }
             }
           }
@@ -664,30 +659,21 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
       }
 
       // NOTE: Step five: Determine perimeter (good enough first pass)
-      // While we're at it, we can set the grid positions of all empty tiles.
+      // While we're at it, we can set the grid positions of all tiles.
 
       for (s64 y = 0; y < result.height; ++y) {
         b32 inside_polygon = false;
         for (s64 x = 0; x < result.width; ++x) {
           Dungeon_Tile *tile = &result.tiles[y * result.width + x];
-          if (tile->flags && !inside_polygon) {
-            Dungeon_Perimeter *p = tile->perim;
+          Dungeon_Perimeter *p = tile->perim;
+          if ((tile->flags && !inside_polygon) || (tile->flags == 0 && inside_polygon)) {
             p->offset = v2(0, 1);
             p->lateral = false;
-            p->left_side = true;
+            p->side = inside_polygon;
+            inside_polygon = !inside_polygon;
             tile->on_perimeter++;
-            inside_polygon = true;
-          } else if (tile->flags == 0) {
-            if (inside_polygon) {
-              Dungeon_Perimeter *p = tile->perim;
-              p->offset = v2(0, 1);
-              p->lateral = false;
-              p->right_side = true;
-              tile->on_perimeter++;
-              inside_polygon = false;
-            }
-            tile->grid_pos = v2(x - half_width, y - half_height);
           }
+          tile->grid_pos = v2(x - half_width, y - half_height);
         }
       }
 
@@ -695,19 +681,11 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         b32 inside_polygon = false;
         for (s64 y = 0; y < result.height; ++y) {
           Dungeon_Tile *tile = &result.tiles[y * result.width + x];
-          if (tile->flags && !inside_polygon) {
+          if ((tile->flags && !inside_polygon) || (tile->flags == 0 && inside_polygon)) {
             Dungeon_Perimeter *p = &tile->perim[tile->on_perimeter++];
-            p->offset = v2(0, 0);
             p->lateral = true;
-            p->left_side = true;
-            inside_polygon = true;
-          }
-          if (tile->flags == 0 && inside_polygon) {
-            Dungeon_Perimeter *p = &tile->perim[tile->on_perimeter++];
-            p->offset = v2(0, 0);
-            p->lateral = true;
-            p->right_side = true;
-            inside_polygon = false;
+            p->side = inside_polygon;
+            inside_polygon = !inside_polygon;
           }
         }
       }

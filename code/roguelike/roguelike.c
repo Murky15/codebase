@@ -16,6 +16,8 @@
 
 // NOTE: Headers
 
+#define OS_NUM_THREADS 1
+
 //#define UNICODE
 #define D3D11_NO_HELPERS
 #define CINTERFACE
@@ -339,7 +341,7 @@ r_init (HWND hwnd) {
   D3D11_DEPTH_STENCIL_DESC depth_stencil_desc = {0};
   depth_stencil_desc.DepthEnable = 1;
   depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-  depth_stencil_desc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+  depth_stencil_desc.DepthFunc = D3D11_COMPARISON_LESS;
   ID3D11DepthStencilState *depth_stencil_state;
   ID3D11Device_CreateDepthStencilState(device, &depth_stencil_desc, &depth_stencil_state);
   ID3D11DeviceContext_OMSetDepthStencilState(ctx, depth_stencil_state, 1);
@@ -449,6 +451,7 @@ typedef struct Push_Quad_Params {
   Vec4 col;
   Quat rot;
   Atlas_Coords atlas_coords;
+  Sprite sprite;
 } Push_Quad_Params;
 #define r_push_quad(...) r_push_quad_(&(Push_Quad_Params){ \
   .scale = (Vec2){1,1}, \
@@ -460,16 +463,22 @@ typedef struct Push_Quad_Params {
 function void
 r_push_quad_ (Push_Quad_Params *p) {
   Instance_Data *next_inst = &quads[InterlockedIncrement64(&num_quads)-1];
+  Vec2 scale = p->scale;
+  Atlas_Coords coords = p->atlas_coords;
+  if (p->sprite.name.len) {
+    coords = p->sprite.coords[0];
+    scale = coords.scale;
+  }
   Mat4 T = m4translate(p->pos);
   Mat4 R = m4rotate(p->rot);
   R = m4mul(m4translate(pv2(p->rot_offset, 0)), R);
   R = m4mul(R, m4translate(v3(-p->rot_offset.x, -p->rot_offset.y, 0)));
-  Mat4 S = m4scale(pv2(p->scale, 0));
+  Mat4 S = m4scale(pv2(scale, 0));
   Mat4 world = m4mul(T,R);
   world = m4mul(world,S);
 
   next_inst->world = world;
-  next_inst->atlas_coords = p->atlas_coords;
+  next_inst->atlas_coords = coords;
   next_inst->color = p->col;
 }
 
@@ -694,8 +703,8 @@ os_entry (void) {
 
     f32 fov_h = M_PI32/4.f;
     f32 aspect_ratio = render_width/render_height;
-    f32 znear = 10.f;
-    f32 zfar = 1000.f;
+    f32 znear = 20.f;
+    f32 zfar = 500.f;
 
     Mat4 proj = m4perspective(fov_h, aspect_ratio, znear, zfar);
     Camera cam = {0};
@@ -721,9 +730,9 @@ os_entry (void) {
   side_wall_rot = qmul(side_wall_rot, axis_angle(v3(0,0,1), -M_PI32/2.f));
   Quat forward_wall_rot = axis_angle(v3(0,1,0), M_PI32/2.f);
 
+  // NOTE: This sprite pack comes with a variety of sprites, but we can only use a few of them because of the 3D perspective
   Sprite spr_wall_mid = get_sprite(gs->sprites, str8_lit("wall_mid"));
-  Sprite spr_wall_left = get_sprite(gs->sprites, str8_lit("floor_1"));
-  Sprite spr_wall_right = get_sprite(gs->sprites, str8_lit("floor_2"));
+  Sprite spr_ceil = get_sprite(gs->sprites, str8_lit("wall_top_mid"));
   Vec4 ceil_color = v4(0.13f,0.13f,0.13f,1);
 
 
@@ -808,39 +817,13 @@ os_entry (void) {
         u64 i = (tile_node - visible_tile_list.first);
         Dungeon_Tile tile = tile_node->tile;
         visible_tiles[i] = tile;
-        if (tile.on_perimeter == 1) {
-          Dungeon_Perimeter_Tile *perim = &perimeter[pidx++];
-          perim->grid_pos = v2add(tile.grid_pos, tile.perim[0].offset);
-          perim->lateral = tile.perim[0].lateral;
-          perim->sprite = spr_wall_mid;
-        } else if (tile.on_perimeter == 2) {
-          Dungeon_Perimeter_Tile *perim0 = &perimeter[pidx++];
-          b32 l0 = tile.perim[0].left_side;
-          b32 r0 = tile.perim[0].right_side;
-          perim0->grid_pos = v2add(tile.grid_pos, tile.perim[0].offset);
-          perim0->lateral = tile.perim[0].lateral;
-          Dungeon_Perimeter_Tile *perim1 = &perimeter[pidx++];
-          b32 l1 = tile.perim[1].left_side;
-          b32 r1 = tile.perim[1].right_side;
-          perim1->grid_pos = v2add(tile.grid_pos, tile.perim[1].offset);
-          perim1->lateral = tile.perim[1].lateral;
 
-          if (l0) {
-            perim0->sprite = spr_wall_right;
-            perim1->sprite = spr_wall_left;
-          }
-          if (r1) {
-            perim0->sprite = spr_wall_left;
-            perim1->sprite = spr_wall_left;
-          }
-          if (r0) {
-            perim0->sprite = spr_wall_left;
-            perim1->sprite = spr_wall_right;
-          }
-          if (l1) {
-            perim0->sprite = spr_wall_right;
-            perim1->sprite = spr_wall_right;
-          }
+        for (u64 p = 0; p < tile.on_perimeter; ++p) {
+          Dungeon_Perimeter_Tile *perim = &perimeter[pidx++];
+          perim->sprite = spr_wall_mid;
+          perim->grid_pos = v2add(tile.grid_pos, tile.perim[p].offset);
+          perim->lateral = tile.perim[p].lateral;
+          perim->requires_ceil_adjustment = !tile.perim[p].side;
         }
       }
     }
@@ -848,6 +831,7 @@ os_entry (void) {
     os_heat_sync_u64((u64*)&perimeter, 0);
 
     u64 wall_height = 3;
+    f32 ceil_height = wall_height * gs->dungeon.grid_dim;
 
     Rangei visible_snippet = os_heat_distribute(visible_tile_list.count);
     for each_in_range (tile, visible_tiles, visible_snippet) {
@@ -855,12 +839,11 @@ os_entry (void) {
       Vec3 pos = v3(world.x, 1, world.y);
       Sprite sprite = tile->sprite;
       if (tile->flags == DUNGEON_TILE_EMPTY) {
-        f32 y = wall_height * gs->dungeon.grid_dim;
-        pos = v3(pos.x, y, pos.z);
+        pos = v3(pos.x, ceil_height, pos.z);
         Vec2 scale = v2(gs->dungeon.grid_dim,gs->dungeon.grid_dim);
         r_push_quad(.pos = pos, .col = ceil_color, .scale = scale, .rot = floor_rot);
       } else {
-        r_push_quad(.pos = pos, .atlas_coords = sprite.coords[0], .scale = sprite.coords[0].scale, .rot = floor_rot);
+        r_push_quad(.pos = pos, .sprite = sprite, .rot = floor_rot);
       }
     }
 
@@ -871,7 +854,7 @@ os_entry (void) {
       for (u64 i = 0; i < wall_height; ++i) {
         f32 y = i * gs->dungeon.grid_dim;
         Vec3 world_pos = v3(p0.x, y, p0.y);
-        r_push_quad(.pos = world_pos, .atlas_coords = tile->sprite.coords[0], .scale = tile->sprite.coords[0].scale, .rot = rot);
+        r_push_quad(.pos = world_pos, .sprite = tile->sprite, .rot = rot);
       }
     }
 
@@ -881,6 +864,30 @@ os_entry (void) {
       r_draw_entity(&gs->player);
     }
 
+    os_heat_sync();
+
+    // NOTE: We need to separate this into its own step because transparent objects must be rendered
+    // after opaque ones.
+    for each_in_range (tile, perimeter, perimeter_snippet) {
+      u64 i = tile - perimeter;
+      Vec2 p0 = d_grid_to_world(&gs->dungeon, tile->grid_pos);
+      Quat rot = tile->lateral ? side_wall_rot : forward_wall_rot;
+      Vec3 ceil_pos = v3(p0.x, ceil_height+1, p0.y);
+      f32 shift_amt = gs->dungeon.grid_dim / 4;
+      if (tile->requires_ceil_adjustment) {
+        if (tile->lateral) {
+          ceil_pos.z -= shift_amt;
+        } else {
+          ceil_pos.x -= shift_amt;
+        }
+      }
+
+      // TODO: Rotation must be flipped for correct visuals on "left" walls!
+      ceil_pos.y += i * 0.001f;
+      r_push_quad(.pos = ceil_pos, .sprite = spr_ceil, .rot = qmul(rot, floor_rot));
+    }
+
+    os_heat_sync();
     r_update_transform(VP);
     r_present(true);
   }

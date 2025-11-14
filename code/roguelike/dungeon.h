@@ -72,8 +72,7 @@ typedef struct Dungeon_Room {
 typedef struct Dungeon_Perimeter {
   Vec2 offset;
   b32 lateral;
-  b32 left_side;
-  b32 right_side;
+  b32 side; // 0 - left, 1 - right
 } Dungeon_Perimeter;
 
 typedef struct Dungeon_Tile {
@@ -88,9 +87,10 @@ typedef struct Dungeon_Tile {
 } Dungeon_Tile;
 
 typedef struct Dungeon_Perimeter_Tile {
+  Sprite sprite;
   Vec2 grid_pos;
   b32 lateral;
-  Sprite sprite;
+  b32 requires_ceil_adjustment;
 } Dungeon_Perimeter_Tile;
 
 typedef struct Dungeon_Tile_Node {

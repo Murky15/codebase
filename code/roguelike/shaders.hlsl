@@ -86,6 +86,7 @@ ps_main (PS_Input input) : SV_TARGET {
     output_col = input.col;
   } else {
     output_col = tex_col * input.col;
+    output_col.a = tex_col.a;
   }
 
   return output_col;
