@@ -124,18 +124,12 @@ typedef struct Quad3D {
   Vec3 p0, p1, p2, p3;
 } Quad3D;
 
-//- @note: Constructors (Deprecated, use compound literals instead)
-core_function Vec2  v2(f32 x, f32 y);
-core_function Vec2i v2i(s32 x, s32 y);
-core_function Vec2i v2i_from_v2(Vec2 v);
-core_function Vec2  dv3(Vec3 v); // demote v3
-
-core_function Vec3  v3(f32 x, f32 y, f32 z);
-core_function Vec3i v3i(s32 x, s32 y, s32 z);
-core_function Vec3i v3i_from_v3(Vec3 v);
-core_function Vec3  pv2(Vec2 v, f32 z); // promote v2
-
-core_function Vec4 v4(f32 x, f32 y, f32 z, f32 w);
+//- @note: Constructors
+#define v2(...)  comp_lit(Vec2,  __VA_ARGS__)
+#define v2i(...) comp_lit(Vec2i, __VA_ARGS__)
+#define v3(...)  comp_lit(Vec3,  __VA_ARGS__)
+#define v3i(...) comp_lit(Vec3i, __VA_ARGS__)
+#define v4(...)  comp_lit(Vec4,  __VA_ARGS__)
 
 //- @note: Vectors
 core_function b32  v2exact(Vec2 a, Vec2 b);

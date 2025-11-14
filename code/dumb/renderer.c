@@ -24,7 +24,7 @@ function void
 r_put_pixel_at (Vec2 p, Color c) {
     Bitmap *canvas = r_get_framebuffer();
 
-    Vec2i pi = v2i_from_v2(p);
+    Vec2i pi = v2i((s32)p.x, (s32)p.y);
     if (pi.x >= 0 && pi.y >= 0 && pi.x < RESOLUTION_W && pi.y < RESOLUTION_H)
         canvas->pixels[pi.y * RESOLUTION_W + pi.x] = (c.r << 16 | c.g << 8 | c.b);
 }

@@ -1,8 +1,7 @@
 /* TODO
   - [ ] Hot Reloading (seperate game & platform)
   - [ ] Profiling (probably a codebase addition)
-  - [ ] Operator overloading for vector types when using CPP?
-  - [ ] Deprecate vector construction functions in favor of compound literals
+  - [X] Deprecate vector construction functions in favor of compound literals
       and also typedef all vectors to be their construction name
       (e.g. Vec2 -> v2). This will make writing compound literals easier
       OR BETTER YET #define v2 as a macro over (Vec2) compound lit!
@@ -13,10 +12,6 @@
   - [ ] Instead of a simple AABB check for determining the visible range, I should
     instead use a point-in-polygon function to support angles rotated around y-axis.
   - [ ] Make wall hight a property per room / hallway for more interesting visuals
-  - [ ] The current method of drawing floors, walls, ceilings (empty space), and decals is terrible.
-    The process is being split up into various stages to combat Z-fighting, and empty tiles are being drawn
-    to make up the "ceiling." This is a waste of resources, the stencil test can solve both of these issues,
-    I need to implement it ASAP.
   - [ ] Audio
 */
 
@@ -475,9 +470,9 @@ r_push_quad_ (Push_Quad_Params *p) {
   }
   Mat4 T = m4translate(p->pos);
   Mat4 R = m4rotate(p->rot);
-  R = m4mul(m4translate(pv2(p->rot_offset, 0)), R);
+  R = m4mul(m4translate(v3(.xy=p->rot_offset)), R);
   R = m4mul(R, m4translate(v3(-p->rot_offset.x, -p->rot_offset.y, 0)));
-  Mat4 S = m4scale(pv2(scale, 0));
+  Mat4 S = m4scale(v3(.xy=scale));
   Mat4 world = m4mul(T,R);
   world = m4mul(world,S);
 

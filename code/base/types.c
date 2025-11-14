@@ -1,50 +1,5 @@
 #ifndef BASE_TYPES_ESSENTIAL_ONLY
 
-core_function Vec2
-v2 (f32 x, f32 y) {
-  return comp_lit(Vec2, {x, y});
-}
-
-core_function Vec2i
-v2i (s32 x, s32 y) {
-  return comp_lit(Vec2i, {x, y});
-}
-
-core_function Vec2i
-v2i_from_v2 (Vec2 v) {
-  return v2i((s32)floor(v.x), (s32)floor(v.y));
-}
-
-core_function Vec2
-dv3 (Vec3 v) {
-  return v2(v.x, v.y);
-}
-
-core_function Vec3
-v3 (f32 x, f32 y, f32 z) {
-  return comp_lit(Vec3, {x, y, z});
-}
-
-core_function Vec3i
-v3i (s32 x, s32 y, s32 z) {
-  return comp_lit(Vec3i, {x, y, z});
-}
-
-core_function Vec3i
-v3i_from_v3 (Vec3 v) {
-  return v3i((s32)floor(v.x), (s32)floor(v.y), (s32)floor(v.z));
-}
-
-core_function Vec3
-pv2 (Vec2 v, f32 z) {
-  return v3(v.x, v.y, z);
-}
-
-core_function Vec4
-v4 (f32 x, f32 y, f32 z, f32 w) {
-  return comp_lit(Vec4, {x, y, z, w});
-}
-
 core_function b32
 v2exact (Vec2 a, Vec2 b) {
   return (a.x == b.x) && (a.y == b.y);
