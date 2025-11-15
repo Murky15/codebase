@@ -47,7 +47,7 @@
 #define com_release(I) if(I) IUnknown_Release(I)
 //#define com_release(T)
 
-#define MAX_OBJECTS_ON_SCREEN 512 * 512
+#define R_MAX_QUADS  4096
 #define PLAYER_MOVE_SPEED 0.15f
 
 typedef struct Game_State {
@@ -82,7 +82,7 @@ global ID3D11DepthStencilView *depth_stencil_view;
 global ID3D11Buffer *uniforms;
 global ID3D11Buffer *instance_buffer;
 
-global Instance_Data quads[MAX_OBJECTS_ON_SCREEN];
+global Instance_Data quads[R_MAX_QUADS];
 global u64 num_quads;
 
 global b32 move_forward, move_back, strafe_left, strafe_right;
@@ -197,7 +197,7 @@ win32_create_window (HINSTANCE hInstance) {
 
 function Vec2i
 r_init (HWND hwnd) {
-  local_persist read_only struct R_Vertex quad_vertices[4] = {
+  local_persist read_only R_Vertex quad_vertices[4] = {
     {{0, 0, 0}, {0, 1}},
     {{1, 0, 0}, {1, 1}},
     {{1, 1, 0}, {1, 0}},
@@ -214,7 +214,7 @@ r_init (HWND hwnd) {
     {"MATRIX",   2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D11_INPUT_PER_INSTANCE_DATA, 1},
     {"MATRIX",   3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1},
     {"TEXCOORD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 64, D3D11_INPUT_PER_INSTANCE_DATA, 1},
-    {"COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 80, D3D11_INPUT_PER_INSTANCE_DATA, 1}
+    {"COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 80, D3D11_INPUT_PER_INSTANCE_DATA, 1},
   };
 
   DXGI_SWAP_CHAIN_DESC sd = {0};
@@ -287,7 +287,7 @@ r_init (HWND hwnd) {
   ID3D11Buffer *ibuffer;
   ID3D11Device_CreateBuffer(device, &index_desc, &index_res, &ibuffer);
   D3D11_BUFFER_DESC instance_desc = {0};
-  instance_desc.ByteWidth = sizeof(Instance_Data) * MAX_OBJECTS_ON_SCREEN;
+  instance_desc.ByteWidth = sizeof(Instance_Data) * R_MAX_QUADS;
   instance_desc.Usage = D3D11_USAGE_DYNAMIC;
   instance_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
   instance_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -341,6 +341,14 @@ r_init (HWND hwnd) {
   depth_stencil_desc.DepthEnable = 1;
   depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
   depth_stencil_desc.DepthFunc = D3D11_COMPARISON_LESS;
+  depth_stencil_desc.StencilEnable = 1;
+  depth_stencil_desc.StencilReadMask = 0xFF;
+  depth_stencil_desc.StencilWriteMask = 0xFF;
+  depth_stencil_desc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+  depth_stencil_desc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+  depth_stencil_desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+  depth_stencil_desc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+  depth_stencil_desc.BackFace = depth_stencil_desc.FrontFace;
   ID3D11DepthStencilState *depth_stencil_state;
   ID3D11Device_CreateDepthStencilState(device, &depth_stencil_desc, &depth_stencil_state);
   ID3D11DeviceContext_OMSetDepthStencilState(ctx, depth_stencil_state, 1);
@@ -368,7 +376,7 @@ r_init (HWND hwnd) {
   com_release(vs_errors_blob);
   com_release(ps_errors_blob);
 
-  return (Vec2i){render_width, render_height};
+  return v2i(render_width, render_height);
 }
 
 function void
@@ -426,7 +434,7 @@ r_prep (void) {
     local_persist read_only f32 clear_color[4] = {0.1f, 0.2f, 0.3f, 1.f};
     memory_zero(quads, num_quads);
     num_quads = 0;
-    ID3D11DeviceContext_ClearDepthStencilView(ctx, depth_stencil_view, D3D11_CLEAR_DEPTH, 1.f, 0);
+    ID3D11DeviceContext_ClearDepthStencilView(ctx, depth_stencil_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.f, 0);
     ID3D11DeviceContext_ClearRenderTargetView(ctx, render_target_view, clear_color);
   }
 }
@@ -453,15 +461,17 @@ typedef struct Push_Quad_Params {
   Sprite sprite;
 } Push_Quad_Params;
 #define r_push_quad(...) r_push_quad_(&(Push_Quad_Params){ \
-  .scale = (Vec2){1,1}, \
-  .col = (Vec4){1,1,1,1}, \
+  .scale = v2(1,1), \
+  .col = v4(1,1,1,1), \
   .rot = qi(), \
   __VA_ARGS__ \
-  })
+  }, false)
 
 function void
-r_push_quad_ (Push_Quad_Params *p) {
-  Instance_Data *next_inst = &quads[InterlockedIncrement64(&num_quads)-1];
+r_push_quad_ (Push_Quad_Params *p, b32 is_decal) {
+  Instance_Data *next_inst;
+  next_inst = &quads[InterlockedIncrement64(&num_quads)-1];
+
   Vec2 scale = p->scale;
   Atlas_Coords coords = p->atlas_coords;
   if (p->sprite.name.len) {
@@ -485,11 +495,13 @@ function void
 r_present (b32 enable_vsync) {
   if (runner_id() == 0) {
     D3D11_MAPPED_SUBRESOURCE instances = {0};
+
+    ID3D11DeviceContext_OMSetRenderTargets(ctx, 1, &render_target_view, depth_stencil_view);
     ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instances);
     memcpy(instances.pData, quads, sizeof(Instance_Data) * num_quads);
     ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)instance_buffer, 0);
-
     ID3D11DeviceContext_DrawIndexedInstanced(ctx, 6, num_quads, 0, 0, 0);
+
     IDXGISwapChain_Present(swap_chain, enable_vsync, 0);
   }
 }
@@ -840,6 +852,7 @@ os_entry (void) {
         Vec2 scale = v2(gs->dungeon.grid_dim,gs->dungeon.grid_dim);
         r_push_quad(.pos = pos, .col = ceil_color, .scale = scale, .rot = floor_rot);
       } else {
+        // TODO: Can we just use backface culling for this?
         r_push_quad(.pos = pos, .sprite = sprite, .rot = floor_rot);
       }
     }
@@ -847,12 +860,31 @@ os_entry (void) {
     Rangei perimeter_snippet = os_heat_distribute(visible_tile_list.num_perimeter);
     for each_in_range (tile, perimeter, perimeter_snippet) {
       Vec2 p0 = d_grid_to_world(&gs->dungeon, tile->grid_pos);
-      Quat rot = tile->lateral ? qi() : forward_wall_rot;
+      Quat rot;
+      Quat ceil_rot;
+      Vec3 ceil_pos = v3(p0.x, ceil_height+0.002f, p0.y);
+      if (tile->lateral) {
+        rot = qi();
+        ceil_rot = rot;
+        ceil_pos.y += 0.001f;
+        if (tile->requires_ceil_adjustment) {
+          ceil_rot = axis_angle(v3(0,1,0), M_PI32);
+          ceil_pos.x += gs->dungeon.grid_dim;
+        }
+      } else {
+        rot = forward_wall_rot;
+        ceil_rot = rot;
+        if (tile->requires_ceil_adjustment) {
+          ceil_rot = qinv(rot);
+          ceil_pos.z -= gs->dungeon.grid_dim;
+        }
+      }
       for (u64 i = 0; i < wall_height; ++i) {
         f32 y = i * gs->dungeon.grid_dim;
         Vec3 world_pos = v3(p0.x, y, p0.y);
         r_push_quad(.pos = world_pos, .sprite = tile->sprite, .rot = rot);
       }
+      r_push_quad(.pos = ceil_pos, .sprite = spr_ceil, .rot = qmul(ceil_rot, floor_rot));
     }
 
     os_heat_sync();
@@ -861,41 +893,6 @@ os_entry (void) {
       r_draw_entity(&gs->player);
     }
 
-    // NOTE: We need to make decaling into its own step because transparent objects must be rendered
-    // after opaque ones.
-
-    for each_in_range (tile, perimeter, perimeter_snippet) {
-      if (tile->lateral) {
-        Vec2 p0 = d_grid_to_world(&gs->dungeon, tile->grid_pos);
-        Quat rot = qi();
-        Vec3 ceil_pos = v3(p0.x, ceil_height+0.001, p0.y);
-        if (tile->requires_ceil_adjustment) {
-          rot = axis_angle(v3(0,1,0), M_PI32);
-          ceil_pos.x += gs->dungeon.grid_dim;
-        }
-
-        r_push_quad(.pos = ceil_pos, .sprite = spr_ceil, .rot = qmul(rot, floor_rot));
-      }
-    }
-
-    os_heat_sync();
-
-    for each_in_range (tile, perimeter, perimeter_snippet) {
-      if (!tile->lateral) {
-        Vec2 p0 = d_grid_to_world(&gs->dungeon, tile->grid_pos);
-        Quat rot = forward_wall_rot;
-        Vec3 ceil_pos = v3(p0.x, ceil_height+0.001, p0.y);
-        if (tile->requires_ceil_adjustment) {
-          rot = qinv(rot);
-          ceil_pos.z -= gs->dungeon.grid_dim;
-        }
-
-        ceil_pos.y += 0.001f;
-        r_push_quad(.pos = ceil_pos, .sprite = spr_ceil, .rot = qmul(rot, floor_rot));
-      }
-    }
-
-    os_heat_sync();
     r_update_transform(VP);
     r_present(true);
   }

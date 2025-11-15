@@ -47,3 +47,13 @@ type_view:
   type: visible_tiles
   expr: array
 }
+breakpoint:
+{
+  source_location: "../code/roguelike/roguelike.c:802:1"
+  hit_count: 1
+}
+breakpoint:
+{
+  source_location: "../code/roguelike/roguelike.c:849:1"
+  hit_count: 7
+}

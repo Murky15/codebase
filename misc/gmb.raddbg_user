@@ -59,9 +59,9 @@ window:
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 805
+        cursor_line: 849
         cursor_column: 1
-        mark_line: 805
+        mark_line: 849
         mark_column: 1
       }
       text:
@@ -115,7 +115,7 @@ window:
   }
   split_x
   pos: 484 312
-  monitor: "\\\\.\\DISPLAY1"
+  monitor: "\\\\.\\DISPLAY6"
   maximized
 }
 keybindings:
