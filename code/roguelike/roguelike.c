@@ -12,6 +12,9 @@
   - [ ] Instead of a simple AABB check for determining the visible range, I should
     instead use a point-in-polygon function to support angles rotated around y-axis.
   - [ ] Make wall hight a property per room / hallway for more interesting visuals
+  - [ ] For inward map corners, use the actual cornered ceiling sprite to patch the hole.
+    This means that each inward corner should only be added to the list of perimeters once
+    to prevent z-flimmering.
   - [ ] Audio
 */
 
