@@ -1,4 +1,5 @@
 /* TODO
+  - [ ] Linux compile & run with wine
   - [ ] Hot Reloading (seperate game & platform)
   - [ ] Profiling (probably a codebase addition)
   - [X] Deprecate vector construction functions in favor of compound literals
@@ -6,8 +7,8 @@
       (e.g. Vec2 -> v2). This will make writing compound literals easier
       OR BETTER YET #define v2 as a macro over (Vec2) compound lit!
       I should also remove `pv2` and `dv3`
-  - [ ] Clean up build script (https://steve-jansen.github.io/guides/windows-batch-scripting/)
-  - [ ] It looks like the game is most performant with spin count = 0 for barriers?
+  - [X] Clean up build script (https://steve-jansen.github.io/guides/windows-batch-scripting/)
+  - [X] It looks like the game is most performant with spin count = 0 for barriers?
     Verify this. Also, what is a good spin count for Critical sections?
   - [ ] Instead of a simple AABB check for determining the visible range, I should
     instead use a point-in-polygon function to support angles rotated around y-axis.
