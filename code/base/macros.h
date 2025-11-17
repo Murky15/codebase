@@ -86,10 +86,12 @@
 #else
 # define comp_lit(T, ...) (T){__VA_ARGS__}
 #endif
-#define comp_zero(T) comp_lit(T, zero_struct)
+#define comp_zero(T) comp_lit(T,)
 
-#define min(a,b) ((a) < (b) ? (a) : (b))
-#define max(a,b) ((a) > (b) ? (a) : (b))
+#ifndef min
+# define min(a,b) ((a) < (b) ? (a) : (b))
+# define max(a,b) ((a) > (b) ? (a) : (b))
+#endif
 #define clamp(a,min,max) ((a) < (min) ? (min) : (a) > (max) ? (max) : (a))
 #define sign(x) (fabs(x)/(x))
 

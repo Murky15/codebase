@@ -21,6 +21,8 @@
 
 // NOTE: Headers
 
+#define OS_NUM_THREADS 1
+
 //#define UNICODE
 #define D3D11_NO_HELPERS
 #define CINTERFACE
@@ -28,7 +30,7 @@
 #include <windows.h>
 #include <dxgi.h>
 #include <d3d11.h>
-#include <D3DCompiler.h>
+#include <d3dcompiler.h>
 #include <stdlib.h>
 #include <stdio.h>
 #define ENABLE_ASSERT 1
@@ -252,9 +254,10 @@ r_init (HWND hwnd) {
   // Compile & create shaders
   ID3DBlob *vs_code_blob, *ps_code_blob;
   ID3DBlob *vs_errors_blob, *ps_errors_blob;
-  D3DCompileFromFile(L"W:/code/roguelike/shaders.hlsl", 0, 0, "vs_main", "vs_5_0", D3DCOMPILE_DEBUG, 0, &vs_code_blob, &vs_errors_blob);
-  D3DCompileFromFile(L"W:/code/roguelike/shaders.hlsl", 0, 0, "ps_main", "ps_5_0", D3DCOMPILE_DEBUG, 0, &ps_code_blob, &ps_errors_blob);
+  D3DCompileFromFile(L"Z:/home/gmb/Work/root/code/roguelike/shaders.hlsl", 0, 0, "vs_main", "vs_5_0", D3DCOMPILE_DEBUG, 0, &vs_code_blob, &vs_errors_blob);
+  D3DCompileFromFile(L"Z:/home/gmb/Work/root/code/roguelike/shaders.hlsl", 0, 0, "ps_main", "ps_5_0", D3DCOMPILE_DEBUG, 0, &ps_code_blob, &ps_errors_blob);
   String8 vs_code, ps_code, vs_errors, ps_errors;
+
   vs_code = d3d11_buffer_from_blob(vs_code_blob);
   ps_code = d3d11_buffer_from_blob(ps_code_blob);
   if (vs_errors_blob) {
@@ -301,9 +304,9 @@ r_init (HWND hwnd) {
   ID3D11Buffer *vertex_buffers[] = {vbuffer, instance_buffer};
   u32 strides[] = {sizeof(R_Vertex), sizeof(Instance_Data)};
   u32 offsets[] = {0,0};
+  ID3D11DeviceContext_IASetInputLayout(ctx, input_layout);
   ID3D11DeviceContext_IASetVertexBuffers(ctx, 0, array_count(vertex_buffers), vertex_buffers, strides, offsets);
   ID3D11DeviceContext_IASetIndexBuffer(ctx, ibuffer, DXGI_FORMAT_R32_UINT, 0);
-  ID3D11DeviceContext_IASetInputLayout(ctx, input_layout);
   ID3D11DeviceContext_IASetPrimitiveTopology(ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   D3D11_BUFFER_DESC uniforms_desc = {0};
   uniforms_desc.ByteWidth = sizeof(Uniforms);
@@ -692,7 +695,7 @@ os_entry (void) {
     f32 render_width = render_dim.width;
     f32 render_height = render_dim.height;
 
-    Texture_Atlas sprites = load_textures(perm, str8_lit("W:/assets/roguelike/0x72_DungeonTilesetII_v1.7"));
+    Texture_Atlas sprites = load_textures(perm, str8_lit("Z:/home/gmb/Work/root/assets/roguelike/0x72_DungeonTilesetII_v1.7"));
     r_create_and_bind_texture(sprites.raw_texture_data, true);
 
     Dungeon dungeon = d_create(perm, sprites,
