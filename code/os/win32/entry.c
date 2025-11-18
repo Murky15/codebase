@@ -1,3 +1,5 @@
+#include <process.h>
+
 s32
 os_bootstrap_thread (void *params) {
   Thread_Init_Package *init = (Thread_Init_Package*)params;
@@ -39,7 +41,7 @@ main (int argc, char **argv) {
       Thread_Init_Package *p = &params[i];
       Thread_Heat heat = comp_lit(Thread_Heat, i, num_threads, default_barrier, default_mutex, broadcast_buffer);
       p->tctx.heat = heat;
-      threads[i] = CreateThread(NULL, 0, os_bootstrap_thread, p, 0, NULL);
+      threads[i] = (HANDLE)_beginthread(os_bootstrap_thread, 0, p);
     }
 
     for (u64 i = 0; i < num_threads; ++i) {

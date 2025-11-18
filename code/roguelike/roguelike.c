@@ -1,5 +1,6 @@
 /* TODO
-  - [ ] Linux compile & run with wine
+  - [X] Linux compile & run with wine
+  - [ ] Linux multithreading
   - [ ] Hot Reloading (seperate game & platform)
   - [ ] Profiling (probably a codebase addition)
   - [X] Deprecate vector construction functions in favor of compound literals
@@ -19,9 +20,17 @@
   - [ ] Audio
 */
 
-// NOTE: Headers
+// TODO: In the future everything will be bundled with the exe, this is just to fix compilations
+// on Linux.
+#ifndef WIN32_ROGUELIKE_SOURCE_PATH
+# error "WIN32_ROGUELIKE_SOURCE_PATH is undefined"
+#endif
 
-#define OS_NUM_THREADS 1
+#ifndef WIN32_ROGUELIKE_ASSET_PATH
+# error "WIN32_ROGUELIKE_ASSET_PATH is undefined"
+#endif
+
+// NOTE: Headers
 
 //#define UNICODE
 #define D3D11_NO_HELPERS
@@ -254,12 +263,20 @@ r_init (HWND hwnd) {
   // Compile & create shaders
   ID3DBlob *vs_code_blob, *ps_code_blob;
   ID3DBlob *vs_errors_blob, *ps_errors_blob;
-  D3DCompileFromFile(L"Z:/home/gmb/Work/root/code/roguelike/shaders.hlsl", 0, 0, "vs_main", "vs_5_0", D3DCOMPILE_DEBUG, 0, &vs_code_blob, &vs_errors_blob);
-  D3DCompileFromFile(L"Z:/home/gmb/Work/root/code/roguelike/shaders.hlsl", 0, 0, "ps_main", "ps_5_0", D3DCOMPILE_DEBUG, 0, &ps_code_blob, &ps_errors_blob);
+  HRESULT vs_comp_result = D3DCompileFromFile(L""WIN32_ROGUELIKE_SOURCE_PATH"shaders.hlsl", 0, 0, "vs_main", "vs_5_0", D3DCOMPILE_DEBUG, 0, &vs_code_blob, &vs_errors_blob);
+  HRESULT ps_comp_result = D3DCompileFromFile(L""WIN32_ROGUELIKE_SOURCE_PATH"shaders.hlsl", 0, 0, "ps_main", "ps_5_0", D3DCOMPILE_DEBUG, 0, &ps_code_blob, &ps_errors_blob);
   String8 vs_code, ps_code, vs_errors, ps_errors;
 
-  vs_code = d3d11_buffer_from_blob(vs_code_blob);
-  ps_code = d3d11_buffer_from_blob(ps_code_blob);
+  if (vs_comp_result) {
+    printf("D3D11: Cannot find location of vertex shader!\n");
+    exit(1);
+  }
+
+  if (ps_comp_result) {
+    printf("D3D11: Cannot find location of pixel shader!\n");
+    exit(1);
+  }
+
   if (vs_errors_blob) {
     vs_errors = d3d11_buffer_from_blob(vs_errors_blob);
     printf("%.*s\n", str8_expand(vs_errors));
@@ -270,6 +287,9 @@ r_init (HWND hwnd) {
     printf("%.*s\n", str8_expand(ps_errors));
     exit(1);
   }
+
+  vs_code = d3d11_buffer_from_blob(vs_code_blob);
+  ps_code = d3d11_buffer_from_blob(ps_code_blob);
 
   ID3D11VertexShader *vertex_shader;
   ID3D11PixelShader *pixel_shader;
@@ -472,10 +492,10 @@ typedef struct Push_Quad_Params {
   .col = v4(1,1,1,1), \
   .rot = qi(), \
   __VA_ARGS__ \
-  }, false)
+  })
 
 function void
-r_push_quad_ (Push_Quad_Params *p, b32 is_decal) {
+r_push_quad_ (Push_Quad_Params *p) {
   Instance_Data *next_inst;
   next_inst = &quads[InterlockedIncrement64(&num_quads)-1];
 
@@ -574,6 +594,10 @@ load_textures (Arena *arena, String8 absolute_path_to_asset_dir) {
     String8 path_to_atlas_data = str8_pushf(scratch.arena,
       "%.*s/tile_list_v1.7", str8_expand(absolute_path_to_asset_dir));
     String8 atlas_txt = os_read_file(arena, path_to_atlas_data, false);
+    if (atlas_txt.len == 0) {
+      printf("Unable to find textures!\n");
+      exit(1);
+    }
 
     String8List atlas_lines = str8_split(scratch.arena, atlas_txt, 1, "\n");
     result.num_sprites = atlas_lines.num_nodes;
@@ -695,7 +719,7 @@ os_entry (void) {
     f32 render_width = render_dim.width;
     f32 render_height = render_dim.height;
 
-    Texture_Atlas sprites = load_textures(perm, str8_lit("Z:/home/gmb/Work/root/assets/roguelike/0x72_DungeonTilesetII_v1.7"));
+    Texture_Atlas sprites = load_textures(perm, str8_lit(WIN32_ROGUELIKE_ASSET_PATH"0x72_DungeonTilesetII_v1.7"));
     r_create_and_bind_texture(sprites.raw_texture_data, true);
 
     Dungeon dungeon = d_create(perm, sprites,
