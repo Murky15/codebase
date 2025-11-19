@@ -6,10 +6,10 @@
   - [O] Linux multithreading
     Here's the problem. mingw-w64 gcc uses the posix thread model instead of win32.
     This emulates win32 threading API calls like CreateThread, EnterCriticalSection, etc.
-    But it also implements the backend for all non win32 API's like the std thread library.
+    But it also implements the backend for all non win32 APIs like the std thread library.
     If we only pick one and stick with it we would be fine, easy right?
     Nope! Thread local storage is currently implemented with __declspec(thread) on MSVC, but this is
-    *unsupported* on mingw-w64 gcc! So, we can't use gcc's __thread, because that's mixing the two API's,
+    *unsupported* on mingw-w64 gcc! So, we can't use gcc's __thread, because that's mixing the two APIs,
     and I can't find a binary of mingw-w64 gcc that uses the win32 threading model to make everything uniform.
     So the only solution now would be to rewrite all tls code to use the win32 runtime tls API. However,
     because I have already wasted half of what should've been a very productive week on this, and because this will
