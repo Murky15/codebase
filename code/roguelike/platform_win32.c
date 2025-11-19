@@ -15,7 +15,7 @@
     because I have already wasted half of what should've been a very productive week on this, and because this will
     probably take some time to build and debug, I have decided that Linux will just have to wait.
 
-  - [X] Seperate game & platform
+  - [X] Separate game & platform
   - [ ] Hot Reloading
   - [ ] Profiling (probably a codebase addition)
   - [ ] Some of `renderer_d3d11.h` is platform specific, some of it isn't, separate it!
@@ -552,6 +552,7 @@ os_entry (void) {
     }
     os_heat_sync();
 
+    // Render
     roguelike_draw(gs);
   }
 }
