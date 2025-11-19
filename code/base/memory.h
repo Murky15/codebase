@@ -20,7 +20,6 @@ enum {
 };
 
 typedef struct Arena {
-    struct Arena *next;
     Arena_Type type;
     u64 pos;
     u64 commit_pos;

@@ -1,3 +1,15 @@
+#include <base/include.h>
+#include <os/include.h>
+#include <file/png.h>
+#include "renderer_d3d11.h"
+#include "dungeon.h"
+#include "roguelike.h"
+
+#include <base/include.c>
+#include <os/include.c>
+#include <file/png.c>
+#include "dungeon.c"
+
 function Cardinal_Dir
 to_cardinal (Vec2 dir) {
   Cardinal_Dir result = 0;
@@ -133,11 +145,43 @@ cam_calculate_visible_range (Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear)
   return (Rect){.xy=v2(min_x, bottom_left.y), .zw=v2(x_diff, y_diff)};
 }
 
+
+function void
+draw_entity (Entity *e) {
+  Sprite *anim = &e->run;
+  Sprite *prev_anim = &e->idle;
+  if (e->dir == 0) {
+    swap(anim, prev_anim);
+  }
+  if (prev_anim->started_at || anim->started_at == 0) {
+    anim->started_at = os_clock_seconds();
+    anim->current_frame = 0;
+
+    prev_anim->started_at = 0;
+  }
+
+  f32 seconds_per_frame = anim->seconds_to_complete / anim->num_frames;
+  f32 current_step = anim->started_at + seconds_per_frame * anim->current_frame;
+  f32 now = os_clock_seconds();
+  if (now - current_step >= seconds_per_frame) {
+    anim->current_frame++;
+    if (anim->current_frame == anim->num_frames) {
+      anim->started_at += seconds_per_frame * anim->current_frame;
+    }
+    anim->current_frame %= anim->num_frames;
+  }
+
+  Quat rot = axis_angle(v3(0,1,0), e->rotation_angle);
+  Atlas_Coords texcoord = anim->coords[anim->current_frame];
+  r_push_quad(.pos = e->pos, .scale = texcoord.scale, .rot = rot, .rot_offset = v2(texcoord.scale.x/2.f, 0), .atlas_coords = texcoord);
+}
+
 function void*
 roguelike_init (Game_Init_Package init) { /* NOTE: Always single threaded */
   Game_State *gs = arena_pushn(init.perm, Game_State, 1);
 
-  Texture_Atlas sprites = load_textures(init.perm, str8_lit(WIN32_ROGUELIKE_ASSET_PATH"0x72_DungeonTilesetII_v1.7"));
+  String8 asset_path = str8_pushf(init.frame, "%.*s0x72_DungeonTilesetII_v1.7", str8_expand(init.asset_dir));
+  Texture_Atlas sprites = load_textures(init.perm, asset_path);
   r_create_and_bind_texture(sprites.raw_texture_data, true);
 
   Dungeon dungeon = d_create(init.perm, sprites,
@@ -327,7 +371,7 @@ roguelike_draw (void *game_state) {
   os_heat_sync();
 
   if (runner_id() == 0) {
-    r_draw_entity(&gs->player);
+    draw_entity(&gs->player);
   }
 
   r_update_transform(VP);

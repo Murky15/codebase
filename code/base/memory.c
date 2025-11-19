@@ -32,7 +32,6 @@ arena_alloc_fixed (void *buff, u64 size) {
     if (buff) {
         result = (Arena*)buff;
         result->type = Arena_Type_Fixed;
-        result->next = 0;
         result->pos = sizeof(Arena);
         result->commit_pos = size;
         result->cap = size;
@@ -47,7 +46,6 @@ arena_alloc (void) {
     if (mem_commit(back_buffer, PAGE_TABLE_SIZE)) {
         result = (Arena*)back_buffer;
         result->type = Arena_Type_MMU;
-        result->next = 0;
         result->pos = sizeof(Arena);
         result->commit_pos = PAGE_TABLE_SIZE;
         result->cap = ARENA_DEFAULT_RESERVE_SIZE;

@@ -19,9 +19,11 @@ typedef struct Game_Input_Package {
   b32 strafe_right;
 } Game_Input_Package;
 
-function void* roguelike_init(Game_Init_Package init); /* NOTE: Always single threaded */
-function void  roguelike_tick(void *game_state, f32 dt, Game_Input_Package input);
-function void  roguelike_draw(void *game_state);
+#if 0
+void* roguelike_init(Game_Init_Package init); /* NOTE: Always single threaded */
+void  roguelike_tick(void *game_state, f32 dt, Game_Input_Package input);
+void  roguelike_draw(void *game_state);
+#endif
 
 // NOTE: Game data
 
@@ -87,8 +89,6 @@ typedef struct Game_State {
   Camera cam;
 } Game_State;
 
-// To avoid the circular dependency
-function void r_draw_entity(Entity *e);
 
 function Cardinal_Dir to_cardinal(Vec2 dir);
 function Sprite* get_atlas_slot(Texture_Atlas atlas, String8 key);
@@ -96,5 +96,6 @@ function Sprite  get_sprite(Texture_Atlas atlas, String8 key);
 function Atlas_Coords make_atlas_coords_from_string(String8 coords);
 function Texture_Atlas load_textures(Arena *arena, String8 absolute_path_to_asset_dir);
 function Rect cam_calculate_visible_range(Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear);
+function void draw_entity(Entity *e);
 
 #endif // ROGUELIKE_H

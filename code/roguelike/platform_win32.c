@@ -75,9 +75,6 @@
 #include <os/include.c>
 #include <file/png.c>
 
-#include "dungeon.c"
-#include "roguelike.c"
-
 #define com_release(I) if(I) IUnknown_Release(I)
 //#define com_release(T)
 
@@ -466,36 +463,6 @@ r_present (b32 enable_vsync) {
 
     IDXGISwapChain_Present(swap_chain, enable_vsync, 0);
   }
-}
-
-function void
-r_draw_entity (Entity *e) {
-  Sprite *anim = &e->run;
-  Sprite *prev_anim = &e->idle;
-  if (e->dir == 0) {
-    swap(anim, prev_anim);
-  }
-  if (prev_anim->started_at || anim->started_at == 0) {
-    anim->started_at = os_clock_seconds();
-    anim->current_frame = 0;
-
-    prev_anim->started_at = 0;
-  }
-
-  f32 seconds_per_frame = anim->seconds_to_complete / anim->num_frames;
-  f32 current_step = anim->started_at + seconds_per_frame * anim->current_frame;
-  f32 now = os_clock_seconds();
-  if (now - current_step >= seconds_per_frame) {
-    anim->current_frame++;
-    if (anim->current_frame == anim->num_frames) {
-      anim->started_at += seconds_per_frame * anim->current_frame;
-    }
-    anim->current_frame %= anim->num_frames;
-  }
-
-  Quat rot = axis_angle(v3(0,1,0), e->rotation_angle);
-  Atlas_Coords texcoord = anim->coords[anim->current_frame];
-  r_push_quad(.pos = e->pos, .scale = texcoord.scale, .rot = rot, .rot_offset = v2(texcoord.scale.x/2.f, 0), .atlas_coords = texcoord);
 }
 
 void
