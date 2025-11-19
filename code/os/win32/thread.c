@@ -42,3 +42,45 @@ core_function void
 os_mutex_invalidate (Thread_Mutex mutex) {
   DeleteCriticalSection(ptr_from_int(mutex.opaque_data));
 }
+
+core_function u64
+os_get_perf_frequency (void) {
+  local_persist threadvar LARGE_INTEGER freq;
+  if (freq.QuadPart == 0)
+    QueryPerformanceFrequency(&freq);
+
+  return freq.QuadPart;
+}
+
+core_function u64
+os_query_clock (void) {
+  LARGE_INTEGER tick;
+  QueryPerformanceCounter(&tick);
+
+  return tick.QuadPart;
+}
+
+core_function f64
+os_get_elapsed_ms (u64 t1, u64 t2) {
+  u64 freq = os_get_perf_frequency();
+  u64 elapsed_ms = (t2 - t1) * 1000;
+
+  return (f32)elapsed_ms / freq;
+}
+
+core_function f64
+os_clock_seconds (void) {
+  u64 freq = os_get_perf_frequency();
+  u64 current_time = os_query_clock();
+
+  return (f64)current_time / freq;
+}
+
+core_function u64
+os_ms_to_tick_interval (f64 ms) {
+  u64 freq = os_get_perf_frequency();
+  u64 ticks = ms * freq;
+  ticks /= 1000;
+
+  return ticks;
+}

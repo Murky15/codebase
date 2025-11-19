@@ -21,5 +21,5 @@ set defines=-DWIN32_ROGUELIKE_SOURCE_PATH=\"%source%\" -DWIN32_ROGUELIKE_ASSET_P
 
 if not exist build mkdir build
 pushd build
-%compiler% %defines% %debug% %warn% %ignore% -I%source%.. %source%roguelike.c %out%roguelike.exe %libs% || exit /b 1
+%compiler% %defines% %debug% %warn% %ignore% -I%source%.. %source%platform_win32.c %out%roguelike.exe %libs% || exit /b 1
 popd

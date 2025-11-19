@@ -1,6 +1,32 @@
 #ifndef ROGUELIKE_H
 #define ROGUELIKE_H
 
+// NOTE: Game<-->platform interface
+
+typedef struct Game_Init_Package {
+  Arena *perm;
+  Arena *frame;
+  String8 source_dir;
+  String8 asset_dir;
+  f32 display_width;
+  f32 display_height;
+} Game_Init_Package;
+
+typedef struct Game_Input_Package {
+  b32 move_forward;
+  b32 move_back;
+  b32 strafe_left;
+  b32 strafe_right;
+} Game_Input_Package;
+
+function void* roguelike_init(Game_Init_Package init); /* NOTE: Always single threaded */
+function void  roguelike_tick(void *game_state, f32 dt, Game_Input_Package input);
+function void  roguelike_draw(void *game_state);
+
+// NOTE: Game data
+
+#define PLAYER_MOVE_SPEED 0.15f
+
 typedef u32 Cardinal_Dir;
 enum {
   NORTH = (1 << 0),
@@ -13,27 +39,6 @@ enum {
   SOUTHEAST = SOUTH | EAST,
   SOUTHWEST = SOUTH | WEST,
 };
-
-typedef struct Atlas_Coords {
-  Vec2 scale;
-  Vec2 offset;
-} Atlas_Coords;
-
-#define MAX_FRAMES 4
-typedef struct Sprite {
-  String8 name;
-  Atlas_Coords coords[MAX_FRAMES];
-  u64 num_frames;
-  u64 current_frame;
-  f32 started_at;
-  f32 seconds_to_complete;
-} Sprite;
-
-typedef struct Texture_Atlas {
-  PNG_Bitmap_RGBA raw_texture_data;
-  Sprite *sprites;
-  u64 num_sprites;
-} Texture_Atlas;
 
 /*
   We can have a 'tween' function type here that takes two Vector3s
@@ -63,6 +68,27 @@ typedef struct Entity {
   Sprite idle;
   Sprite run;
 } Entity;
+
+typedef struct Game_State {
+  Arena *perm;
+  Arena *frame;
+
+  Texture_Atlas sprites;
+  Sprite spr_wall_mid;
+  Sprite spr_ceil;
+  Vec4 ceil_color;
+
+  Dungeon dungeon;
+  Mat4 proj;
+  Quat floor_rot;
+  Quat forward_wall_rot;
+
+  Entity player;
+  Camera cam;
+} Game_State;
+
+// To avoid the circular dependency
+function void r_draw_entity(Entity *e);
 
 function Cardinal_Dir to_cardinal(Vec2 dir);
 function Sprite* get_atlas_slot(Texture_Atlas atlas, String8 key);

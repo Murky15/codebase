@@ -1,4 +1,4 @@
-// raddbg 0.9.23 user file
+// raddbg 0.9.21 user file
 
 recent_project: path: "root.raddbg_project"
 recent_project: path: path
@@ -15,7 +15,6 @@ window:
       0.132224: watch: selected expression: "query:types"
       0.560900:
       {
-        selected
         watch: selected expression: "query:threads"
         watch: expression: "query:breakpoints"
         watch: expression: "query:watch_pins"
@@ -40,8 +39,9 @@ window:
         watch: expression: "query:modules"
       }
     }
-    0.380208:
+    0.273322:
     {
+      selected
       getting_started
       text:
       {
@@ -49,9 +49,9 @@ window:
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 142
+        cursor_line: 18
         cursor_column: 1
-        mark_line: 142
+        mark_line: 18
         mark_column: 1
       }
       text:
@@ -86,23 +86,22 @@ window:
       }
       text:
       {
-        expression: "file:\"W:/code/file/png.c\".data"
+        expression: "file:\"W:/code/base/strings.c\".data"
         auto: 1
-        cursor_line: 419
+        cursor_line: 72
         cursor_column: 1
-        mark_line: 419
+        mark_line: 72
         mark_column: 1
         query: input: ""
       }
     }
-    0.296600:
+    0.403486:
     {
       0.647769:
       {
-        watch: expression: "query:locals"
+        watch: selected expression: "query:locals"
         watch:
         {
-          selected
           expression: ""
           normal: 0.350000 0.339024 0.310976
           watch: sprite

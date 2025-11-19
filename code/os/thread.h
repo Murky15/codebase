@@ -48,6 +48,14 @@ core_function Thread_Context* os_get_thread_context(void);
 #define runner_id() (os_get_thread_context()->heat.runner_id)
 #define num_runners() (os_get_thread_context()->heat.num_runners)
 
+// NOTE: Timing
+
+function u64 os_get_perf_frequency(void);
+function u64 os_query_clock(void);
+function f64 os_clock_seconds(void);
+function f64 os_get_elapsed_ms(u64 t1, u64 t2);
+function u64 os_ms_to_tick_interval(f64 ms);
+
 // NOTE: Heat Functions
 
 core_function void os_heat_sync(void);
