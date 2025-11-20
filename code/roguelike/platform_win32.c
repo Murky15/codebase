@@ -18,7 +18,6 @@
   - [X] Separate game & platform
   - [ ] Hot Reloading
   - [ ] Profiling (probably a codebase addition)
-  - [ ] Some of `renderer_d3d11.h` is platform specific, some of it isn't, separate it!
 
   - [X] Deprecate vector construction functions in favor of compound literals
       and also typedef all vectors to be their construction name
@@ -78,7 +77,22 @@
 #define com_release(I) if(I) IUnknown_Release(I)
 //#define com_release(T)
 
-#define R_MAX_QUADS  4096
+#define R_MAX_QUADS 4096
+
+typedef struct R_Vertex {
+  Vec3 pos;
+  Vec2 uv;
+} R_Vertex;
+
+typedef struct Uniforms {
+  Mat4 view_proj;
+} Uniforms;
+
+typedef struct Instance_Data {
+  Mat4 world;
+  Atlas_Coords atlas_coords;
+  Vec4 color;
+} Instance_Data;
 
 global ID3D11Device *device;
 global ID3D11DeviceContext *ctx;
@@ -470,6 +484,7 @@ os_entry (void) {
   // NOTE: Initialization, some aspects, like dungeon creation/partitioning can potentially be parallelized if
   // they become performance problems.
   void *gs;
+  Game_VTable *game;
   Arena *perm;
   Arena *frame;
   if (runner_id() == 0) {
@@ -483,16 +498,34 @@ os_entry (void) {
     f32 render_width = render_dim.width;
     f32 render_height = render_dim.height;
 
-    gs = roguelike_init((Game_Init_Package){
+    HMODULE game_code = LoadLibrary(TEXT("roguelike.dll"));
+    if (game_code == NULL) {
+      printf("Cannot find/open \"roguelike.dll\"\n");
+      exit(1);
+    }
+
+    game = arena_pushn(perm, Game_VTable, 1);
+    game->init = (roguelike_init_type)GetProcAddress(game_code, "roguelike_init");
+    game->tick = (roguelike_tick_type)GetProcAddress(game_code, "roguelike_tick");
+    game->draw = (roguelike_draw_type)GetProcAddress(game_code, "roguelike_draw");
+    if (game->init == NULL || game->tick == NULL || game->draw == NULL) {
+      printf("Unable to load game code!\n");
+      exit(1);
+    }
+
+    gs = game->init(os_get_thread_context(),(Game_Init_Package){
       perm, frame,
       str8_lit(WIN32_ROGUELIKE_SOURCE_PATH),
       str8_lit(WIN32_ROGUELIKE_ASSET_PATH),
-      render_width, render_height
+      render_width, render_height,
+      r_create_and_bind_texture
       });
+
   }
-  os_heat_sync_u64((u64*)&gs, 0);
-  os_heat_sync_u64((u64*)&perm, 0);
-  os_heat_sync_u64((u64*)&frame, 0);
+  os_heat_sync_ptr(gs, 0);
+  os_heat_sync_ptr(game, 0);
+  os_heat_sync_ptr(perm, 0);
+  os_heat_sync_ptr(frame, 0);
 
   u64 last = os_query_clock(), now = 0;
   f32 dt = 0;
@@ -515,11 +548,11 @@ os_entry (void) {
       dt = os_get_elapsed_ms(last, now);
       last = now;
 
-      roguelike_tick(gs, dt, (Game_Input_Package){move_forward, move_back, strafe_left, strafe_right});
+      game->tick(os_get_thread_context(), gs, dt, (Game_Input_Package){move_forward, move_back, strafe_left, strafe_right});
     }
     os_heat_sync();
 
     // Render
-    roguelike_draw(gs);
+    game->draw(os_get_thread_context(), gs, &(Renderer_VTable){r_create_and_bind_texture, r_prep, r_update_transform, r_push_quad_, r_present});
   }
 }

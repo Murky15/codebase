@@ -6,7 +6,7 @@ os_get_thread_context (void) {
 }
 
 core_function void
-os_select_thread_context (Thread_Context ctx) {
+os_set_thread_context (Thread_Context ctx) {
   Thread_Context *current_thread_context = os_get_thread_context();
   *current_thread_context = ctx;
 }

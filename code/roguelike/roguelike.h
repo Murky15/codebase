@@ -3,6 +3,12 @@
 
 // NOTE: Game<-->platform interface
 
+typedef void (*r_create_and_bind_texture_type)(PNG_Bitmap_RGBA,b32);
+typedef void (*r_prep_type)(void);
+typedef void (*r_update_transform_type)(Mat4);
+typedef void (*r_push_quad_type)(Push_Quad_Params);
+typedef void (*r_present_type)(Push_Quad_Params);
+
 typedef struct Game_Init_Package {
   Arena *perm;
   Arena *frame;
@@ -10,6 +16,7 @@ typedef struct Game_Init_Package {
   String8 asset_dir;
   f32 display_width;
   f32 display_height;
+  r_create_and_bind_texture_type create_and_bind_texture;
 } Game_Init_Package;
 
 typedef struct Game_Input_Package {
@@ -19,11 +26,40 @@ typedef struct Game_Input_Package {
   b32 strafe_right;
 } Game_Input_Package;
 
-#if 0
-void* roguelike_init(Game_Init_Package init); /* NOTE: Always single threaded */
-void  roguelike_tick(void *game_state, f32 dt, Game_Input_Package input);
-void  roguelike_draw(void *game_state);
-#endif
+typedef struct Push_Quad_Params {
+  Vec3 pos;
+  Vec2 scale;
+  Vec2 rot_offset;
+  Vec4 col;
+  Quat rot;
+  Atlas_Coords atlas_coords;
+  Sprite sprite;
+} Push_Quad_Params;
+#define r_push_quad(...) r->push_quad(&(Push_Quad_Params){ \
+  .scale = v2(1,1), \
+  .col = v4(1,1,1,1), \
+  .rot = qi(), \
+  __VA_ARGS__ \
+  })
+
+typedef struct Renderer_VTable {
+  r_create_and_bind_texture_type create_and_bind_texture;
+  r_prep_type prep;
+  r_update_transform_type update_transform;
+  r_push_quad_type push_quad;
+  r_present_type present;
+} Renderer_VTable;
+
+
+typedef void *(*roguelike_init_type)(Thread_Context*,Game_Init_Package);
+typedef void  (*roguelike_tick_type)(Thread_Context*,void*,f32,Game_Input_Package);
+typedef void  (*roguelike_draw_type)(Thread_Context*,void*,Renderer_VTable*);
+
+typedef struct Game_VTable {
+  roguelike_init_type init; /* NOTE: Always single threaded */
+  roguelike_tick_type tick;
+  roguelike_draw_type draw;
+} Game_VTable;
 
 // NOTE: Game data
 
@@ -96,6 +132,6 @@ function Sprite  get_sprite(Texture_Atlas atlas, String8 key);
 function Atlas_Coords make_atlas_coords_from_string(String8 coords);
 function Texture_Atlas load_textures(Arena *arena, String8 absolute_path_to_asset_dir);
 function Rect cam_calculate_visible_range(Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear);
-function void draw_entity(Entity *e);
+function void draw_entity(Entity *e, Renderer_VTable *r);
 
 #endif // ROGUELIKE_H

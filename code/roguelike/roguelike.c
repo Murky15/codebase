@@ -1,3 +1,6 @@
+#define OS_NO_ENTRY 1
+#define ENABLE_ASSERT 1
+#define DEBUG 1
 #include <base/include.h>
 #include <os/include.h>
 #include <file/png.h>
@@ -147,7 +150,7 @@ cam_calculate_visible_range (Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear)
 
 
 function void
-draw_entity (Entity *e) {
+draw_entity (Entity *e, Renderer_VTable *r) {
   Sprite *anim = &e->run;
   Sprite *prev_anim = &e->idle;
   if (e->dir == 0) {
@@ -176,13 +179,14 @@ draw_entity (Entity *e) {
   r_push_quad(.pos = e->pos, .scale = texcoord.scale, .rot = rot, .rot_offset = v2(texcoord.scale.x/2.f, 0), .atlas_coords = texcoord);
 }
 
-function void*
-roguelike_init (Game_Init_Package init) { /* NOTE: Always single threaded */
+extern void*
+roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always single threaded */
+  os_set_thread_context(*tctx);
   Game_State *gs = arena_pushn(init.perm, Game_State, 1);
 
   String8 asset_path = str8_pushf(init.frame, "%.*s0x72_DungeonTilesetII_v1.7", str8_expand(init.asset_dir));
   Texture_Atlas sprites = load_textures(init.perm, asset_path);
-  r_create_and_bind_texture(sprites.raw_texture_data, true);
+  init.create_and_bind_texture(sprites.raw_texture_data, true);
 
   Dungeon dungeon = d_create(init.perm, sprites,
     .target_room_count = 500,
@@ -242,8 +246,9 @@ roguelike_init (Game_Init_Package init) { /* NOTE: Always single threaded */
   return (void*)gs;
 }
 
-function void
-roguelike_tick (void *game_state, f32 dt, Game_Input_Package input) {
+extern void
+roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Package input) {
+  os_set_thread_context(*tctx);
   Game_State *gs = (Game_State*)game_state;
 
   Vec2 move_dir = {0};
@@ -278,11 +283,12 @@ roguelike_tick (void *game_state, f32 dt, Game_Input_Package input) {
   }
 }
 
-function void
-roguelike_draw (void *game_state) {
+extern void
+roguelike_draw (Thread_Context *tctx, void *game_state, Renderer_VTable *r) {
+  os_set_thread_context(*tctx);
   Game_State *gs = (Game_State*)game_state;
 
-  r_prep();
+  r->prep();
 
   Mat4 view = m4lookat(gs->cam.pos, gs->cam.focus, v3(0,1,0));
   Mat4 VP = m4mul(gs->proj, view);
@@ -317,8 +323,8 @@ roguelike_draw (void *game_state) {
       }
     }
   }
-  os_heat_sync_u64((u64*)&visible_tiles, 0);
-  os_heat_sync_u64((u64*)&perimeter, 0);
+  os_heat_sync_ptr(visible_tiles, 0);
+  os_heat_sync_ptr(perimeter, 0);
 
   u64 wall_height = 3;
   f32 ceil_height = wall_height * gs->dungeon.grid_dim;
@@ -371,9 +377,9 @@ roguelike_draw (void *game_state) {
   os_heat_sync();
 
   if (runner_id() == 0) {
-    draw_entity(&gs->player);
+    draw_entity(&gs->player, r);
   }
 
-  r_update_transform(VP);
-  r_present(true);
+  r->update_transform(VP);
+  r->present(true);
 }

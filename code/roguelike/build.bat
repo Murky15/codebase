@@ -15,11 +15,17 @@ set debug=-Od -Zi
 set warn=-WX -W3
 set ignore=-wd4146 -wd4244 -wd4005
 set out=-Fe
-set libs=User32.lib d3d11.lib dxgi.lib dxguid.lib D3DCompiler.lib Winmm.lib
-
 set defines=-DWIN32_ROGUELIKE_SOURCE_PATH=\"%source%\" -DWIN32_ROGUELIKE_ASSET_PATH=\"%assets%\"
+
+set compile=%compiler% %defines% %debug% %warn% %ignore% -I%source%..
+set platform_link=-link User32.lib d3d11.lib dxgi.lib dxguid.lib D3DCompiler.lib Winmm.lib
+set game_link=-link -DLL -EXPORT:roguelike_init -EXPORT:roguelike_tick -EXPORT:roguelike_draw
 
 if not exist build mkdir build
 pushd build
-%compiler% %defines% %debug% %warn% %ignore% -I%source%.. %source%platform_win32.c %out%roguelike.exe %libs% || exit /b 1
+echo Building platform layer...
+%compile% %source%platform_win32.c %out%roguelike_platform_win32.exe %platform_link% || exit /b 1
+echo Building game dll...
+%compile% %source%roguelike.c %out%roguelike.dll %game_link% || exit /b 1
+echo Done
 popd

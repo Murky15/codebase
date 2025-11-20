@@ -43,7 +43,7 @@ core_function void os_mutex_claim(Thread_Mutex mutex);
 core_function void os_mutex_release(Thread_Mutex mutex);
 core_function void os_mutex_invalidate(Thread_Mutex mutex);
 
-core_function void os_select_thread_context(Thread_Context ctx);
+core_function void os_set_thread_context(Thread_Context ctx);
 core_function Thread_Context* os_get_thread_context(void);
 #define runner_id() (os_get_thread_context()->heat.runner_id)
 #define num_runners() (os_get_thread_context()->heat.num_runners)
@@ -60,6 +60,7 @@ function u64 os_ms_to_tick_interval(f64 ms);
 
 core_function void os_heat_sync(void);
 core_function void os_heat_sync_u64(u64 *value, u64 broadcaster_id);
+#define os_heat_sync_ptr(p,i) os_heat_sync_u64((u64*)&(p),(i))
 core_function void os_heat_begin_critical_section(void);
 core_function void os_heat_end_critical_section(void);
 core_function Rangei os_heat_distribute(u64 num_items);

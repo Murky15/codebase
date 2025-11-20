@@ -10,13 +10,14 @@ window:
   size: 1536.000000 816.000000
   panels:
   {
-    0.323192:
+    0.294369:
     {
       0.132224: watch: selected expression: "query:types"
       0.560900:
       {
-        watch: selected expression: "query:threads"
-        watch: expression: "query:breakpoints"
+        selected
+        watch: expression: "query:threads"
+        watch: selected expression: "query:breakpoints"
         watch: expression: "query:watch_pins"
       }
       0.056876:
@@ -39,67 +40,40 @@ window:
         watch: expression: "query:modules"
       }
     }
-    0.273322:
+    0.406629:
     {
-      selected
-      getting_started
+      text:
+      {
+        expression: "file:\"W:/code/roguelike/platform_win32.c\".data"
+        project: "W:/misc/root.raddbg_project"
+        query: input: ""
+        cursor_line: 558
+        cursor_column: 1
+        mark_line: 558
+        mark_column: 1
+      }
       text:
       {
         selected
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
-        project: "W:/misc/root.raddbg_project"
-        query: input: ""
-        cursor_line: 18
-        cursor_column: 1
-        mark_line: 18
-        mark_column: 1
-      }
-      text:
-      {
-        expression: "file:\"W:/code/os/win32/thread.c\".data"
-        project: "W:/misc/root.raddbg_project"
-        query: input: ""
-        cursor_line: 14
-        cursor_column: 2
-        mark_line: 14
-        mark_column: 2
-      }
-      text:
-      {
-        expression: "file:\"W:/code/os/thread.c\".data"
-        project: "W:/misc/root.raddbg_project"
-        query: input: ""
-        cursor_line: 24
-        cursor_column: 4
-        mark_line: 24
-        mark_column: 4
-      }
-      text:
-      {
-        expression: "file:\"W:/code/roguelike/dungeon.c\".data"
-        project: "W:/misc/root.raddbg_project"
-        query: input: ""
-        cursor_line: 487
-        cursor_column: 49
-        mark_line: 487
-        mark_column: 49
-      }
-      text:
-      {
-        expression: "file:\"W:/code/base/strings.c\".data"
         auto: 1
-        cursor_line: 72
-        cursor_column: 1
-        mark_line: 72
-        mark_column: 1
         query: input: ""
+        cursor_line: 385
+        cursor_column: 1
+        mark_line: 385
+        mark_column: 1
       }
     }
-    0.403486:
+    0.299002:
     {
       0.647769:
       {
-        watch: selected expression: "query:locals"
+        watch:
+        {
+          selected
+          expression: "query:locals"
+          normal: 0.411898 0.338102 0.250000
+        }
         watch:
         {
           expression: ""
@@ -107,6 +81,7 @@ window:
           watch: sprite
           watch: tile
           watch: blob
+          watch: gs
         }
         watch: expression: "query:type_views"
       }

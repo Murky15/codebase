@@ -419,8 +419,8 @@ d_query_range (Arena *arena, Dungeon_Map tree, Rect grid_range, b32 include_full
     next_slice_to_check = arena_pushn(scratch.arena, Dungeon_Slice*, tree.num_slices);
     next_slice_to_check[0] = tree.root;
   }
-  os_heat_sync_u64((u64*)&result, 0);
-  os_heat_sync_u64((u64*)&next_slice_to_check, 0);
+  os_heat_sync_ptr(result, 0);
+  os_heat_sync_ptr(next_slice_to_check, 0);
 
   while (true) {
     u64 slice_idx = InterlockedIncrement64(&last_checked_slice_idx)-1;
@@ -471,7 +471,7 @@ d_query_range (Arena *arena, Dungeon_Map tree, Rect grid_range, b32 include_full
 function Dungeon
 d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
   Dungeon result = {0};
-    if (runner_id() == 0) {
+  if (runner_id() == 0) {
     result.width = p->map_width;
     result.height = p->map_height;
     result.grid_dim = p->grid_dim;

@@ -1,18 +1,20 @@
 // raddbg 0.9.21 project file
 
 recent_file: path: "../code/roguelike/roguelike.c"
+recent_file: path: "../code/os/thread.c"
+recent_file: path: "../code/roguelike/dungeon.c"
+recent_file: path: "../code/roguelike/platform_win32.c"
+recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memcpy.asm"
 recent_file: path: "../code/base/strings.c"
+recent_file: path: "d:/os/obj/amd64fre/minkernel/crts/ucrt/src/appcrt/startup/mt/objfre/amd64/minkernel/crts/ucrt/src/appcrt/startup/thread.cpp"
+recent_file: path: "../code/os/win32/entry.c"
+recent_file: path: "../code/base/types.c"
 recent_file: path: "../code/file/png.c"
 recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memcmp.asm"
-recent_file: path: "../code/roguelike/dungeon.c"
 recent_file: path: "d:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm"
-recent_file: path: "../code/os/thread.c"
 recent_file: path: "../code/os/win32/thread.c"
-recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memcpy.asm"
-recent_file: path: "../code/os/win32/entry.c"
 recent_file: path: "../code/rougelike/rougelike.c"
 recent_file: path: "../code/rougelike/dungeon.c"
-recent_file: path: "../code/base/types.c"
 recent_file: path: "../code/rougelike/procedural_dungeon_test/test.c"
 recent_file: path: "../code/os/win32/io.c"
 recent_file: path: "../code/base/memory.c"
@@ -40,7 +42,7 @@ target:
 }
 target:
 {
-  executable: "../build/roguelike.exe"
+  executable: "../build/roguelike_platform_win32.exe"
   working_directory: "../build"
   enabled: 1
 }
@@ -52,15 +54,10 @@ type_view:
 breakpoint:
 {
   source_location: "../code/roguelike/roguelike.c:802:1"
+  hit_count: 1
+}
+breakpoint:
+{
+  source_location: "../code/roguelike/platform_win32.c:558:1"
   hit_count: 0
-}
-breakpoint:
-{
-  source_location: "../code/roguelike/roguelike.c:140:1"
-  hit_count: 1
-}
-breakpoint:
-{
-  source_location: "../code/roguelike/roguelike.c:89:1"
-  hit_count: 1
 }

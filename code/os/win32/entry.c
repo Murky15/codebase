@@ -3,7 +3,7 @@
 s32
 os_bootstrap_thread (void *params) {
   Thread_Init_Package *init = (Thread_Init_Package*)params;
-  os_select_thread_context(init->tctx);
+  os_set_thread_context(init->tctx);
   os_entry();
 
   return 0;
