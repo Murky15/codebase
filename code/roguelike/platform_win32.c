@@ -64,7 +64,7 @@
 #include <os/include.h>
 #include <file/png.h>
 
-#include "renderer_d3d11.h"
+#include "graphics.h"
 #include "dungeon.h"
 #include "roguelike.h"
 

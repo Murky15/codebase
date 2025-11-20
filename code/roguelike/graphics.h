@@ -1,5 +1,5 @@
-#ifndef RENDERER_D3D11_H
-#define RENDERER_D3D11_H
+#ifndef GRAPHICS_H
+#define GRAPHICS_H
 
 typedef struct Atlas_Coords {
   Vec2 scale;
@@ -22,4 +22,4 @@ typedef struct Texture_Atlas {
   u64 num_sprites;
 } Texture_Atlas;
 
-#endif // RENDERER_D3D11_H
+#endif // GRAPHICS_H
