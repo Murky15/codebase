@@ -15,7 +15,6 @@ window:
       0.132224: watch: selected expression: "query:types"
       0.560900:
       {
-        selected
         watch: expression: "query:threads"
         watch: selected expression: "query:breakpoints"
         watch: expression: "query:watch_pins"
@@ -42,6 +41,7 @@ window:
     }
     0.406629:
     {
+      selected
       text:
       {
         expression: "file:\"W:/code/roguelike/platform_win32.c\".data"
@@ -58,10 +58,10 @@ window:
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         auto: 1
         query: input: ""
-        cursor_line: 385
-        cursor_column: 1
-        mark_line: 385
-        mark_column: 1
+        cursor_line: 377
+        cursor_column: 18
+        mark_line: 377
+        mark_column: 18
       }
     }
     0.299002:

@@ -23,9 +23,9 @@ set game_link=-link -DLL -EXPORT:roguelike_init -EXPORT:roguelike_tick -EXPORT:r
 
 if not exist build mkdir build
 pushd build
-echo Building platform layer...
-%compile% %source%platform_win32.c %out%roguelike_platform_win32.exe %platform_link% || exit /b 1
 echo Building game dll...
 %compile% %source%roguelike.c %out%roguelike.dll %game_link% || exit /b 1
+echo Building platform layer...
+%compile% %source%platform_win32.c %out%roguelike_platform_win32.exe %platform_link% || exit /b 1
 echo Done
 popd
