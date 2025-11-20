@@ -13,6 +13,28 @@
 #include <file/png.c>
 #include "dungeon.c"
 
+typedef struct Game_State {
+  Arena *perm;
+  Arena *frame;
+  Renderer_VTable rvtbl;
+
+  Texture_Atlas sprites;
+  Sprite spr_wall_mid;
+  Sprite spr_ceil;
+  Vec4 ceil_color;
+
+  Dungeon dungeon;
+  u64 seed;
+  Mat4 proj;
+  Quat floor_rot;
+  Quat forward_wall_rot;
+
+  Entity player;
+  Camera cam;
+} Game_State;
+
+global threadvar b32 dll_is_loaded = false;
+
 function Cardinal_Dir
 to_cardinal (Vec2 dir) {
   Cardinal_Dir result = 0;
@@ -183,10 +205,11 @@ extern void*
 roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always single threaded */
   os_set_thread_context(*tctx);
   Game_State *gs = arena_pushn(init.perm, Game_State, 1);
+  srand(os_query_clock());
 
   String8 asset_path = str8_pushf(init.frame, "%.*s0x72_DungeonTilesetII_v1.7", str8_expand(init.asset_dir));
   Texture_Atlas sprites = load_textures(init.perm, asset_path);
-  init.create_and_bind_texture(sprites.raw_texture_data, true);
+  init.rvtbl.create_and_bind_texture(sprites.raw_texture_data, true);
 
   Dungeon dungeon = d_create(init.perm, sprites,
     .target_room_count = 500,
@@ -242,13 +265,18 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   gs->spr_wall_mid = spr_wall_mid;
   gs->spr_ceil = spr_ceil;
   gs->ceil_color = ceil_color;
+  gs->rvtbl = init.rvtbl;
 
   return (void*)gs;
 }
 
 extern void
 roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Package input) {
-  os_set_thread_context(*tctx);
+  if (!dll_is_loaded) {
+    dll_is_loaded = true;
+    os_set_thread_context(*tctx);
+    srand(os_query_clock());
+  }
   Game_State *gs = (Game_State*)game_state;
 
   Vec2 move_dir = {0};
@@ -284,9 +312,14 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
 }
 
 extern void
-roguelike_draw (Thread_Context *tctx, void *game_state, Renderer_VTable *r) {
-  os_set_thread_context(*tctx);
+roguelike_draw (Thread_Context *tctx, void *game_state) {
+  if (!dll_is_loaded) {
+    dll_is_loaded = true;
+    os_set_thread_context(*tctx);
+    srand(os_query_clock());
+  }
   Game_State *gs = (Game_State*)game_state;
+  Renderer_VTable *r = &gs->rvtbl;
 
   r->prep();
 
@@ -302,8 +335,8 @@ roguelike_draw (Thread_Context *tctx, void *game_state, Renderer_VTable *r) {
   player_visible_range.zw = v2add(player_visible_range.zw, v2(buff_amt_tiles*2,buff_amt_tiles*2));
   Dungeon_Tile_List visible_tile_list = d_query_range(gs->frame, gs->dungeon.map, player_visible_range, true);
 
-  Dungeon_Tile *visible_tiles;
-  Dungeon_Perimeter_Tile *perimeter;
+  Dungeon_Tile *visible_tiles = 0;
+  Dungeon_Perimeter_Tile *perimeter = 0;
   if (runner_id() == 0) {
     visible_tiles = arena_pushn(gs->frame, Dungeon_Tile, visible_tile_list.count);
     perimeter = arena_pushn(gs->frame, Dungeon_Perimeter_Tile, visible_tile_list.num_perimeter);

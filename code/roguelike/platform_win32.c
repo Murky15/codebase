@@ -53,6 +53,7 @@
 #define CINTERFACE
 #define COBJMACROS
 #include <windows.h>
+#include <shlwapi.h>
 #include <dxgi.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
@@ -65,7 +66,6 @@
 #include <file/png.h>
 
 #include "graphics.h"
-#include "dungeon.h"
 #include "roguelike.h"
 
 // NOTE: Source
@@ -479,18 +479,42 @@ r_present (b32 enable_vsync) {
   }
 }
 
+function void
+win32_update_game_dll (HMODULE *game_code, Game_VTable *game_vtable) {
+  if (PathFileExists(TEXT("roguelike_new.dll"))) {
+    if (*game_code) {
+      FreeLibrary(*game_code);
+      *game_code = NULL;
+    }
+    while (!MoveFileEx(TEXT("roguelike_new.dll"), TEXT("roguelike.dll"), MOVEFILE_REPLACE_EXISTING));
+  }
+
+  if (*game_code == NULL) {
+    *game_code = LoadLibrary(TEXT("roguelike.dll"));
+    assert (*game_code);
+
+    game_vtable->init = (roguelike_init_type)GetProcAddress(*game_code, "roguelike_init");
+    game_vtable->tick = (roguelike_tick_type)GetProcAddress(*game_code, "roguelike_tick");
+    game_vtable->draw = (roguelike_draw_type)GetProcAddress(*game_code, "roguelike_draw");
+    if (game_vtable->init == NULL) {
+      printf("Unable to load game code!\n");
+      assert(0);
+    }
+  }
+}
+
 void
 os_entry (void) {
   // NOTE: Initialization, some aspects, like dungeon creation/partitioning can potentially be parallelized if
   // they become performance problems.
-  void *gs;
-  Game_VTable *game;
-  Arena *perm;
-  Arena *frame;
+  void *gs = 0;
+  Game_VTable *game = 0;
+  HMODULE game_dll = 0;
+  Arena *perm = 0;
+  Arena *frame = 0;
   if (runner_id() == 0) {
     perm = arena_alloc();
     frame = arena_alloc();
-    srand(os_query_clock());
 
     HINSTANCE hInstance = GetModuleHandle(NULL);
     HWND hwnd = win32_create_window(hInstance);
@@ -498,31 +522,20 @@ os_entry (void) {
     f32 render_width = render_dim.width;
     f32 render_height = render_dim.height;
 
-    HMODULE game_code = LoadLibrary(TEXT("roguelike.dll"));
-    if (game_code == NULL) {
-      printf("Cannot find/open \"roguelike.dll\"\n");
-      exit(1);
-    }
-
     game = arena_pushn(perm, Game_VTable, 1);
-    game->init = (roguelike_init_type)GetProcAddress(game_code, "roguelike_init");
-    game->tick = (roguelike_tick_type)GetProcAddress(game_code, "roguelike_tick");
-    game->draw = (roguelike_draw_type)GetProcAddress(game_code, "roguelike_draw");
-    if (game->init == NULL || game->tick == NULL || game->draw == NULL) {
-      printf("Unable to load game code!\n");
-      exit(1);
-    }
+    win32_update_game_dll(&game_dll, game);
 
     gs = game->init(os_get_thread_context(),(Game_Init_Package){
       perm, frame,
       str8_lit(WIN32_ROGUELIKE_SOURCE_PATH),
       str8_lit(WIN32_ROGUELIKE_ASSET_PATH),
       render_width, render_height,
-      r_create_and_bind_texture
+      (Renderer_VTable){r_create_and_bind_texture, r_prep, r_update_transform, r_push_quad_, r_present}
       });
 
   }
   os_heat_sync_ptr(gs, 0);
+  os_heat_sync_ptr(game_dll, 0);
   os_heat_sync_ptr(game, 0);
   os_heat_sync_ptr(perm, 0);
   os_heat_sync_ptr(frame, 0);
@@ -543,6 +556,8 @@ os_entry (void) {
         DispatchMessage(&msg);
       }
 
+      win32_update_game_dll(&game_dll, game);
+
       // Update TODO: Parallelize
       now = os_query_clock();
       dt = os_get_elapsed_ms(last, now);
@@ -553,6 +568,6 @@ os_entry (void) {
     os_heat_sync();
 
     // Render
-    game->draw(os_get_thread_context(), gs, &(Renderer_VTable){r_create_and_bind_texture, r_prep, r_update_transform, r_push_quad_, r_present});
+    game->draw(os_get_thread_context(), gs);
   }
 }

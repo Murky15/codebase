@@ -407,10 +407,10 @@ d_query_range (Arena *arena, Dungeon_Map tree, Rect grid_range, b32 include_full
 
   Temp_Arena scratch = get_scratch(&arena, 1);
 
-  Dungeon_Slice **next_slice_to_check;
-  thread_shared u64 last_checked_slice_idx;
-  thread_shared u64 last_filled_slice_idx;
-  thread_shared u64 num_leaves_processed;
+  Dungeon_Slice **next_slice_to_check = 0;
+  thread_shared u64 last_checked_slice_idx = 0;
+  thread_shared u64 last_filled_slice_idx = 0;
+  thread_shared u64 num_leaves_processed = 0;
   num_leaves_processed = 0;
   last_checked_slice_idx = 0;
   last_filled_slice_idx = 1;
