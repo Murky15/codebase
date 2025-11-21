@@ -645,19 +645,6 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         floors[sprite_idx] = get_sprite(textures, str8_pushf(scratch.arena, "floor_%d", sprite_idx+1));
       }
 
-      for each_in_arrayc(tile, result.tiles, result.width * result.height) {
-        if (tile->flags) {
-          u64 val = (rand() % 100) + 1;
-          u64 sprite_idx = 0;
-          if (val <= p->percent_tiles_cracked) {
-            // TODO: Maybe I could add some way to rotate the tile to increase
-            // variation.
-            sprite_idx = (rand() % (array_count(floors)-1)) + 1;
-          }
-          tile->sprite = floors[sprite_idx];
-        }
-      }
-
       // NOTE: Step five: Determine perimeter (good enough first pass)
       // While we're at it, we can set the grid positions of all tiles.
 
@@ -665,15 +652,25 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         b32 inside_polygon = false;
         for (s64 x = 0; x < result.width; ++x) {
           Dungeon_Tile *tile = &result.tiles[y * result.width + x];
-          Dungeon_Perimeter *p = tile->perim;
+          Dungeon_Perimeter *perim = tile->perim;
           if ((tile->flags && !inside_polygon) || (tile->flags == 0 && inside_polygon)) {
-            p->offset = v2(0, 1);
-            p->lateral = false;
-            p->side = inside_polygon;
+            perim->offset = v2(0, 1);
+            perim->lateral = false;
+            perim->side = inside_polygon;
             inside_polygon = !inside_polygon;
             tile->on_perimeter++;
           }
           tile->grid_pos = v2(x - half_width, y - half_height);
+          if (tile->flags) {
+            u64 val = (rand() % 100) + 1;
+            u64 sprite_idx = 0;
+            if (val <= p->percent_tiles_cracked) {
+              // TODO: Maybe I could add some way to rotate the tile to increase
+              // variation.
+              sprite_idx = (rand() % (array_count(floors)-1)) + 1;
+            }
+            tile->sprite = floors[sprite_idx];
+          }
         }
       }
 

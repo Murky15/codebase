@@ -1,9 +1,9 @@
-// raddbg 0.9.23 project file
+// raddbg 0.9.21 project file
 
+recent_file: path: "../code/roguelike/roguelike.c"
 recent_file: path: "../code/os/win32/thread.c"
 recent_file: path: "../code/roguelike/platform_win32.c"
 recent_file: path: "../code/os/thread.c"
-recent_file: path: "../code/roguelike/roguelike.c"
 recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcstartup/src/gs/amd64/amdsecgs.asm"
 recent_file: path: "../code/base/types.c"
 recent_file: path: "../code/os/win32/entry.c"
@@ -51,4 +51,9 @@ type_view:
 {
   type: visible_tiles
   expr: array
+}
+breakpoint:
+{
+  source_location: "../code/roguelike/roguelike.c:299:1"
+  hit_count: 1
 }

@@ -1,4 +1,4 @@
-// raddbg 0.9.23 user file
+// raddbg 0.9.21 user file
 
 recent_project: path: "root.raddbg_project"
 recent_project: path: path
@@ -54,23 +54,27 @@ window:
       }
       text:
       {
+        selected
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 399
-        cursor_column: 34
-        mark_line: 399
-        mark_column: 34
+        cursor_line: 300
+        cursor_column: 1
+        mark_line: 300
+        mark_column: 1
       }
       text:
       {
-        selected
         expression: "file:\"W:/code/os/win32/thread.c\".data"
         auto: 1
-        query: input: ""
-        cursor_line: 19
+        query:
+        {
+          input: ""
+          cmd: search
+        }
+        cursor_line: 34
         cursor_column: 2
-        mark_line: 19
+        mark_line: 34
         mark_column: 2
       }
     }
@@ -80,15 +84,16 @@ window:
       {
         watch:
         {
-          selected
           expression: "query:locals"
           normal: 0.372132 0.627868 0.250000
         }
         watch:
         {
+          selected
           expression: ""
-          normal: 0.350000 0.339024 0.310976
-          watch: game_code
+          normal: 0.335916 0.353108 0.310976
+          watch: sprites
+          watch: sprite
         }
         watch: expression: "query:type_views"
       }
@@ -96,7 +101,7 @@ window:
     }
   }
   split_x
-  pos: 192 162
+  pos: 484 312
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }

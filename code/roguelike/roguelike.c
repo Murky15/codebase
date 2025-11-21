@@ -1,3 +1,42 @@
+/* TODO
+  X -> complete
+  O -> omitted
+
+  - [X] Linux cross-compile & run with wine
+  - [O] Linux multithreading
+    Here's the problem. mingw-w64 gcc uses the posix thread model instead of win32.
+    This emulates win32 threading API calls like CreateThread, EnterCriticalSection, etc.
+    But it also implements the backend for all non win32 APIs like the std thread library.
+    If we only pick one and stick with it we would be fine, easy right?
+    Nope! Thread local storage is currently implemented with __declspec(thread) on MSVC, but this is
+    *unsupported* on mingw-w64 gcc! So, we can't use gcc's __thread, because that's mixing the two APIs,
+    and I can't find a binary of mingw-w64 gcc that uses the win32 threading model to make everything uniform.
+    So the only solution now would be to rewrite all tls code to use the win32 runtime tls API. However,
+    because I have already wasted half of what should've been a very productive week on this, and because this will
+    probably take some time to build and debug, I have decided that Linux will just have to wait.
+
+  - [X] Separate game & platform
+  - [X] Hot Reloading
+  - [ ] Profiling (probably a codebase addition)
+
+  - [X] Deprecate vector construction functions in favor of compound literals
+      and also typedef all vectors to be their construction name
+      (e.g. Vec2 -> v2). This will make writing compound literals easier
+      OR BETTER YET #define v2 as a macro over (Vec2) compound lit!
+      I should also remove `pv2` and `dv3`
+  - [X] Clean up build script (https://steve-jansen.github.io/guides/windows-batch-scripting/)
+  - [X] It looks like the game is most performant with spin count = 0 for barriers?
+    Verify this. Also, what is a good spin count for Critical sections?
+
+  - [ ] Instead of a simple AABB check for determining the visible range, I should
+    instead use a point-in-polygon function to support angles rotated around y-axis.
+  - [ ] Make wall hight a property per room / hallway for more interesting visuals
+  - [ ] For inward map corners, use the actual cornered ceiling sprite to patch the hole.
+    This means that each inward corner should only be added to the list of perimeters once
+    to prevent z-flimmering.
+  - [ ] Audio
+*/
+
 #define OS_NO_ENTRY 1
 #define ENABLE_ASSERT 1
 #define DEBUG 1
@@ -12,6 +51,9 @@
 #include <os/include.c>
 #include <file/png.c>
 #include "dungeon.c"
+
+#define PLAYER_MOVE_SPEED 0.15f
+#define MAX_ENTITIES 256
 
 typedef struct Game_State {
   Arena *perm;
@@ -372,7 +414,6 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
       Vec2 scale = v2(gs->dungeon.grid_dim,gs->dungeon.grid_dim);
       r_push_quad(.pos = pos, .col = gs->ceil_color, .scale = scale, .rot = gs->floor_rot);
     } else {
-      // TODO: Can we just use backface culling for this?
       r_push_quad(.pos = pos, .sprite = sprite, .rot = gs->floor_rot);
     }
   }
