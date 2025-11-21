@@ -523,9 +523,9 @@ os_entry (void) {
       now = os_query_clock();
       dt = os_get_elapsed_ms(last, now);
       last = now;
-
-      game->tick(os_get_thread_context(), gs, dt, (Game_Input_Package){move_forward, move_back, strafe_left, strafe_right});
     }
+    os_heat_sync_ptr(dt, 0);
+    game->tick(os_get_thread_context(), gs, dt, (Game_Input_Package){move_forward, move_back, strafe_left, strafe_right});
     os_heat_sync();
 
     // Render

@@ -66,13 +66,14 @@ typedef struct Game_State {
   Vec4 ceil_color;
 
   Dungeon dungeon;
-  u64 seed;
   Mat4 proj;
   Quat floor_rot;
   Quat forward_wall_rot;
 
-  Entity player;
+  //Entity player;
   Camera cam;
+  u64 num_entities;
+  Entity entities[MAX_ENTITIES];
 } Game_State;
 
 global threadvar b32 dll_is_loaded = false;
@@ -266,7 +267,9 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     .percent_edges_included = 12,
     .percent_tiles_cracked = 5);
 
+
   Entity player = {0};
+  player.flags = ENTITY_FLAG_INPUT_SENSITIVE | ENTITY_FLAG_ANIMATE_ROTATIONS | ENTITY_FLAG_DRAWABLE;
   player.pos = v3(0,1,0);
   player.seconds_to_rotate = 0.12f;
   player.idle = get_sprite(sprites, str8_lit("doc_idle_anim"));
@@ -300,7 +303,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   gs->sprites = sprites;
   gs->dungeon = dungeon;
   gs->proj = proj;
-  gs->player = player;
+  gs->entities[gs->num_entities++] = player;
   gs->cam = cam;
   gs->floor_rot = floor_rot;
   gs->forward_wall_rot = forward_wall_rot;
@@ -317,39 +320,53 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
   if (!dll_is_loaded) {
     dll_is_loaded = true;
     os_set_thread_context(*tctx);
-    srand(os_query_clock());
+    if (runner_id() == 0) {
+      srand(os_query_clock());
+    }
   }
   Game_State *gs = (Game_State*)game_state;
 
+  // NOTE: Process received input
   Vec2 move_dir = {0};
   if (input.move_forward) move_dir.y += 1;
   if (input.strafe_left)  move_dir.x -= 1;
   if (input.move_back)    move_dir.y -= 1;
   if (input.strafe_right) move_dir.x += 1;
   if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
-  gs->cam.pos = v3add(gs->cam.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
-  gs->cam.focus = v3add(gs->cam.focus, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
-  gs->cam.visible_range.xy = v2add(gs->cam.visible_range.xy, v2muls(move_dir, dt * PLAYER_MOVE_SPEED));
 
-  gs->player.pos = v3add(gs->player.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
+  // NOTE: Update all entities
+  Rangei entity_snippet = os_heat_distribute(gs->num_entities);
+  for each_in_range (e, gs->entities, entity_snippet) {
+    /*
+    gs->cam.pos = v3add(gs->cam.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
+    gs->cam.focus = v3add(gs->cam.focus, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
+    gs->cam.visible_range.xy = v2add(gs->cam.visible_range.xy, v2muls(move_dir, dt * PLAYER_MOVE_SPEED));
+    */
 
-  gs->player.dir = to_cardinal(move_dir);
-  if (gs->player.dir & EAST) {
-    gs->player.end_angle = 0;
-  } else if (gs->player.dir & WEST) {
-    gs->player.end_angle = M_PI32;
-  }
-
-  if (!almost_equal(gs->player.rotation_angle, gs->player.end_angle)) {
-    if (!gs->player.started_rotating_at) {
-      gs->player.started_rotating_at = os_clock_seconds();
+    if (e->flags & ENTITY_FLAG_INPUT_SENSITIVE) {
+      e->pos = v3add(e->pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
     }
-    f64 current_time = os_clock_seconds();
-    f64 rot_amt = cnorm(current_time, gs->player.started_rotating_at, gs->player.started_rotating_at + gs->player.seconds_to_rotate);
-    gs->player.rotation_angle = lerp(gs->player.start_angle, gs->player.end_angle, rot_amt);
-  } else {
-    gs->player.start_angle = gs->player.end_angle;
-    gs->player.started_rotating_at = 0;
+
+    if (e->flags & ENTITY_FLAG_ANIMATE_ROTATIONS) {
+      e->dir = to_cardinal(move_dir);
+      if (e->dir & EAST) {
+        e->end_angle = 0;
+      } else if (e->dir & WEST) {
+        e->end_angle = M_PI32;
+      }
+
+      if (!almost_equal(e->rotation_angle, e->end_angle)) {
+        if (!e->started_rotating_at) {
+          e->started_rotating_at = os_clock_seconds();
+        }
+        f64 current_time = os_clock_seconds();
+        f64 rot_amt = cnorm(current_time, e->started_rotating_at, e->started_rotating_at + e->seconds_to_rotate);
+        e->rotation_angle = lerp(e->start_angle, e->end_angle, rot_amt);
+      } else {
+        e->start_angle = e->end_angle;
+        e->started_rotating_at = 0;
+      }
+    }
   }
 }
 
@@ -358,7 +375,9 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
   if (!dll_is_loaded) {
     dll_is_loaded = true;
     os_set_thread_context(*tctx);
-    srand(os_query_clock());
+    if (runner_id() == 0) {
+      srand(os_query_clock());
+    }
   }
   Game_State *gs = (Game_State*)game_state;
   Renderer_VTable *r = &gs->rvtbl;
@@ -450,8 +469,11 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
 
   os_heat_sync();
 
-  if (runner_id() == 0) {
-    draw_entity(&gs->player, r);
+  Rangei entity_snippet = os_heat_distribute(gs->num_entities);
+  for each_in_range (e, gs->entities, entity_snippet) {
+    if (e->flags & ENTITY_FLAG_DRAWABLE) {
+      draw_entity(e, r);
+    }
   }
 
   r->update_transform(VP);
