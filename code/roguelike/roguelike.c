@@ -15,6 +15,8 @@
     because I have already wasted half of what should've been a very productive week on this, and because this will
     probably take some time to build and debug, I have decided that Linux will just have to wait.
 
+  - [ ] Linux platform layer with a simple software renderer
+
   - [X] Separate game & platform
   - [X] Hot Reloading
   - [ ] Profiling (probably a codebase addition)
@@ -27,6 +29,7 @@
   - [X] Clean up build script (https://steve-jansen.github.io/guides/windows-batch-scripting/)
   - [X] It looks like the game is most performant with spin count = 0 for barriers?
     Verify this. Also, what is a good spin count for Critical sections?
+  - [ ] Vector swizzle functions: xz(Vec3) -> Vec2
 
   - [ ] Instead of a simple AABB check for determining the visible range, I should
     instead use a point-in-polygon function to support angles rotated around y-axis.
@@ -213,30 +216,63 @@ cam_calculate_visible_range (Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear)
   return (Rect){.xy=v2(min_x, bottom_left.y), .zw=v2(x_diff, y_diff)};
 }
 
+function void
+cam_set_target (Camera *cam, Entity *e) {
+  Entity_Ref ref = {e->gen, e};
+  cam->tracking = ref;
+
+  cam->offset = v3(e->idle.coords[0].scale.x/2.f);
+  cam->pos = v3(cam->offset.x, cam->zoom, -cam->zoom);
+  cam->focus = v3(cam->offset.x, e->pos.y, 0);
+  cam->follow_dist = v3sub(cam->pos,cam->focus);
+  cam->visible_range = cam_calculate_visible_range(*cam, cam->fov_h, cam->aspect_ratio, cam->znear);
+}
+
+function void
+cam_update_tracking (Camera *cam) {
+  if (cam->tracking.gen != cam->tracking.e->gen) {
+    return;
+  }
+
+  Entity *tracking = cam->tracking.e;
+  if (cam->track_mode == 0) { // Default "snap"
+    Vec3 focus_diff = v3sub(tracking->pos, cam->focus);
+    focus_diff = v3add(focus_diff, cam->offset);
+    focus_diff.y = 0;
+    cam->pos   = v3add(cam->pos, focus_diff);
+    cam->focus = v3add(cam->focus, focus_diff);
+    cam->visible_range.xy = v2add(cam->visible_range.xy, v2(focus_diff.x, focus_diff.z));
+  }
+}
 
 function void
 draw_entity (Entity *e, Renderer_VTable *r) {
   Sprite *anim = &e->run;
   Sprite *prev_anim = &e->idle;
-  if (e->dir == 0) {
-    swap(anim, prev_anim);
-  }
-  if (prev_anim->started_at || anim->started_at == 0) {
-    anim->started_at = os_clock_seconds();
-    anim->current_frame = 0;
-
-    prev_anim->started_at = 0;
-  }
-
-  f32 seconds_per_frame = anim->seconds_to_complete / anim->num_frames;
-  f32 current_step = anim->started_at + seconds_per_frame * anim->current_frame;
-  f32 now = os_clock_seconds();
-  if (now - current_step >= seconds_per_frame) {
-    anim->current_frame++;
-    if (anim->current_frame == anim->num_frames) {
-      anim->started_at += seconds_per_frame * anim->current_frame;
+  if (e->flags & ENTITY_FLAG_ANIMATE_SPRITES) {
+    if (e->dir == 0) {
+      swap(anim, prev_anim);
     }
-    anim->current_frame %= anim->num_frames;
+    if (prev_anim->started_at || anim->started_at == 0) {
+      anim->started_at = os_clock_seconds();
+      anim->current_frame = 0;
+
+      prev_anim->started_at = 0;
+    }
+
+    f32 seconds_per_frame = anim->seconds_to_complete / anim->num_frames;
+    f32 current_step = anim->started_at + seconds_per_frame * anim->current_frame;
+    f32 now = os_clock_seconds();
+    if (now - current_step >= seconds_per_frame) {
+      anim->current_frame++;
+      if (anim->current_frame == anim->num_frames) {
+        anim->started_at += seconds_per_frame * anim->current_frame;
+      }
+      anim->current_frame %= anim->num_frames;
+    }
+  } else {
+    anim = &e->idle;
+    anim->current_frame = 0;
   }
 
   Quat rot = axis_angle(v3(0,1,0), e->rotation_angle);
@@ -247,8 +283,8 @@ draw_entity (Entity *e, Renderer_VTable *r) {
 extern void*
 roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always single threaded */
   os_set_thread_context(*tctx);
-  Game_State *gs = arena_pushn(init.perm, Game_State, 1);
   srand(os_query_clock());
+  Game_State *gs = arena_pushn(init.perm, Game_State, 1);
 
   String8 asset_path = str8_pushf(init.frame, "%.*s0x72_DungeonTilesetII_v1.7", str8_expand(init.asset_dir));
   Texture_Atlas sprites = load_textures(init.perm, asset_path);
@@ -269,13 +305,14 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
 
 
   Entity player = {0};
-  player.flags = ENTITY_FLAG_INPUT_SENSITIVE | ENTITY_FLAG_ANIMATE_ROTATIONS | ENTITY_FLAG_DRAWABLE;
+  player.flags = ENTITY_FLAG_INPUT_SENSITIVE | ENTITY_FLAG_ANIMATE_SPRITES | ENTITY_FLAG_ANIMATE_ROTATIONS | ENTITY_FLAG_DRAWABLE;
   player.pos = v3(0,1,0);
   player.seconds_to_rotate = 0.12f;
   player.idle = get_sprite(sprites, str8_lit("doc_idle_anim"));
   player.idle.seconds_to_complete = 0.5f;
   player.run  = get_sprite(sprites, str8_lit("doc_run_anim"));
   player.run.seconds_to_complete = 0.5f;
+  gs->entities[gs->num_entities++] = player;
 
   f32 fov_h = M_PI32/4.f;
   f32 aspect_ratio = init.display_width/init.display_height;
@@ -284,11 +321,12 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
 
   Mat4 proj = m4perspective(fov_h, aspect_ratio, znear, zfar);
   Camera cam = {0};
-  f32 cam_zoom = 150.f;
-  cam.pos = v3(player.idle.coords[0].scale.x/2.f, cam_zoom, -cam_zoom);
-  cam.focus = v3(cam.pos.x, player.pos.y, 0);
-  cam.follow_dist = v3sub(cam.pos,cam.focus);
-  cam.visible_range = cam_calculate_visible_range(cam, fov_h, aspect_ratio, znear);
+  cam.zoom = 150.f;
+  cam.fov_h = fov_h;
+  cam.aspect_ratio = aspect_ratio;
+  cam.znear = znear;
+  cam.zfar = zfar;
+  cam_set_target(&cam, &gs->entities[0]);
 
   Quat floor_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
   Quat forward_wall_rot = axis_angle(v3(0,1,0), M_PI32/2.f);
@@ -303,7 +341,6 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   gs->sprites = sprites;
   gs->dungeon = dungeon;
   gs->proj = proj;
-  gs->entities[gs->num_entities++] = player;
   gs->cam = cam;
   gs->floor_rot = floor_rot;
   gs->forward_wall_rot = forward_wall_rot;
@@ -317,6 +354,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
 
 extern void
 roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Package input) {
+  Game_State *gs = (Game_State*)game_state;
   if (!dll_is_loaded) {
     dll_is_loaded = true;
     os_set_thread_context(*tctx);
@@ -324,7 +362,6 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       srand(os_query_clock());
     }
   }
-  Game_State *gs = (Game_State*)game_state;
 
   // NOTE: Process received input
   Vec2 move_dir = {0};
@@ -337,18 +374,12 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
   // NOTE: Update all entities
   Rangei entity_snippet = os_heat_distribute(gs->num_entities);
   for each_in_range (e, gs->entities, entity_snippet) {
-    /*
-    gs->cam.pos = v3add(gs->cam.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
-    gs->cam.focus = v3add(gs->cam.focus, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
-    gs->cam.visible_range.xy = v2add(gs->cam.visible_range.xy, v2muls(move_dir, dt * PLAYER_MOVE_SPEED));
-    */
-
     if (e->flags & ENTITY_FLAG_INPUT_SENSITIVE) {
       e->pos = v3add(e->pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
     }
 
+    e->dir = to_cardinal(move_dir);
     if (e->flags & ENTITY_FLAG_ANIMATE_ROTATIONS) {
-      e->dir = to_cardinal(move_dir);
       if (e->dir & EAST) {
         e->end_angle = 0;
       } else if (e->dir & WEST) {
@@ -368,10 +399,16 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       }
     }
   }
+
+  if (runner_id() == 0) {
+    cam_update_tracking(&gs->cam);
+  }
 }
 
 extern void
 roguelike_draw (Thread_Context *tctx, void *game_state) {
+  Game_State *gs = (Game_State*)game_state;
+  Renderer_VTable *r = &gs->rvtbl;
   if (!dll_is_loaded) {
     dll_is_loaded = true;
     os_set_thread_context(*tctx);
@@ -379,8 +416,6 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
       srand(os_query_clock());
     }
   }
-  Game_State *gs = (Game_State*)game_state;
-  Renderer_VTable *r = &gs->rvtbl;
 
   r->prep();
 
@@ -420,7 +455,7 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
   os_heat_sync_ptr(visible_tiles, 0);
   os_heat_sync_ptr(perimeter, 0);
 
-  u64 wall_height = 3;
+  u64 wall_height = 2;
   f32 ceil_height = wall_height * gs->dungeon.grid_dim;
 
   Rangei visible_snippet = os_heat_distribute(visible_tile_list.count);

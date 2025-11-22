@@ -75,26 +75,22 @@ enum {
   SOUTHWEST = SOUTH | WEST,
 };
 
-/*
-  We can have a 'tween' function type here that takes two Vector3s
-  which is then packed in the Camera struct for camera_update_tracking
-  to modify how the camera changes position
-*/
-typedef struct Camera {
-  Vec3 pos;
-  Vec3 focus;
-  Vec3 follow_dist;
-  Rect visible_range;
-} Camera;
-
 typedef u32 Entity_Flags;
 enum {
   ENTITY_FLAG_INPUT_SENSITIVE = (1 << 0),
-  ENTITY_FLAG_ANIMATE_ROTATIONS = (1 << 1),
-  ENTITY_FLAG_DRAWABLE = (1 << 2),
+  ENTITY_FLAG_ANIMATE_SPRITES = (1 << 1),
+  ENTITY_FLAG_ANIMATE_ROTATIONS = (1 << 2),
+  ENTITY_FLAG_DRAWABLE = (1 << 3),
 };
 
-typedef struct Entity {
+typedef struct Entity Entity;
+
+typedef struct Entity_Ref {
+  u64 gen;
+  Entity *e;
+} Entity_Ref;
+
+struct Entity {
   // General info
   u64 gen;
   Entity_Flags flags;
@@ -111,14 +107,42 @@ typedef struct Entity {
   // Sprites
   Sprite idle;
   Sprite run;
-} Entity;
+};
+
+/*
+  We can have a 'tween' function type here that takes two Vector3s
+  which is then packed in the Camera struct for camera_update_tracking
+  to modify how the camera changes position
+*/
+typedef f32 (*tween_func)(f32,f32,f32);
+typedef struct Camera {
+  Vec3 pos;
+  Vec3 focus;
+  Vec3 follow_dist;
+  Vec3 offset;
+  f32  zoom;
+
+  f32  fov_h;
+  f32  aspect_ratio;
+  f32  znear;
+  f32  zfar;
+  Rect visible_range;
+
+  Entity_Ref tracking;
+  tween_func track_mode;
+} Camera;
 
 function Cardinal_Dir to_cardinal(Vec2 dir);
-function Sprite* get_atlas_slot(Texture_Atlas atlas, String8 key);
-function Sprite  get_sprite(Texture_Atlas atlas, String8 key);
-function Atlas_Coords make_atlas_coords_from_string(String8 coords);
+
+function Sprite*       get_atlas_slot(Texture_Atlas atlas, String8 key);
+function Sprite        get_sprite(Texture_Atlas atlas, String8 key);
+function Atlas_Coords  make_atlas_coords_from_string(String8 coords);
 function Texture_Atlas load_textures(Arena *arena, String8 absolute_path_to_asset_dir);
+
 function Rect cam_calculate_visible_range(Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear);
+function void cam_set_target(Camera *cam, Entity *e);
+function void cam_update_tracking(Camera *cam);
+
 function void draw_entity(Entity *e, Renderer_VTable *r);
 
 #endif // ROGUELIKE_H

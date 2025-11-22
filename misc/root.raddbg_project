@@ -1,6 +1,7 @@
 // raddbg 0.9.21 project file
 
 recent_file: path: "../code/roguelike/roguelike.c"
+recent_file: path: "../code/base/memory.c"
 recent_file: path: "../code/os/win32/thread.c"
 recent_file: path: "../code/roguelike/platform_win32.c"
 recent_file: path: "../code/os/thread.c"
@@ -18,7 +19,6 @@ recent_file: path: "../code/rougelike/rougelike.c"
 recent_file: path: "../code/rougelike/dungeon.c"
 recent_file: path: "../code/rougelike/procedural_dungeon_test/test.c"
 recent_file: path: "../code/os/win32/io.c"
-recent_file: path: "../code/base/memory.c"
 recent_file: path: "../build/rougelike.exe"
 recent_file: path: path
 recent_file: path: path
@@ -51,9 +51,4 @@ type_view:
 {
   type: visible_tiles
   expr: array
-}
-breakpoint:
-{
-  source_location: "../code/roguelike/roguelike.c:299:1"
-  hit_count: 1
 }
