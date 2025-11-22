@@ -16,6 +16,7 @@
     probably take some time to build and debug, I have decided that Linux will just have to wait.
 
   - [ ] Linux platform layer with a simple software renderer
+  - [ ] Web platform layer with WebGL
 
   - [X] Separate game & platform
   - [X] Hot Reloading
@@ -29,7 +30,7 @@
   - [X] Clean up build script (https://steve-jansen.github.io/guides/windows-batch-scripting/)
   - [X] It looks like the game is most performant with spin count = 0 for barriers?
     Verify this. Also, what is a good spin count for Critical sections?
-  - [ ] Vector swizzle functions: xz(Vec3) -> Vec2
+  - [ ] Vector swizzle *macros*: xz(Vec3) -> Vec2
 
   - [ ] Instead of a simple AABB check for determining the visible range, I should
     instead use a point-in-polygon function to support angles rotated around y-axis.
@@ -217,9 +218,10 @@ cam_calculate_visible_range (Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear)
 }
 
 function void
-cam_set_target (Camera *cam, Entity *e) {
+cam_set_target (Camera *cam, Entity *e, Camera_Track_Mode track_mode) {
   Entity_Ref ref = {e->gen, e};
   cam->tracking = ref;
+  cam->track_mode = track_mode;
 
   cam->offset = v3(e->idle.coords[0].scale.x/2.f);
   cam->pos = v3(cam->offset.x, cam->zoom, -cam->zoom);
@@ -229,19 +231,26 @@ cam_set_target (Camera *cam, Entity *e) {
 }
 
 function void
-cam_update_tracking (Camera *cam) {
+cam_update_tracking (Camera *cam, f32 dt) {
   if (cam->tracking.gen != cam->tracking.e->gen) {
     return;
   }
 
   Entity *tracking = cam->tracking.e;
-  if (cam->track_mode == 0) { // Default "snap"
+
+  if (cam->track_mode == CAMERA_TRACK_MODE_FIXED) { // Default "snap"
     Vec3 focus_diff = v3sub(tracking->pos, cam->focus);
     focus_diff = v3add(focus_diff, cam->offset);
     focus_diff.y = 0;
     cam->pos   = v3add(cam->pos, focus_diff);
     cam->focus = v3add(cam->focus, focus_diff);
     cam->visible_range.xy = v2add(cam->visible_range.xy, v2(focus_diff.x, focus_diff.z));
+  } else if (cam->track_mode == CAMERA_TRACK_MODE_LERP) {
+    f32 t = clamp(0.003f * dt, 0, 1);
+    Vec2 prev_focus = v2(cam->focus.x, cam->focus.z);
+    cam->pos   = v3lerp(cam->pos, v3add(tracking->pos,v3(cam->offset.x,cam->follow_dist.y,cam->follow_dist.z)), t);
+    cam->focus = v3lerp(cam->focus, v3add(tracking->pos, v3(.x=cam->offset.x)), t);
+    cam->visible_range.xy = v2add(cam->visible_range.xy, v2sub(v2(cam->focus.x, cam->focus.z), prev_focus));
   }
 }
 
@@ -326,7 +335,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   cam.aspect_ratio = aspect_ratio;
   cam.znear = znear;
   cam.zfar = zfar;
-  cam_set_target(&cam, &gs->entities[0]);
+  cam_set_target(&cam, &gs->entities[0], CAMERA_TRACK_MODE_LERP);
 
   Quat floor_rot = axis_angle(v3(1,0,0), M_PI32/2.f);
   Quat forward_wall_rot = axis_angle(v3(0,1,0), M_PI32/2.f);
@@ -360,6 +369,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     os_set_thread_context(*tctx);
     if (runner_id() == 0) {
       srand(os_query_clock());
+      cam_set_target(&gs->cam, &gs->entities[0], CAMERA_TRACK_MODE_LERP);
     }
   }
 
@@ -401,7 +411,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
   }
 
   if (runner_id() == 0) {
-    cam_update_tracking(&gs->cam);
+    cam_update_tracking(&gs->cam, dt);
   }
 }
 

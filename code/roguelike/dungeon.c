@@ -437,6 +437,7 @@ d_query_range (Arena *arena, Dungeon_Map tree, Rect grid_range, b32 include_full
           Dungeon_Tile tile = tile_node->tile;
           Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
           if (include_full_chunk || d_rects_intersect(r0, grid_range)) {
+            assert (tile.on_perimeter <= 2);
             InterlockedAdd64(&result->num_perimeter, tile.on_perimeter);
             os_heat_begin_critical_section(); // TODO: Would this be more performant if I moved it to outside the for?
             d_tile_list_push(arena, result, tile);

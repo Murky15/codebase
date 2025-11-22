@@ -183,6 +183,9 @@ core_function Mat4 m4lookat(Vec3 viewpoint, Vec3 focus, Vec3 reference_up);
 //- @note: Some float helpers
 core_function f64 fmod_cycling(f64 x, f64 y);
 core_function f64 lerp(f64 v0, f64 v1, f64 t);
+#define v2lerp(a,b,t) v2(lerp((a).x,(b).x,(t)),lerp((a).y,(b).y,(t)))
+#define v3lerp(a,b,t) v3(lerp((a).x,(b).x,(t)),lerp((a).y,(b).y,(t)),lerp((a).z,(b).z,(t)))
+#define v4lerp(a,b,t) v4(lerp((a).x,(b).x,(t)),lerp((a).y,(b).y,(t)),lerp((a).z,(b).z,(t)),lerp((a).w,(b).w,(t)))
 core_function f64 norm(f64 x, f64 min, f64 max);
 core_function f64 cnorm(f64 x, f64 min, f64 max); // Clamped norm
 core_function b32 almost_equal(f64 a, f64 b);

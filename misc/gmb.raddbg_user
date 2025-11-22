@@ -15,8 +15,8 @@ window:
       0.132224: watch: selected expression: "query:types"
       0.560900:
       {
-        watch: selected expression: "query:threads"
-        watch: expression: "query:breakpoints"
+        watch: expression: "query:threads"
+        watch: selected expression: "query:breakpoints"
         watch: expression: "query:watch_pins"
       }
       0.056876:
@@ -39,16 +39,16 @@ window:
         watch: expression: "query:modules"
       }
     }
-    0.367172:
+    0.430022:
     {
       text:
       {
         expression: "file:\"W:/code/roguelike/platform_win32.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 489
+        cursor_line: 532
         cursor_column: 1
-        mark_line: 489
+        mark_line: 532
         mark_column: 1
       }
       text:
@@ -57,44 +57,48 @@ window:
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 224
+        cursor_line: 242
         cursor_column: 1
-        mark_line: 224
+        mark_line: 242
         mark_column: 1
       }
       text:
       {
-        expression: "file:\"W:/code/base/memory.c\".data"
+        expression: "file:\"W:/code/roguelike/dungeon.c\".data"
         auto: 1
         query:
         {
           input: ""
           cmd: search
         }
-        cursor_line: 81
+        cursor_line: 440
         cursor_column: 1
-        mark_line: 81
+        mark_line: 440
         mark_column: 1
       }
     }
-    0.338459:
+    0.275609:
     {
       0.647769:
       {
         selected
         watch:
         {
-          selected
           expression: "query:locals"
           normal: 0.372132 0.627868 0.250000
         }
         watch:
         {
+          selected
           expression: ""
           normal: 0.335916 0.353108 0.310976
-          watch: sprites
-          watch: sprite
-          watch: e
+          watch: slice
+          watch: "cam->pos"
+          watch: "cam->focus"
+          watch: "cam.follow_dist"
+          watch: "cam.visible_range"
+          watch: focus_diff
+          watch: "tracking->pos"
         }
         watch: expression: "query:type_views"
       }
