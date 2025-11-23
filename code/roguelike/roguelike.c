@@ -16,7 +16,7 @@
     probably take some time to build and debug, I have decided that Linux will just have to wait.
 
   - [ ] Linux platform layer with a simple software renderer
-  - [ ] Web platform layer with WebGL
+  - [ ] Web platform layer with WebGL (GL code can be shared with Linux)
 
   - [X] Separate game & platform
   - [X] Hot Reloading
