@@ -1,8 +1,8 @@
 // raddbg 0.9.21 project file
 
-recent_file: path: "../code/roguelike/platform_win32.c"
-recent_file: path: "../code/roguelike/roguelike.c"
 recent_file: path: "../code/roguelike/dungeon.c"
+recent_file: path: "../code/roguelike/roguelike.c"
+recent_file: path: "../code/roguelike/platform_win32.c"
 recent_file: path: "../code/base/memory.c"
 recent_file: path: "../code/os/win32/thread.c"
 recent_file: path: "../code/os/thread.c"

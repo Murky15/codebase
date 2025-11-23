@@ -89,5 +89,9 @@ ps_main (PS_Input input) : SV_TARGET {
     output_col.a = tex_col.a;
   }
 
+  if (output_col.a < 0.5) {
+    discard;
+  }
+
   return output_col;
 }

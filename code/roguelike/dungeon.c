@@ -284,8 +284,10 @@ d_point_in_rect (Vec2 p, Rect r) {
 
 function Dungeon_Tile*
 d_index_tile (Dungeon *dungeon, Vec2 index) {
-  u64 x = index.x + dungeon->width/2;
-  u64 y = index.y + dungeon->height/2;
+  s64 x = index.x + dungeon->width/2;
+  s64 y = index.y + dungeon->height/2;
+  assert (x < dungeon->width && x >= 0);
+  assert (y < dungeon->height && y >= 0);
 
   return &dungeon->tiles[y * dungeon->width + x];
 }
@@ -293,8 +295,10 @@ d_index_tile (Dungeon *dungeon, Vec2 index) {
 function Dungeon_Tile*
 d_index_tile_from_world (Dungeon *dungeon, Vec2 p) {
   p = v2muls(p, 1.f/dungeon->grid_dim);
-  u64 x = p.x + dungeon->width/2;
-  u64 y = p.y + dungeon->height/2;
+  s64 x = p.x + dungeon->width/2;
+  s64 y = p.y + dungeon->height/2;
+  assert (x < dungeon->width && x >= 0);
+  assert (y < dungeon->height && y >= 0);
 
   return &dungeon->tiles[y * dungeon->width + x];
 }
@@ -354,9 +358,9 @@ d_process_slice (Arena *arena, Dungeon_Map *tree, Dungeon *d, u64 max_tiles_per_
     arena_pop_to(arena, arena_restore_pos);
     Vec2 new_size = v2muls(bounds.zw, 0.5f);
     Rect b0 = {.xy = bounds.xy, .zw = new_size};
-    Rect b1 = {.xy = v2add(bounds.xy, v2(new_size.x,0)), .zw = new_size};
+    Rect b1 = {.xy = v2add(bounds.xy, v2(new_size.x)), .zw = new_size};
     Rect b2 = {.xy = v2add(bounds.xy, new_size), .zw = new_size};
-    Rect b3 = {.xy = v2add(bounds.xy, v2(0,new_size.y)), .zw = new_size};
+    Rect b3 = {.xy = v2add(bounds.xy, v2(.y=new_size.y)), .zw = new_size};
     slice->south_west = d_process_slice(arena, tree, d, max_tiles_per_slice, b0);
     slice->south_east = d_process_slice(arena, tree, d, max_tiles_per_slice, b1);
     slice->north_east = d_process_slice(arena, tree, d, max_tiles_per_slice, b2);
@@ -375,7 +379,7 @@ d_partition_dungeon (Arena *arena, Dungeon *d, u64 max_tiles_per_slice) {
   if (runner_id() == 0) {
     f32 half_width = d->width / 2.f;
     f32 half_height = d->height / 2.f;
-    Rect initial_bounds = {-half_width, -half_height, d->width, d->height};
+    Rect initial_bounds = {-half_width, -half_height, d->width-1, d->height-1};
     result.root = d_process_slice(arena, &result, d, max_tiles_per_slice, initial_bounds);
   }
 
@@ -649,9 +653,9 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
       // NOTE: Step five: Determine perimeter (good enough first pass)
       // While we're at it, we can set the grid positions of all tiles.
 
-      for (s64 y = 0; y < result.height; ++y) {
+      for (u64 y = 0; y < (u64)result.height; ++y) {
         b32 inside_polygon = false;
-        for (s64 x = 0; x < result.width; ++x) {
+        for (u64 x = 0; x < (u64)result.width; ++x) {
           Dungeon_Tile *tile = &result.tiles[y * result.width + x];
           Dungeon_Perimeter *perim = tile->perim;
           if ((tile->flags && !inside_polygon) || (tile->flags == 0 && inside_polygon)) {
@@ -675,9 +679,9 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         }
       }
 
-      for (s64 x = 0; x < result.width; ++x) {
+      for (u64 x = 0; x < (u64)result.width; ++x) {
         b32 inside_polygon = false;
-        for (s64 y = 0; y < result.height; ++y) {
+        for (u64 y = 0; y < (u64)result.height; ++y) {
           Dungeon_Tile *tile = &result.tiles[y * result.width + x];
           if ((tile->flags && !inside_polygon) || (tile->flags == 0 && inside_polygon)) {
             Dungeon_Perimeter *p = &tile->perim[tile->on_perimeter++];

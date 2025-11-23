@@ -12,8 +12,8 @@ window:
   {
     0.294369:
     {
-      0.132224: watch: selected expression: "query:types"
-      0.560900:
+      0.345830: watch: selected expression: "query:types"
+      0.347294:
       {
         watch: expression: "query:threads"
         watch: selected expression: "query:breakpoints"
@@ -27,7 +27,15 @@ window:
           expression: ""
           query: input: ""
         }
-        text: expression: "query:output"
+        text:
+        {
+          expression: "query:output"
+          query: input: ""
+          cursor_line: 1
+          cursor_column: 1
+          mark_line: 1
+          mark_column: 1
+        }
       }
       0.25:
       {
@@ -39,18 +47,17 @@ window:
         watch: expression: "query:modules"
       }
     }
-    0.430022:
+    0.430422:
     {
       selected
       text:
       {
-        selected
         expression: "file:\"W:/code/roguelike/platform_win32.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 423
+        cursor_line: 408
         cursor_column: 1
-        mark_line: 423
+        mark_line: 408
         mark_column: 1
       }
       text:
@@ -58,13 +65,14 @@ window:
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 250
-        cursor_column: 1
-        mark_line: 250
-        mark_column: 1
+        cursor_line: 449
+        cursor_column: 61
+        mark_line: 449
+        mark_column: 61
       }
       text:
       {
+        selected
         expression: "file:\"W:/code/roguelike/dungeon.c\".data"
         auto: 1
         query:
@@ -72,34 +80,32 @@ window:
           input: ""
           cmd: search
         }
-        cursor_line: 440
-        cursor_column: 1
-        mark_line: 440
-        mark_column: 1
+        cursor_line: 345
+        cursor_column: 41
+        mark_line: 345
+        mark_column: 41
       }
     }
-    0.275609:
+    0.275209:
     {
       0.647769:
       {
         watch:
         {
+          selected
           expression: "query:locals"
           normal: 0.372132 0.627868 0.250000
         }
         watch:
         {
-          selected
           expression: ""
           normal: 0.335916 0.353108 0.310976
+          watch: result
+          watch: next_slice_to_check
+          watch: last_checked_slice_idx
+          watch: tree
+          watch: tile
           watch: slice
-          watch: "cam->pos"
-          watch: "cam->focus"
-          watch: "cam.follow_dist"
-          watch: "cam.visible_range"
-          watch: focus_diff
-          watch: "tracking->pos"
-          watch: "cam->offset"
         }
         watch: expression: "query:type_views"
       }

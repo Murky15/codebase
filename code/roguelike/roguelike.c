@@ -30,7 +30,7 @@
   - [X] Clean up build script (https://steve-jansen.github.io/guides/windows-batch-scripting/)
   - [X] It looks like the game is most performant with spin count = 0 for barriers?
     Verify this. Also, what is a good spin count for Critical sections?
-  - [ ] Vector swizzle *macros*: xz(Vec3) -> Vec2
+  - [X] Vector swizzle *macros*: xz(Vec3) -> Vec2
 
   - [ ] Instead of a simple AABB check for determining the visible range, I should
     instead use a point-in-polygon function to support angles rotated around y-axis.
@@ -310,8 +310,8 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     .room_height_deviation = 5,
     .hallway_width = 3,
     .percent_edges_included = 12,
-    .percent_tiles_cracked = 5);
-
+    .percent_tiles_cracked = 5,
+    .max_tiles_per_map_slice = 512);
 
   Entity player = {0};
   player.flags = ENTITY_FLAG_INPUT_SENSITIVE | ENTITY_FLAG_ANIMATE_SPRITES | ENTITY_FLAG_ANIMATE_ROTATIONS | ENTITY_FLAG_DRAWABLE;
@@ -494,11 +494,11 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
     Vec2 p0 = d_grid_to_world(&gs->dungeon, tile->grid_pos);
     Quat rot;
     Quat ceil_rot;
-    Vec3 ceil_pos = v3(p0.x, ceil_height+0.002f, p0.y);
+    Vec3 ceil_pos = v3(p0.x, ceil_height+0.006f, p0.y);
     if (tile->lateral) {
       rot = qi();
       ceil_rot = rot;
-      ceil_pos.y += 0.001f;
+      ceil_pos.y += 0.005f;
       if (tile->requires_ceil_adjustment) {
         ceil_rot = axis_angle(v3(0,1,0), M_PI32);
         ceil_pos.x += gs->dungeon.grid_dim;
