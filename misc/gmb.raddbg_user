@@ -41,25 +41,26 @@ window:
     }
     0.430022:
     {
+      selected
       text:
       {
+        selected
         expression: "file:\"W:/code/roguelike/platform_win32.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 532
+        cursor_line: 423
         cursor_column: 1
-        mark_line: 532
+        mark_line: 423
         mark_column: 1
       }
       text:
       {
-        selected
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 242
+        cursor_line: 250
         cursor_column: 1
-        mark_line: 242
+        mark_line: 250
         mark_column: 1
       }
       text:
@@ -81,7 +82,6 @@ window:
     {
       0.647769:
       {
-        selected
         watch:
         {
           expression: "query:locals"
@@ -99,6 +99,7 @@ window:
           watch: "cam.visible_range"
           watch: focus_diff
           watch: "tracking->pos"
+          watch: "cam->offset"
         }
         watch: expression: "query:type_views"
       }

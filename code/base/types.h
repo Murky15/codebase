@@ -68,6 +68,7 @@ typedef union Vec2 {
   struct { f32 x, y; };
   struct { f32 width, height; };
   struct { f32 first, last; };
+
   f32 e[2];
 } Vec2;
 typedef Vec2 Range, Pair;
@@ -80,15 +81,19 @@ typedef union Vec2i {
 } Vec2i;
 typedef Vec2i Rangei, Pairi;
 
+// I finally found a feature I would add to C, cross-union initializers.
 typedef union Vec3 {
   struct { f32 x, y, z; };
-  Vec2 xy;
+  struct { Vec2 xy; f32 z1; };
+  struct { f32 x1; Vec2 yz; };
+
   f32 e[3];
 } Vec3;
 
 typedef union Vec3i {
   struct { s32 x, y, z; };
-  Vec2i xy;
+  struct { Vec2i xy; s32 z1; };
+  struct { s32 x1; Vec2i yz; };
   s32 e[2];
 } Vec3i;
 
@@ -98,7 +103,7 @@ typedef union Vec4 {
   struct { Vec3 xyz; };
 
   struct { Vec2 min, max; };
-  struct { Vec2 __p0; f32 width, height; };
+  struct { Vec2 xy1; f32 width, height; };
 
   f32 e[4];
 } Vec4;
@@ -130,6 +135,9 @@ typedef struct Quad3D {
 #define v3(...)  comp_lit(Vec3,  __VA_ARGS__)
 #define v3i(...) comp_lit(Vec3i, __VA_ARGS__)
 #define v4(...)  comp_lit(Vec4,  __VA_ARGS__)
+
+// NOTE: More swizzles
+#define xz(v) v2((v).x,(v).z)
 
 //- @note: Vectors
 core_function b32  v2exact(Vec2 a, Vec2 b);

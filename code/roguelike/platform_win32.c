@@ -38,7 +38,7 @@
 #define com_release(I) if(I) IUnknown_Release(I)
 //#define com_release(T)
 
-#define R_MAX_QUADS 4096
+#define R_MAX_QUADS 512*512
 
 typedef struct R_Vertex {
   Vec3 pos;

@@ -244,13 +244,13 @@ cam_update_tracking (Camera *cam, f32 dt) {
     focus_diff.y = 0;
     cam->pos   = v3add(cam->pos, focus_diff);
     cam->focus = v3add(cam->focus, focus_diff);
-    cam->visible_range.xy = v2add(cam->visible_range.xy, v2(focus_diff.x, focus_diff.z));
+    cam->visible_range.xy = v2add(cam->visible_range.xy, xz(focus_diff));
   } else if (cam->track_mode == CAMERA_TRACK_MODE_LERP) {
-    f32 t = clamp(0.003f * dt, 0, 1);
-    Vec2 prev_focus = v2(cam->focus.x, cam->focus.z);
-    cam->pos   = v3lerp(cam->pos, v3add(tracking->pos,v3(cam->offset.x,cam->follow_dist.y,cam->follow_dist.z)), t);
-    cam->focus = v3lerp(cam->focus, v3add(tracking->pos, v3(.x=cam->offset.x)), t);
-    cam->visible_range.xy = v2add(cam->visible_range.xy, v2sub(v2(cam->focus.x, cam->focus.z), prev_focus));
+    f32 t = clamp(0.0045f * dt, 0, 1);
+    Vec2 prev_focus = xz(cam->focus);
+    cam->pos   = v3lerp(cam->pos, v3add(tracking->pos,v3(.x1=cam->offset.x,.yz=cam->follow_dist.yz)), t);
+    cam->focus = v3lerp(cam->focus, v3add(tracking->pos, v3(cam->offset.x)), t);
+    cam->visible_range.xy = v2add(cam->visible_range.xy, v2sub(xz(cam->focus), prev_focus));
   }
 }
 
@@ -330,7 +330,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
 
   Mat4 proj = m4perspective(fov_h, aspect_ratio, znear, zfar);
   Camera cam = {0};
-  cam.zoom = 150.f;
+  cam.zoom = 200.f;
   cam.fov_h = fov_h;
   cam.aspect_ratio = aspect_ratio;
   cam.znear = znear;
@@ -369,7 +369,17 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     os_set_thread_context(*tctx);
     if (runner_id() == 0) {
       srand(os_query_clock());
-      cam_set_target(&gs->cam, &gs->entities[0], CAMERA_TRACK_MODE_LERP);
+
+      Entity enemy = {0};
+      enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES | ENTITY_FLAG_ANIMATE_ROTATIONS | ENTITY_FLAG_DRAWABLE;
+      enemy.pos = gs->entities[0].pos;
+      enemy.seconds_to_rotate = 0.12f;
+      enemy.idle = get_sprite(gs->sprites, str8_lit("skelet_idle_anim"));
+      enemy.idle.seconds_to_complete = 0.5f;
+      enemy.run = get_sprite(gs->sprites, str8_lit("skelet_run_anim"));
+      enemy.run.seconds_to_complete = 0.5f;
+      gs->entities[1] = enemy;
+      gs->num_entities = 2;
     }
   }
 
@@ -386,9 +396,9 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
   for each_in_range (e, gs->entities, entity_snippet) {
     if (e->flags & ENTITY_FLAG_INPUT_SENSITIVE) {
       e->pos = v3add(e->pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
+      e->dir = to_cardinal(move_dir);
     }
 
-    e->dir = to_cardinal(move_dir);
     if (e->flags & ENTITY_FLAG_ANIMATE_ROTATIONS) {
       if (e->dir & EAST) {
         e->end_angle = 0;
@@ -422,9 +432,6 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
   if (!dll_is_loaded) {
     dll_is_loaded = true;
     os_set_thread_context(*tctx);
-    if (runner_id() == 0) {
-      srand(os_query_clock());
-    }
   }
 
   r->prep();
@@ -520,6 +527,8 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
       draw_entity(e, r);
     }
   }
+
+  os_heat_sync();
 
   r->update_transform(VP);
   r->present(true);
