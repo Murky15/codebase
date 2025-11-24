@@ -325,6 +325,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   player.idle.seconds_to_complete = 0.5f;
   player.run  = get_sprite(sprites, str8_lit("doc_run_anim"));
   player.run.seconds_to_complete = 0.5f;
+  player.bbox = player.idle.coords[0].scale;
   gs->entities[gs->num_entities++] = player;
 
   f32 fov_h = M_PI32/4.f;
@@ -396,15 +397,45 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
   if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
 
   // NOTE: Update all entities
+
   Rangei entity_snippet = os_heat_distribute(gs->num_entities);
   for each_in_range (e, gs->entities, entity_snippet) {
+    // Get some spatial context
+    Dungeon_Tile *current_tile = d_index_tile_from_world(&gs->dungeon, xz(e->pos));
+    Dungeon_Tile *potential_overlap = d_index_tile_from_world(&gs->dungeon, v2add(xz(e->pos), v2(e->bbox.width-1)));
+
+    Dungeon_Tile *right      = d_index_tile(&gs->dungeon, v2add(current_tile->grid_pos, v2(1)));
+    Dungeon_Tile *left       = d_index_tile(&gs->dungeon, v2sub(current_tile->grid_pos, v2(1)));
+    Dungeon_Tile *up_left    = d_index_tile(&gs->dungeon, v2add(current_tile->grid_pos, v2(.y=1)));
+    Dungeon_Tile *down_left  = d_index_tile(&gs->dungeon, v2sub(current_tile->grid_pos, v2(.y=1)));
+    Dungeon_Tile *up_right   = d_index_tile(&gs->dungeon, v2add(potential_overlap->grid_pos, v2(.y=1)));
+    Dungeon_Tile *down_right = d_index_tile(&gs->dungeon, v2sub(potential_overlap->grid_pos, v2(.y=1)));
+
     if (e->flags & ENTITY_FLAG_INPUT_SENSITIVE) {
       e->pos = v3add(e->pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
       e->dir = to_cardinal(move_dir);
     }
-    
-    if (e->flags & ENTITY_FLAG_COLLISIONS) {
 
+    if (e->flags & ENTITY_FLAG_COLLISION) {
+      // NOTE: Handle wall collisions
+      if (up_left->flags == DUNGEON_TILE_EMPTY) {
+        e->pos.z = min(e->pos.z, d_grid_to_world(&gs->dungeon, up_left->grid_pos).y-1);
+      }
+      if (down_left->flags == DUNGEON_TILE_EMPTY) {
+        e->pos.z = max(e->pos.z, d_grid_to_world(&gs->dungeon, v2add(down_left->grid_pos, v2(.y=1))).y);
+      }
+      if (current_tile != potential_overlap && up_right->flags == DUNGEON_TILE_EMPTY) {
+        e->pos.z = min(e->pos.z, d_grid_to_world(&gs->dungeon, up_right->grid_pos).y-1);
+      }
+      if (current_tile != potential_overlap && down_right->flags == DUNGEON_TILE_EMPTY) {
+        e->pos.z = max(e->pos.z, d_grid_to_world(&gs->dungeon, v2add(down_right->grid_pos, v2(.y=1))).y);
+      }
+      if (left->flags == DUNGEON_TILE_EMPTY) {
+        e->pos.x = max(e->pos.x, d_grid_to_world(&gs->dungeon, v2add(left->grid_pos, v2(1))).x);
+      }
+      if (right->flags == DUNGEON_TILE_EMPTY) {
+        e->pos.x = min(e->pos.x + e->bbox.width, d_grid_to_world(&gs->dungeon, right->grid_pos).x) - e->bbox.width;
+      }
     }
 
     if (e->flags & ENTITY_FLAG_ANIMATE_ROTATIONS) {

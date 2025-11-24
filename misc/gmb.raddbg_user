@@ -80,10 +80,10 @@ window:
           input: ""
           cmd: search
         }
-        cursor_line: 348
-        cursor_column: 34
-        mark_line: 344
-        mark_column: 34
+        cursor_line: 338
+        cursor_column: 77
+        mark_line: 338
+        mark_column: 77
       }
     }
     0.275209:

@@ -145,7 +145,7 @@ struct Entity {
   Entity_Type type;
 
   Vec3 pos;
-  Rect bbox;
+  Vec2 bbox;
   Cardinal_Dir dir;
 
   // Rotation animation

@@ -80,8 +80,6 @@ typedef struct Dungeon_Tile {
   Dungeon_Room *room;
   Sprite sprite;
   Vec2 grid_pos;
-  // NOTE: To encourage better work distribution, corner tiles should be added twice,
-  // once for x, and another for y.
   u64 on_perimeter;
   Dungeon_Perimeter perim[2];
 } Dungeon_Tile;
@@ -170,6 +168,7 @@ function D_Edge_List d_prim_mst(Arena *arena, D_Edge_List bw_result, u64 num_poi
 
 // NOTE: Public API
 function Dungeon_Room*     d_push_room(Arena *arena, Dungeon *dungeon, Dungeon_Room room);
+function Dungeon_Tile*     d_index_tile(Dungeon *dungeon, Vec2 index);
 function Dungeon_Tile*     d_index_tile_from_world(Dungeon *dungeon, Vec2 p);
 function Vec2              d_grid_to_world(Dungeon *dungeon, Vec2 index);
 function Vec2              d_world_to_grid(Dungeon *dungeon, Vec2 p);
