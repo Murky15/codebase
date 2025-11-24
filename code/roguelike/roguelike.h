@@ -75,12 +75,58 @@ enum {
   SOUTHWEST = SOUTH | WEST,
 };
 
-typedef u32 Entity_Flags;
+typedef u64 Entity_Flags;
 enum {
   ENTITY_FLAG_INPUT_SENSITIVE = (1 << 0),
   ENTITY_FLAG_ANIMATE_SPRITES = (1 << 1),
   ENTITY_FLAG_ANIMATE_ROTATIONS = (1 << 2),
   ENTITY_FLAG_DRAWABLE = (1 << 3),
+};
+
+typedef u32 Entity_Class;
+enum {
+  ENTITY_CLASS_NEUTRAL = 0,
+  ENTITY_CLASS_HERO,
+  ENTITY_CLASS_MONSTER,
+  ENTITY_CLASS_MONSTER_TINY,
+  ENTITY_CLASS_MONSTER_BIG,
+
+  ENTITY_CLASS_COUNT
+};
+
+// NOTE: These can be used to index into a metatable of entity templates
+typedef u32 Entity_Type;
+enum {
+  ENTITY_TYPE_NULL = 0,
+  ENTITY_TYPE_DEMON_BIG,
+  ENTITY_TYPE_ZOMBIE_BIG,
+  ENTITY_TYPE_WIZZARD,
+  ENTITY_TYPE_IMP,
+  ENTITY_TYPE_LIZARD,
+  ENTITY_TYPE_DWARD,
+  ENTITY_TYPE_KNIGHT,
+  ENTITY_TYPE_WOGOL,
+  ENTITY_TYPE_ZOMBIE,
+  ENTITY_TYPE_ZOMBIE_TINY,
+  ENTITY_TYPE_GOBLIN,
+  ENTITY_TYPE_ICE_ZOMBIE,
+  ENTITY_TYPE_ORC_SHAMAN,
+  ENTITY_TYPE_SWAMPY,
+  ENTITY_TYPE_MUDDY,
+  ENTITY_TYPE_NECROMANCER,
+  ENTITY_TYPE_MASKED_ORC,
+  ENTITY_TYPE_ORC_WARRIOR,
+  ENTITY_TYPE_SKELET,
+  ENTITY_TYPE_OGRE,
+  ENTITY_TYPE_DOC,
+  ENTITY_TYPE_PUMPKIN_MAN,
+  ENTITY_TYPE_ANGEL, // Could this be a hero? Monsters would attack the angel, that's interesting.
+  ENTITY_TYPE_CHORT,
+  ENTITY_TYPE_ELF,
+  ENTITY_TYPE_SLUG,
+  ENTITY_TYPE_SLUG_TINY,
+
+  ENTITY_TYPE_COUNT
 };
 
 typedef struct Entity Entity;
@@ -94,10 +140,13 @@ struct Entity {
   // General info
   u64 gen;
   Entity_Flags flags;
+  Entity_Class class;
+  Entity_Type type;
+
   Vec3 pos;
+  Cardinal_Dir dir;
 
   // Rotation animation
-  Cardinal_Dir dir;
   f32 start_angle;
   f32 end_angle;
   f32 seconds_to_rotate;
@@ -111,7 +160,7 @@ struct Entity {
 
 typedef u32 Camera_Track_Mode;
 enum {
-  CAMERA_TRACK_MODE_FIXED,
+  CAMERA_TRACK_MODE_FIXED = 0,
   CAMERA_TRACK_MODE_LERP,
 
   CAMERA_TRACK_MODE_COUNT
