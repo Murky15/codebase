@@ -291,7 +291,9 @@ draw_entity (Entity *e, Renderer_VTable *r) {
 extern void*
 roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always single threaded */
   os_set_thread_context(*tctx);
-  srand(os_query_clock());
+  u64 seed = os_query_clock();
+  srand(seed);
+  printf("Seed: %llu\n", seed);
   Game_State *gs = arena_pushn(init.perm, Game_State, 1);
 
   String8 asset_path = str8_pushf(init.frame, "%.*s0x72_DungeonTilesetII_v1.7", str8_expand(init.asset_dir));
@@ -320,6 +322,10 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     | ENTITY_FLAG_COLLISION;
 
   player.pos = v3(0,1,0);
+  while (d_index_tile_from_world(&dungeon, xz(player.pos))->flags == DUNGEON_TILE_EMPTY) {
+    player.pos.x = (rand() % dungeon.width) - dungeon.width/2;
+    player.pos.z = (rand() % dungeon.height) - dungeon.height/2;
+  }
   player.seconds_to_rotate = 0.12f;
   player.idle = get_sprite(sprites, str8_lit("doc_idle_anim"));
   player.idle.seconds_to_complete = 0.5f;
