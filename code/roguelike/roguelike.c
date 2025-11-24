@@ -15,8 +15,7 @@
     because I have already wasted half of what should've been a very productive week on this, and because this will
     probably take some time to build and debug, I have decided that Linux will just have to wait.
 
-  - [ ] Linux platform layer with a simple software renderer
-  - [ ] Web platform layer with WebGL (GL code can be shared with Linux)
+  - [ ] Linux/Web platform layer (emscripten supports Xlib and EGL)
 
   - [X] Separate game & platform
   - [X] Hot Reloading
@@ -314,7 +313,12 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     .max_tiles_per_map_slice = 512);
 
   Entity player = {0};
-  player.flags = ENTITY_FLAG_INPUT_SENSITIVE | ENTITY_FLAG_ANIMATE_SPRITES | ENTITY_FLAG_ANIMATE_ROTATIONS | ENTITY_FLAG_DRAWABLE;
+  player.flags = ENTITY_FLAG_INPUT_SENSITIVE
+    | ENTITY_FLAG_ANIMATE_SPRITES
+    | ENTITY_FLAG_ANIMATE_ROTATIONS
+    | ENTITY_FLAG_DRAWABLE
+    | ENTITY_FLAG_COLLISION;
+
   player.pos = v3(0,1,0);
   player.seconds_to_rotate = 0.12f;
   player.idle = get_sprite(sprites, str8_lit("doc_idle_anim"));
@@ -397,6 +401,10 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     if (e->flags & ENTITY_FLAG_INPUT_SENSITIVE) {
       e->pos = v3add(e->pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
       e->dir = to_cardinal(move_dir);
+    }
+    
+    if (e->flags & ENTITY_FLAG_COLLISIONS) {
+
     }
 
     if (e->flags & ENTITY_FLAG_ANIMATE_ROTATIONS) {

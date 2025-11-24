@@ -81,6 +81,7 @@ enum {
   ENTITY_FLAG_ANIMATE_SPRITES = (1 << 1),
   ENTITY_FLAG_ANIMATE_ROTATIONS = (1 << 2),
   ENTITY_FLAG_DRAWABLE = (1 << 3),
+  ENTITY_FLAG_COLLISION = (1 << 4),
 };
 
 typedef u32 Entity_Class;
@@ -144,6 +145,7 @@ struct Entity {
   Entity_Type type;
 
   Vec3 pos;
+  Rect bbox;
   Cardinal_Dir dir;
 
   // Rotation animation
