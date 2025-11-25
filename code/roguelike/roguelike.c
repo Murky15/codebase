@@ -411,6 +411,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       enemy.run = get_sprite(gs->sprites, str8_lit("skelet_run_anim"));
       enemy.run.seconds_to_complete = 0.5f;
       enemy.speed = MONSTER_MOVE_SPEED;
+      enemy.bbox = enemy.idle.coords[0].scale;
       gs->entities[1] = enemy;
       gs->num_entities = 2;
     }
@@ -443,7 +444,6 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       e->pos = v3add(e->pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * e->speed));
       e->dir = to_cardinal(move_dir);
     } else {
-      // NOTE: Default monster tick
       Entity *target_hero = get_entity(e->target_hero);
       if (target_hero == 0) {
         for each_in_arrayc (it, gs->entities, (s64)gs->num_entities) {
@@ -454,11 +454,11 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           }
         }
       }
-
-      Vec2 move_dir = v2sub(xz(target_hero->pos), xz(e->pos));
-      if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
-      e->pos = v3add(e->pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * e->speed));
-      e->dir = to_cardinal(move_dir);
+      Dungeon_Tile *hero_tile = d_index_tile_from_world(&gs->dungeon, xz(target_hero->pos));
+      Dungeon_Tile_List path = d_astar_calculate_path(gs->frame, &gs->dungeon, current_tile, hero_tile);
+      for each_in_list (node, &path) {
+        // ?
+      }
     }
 
     if (e->flags & ENTITY_FLAG_COLLISION) {
@@ -541,7 +541,7 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
     u64 pidx = 0;
     for each_in_list (tile_node, &visible_tile_list) {
       u64 i = (tile_node - visible_tile_list.first);
-      Dungeon_Tile tile = tile_node->tile;
+      Dungeon_Tile tile = *tile_node->tile;
       visible_tiles[i] = tile;
 
       for (u64 p = 0; p < tile.on_perimeter; ++p) {

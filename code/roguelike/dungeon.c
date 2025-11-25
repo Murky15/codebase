@@ -299,16 +299,6 @@ d_index_tile_from_world (Dungeon *dungeon, Vec2 p) {
   return &dungeon->tiles[y * dungeon->width + x];
 }
 
-function Vec2i
-d_grid_to_array_idx (Dungeon *dungeon, Vec2 index) {
-  s64 x = index.x + dungeon->width/2;
-  s64 y = index.y + dungeon->height/2;
-  assert (x < dungeon->width && x >= 0);
-  assert (y < dungeon->height && y >= 0);
-
-  return v2i(x,y);
-}
-
 function Vec2
 d_grid_to_world (Dungeon *dungeon, Vec2 index) {
   index = v2muls(index, dungeon->grid_dim);
@@ -333,11 +323,32 @@ d_get_room_at_pos (Dungeon *dungeon, Vec2 p) {
 }
 
 function void
-d_tile_list_push (Arena *arena, Dungeon_Tile_List *list, Dungeon_Tile tile) {
+d_tile_list_push (Arena *arena, Dungeon_Tile_List *list, Dungeon_Tile *tile) {
   Dungeon_Tile_Node *node = arena_pushn(arena, Dungeon_Tile_Node, 1);
   node->tile = tile;
-  sll_queue_push(list->first, list->last, node);
+  dll_push_back(list->first, list->last, node);
   list->count++;
+}
+
+function void
+d_tile_list_push_if_unique (Arena *arena, Dungeon_Tile_List *list, Dungeon_Tile *tile) {
+  b32 unique = true;
+  for each_in_list (node, list) {
+    if (node->tile == tile) {
+      unique = false;
+      break;
+    }
+  }
+  if (unique) {
+    d_tile_list_push(arena, list, tile);
+  }
+}
+
+function void
+d_tile_list_remove (Dungeon_Tile_List *list, Dungeon_Tile_Node *n) {
+  dll_remove(list->first, list->last, n);
+  list->num_perimeter -= n->tile->on_perimeter;
+  list->count--;
 }
 
 function Dungeon_Slice*
@@ -351,7 +362,7 @@ d_process_slice (Arena *arena, Dungeon_Map *tree, Dungeon *d, u64 max_tiles_per_
     for (s64 x = bounds.x; x <= bounds.x + bounds.width; ++x) {
       Dungeon_Tile *tile = d_index_tile(d, v2(x,y));
       if (slice->tiles.count < max_tiles_per_slice) {
-        d_tile_list_push(arena, &slice->tiles, *tile);
+        d_tile_list_push(arena, &slice->tiles, tile);
       } else {
         slice->is_leaf = false;
         goto overflow;
@@ -442,11 +453,11 @@ d_query_range (Arena *arena, Dungeon_Map tree, Rect grid_range, b32 include_full
     if (slice->is_leaf) {
       if (d_rects_intersect(slice->bounds, grid_range)) {
         for each_in_list (tile_node, &slice->tiles) {
-          Dungeon_Tile tile = tile_node->tile;
-          Rect r0 = {.xy = tile.grid_pos, .zw = v2(1,1)};
+          Dungeon_Tile *tile = tile_node->tile;
+          Rect r0 = {.xy = tile->grid_pos, .zw = v2(1,1)};
           if (include_full_chunk || d_rects_intersect(r0, grid_range)) {
-            assert (tile.on_perimeter <= 2);
-            InterlockedAdd64(&result->num_perimeter, tile.on_perimeter);
+            assert (tile->on_perimeter <= 2);
+            InterlockedAdd64(&result->num_perimeter, tile->on_perimeter);
             os_heat_begin_critical_section(); // TODO: Would this be more performant if I moved it to outside the for?
             d_tile_list_push(arena, result, tile);
             os_heat_end_critical_section();
@@ -705,12 +716,16 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
 // NOTE: This could be the taxicab distance. I should experiment with this, but for right now
 // straight-line distance is fine.
 function f32
-d_astar_heuristic (Dungeon_Tile tile, Dungeon_Tile goal) {
-  return v2dist(goal.grid_pos, tile.grid_pos);
+d_astar_heuristic (Dungeon_Tile *tile, Dungeon_Tile *goal) {
+  return v2dist(goal->grid_pos, tile->grid_pos);
 }
 
 function Dungeon_Tile_List
-d_astar_calculate_path (Arena *arena, Dungeon *d, Dungeon_Tile start, Dungeon_Tile end) {
+d_astar_calculate_path (Arena *arena, Dungeon *d, Dungeon_Tile *start, Dungeon_Tile *end) {
+  #define gscore(t) astar_map[((s64)(t)->grid_pos.y+d->height/2)*d->width+((s64)(t)->grid_pos.x+d->width/2)].gscore
+  #define fscore(t) astar_map[((s64)(t)->grid_pos.y+d->height/2)*d->width+((s64)(t)->grid_pos.x+d->width/2)].fscore
+  #define came_from(t) astar_map[((s64)(t)->grid_pos.y+d->height/2)*d->width+((s64)(t)->grid_pos.x+d->width/2)].came_from
+
   Dungeon_Tile_List result = {0};
 
   Temp_Arena scratch;
@@ -720,21 +735,72 @@ d_astar_calculate_path (Arena *arena, Dungeon *d, Dungeon_Tile start, Dungeon_Ti
     for each_in_arrayc (tile, astar_map, (s64)map_size) {
       tile->gscore = INFINITY;
       tile->fscore = INFINITY;
+      tile->came_from = 0;
     }
 
     Dungeon_Tile_List frontier = {0};
     d_tile_list_push(scratch.arena, &frontier, start);
-    Vec2i map_idx = d_grid_to_array_idx(d, start.grid_pos);
-    astar_map[map_idx.y * d->width + map_idx.x].gscore = 0;
-    astar_map[map_idx.y * d->width + map_idx.x].fscore = d_astar_heuristic(start, end);
+    gscore(start) = 0;
+    fscore(start) = d_astar_heuristic(start, end);
+    came_from(end) = start;
 
+    b32 completed_path = false;
     while (frontier.count > 0) {
       f32 lowest_fscore = INFINITY;
-      
-      for each_in_list (current_node, &frontier) {
-        Dungeon_Tile tile = current_node->tile;
+      Dungeon_Tile_Node *current_node = 0;
+      Dungeon_Tile *current = 0;
+      for each_in_list (node, &frontier) {
+        Dungeon_Tile *tile = node->tile;
+        if (fscore(tile) < lowest_fscore) {
+          lowest_fscore = fscore(tile);
+          current_node = node;
+          current = tile;
+        }
+      }
 
+      if (current == end) {
+        completed_path = true;
+        break;
+      }
+      d_tile_list_remove(&frontier, current_node);
+
+      Dungeon_Tile *neighbors[] = {
+        // Right, Left, Up, Down
+        d_index_tile(d, v2add(current->grid_pos, v2(1))),
+        d_index_tile(d, v2sub(current->grid_pos, v2(1))),
+        d_index_tile(d, v2add(current->grid_pos, v2(.y=1))),
+        d_index_tile(d, v2sub(current->grid_pos, v2(.y=1))),
+      };
+      for each_in_array (neighbor, neighbors) {
+        if ((*neighbor)->flags) {
+          f32 new_gscore = gscore(current) + d_astar_heuristic(current, *neighbor);
+          if (new_gscore < gscore(*neighbor)) {
+            //d_tile_list_push_if_unique(arena, &result, current);
+            came_from(*neighbor) = current;
+            gscore(*neighbor) = new_gscore;
+            fscore(*neighbor) = new_gscore + d_astar_heuristic(*neighbor, end);
+            d_tile_list_push_if_unique(scratch.arena, &frontier, *neighbor);
+          }
+        }
+      }
+    }
+
+    if (completed_path) {
+      assert (came_from(end) != 0);
+      Dungeon_Tile *current = end;
+      while (true) {
+        d_tile_list_push(arena, &result, current);
+        if (current == start) {
+          break;
+        }
+        current = came_from(current);
       }
     }
   }
+
+  return result;
+
+  #undef gscore
+  #undef fscore
+  #undef came_from
 }

@@ -47,9 +47,8 @@ window:
         watch: expression: "query:modules"
       }
     }
-    0.430422:
+    0.397996:
     {
-      selected
       text:
       {
         expression: "file:\"W:/code/roguelike/platform_win32.c\".data"
@@ -62,50 +61,47 @@ window:
       }
       text:
       {
-        selected
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 457
-        cursor_column: 61
-        mark_line: 457
-        mark_column: 61
+        cursor_line: 432
+        cursor_column: 32
+        mark_line: 432
+        mark_column: 32
       }
       text:
       {
+        selected
         expression: "file:\"W:/code/roguelike/dungeon.c\".data"
-        auto: 1
-        query:
-        {
-          input: ""
-          cmd: search
-        }
-        cursor_line: 300
+        project: "W:/misc/root.raddbg_project"
+        query: input: ""
+        cursor_line: 792
         cursor_column: 1
-        mark_line: 300
+        mark_line: 792
         mark_column: 1
       }
     }
-    0.275209:
+    0.307635:
     {
       0.647769:
       {
+        selected
         watch:
         {
-          selected
           expression: "query:locals"
           normal: 0.372132 0.627868 0.250000
         }
         watch:
         {
+          selected
           expression: ""
           normal: 0.335916 0.353108 0.310976
-          watch: result
-          watch: next_slice_to_check
-          watch: last_checked_slice_idx
-          watch: tree
-          watch: tile
-          watch: slice
+          watch: new_gscore
+          watch: lowest_fscore
+          watch: frontier
+          watch: "astar_map[((s64)(start)->grid_pos.y+d->height/2) * d->width + ((s64)(start)->grid_pos.x+d->width/2)].came_from"
+          watch: start
+          watch: current
         }
         watch: expression: "query:type_views"
       }

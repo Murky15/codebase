@@ -55,11 +55,6 @@ struct D_Vertex {
   D_Vertex_Neighborhood neighbors;
 };
 
-typedef struct AStar_Tile {
-  f32 gscore;
-  f32 fscore;
-} AStar_Tile;
-
 typedef struct Dungeon_Room {
   struct Dungeon_Room *next;
 
@@ -98,7 +93,7 @@ typedef struct Dungeon_Perimeter_Tile {
 
 typedef struct Dungeon_Tile_Node {
   struct Dungeon_Tile_Node *next, *prev;
-  Dungeon_Tile tile;
+  Dungeon_Tile *tile;
 } Dungeon_Tile_Node;
 
 typedef struct Dungeon_Tile_List {
@@ -131,6 +126,12 @@ typedef struct Dungeon_Map {
   u64 num_leaves;
 } Dungeon_Map;
 
+typedef struct AStar_Tile {
+  f32 gscore;
+  f32 fscore;
+  Dungeon_Tile *came_from;
+} AStar_Tile;
+
 typedef struct Dungeon {
   Dungeon_Tile *tiles;
   s64 width, height;
@@ -143,42 +144,44 @@ typedef struct Dungeon {
 } Dungeon;
 
 // NOTE: Helpers
-function u64 d_v2hash(Vec2 v);
-function b32 d_rects_intersect_expanded(Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1);
-function b32 d_rects_intersect(Rect r0, Rect r1);
-function b32 d_point_in_rect(Vec2 p, Rect r);
-function f64 d_gaussian_next(f64 mu, f64 sigma);
+function u64               d_v2hash(Vec2 v);
+function b32               d_rects_intersect_expanded(Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1);
+function b32               d_rects_intersect(Rect r0, Rect r1);
+function b32               d_point_in_rect(Vec2 p, Rect r);
+function f64               d_gaussian_next(f64 mu, f64 sigma);
 
 // NOTE: Edge Manipulation
-function b32  d_edges_are_equal(D_Edge a, D_Edge b);
-function void d_push_edge(Arena *arena, D_Edge_List *edges, D_Edge e);
-function void d_push_edge_if_unique(Arena *arena, D_Edge_List *edges, D_Edge e);
-function void d_polygon_push_triangle_edges(Arena *arena, D_Edge_List *p, D_Triangle triangle);
+function b32               d_edges_are_equal(D_Edge a, D_Edge b);
+function void              d_push_edge(Arena *arena, D_Edge_List *edges, D_Edge e);
+function void              d_push_edge_if_unique(Arena *arena, D_Edge_List *edges, D_Edge e);
+function void              d_polygon_push_triangle_edges(Arena *arena, D_Edge_List *p, D_Triangle triangle);
 
 // NOTE: D_Triangle Manipulation
-function D_Triangle d_make_triangle(Vec2 p0, Vec2 p1, Vec2 p2);
-function void       d_mesh_push_triangle(Arena *arena, D_Triangle_Mesh *mesh, D_Triangle triangle);
-function b32        d_shared_vertex(D_Triangle a, D_Triangle b);
+function D_Triangle        d_make_triangle(Vec2 p0, Vec2 p1, Vec2 p2);
+function void              d_mesh_push_triangle(Arena *arena, D_Triangle_Mesh *mesh, D_Triangle triangle);
+function b32               d_shared_vertex(D_Triangle a, D_Triangle b);
 
 // NOTE: D_Vertex Manipulation
-function D_Vertex* d_get_vertex(D_Vertex *vertices, u64 num_vertices, Vec2 v);
-function void      d_push_vertex_if_unique(Arena *arena, D_Vertex_Neighborhood *n, D_Vertex *v);
+function D_Vertex*         d_get_vertex(D_Vertex *vertices, u64 num_vertices, Vec2 v);
+function void              d_push_vertex_if_unique(Arena *arena, D_Vertex_Neighborhood *n, D_Vertex *v);
 
-// NOTE: Spacial Algorithms
-function D_Edge_List d_bowyer_watson_triangulate(Arena *arena, Vec2 *points, u64 num_points, D_Triangle super);
+// NOTE: Spatial Algorithms
+function D_Edge_List       d_bowyer_watson_triangulate(Arena *arena, Vec2 *points, u64 num_points, D_Triangle super);
 // TODO: We could use taxicab distance instead of euclidean for edge weights, it might make the
 // hallway generation smarter because diagonal lines will generate L paths.
-function D_Edge_List d_prim_mst(Arena *arena, D_Edge_List bw_result, u64 num_points);
+function D_Edge_List       d_prim_mst(Arena *arena, D_Edge_List bw_result, u64 num_points);
+function f32               d_astar_heuristic(Dungeon_Tile *tile, Dungeon_Tile *goal);
+function Dungeon_Tile_List d_astar_calculate_path(Arena *arena, Dungeon *d, Dungeon_Tile *start, Dungeon_Tile *end);
 
-// NOTE: Public API
+// NOTE: General
 function Dungeon_Room*     d_push_room(Arena *arena, Dungeon *dungeon, Dungeon_Room room);
 function Dungeon_Tile*     d_index_tile(Dungeon *dungeon, Vec2 index);
 function Dungeon_Tile*     d_index_tile_from_world(Dungeon *dungeon, Vec2 p);
-function Vec2i             d_grid_to_array_idx(Dungeon *dungeon, Vec2 index);
 function Vec2              d_grid_to_world(Dungeon *dungeon, Vec2 index);
 function Vec2              d_world_to_grid(Dungeon *dungeon, Vec2 p);
 function Dungeon_Room*     d_get_room_at_pos(Dungeon *dungeon, Vec2 p);
-function void              d_tile_list_push(Arena *arena, Dungeon_Tile_List *list, Dungeon_Tile tile);
+function void              d_tile_list_push(Arena *arena, Dungeon_Tile_List *list, Dungeon_Tile *tile);
+function void              d_tile_list_remove(Dungeon_Tile_List *list, Dungeon_Tile_Node *n);
 
 function Dungeon_Slice*    d_process_slice(Arena *arena, Dungeon_Map *tree, Dungeon *d, u64 max_tiles_per_slice, Rect bounds);
 function Dungeon_Map       d_partition_dungeon(Arena *arena, Dungeon *d, u64 max_tiles_per_slice);
