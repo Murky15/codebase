@@ -56,6 +56,7 @@
 #include "dungeon.c"
 
 #define PLAYER_MOVE_SPEED 0.15f
+#define MONSTER_MOVE_SPEED PLAYER_MOVE_SPEED/2
 #define MAX_ENTITIES 256
 
 typedef struct Game_State {
@@ -315,6 +316,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     .max_tiles_per_map_slice = 512);
 
   Entity player = {0};
+  player.class = ENTITY_CLASS_HERO;
   player.flags = ENTITY_FLAG_INPUT_SENSITIVE
     | ENTITY_FLAG_ANIMATE_SPRITES
     | ENTITY_FLAG_ANIMATE_ROTATIONS
@@ -332,6 +334,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   player.run  = get_sprite(sprites, str8_lit("doc_run_anim"));
   player.run.seconds_to_complete = 0.5f;
   player.bbox = player.idle.coords[0].scale;
+  player.speed = PLAYER_MOVE_SPEED;
   gs->entities[gs->num_entities++] = player;
 
   f32 fov_h = M_PI32/4.f;
@@ -372,6 +375,21 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   return (void*)gs;
 }
 
+function Entity_Ref
+create_entity_reference (Entity *e) {
+  return (Entity_Ref){e->gen, e};
+}
+
+function Entity*
+get_entity (Entity_Ref ref) {
+  Entity *result = 0;
+  if (ref.e && ref.e->gen == ref.gen) {
+    result = ref.e;
+  }
+
+  return result;
+}
+
 extern void
 roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Package input) {
   Game_State *gs = (Game_State*)game_state;
@@ -382,13 +400,17 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       srand(os_query_clock());
 
       Entity enemy = {0};
-      enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES | ENTITY_FLAG_ANIMATE_ROTATIONS | ENTITY_FLAG_DRAWABLE;
+      enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES
+        | ENTITY_FLAG_ANIMATE_ROTATIONS
+        | ENTITY_FLAG_DRAWABLE
+        | ENTITY_FLAG_COLLISION;
       enemy.pos = gs->entities[0].pos;
       enemy.seconds_to_rotate = 0.12f;
       enemy.idle = get_sprite(gs->sprites, str8_lit("skelet_idle_anim"));
       enemy.idle.seconds_to_complete = 0.5f;
       enemy.run = get_sprite(gs->sprites, str8_lit("skelet_run_anim"));
       enemy.run.seconds_to_complete = 0.5f;
+      enemy.speed = MONSTER_MOVE_SPEED;
       gs->entities[1] = enemy;
       gs->num_entities = 2;
     }
@@ -418,7 +440,24 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     Dungeon_Tile *down_right = d_index_tile(&gs->dungeon, v2sub(potential_overlap->grid_pos, v2(.y=1)));
 
     if (e->flags & ENTITY_FLAG_INPUT_SENSITIVE) {
-      e->pos = v3add(e->pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
+      e->pos = v3add(e->pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * e->speed));
+      e->dir = to_cardinal(move_dir);
+    } else {
+      // NOTE: Default monster tick
+      Entity *target_hero = get_entity(e->target_hero);
+      if (target_hero == 0) {
+        for each_in_arrayc (it, gs->entities, (s64)gs->num_entities) {
+          if (it->class == ENTITY_CLASS_HERO) {
+            e->target_hero = create_entity_reference(it);
+            target_hero = it;
+            break;
+          }
+        }
+      }
+
+      Vec2 move_dir = v2sub(xz(target_hero->pos), xz(e->pos));
+      if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
+      e->pos = v3add(e->pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * e->speed));
       e->dir = to_cardinal(move_dir);
     }
 

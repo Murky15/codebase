@@ -55,6 +55,11 @@ struct D_Vertex {
   D_Vertex_Neighborhood neighbors;
 };
 
+typedef struct AStar_Tile {
+  f32 gscore;
+  f32 fscore;
+} AStar_Tile;
+
 typedef struct Dungeon_Room {
   struct Dungeon_Room *next;
 
@@ -92,7 +97,7 @@ typedef struct Dungeon_Perimeter_Tile {
 } Dungeon_Perimeter_Tile;
 
 typedef struct Dungeon_Tile_Node {
-  struct Dungeon_Tile_Node *next;
+  struct Dungeon_Tile_Node *next, *prev;
   Dungeon_Tile tile;
 } Dungeon_Tile_Node;
 
@@ -137,7 +142,6 @@ typedef struct Dungeon {
   Dungeon_Map map;
 } Dungeon;
 
-
 // NOTE: Helpers
 function u64 d_v2hash(Vec2 v);
 function b32 d_rects_intersect_expanded(Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1);
@@ -170,9 +174,11 @@ function D_Edge_List d_prim_mst(Arena *arena, D_Edge_List bw_result, u64 num_poi
 function Dungeon_Room*     d_push_room(Arena *arena, Dungeon *dungeon, Dungeon_Room room);
 function Dungeon_Tile*     d_index_tile(Dungeon *dungeon, Vec2 index);
 function Dungeon_Tile*     d_index_tile_from_world(Dungeon *dungeon, Vec2 p);
+function Vec2i             d_grid_to_array_idx(Dungeon *dungeon, Vec2 index);
 function Vec2              d_grid_to_world(Dungeon *dungeon, Vec2 index);
 function Vec2              d_world_to_grid(Dungeon *dungeon, Vec2 p);
 function Dungeon_Room*     d_get_room_at_pos(Dungeon *dungeon, Vec2 p);
+function void              d_tile_list_push(Arena *arena, Dungeon_Tile_List *list, Dungeon_Tile tile);
 
 function Dungeon_Slice*    d_process_slice(Arena *arena, Dungeon_Map *tree, Dungeon *d, u64 max_tiles_per_slice, Rect bounds);
 function Dungeon_Map       d_partition_dungeon(Arena *arena, Dungeon *d, u64 max_tiles_per_slice);

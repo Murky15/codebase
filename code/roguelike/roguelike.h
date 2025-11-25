@@ -138,15 +138,17 @@ typedef struct Entity_Ref {
 } Entity_Ref;
 
 struct Entity {
-  // General info
+  // Header
   u64 gen;
   Entity_Flags flags;
   Entity_Class class;
   Entity_Type type;
 
+  // Position / Orientation
   Vec3 pos;
   Vec2 bbox;
   Cardinal_Dir dir;
+  f32 speed;
 
   // Rotation animation
   f32 start_angle;
@@ -158,6 +160,9 @@ struct Entity {
   // Sprites
   Sprite idle;
   Sprite run;
+
+  // For Monsters
+  Entity_Ref target_hero;
 };
 
 typedef u32 Camera_Track_Mode;
