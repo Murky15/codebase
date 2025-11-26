@@ -1,4 +1,4 @@
-// raddbg 0.9.21 user file
+// raddbg 0.9.23 user file
 
 recent_project: path: "root.raddbg_project"
 recent_project: path: path
@@ -76,9 +76,9 @@ window:
         expression: "file:\"W:/code/roguelike/dungeon.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 737
+        cursor_line: 754
         cursor_column: 1
-        mark_line: 737
+        mark_line: 754
         mark_column: 1
       }
     }
@@ -109,7 +109,7 @@ window:
     }
   }
   split_x
-  pos: 484 312
+  pos: 192 162
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }

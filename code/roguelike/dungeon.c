@@ -679,14 +679,23 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
       b32 inside_polygon = false;
       for (u64 x = 0; x < (u64)result.width; ++x) {
         Dungeon_Tile *tile = &result.tiles[y * result.width + x];
-        Dungeon_Perimeter *perim = tile->perim;
-        if ((tile->flags && !inside_polygon) || (tile->flags == 0 && inside_polygon)) {
-          perim->offset = v2(0, 1);
+        Dungeon_Tile *prev_tile = &result.tiles[y * result.width + (x-1)];
+        Dungeon_Perimeter *perim = 0;
+        if (tile->flags && !inside_polygon) {
+          perim = tile->perim;
+          tile->on_perimeter++;
+          perim->offset = v2(0,1);
+        } else if (tile->flags == 0 && inside_polygon) {
+          perim = prev_tile->perim;
+          prev_tile->on_perimeter++;
+          perim->offset = v2(1,1);
+        }
+        if (perim) {
           perim->lateral = false;
           perim->side = inside_polygon;
           inside_polygon = !inside_polygon;
-          tile->on_perimeter++;
         }
+
         tile->grid_pos = v2(x - half_width, y - half_height);
         if (tile->flags) {
           u64 val = (rand() % 100) + 1;
@@ -705,10 +714,18 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
       b32 inside_polygon = false;
       for (u64 y = 0; y < (u64)result.height; ++y) {
         Dungeon_Tile *tile = &result.tiles[y * result.width + x];
-        if ((tile->flags && !inside_polygon) || (tile->flags == 0 && inside_polygon)) {
-          Dungeon_Perimeter *p = &tile->perim[tile->on_perimeter++];
-          p->lateral = true;
-          p->side = inside_polygon;
+        Dungeon_Tile *prev_tile = &result.tiles[(y-1) * result.width + x];
+        Dungeon_Perimeter *perim = 0;
+        if (tile->flags && !inside_polygon) {
+          perim = &tile->perim[tile->on_perimeter++];
+
+        } else if (tile->flags == 0 && inside_polygon) {
+          perim = &prev_tile->perim[prev_tile->on_perimeter++];
+          perim->offset = v2(.y=1);
+        }
+        if (perim) {
+          perim->lateral = true;
+          perim->side = inside_polygon;
           inside_polygon = !inside_polygon;
         }
       }
@@ -725,7 +742,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
 // straight-line distance is fine.
 function f32
 d_astar_heuristic (Dungeon_Tile *tile, Dungeon_Tile *goal) {
-  return v2dist(goal->grid_pos, tile->grid_pos) + (!!tile->on_perimeter * 100);
+  return v2dist(goal->grid_pos, tile->grid_pos) + (!!tile->on_perimeter);
 }
 
 function Dungeon_Tile_List
@@ -780,12 +797,18 @@ d_astar_calculate_path (Arena *arena, Dungeon *d, Dungeon_Tile *start, Dungeon_T
         d_index_tile(d, v2sub(current->grid_pos, v2(1))),
         d_index_tile(d, v2add(current->grid_pos, v2(.y=1))),
         d_index_tile(d, v2sub(current->grid_pos, v2(.y=1))),
+
+        // Bottom Left, Bottom Right, Top Right, Top Left
+        // NOTE: These should be conditionally included
+        d_index_tile(d, v2add(current->grid_pos, v2(-1,-1))),
+        d_index_tile(d, v2add(current->grid_pos, v2(1,-1))),
+        d_index_tile(d, v2add(current->grid_pos, v2(1,1))),
+        d_index_tile(d, v2add(current->grid_pos, v2(-1,1))),
       };
       for each_in_array (neighbor, neighbors) {
         if ((*neighbor)->flags) {
           f32 new_gscore = gscore(current) + d_astar_heuristic(current, *neighbor);
           if (new_gscore < gscore(*neighbor)) {
-            //d_tile_list_push_if_unique(arena, &result, current);
             came_from(*neighbor) = current;
             gscore(*neighbor) = new_gscore;
             fscore(*neighbor) = new_gscore + d_astar_heuristic(*neighbor, end);
