@@ -27,6 +27,7 @@
 #include <file/png.h>
 
 #include "graphics.h"
+#include "dungeon.h"
 #include "roguelike.h"
 
 // NOTE: Source

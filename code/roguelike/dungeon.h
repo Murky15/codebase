@@ -181,6 +181,7 @@ function Vec2              d_grid_to_world(Dungeon *dungeon, Vec2 index);
 function Vec2              d_world_to_grid(Dungeon *dungeon, Vec2 p);
 function Dungeon_Room*     d_get_room_at_pos(Dungeon *dungeon, Vec2 p);
 function void              d_tile_list_push(Arena *arena, Dungeon_Tile_List *list, Dungeon_Tile *tile);
+function void              d_tile_list_push_front(Arena *arena, Dungeon_Tile_List *list, Dungeon_Tile *tile);
 function void              d_tile_list_remove(Dungeon_Tile_List *list, Dungeon_Tile_Node *n);
 
 function Dungeon_Slice*    d_process_slice(Arena *arena, Dungeon_Map *tree, Dungeon *d, u64 max_tiles_per_slice, Rect bounds);

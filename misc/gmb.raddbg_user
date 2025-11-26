@@ -49,6 +49,7 @@ window:
     }
     0.397996:
     {
+      selected
       text:
       {
         expression: "file:\"W:/code/roguelike/platform_win32.c\".data"
@@ -64,10 +65,10 @@ window:
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 432
-        cursor_column: 32
-        mark_line: 432
-        mark_column: 32
+        cursor_line: 473
+        cursor_column: 1
+        mark_line: 473
+        mark_column: 1
       }
       text:
       {
@@ -75,9 +76,9 @@ window:
         expression: "file:\"W:/code/roguelike/dungeon.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 792
+        cursor_line: 737
         cursor_column: 1
-        mark_line: 792
+        mark_line: 737
         mark_column: 1
       }
     }
@@ -85,7 +86,6 @@ window:
     {
       0.647769:
       {
-        selected
         watch:
         {
           expression: "query:locals"

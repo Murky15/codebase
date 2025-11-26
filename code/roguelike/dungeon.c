@@ -331,6 +331,14 @@ d_tile_list_push (Arena *arena, Dungeon_Tile_List *list, Dungeon_Tile *tile) {
 }
 
 function void
+d_tile_list_push_front (Arena *arena, Dungeon_Tile_List *list, Dungeon_Tile *tile) {
+  Dungeon_Tile_Node *node = arena_pushn(arena, Dungeon_Tile_Node, 1);
+  node->tile = tile;
+  dll_push_front(list->first, list->last, node);
+  list->count++;
+}
+
+function void
 d_tile_list_push_if_unique (Arena *arena, Dungeon_Tile_List *list, Dungeon_Tile *tile) {
   b32 unique = true;
   for each_in_list (node, list) {
@@ -717,7 +725,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
 // straight-line distance is fine.
 function f32
 d_astar_heuristic (Dungeon_Tile *tile, Dungeon_Tile *goal) {
-  return v2dist(goal->grid_pos, tile->grid_pos);
+  return v2dist(goal->grid_pos, tile->grid_pos) + (!!tile->on_perimeter * 100);
 }
 
 function Dungeon_Tile_List
@@ -725,6 +733,8 @@ d_astar_calculate_path (Arena *arena, Dungeon *d, Dungeon_Tile *start, Dungeon_T
   #define gscore(t) astar_map[((s64)(t)->grid_pos.y+d->height/2)*d->width+((s64)(t)->grid_pos.x+d->width/2)].gscore
   #define fscore(t) astar_map[((s64)(t)->grid_pos.y+d->height/2)*d->width+((s64)(t)->grid_pos.x+d->width/2)].fscore
   #define came_from(t) astar_map[((s64)(t)->grid_pos.y+d->height/2)*d->width+((s64)(t)->grid_pos.x+d->width/2)].came_from
+
+  assert (start->flags && end->flags);
 
   Dungeon_Tile_List result = {0};
 
@@ -789,7 +799,7 @@ d_astar_calculate_path (Arena *arena, Dungeon *d, Dungeon_Tile *start, Dungeon_T
       assert (came_from(end) != 0);
       Dungeon_Tile *current = end;
       while (true) {
-        d_tile_list_push(arena, &result, current);
+        d_tile_list_push_front(arena, &result, current);
         if (current == start) {
           break;
         }

@@ -56,7 +56,7 @@
 #include "dungeon.c"
 
 #define PLAYER_MOVE_SPEED 0.15f
-#define MONSTER_MOVE_SPEED PLAYER_MOVE_SPEED/2
+#define MONSTER_MOVE_SPEED PLAYER_MOVE_SPEED/1.3f
 #define MAX_ENTITIES 256
 
 typedef struct Game_State {
@@ -431,7 +431,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
   for each_in_range (e, gs->entities, entity_snippet) {
     // Get some spatial context
     Dungeon_Tile *current_tile = d_index_tile_from_world(&gs->dungeon, xz(e->pos));
-    Dungeon_Tile *potential_overlap = d_index_tile_from_world(&gs->dungeon, v2add(xz(e->pos), v2(e->bbox.width-1)));
+    Dungeon_Tile *potential_overlap = d_index_tile_from_world(&gs->dungeon, v2add(xz(e->pos), v2(e->bbox.width-1,1)));
 
     Dungeon_Tile *right      = d_index_tile(&gs->dungeon, v2add(current_tile->grid_pos, v2(1)));
     Dungeon_Tile *left       = d_index_tile(&gs->dungeon, v2sub(current_tile->grid_pos, v2(1)));
@@ -444,6 +444,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       e->pos = v3add(e->pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * e->speed));
       e->dir = to_cardinal(move_dir);
     } else {
+      // NOTE: Find Hero
       Entity *target_hero = get_entity(e->target_hero);
       if (target_hero == 0) {
         for each_in_arrayc (it, gs->entities, (s64)gs->num_entities) {
@@ -455,10 +456,20 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
         }
       }
       Dungeon_Tile *hero_tile = d_index_tile_from_world(&gs->dungeon, xz(target_hero->pos));
-      Dungeon_Tile_List path = d_astar_calculate_path(gs->frame, &gs->dungeon, current_tile, hero_tile);
-      for each_in_list (node, &path) {
-        // ?
+      Dungeon_Tile_List path_to_hero = d_astar_calculate_path(gs->frame, &gs->dungeon, current_tile, hero_tile);
+      if (e->path_end == 0 || e->path_end != hero_tile) {
+        e->path_start = current_tile;
+        e->path_end = hero_tile;
+        e->path_pos = path_to_hero.first;
       }
+      if ((current_tile == e->path_pos->tile || potential_overlap == e->path_pos->tile) && e->path_pos->next) {
+        e->path_pos = e->path_pos->next;
+      }
+      Vec2 next_pos = d_grid_to_world(&gs->dungeon, e->path_pos->tile->grid_pos);
+      Vec2 move_dir = v2sub(next_pos, xz(e->pos));
+      if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
+      e->pos = v3add(e->pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * e->speed));
+      e->dir = to_cardinal(move_dir);
     }
 
     if (e->flags & ENTITY_FLAG_COLLISION) {
@@ -467,16 +478,16 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
         e->pos.z = min(e->pos.z, d_grid_to_world(&gs->dungeon, up_left->grid_pos).y-1);
       }
       if (down_left->flags == DUNGEON_TILE_EMPTY) {
-        e->pos.z = max(e->pos.z, d_grid_to_world(&gs->dungeon, v2add(down_left->grid_pos, v2(.y=1))).y);
+        e->pos.z = max(e->pos.z, d_grid_to_world(&gs->dungeon, v2add(down_left->grid_pos, v2(.y=1))).y+1);
       }
       if (current_tile != potential_overlap && up_right->flags == DUNGEON_TILE_EMPTY) {
         e->pos.z = min(e->pos.z, d_grid_to_world(&gs->dungeon, up_right->grid_pos).y-1);
       }
       if (current_tile != potential_overlap && down_right->flags == DUNGEON_TILE_EMPTY) {
-        e->pos.z = max(e->pos.z, d_grid_to_world(&gs->dungeon, v2add(down_right->grid_pos, v2(.y=1))).y);
+        e->pos.z = max(e->pos.z, d_grid_to_world(&gs->dungeon, v2add(down_right->grid_pos, v2(.y=1))).y+1);
       }
       if (left->flags == DUNGEON_TILE_EMPTY) {
-        e->pos.x = max(e->pos.x, d_grid_to_world(&gs->dungeon, v2add(left->grid_pos, v2(1))).x);
+        e->pos.x = max(e->pos.x, d_grid_to_world(&gs->dungeon, v2add(left->grid_pos, v2(1))).x+1);
       }
       if (right->flags == DUNGEON_TILE_EMPTY) {
         e->pos.x = min(e->pos.x + e->bbox.width, d_grid_to_world(&gs->dungeon, right->grid_pos).x) - e->bbox.width;
