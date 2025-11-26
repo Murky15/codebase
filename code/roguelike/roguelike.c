@@ -455,6 +455,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           }
         }
       }
+      // Only calculate path if player & entity are not in the same room, otherwise just go off of the player's position?
       Dungeon_Tile *hero_tile = d_index_tile_from_world(&gs->dungeon, xz(target_hero->pos));
       Dungeon_Tile_List path_to_hero = d_astar_calculate_path(gs->frame, &gs->dungeon, current_tile, hero_tile);
       if (e->path_end == 0 || e->path_end != hero_tile) {
