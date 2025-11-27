@@ -171,21 +171,23 @@ function D_Edge_List       d_bowyer_watson_triangulate(Arena *arena, Vec2 *point
 // hallway generation smarter because diagonal lines will generate L paths.
 function D_Edge_List       d_prim_mst(Arena *arena, D_Edge_List bw_result, u64 num_points);
 function f32               d_astar_heuristic(Dungeon_Tile *tile, Dungeon_Tile *goal);
-function Dungeon_Tile_List d_astar_calculate_path(Arena *arena, Dungeon *d, Dungeon_Tile *start, Dungeon_Tile *end);
+function Dungeon_Tile_List d_astar_calculate_path(Arena *arena, Dungeon_Tile *start, Dungeon_Tile *end);
 
 // NOTE: General
-function Dungeon_Room*     d_push_room(Arena *arena, Dungeon *dungeon, Dungeon_Room room);
-function Dungeon_Tile*     d_index_tile(Dungeon *dungeon, Vec2 index);
-function Dungeon_Tile*     d_index_tile_from_world(Dungeon *dungeon, Vec2 p);
-function Vec2              d_grid_to_world(Dungeon *dungeon, Vec2 index);
-function Vec2              d_world_to_grid(Dungeon *dungeon, Vec2 p);
-function Dungeon_Room*     d_get_room_at_pos(Dungeon *dungeon, Vec2 p);
+function void              d_select(Dungeon *dungeon);
+
+function Dungeon_Room*     d_push_room(Arena *arena, Dungeon_Room room);
+function Dungeon_Tile*     d_index_tile(Vec2 index);
+function Dungeon_Tile*     d_index_tile_from_world(Vec2 p);
+function Vec2              d_grid_to_world(Vec2 index);
+function Vec2              d_world_to_grid(Vec2 p);
+function Dungeon_Room*     d_get_room_at_pos(Vec2 p);
 function void              d_tile_list_push(Arena *arena, Dungeon_Tile_List *list, Dungeon_Tile *tile);
 function void              d_tile_list_push_front(Arena *arena, Dungeon_Tile_List *list, Dungeon_Tile *tile);
 function void              d_tile_list_remove(Dungeon_Tile_List *list, Dungeon_Tile_Node *n);
 
-function Dungeon_Slice*    d_process_slice(Arena *arena, Dungeon_Map *tree, Dungeon *d, u64 max_tiles_per_slice, Rect bounds);
-function Dungeon_Map       d_partition_dungeon(Arena *arena, Dungeon *d, u64 max_tiles_per_slice);
+function Dungeon_Slice*    d_process_slice(Arena *arena, Dungeon_Map *tree, u64 max_tiles_per_slice, Rect bounds);
+function Dungeon_Map       d_partition_dungeon(Arena *arena, u64 max_tiles_per_slice);
 function Dungeon_Slice*    d_index_at(Dungeon_Slice *slice, Vec2 grid_pos);
 function Dungeon_Tile_List d_query_range(Arena *arena, Dungeon_Map tree, Rect grid_range, b32 include_full_chunk);
 
@@ -227,6 +229,6 @@ typedef struct Dungeon_Create_Params {
   __VA_ARGS__                     \
   })
 
-function Dungeon d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p);
+function Dungeon* d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p);
 
 #endif // DUNGEON_H

@@ -70,7 +70,7 @@ typedef struct Game_State {
   Sprite spr_ceil;
   Vec4 ceil_color;
 
-  Dungeon dungeon;
+  Dungeon *dungeon;
   Mat4 proj;
   Quat floor_rot;
   Quat forward_wall_rot;
@@ -302,7 +302,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   Texture_Atlas sprites = load_textures(init.perm, asset_path);
   init.rvtbl.create_and_bind_texture(sprites.raw_texture_data, true);
 
-  Dungeon dungeon = d_create(init.perm, sprites,
+  Dungeon *dungeon = d_create(init.perm, sprites,
     .target_room_count = 500,
     .grid_dim   = 16,
     .map_width  = 512,
@@ -325,9 +325,9 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     | ENTITY_FLAG_COLLISION;
 
   player.pos = v3(0,1,0);
-  while (d_index_tile_from_world(&dungeon, xz(player.pos))->flags == DUNGEON_TILE_EMPTY) {
-    player.pos.x = (rand() % dungeon.width) - dungeon.width/2;
-    player.pos.z = (rand() % dungeon.height) - dungeon.height/2;
+  while (d_index_tile_from_world(xz(player.pos))->flags == DUNGEON_TILE_EMPTY) {
+    player.pos.x = (rand() % dungeon->width) - dungeon->width/2;
+    player.pos.z = (rand() % dungeon->height) - dungeon->height/2;
   }
   player.seconds_to_rotate = 0.12f;
   player.idle = get_sprite(sprites, str8_lit("knight_m_idle_anim"));
@@ -335,7 +335,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   player.run  = get_sprite(sprites, str8_lit("knight_m_run_anim"));
   player.run.seconds_to_complete = 0.5f;
   player.bbox.width = player.idle.coords[0].scale.width;
-  player.bbox.height = dungeon.grid_dim;
+  player.bbox.height = dungeon->grid_dim/4.f;
   player.speed = PLAYER_MOVE_SPEED;
   gs->entities[gs->num_entities++] = player;
 
@@ -400,6 +400,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     os_set_thread_context(*tctx);
     if (runner_id() == 0) {
       srand(os_query_clock());
+      d_select(gs->dungeon);
 
       Entity enemy = {0};
       enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES
@@ -414,7 +415,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       enemy.run.seconds_to_complete = 0.5f;
       enemy.speed = MONSTER_MOVE_SPEED;
       enemy.bbox.width = enemy.idle.coords[0].scale.width;
-      enemy.bbox.height = gs->dungeon.grid_dim;
+      enemy.bbox.height = gs->dungeon->grid_dim/2.f;
       gs->entities[1] = enemy;
       gs->num_entities = 2;
     }
@@ -429,18 +430,15 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
   if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
 
   // NOTE: Update all entities
-  // Position should only be updated once. Multithreading conflict after entity moves and its position is accessed before collision updates
-
   Rangei entity_snippet = os_heat_distribute(gs->num_entities);
   for each_in_range (e, gs->entities, entity_snippet) {
     Entity new_state = *e;
 
-    // Get some spatial context
     if (new_state.flags & ENTITY_FLAG_INPUT_SENSITIVE) {
       new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
       new_state.dir = to_cardinal(move_dir);
     } else {
-      Dungeon_Tile *current_tile = d_index_tile_from_world(&gs->dungeon, xz(new_state.pos));
+      Dungeon_Tile *current_tile = d_index_tile_from_world(xz(new_state.pos));
       // NOTE: Find Hero
       Entity *target_hero = get_entity(new_state.target_hero);
       if (target_hero == 0) {
@@ -453,9 +451,9 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
         }
       }
       // Only calculate path if player & entity are not in the same room, otherwise just go off of the player's position?
-      Dungeon_Tile *hero_tile = d_index_tile_from_world(&gs->dungeon, xz(target_hero->pos));
-      Dungeon_Tile *potential_overlap = d_index_tile_from_world(&gs->dungeon, v2add(xz(new_state.pos), v2(new_state.bbox.width)));
-      Dungeon_Tile_List path_to_hero = d_astar_calculate_path(gs->frame, &gs->dungeon, current_tile, hero_tile);
+      Dungeon_Tile *hero_tile = d_index_tile_from_world(xz(target_hero->pos));
+      Dungeon_Tile *potential_overlap = d_index_tile_from_world(v2add(xz(new_state.pos), v2(new_state.bbox.width)));
+      Dungeon_Tile_List path_to_hero = d_astar_calculate_path(gs->frame, current_tile, hero_tile);
       if (new_state.path_end == 0 || new_state.path_end != hero_tile) {
         new_state.path_start = current_tile;
         new_state.path_end = hero_tile;
@@ -464,7 +462,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       if ((current_tile == new_state.path_pos->tile || potential_overlap == new_state.path_pos->tile) && new_state.path_pos->next) {
         new_state.path_pos = new_state.path_pos->next;
       }
-      Vec2 next_pos = d_grid_to_world(&gs->dungeon, new_state.path_pos->tile->grid_pos);
+      Vec2 next_pos = d_grid_to_world(new_state.path_pos->tile->grid_pos);
       Vec2 move_dir = v2sub(next_pos, xz(new_state.pos));
       if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
       new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
@@ -473,40 +471,40 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
 
     if (new_state.flags & ENTITY_FLAG_COLLISION) {
       // NOTE: Handle wall collisions
-      Dungeon_Tile *left = d_index_tile_from_world(&gs->dungeon, xz(new_state.pos));
+      Dungeon_Tile *left = d_index_tile_from_world(xz(new_state.pos));
       if (left->flags == DUNGEON_TILE_EMPTY) {
-        Vec2 intersect_pos = d_grid_to_world(&gs->dungeon, v2add(left->grid_pos, v2(1)));
+        Vec2 intersect_pos = d_grid_to_world(v2add(left->grid_pos, v2(1)));
         f32 x_offset = intersect_pos.x - new_state.pos.x;
         new_state.pos.x += x_offset;
       }
-      Dungeon_Tile *right = d_index_tile_from_world(&gs->dungeon, v2add(xz(new_state.pos), v2(new_state.bbox.width)));
+      Dungeon_Tile *right = d_index_tile_from_world(v2add(xz(new_state.pos), v2(new_state.bbox.width)));
       if (right->flags == DUNGEON_TILE_EMPTY) {
-        Vec2 intersect_pos = d_grid_to_world(&gs->dungeon, right->grid_pos);
+        Vec2 intersect_pos = d_grid_to_world(right->grid_pos);
         f32 x_offset = (new_state.pos.x + new_state.bbox.width) - intersect_pos.x;
         new_state.pos.x -= x_offset;
       }
-      Dungeon_Tile *top_left = d_index_tile_from_world(&gs->dungeon, v2add(xz(new_state.pos), v2(.y=new_state.bbox.height/4.f)));
+      Dungeon_Tile *top_left = d_index_tile_from_world(v2add(xz(new_state.pos), v2(.y=new_state.bbox.height/2.f)));
       if (top_left->flags == DUNGEON_TILE_EMPTY) {
-        Vec2 intersect_pos = d_grid_to_world(&gs->dungeon, top_left->grid_pos);
-        f32 y_offset = (new_state.pos.z + new_state.bbox.height/4.f) - intersect_pos.y;
+        Vec2 intersect_pos = d_grid_to_world(top_left->grid_pos);
+        f32 y_offset = (new_state.pos.z + new_state.bbox.height/2.f) - intersect_pos.y;
         new_state.pos.z -= y_offset;
       }
-      Dungeon_Tile *top_right = d_index_tile_from_world(&gs->dungeon, v2add(xz(new_state.pos), v2(new_state.bbox.width-1,new_state.bbox.height/4.f)));
+      Dungeon_Tile *top_right = d_index_tile_from_world(v2add(xz(new_state.pos), v2(new_state.bbox.width-1,new_state.bbox.height/2.f)));
       if (top_right->flags == DUNGEON_TILE_EMPTY) {
-        Vec2 intersect_pos = d_grid_to_world(&gs->dungeon, top_right->grid_pos);
-        f32 y_offset = (new_state.pos.z + new_state.bbox.height/4.f) - intersect_pos.y;
+        Vec2 intersect_pos = d_grid_to_world(top_right->grid_pos);
+        f32 y_offset = (new_state.pos.z + new_state.bbox.height/2.f) - intersect_pos.y;
         new_state.pos.z -= y_offset;
       }
-      Dungeon_Tile *bottom_left = d_index_tile_from_world(&gs->dungeon, v2sub(xz(new_state.pos), v2(.y=new_state.bbox.height/4.f)));
+      Dungeon_Tile *bottom_left = d_index_tile_from_world(v2sub(xz(new_state.pos), v2(.y=new_state.bbox.height/2.f)));
       if (bottom_left->flags == DUNGEON_TILE_EMPTY) {
-        Vec2 intersect_pos = d_grid_to_world(&gs->dungeon, v2add(bottom_left->grid_pos, v2(.y=1)));
-        f32 y_offset = intersect_pos.y - (new_state.pos.z - new_state.bbox.height/4.f);
+        Vec2 intersect_pos = d_grid_to_world(v2add(bottom_left->grid_pos, v2(.y=1)));
+        f32 y_offset = intersect_pos.y - (new_state.pos.z - new_state.bbox.height/2.f);
         new_state.pos.z += y_offset;
       }
-      Dungeon_Tile *bottom_right = d_index_tile_from_world(&gs->dungeon, v2add(xz(new_state.pos), v2(new_state.bbox.width-1,-new_state.bbox.height/4.f)));
+      Dungeon_Tile *bottom_right = d_index_tile_from_world(v2add(xz(new_state.pos), v2(new_state.bbox.width-1,-new_state.bbox.height/2.f)));
       if (bottom_right->flags == DUNGEON_TILE_EMPTY) {
-        Vec2 intersect_pos = d_grid_to_world(&gs->dungeon, v2add(bottom_right->grid_pos, v2(.y=1)));
-        f32 y_offset = intersect_pos.y - (new_state.pos.z - new_state.bbox.height/4.f);
+        Vec2 intersect_pos = d_grid_to_world(v2add(bottom_right->grid_pos, v2(.y=1)));
+        f32 y_offset = intersect_pos.y - (new_state.pos.z - new_state.bbox.height/2.f);
         new_state.pos.z += y_offset;
       }
     }
@@ -555,13 +553,13 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
   Mat4 VP = m4mul(gs->proj, view);
 
   Rect player_visible_range;
-  player_visible_range.xy = d_world_to_grid(&gs->dungeon, gs->cam.visible_range.xy);
-  player_visible_range.zw = d_world_to_grid(&gs->dungeon, gs->cam.visible_range.zw);
+  player_visible_range.xy = d_world_to_grid(gs->cam.visible_range.xy);
+  player_visible_range.zw = d_world_to_grid(gs->cam.visible_range.zw);
   // Apply buffer
   f32 buff_amt_tiles = 3;
   player_visible_range.xy = v2sub(player_visible_range.xy, v2(buff_amt_tiles,buff_amt_tiles));
   player_visible_range.zw = v2add(player_visible_range.zw, v2(buff_amt_tiles*2,buff_amt_tiles*2));
-  Dungeon_Tile_List visible_tile_list = d_query_range(gs->frame, gs->dungeon.map, player_visible_range, true);
+  Dungeon_Tile_List visible_tile_list = d_query_range(gs->frame, gs->dungeon->map, player_visible_range, true);
 
   Dungeon_Tile *visible_tiles = 0;
   Dungeon_Perimeter_Tile *perimeter = 0;
@@ -588,16 +586,16 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
   os_heat_sync_ptr(perimeter, 0);
 
   u64 wall_height = 2;
-  f32 ceil_height = wall_height * gs->dungeon.grid_dim;
+  f32 ceil_height = wall_height * gs->dungeon->grid_dim;
 
   Rangei visible_snippet = os_heat_distribute(visible_tile_list.count);
   for each_in_range (tile, visible_tiles, visible_snippet) {
-    Vec2 world = d_grid_to_world(&gs->dungeon, tile->grid_pos);
+    Vec2 world = d_grid_to_world(tile->grid_pos);
     Vec3 pos = v3(world.x, 1, world.y);
     Sprite sprite = tile->sprite;
     if (tile->flags == DUNGEON_TILE_EMPTY) {
       pos = v3(pos.x, ceil_height, pos.z);
-      Vec2 scale = v2(gs->dungeon.grid_dim,gs->dungeon.grid_dim);
+      Vec2 scale = v2(gs->dungeon->grid_dim,gs->dungeon->grid_dim);
       r_push_quad(.pos = pos, .col = gs->ceil_color, .scale = scale, .rot = gs->floor_rot);
     } else {
       r_push_quad(.pos = pos, .sprite = sprite, .rot = gs->floor_rot);
@@ -606,7 +604,7 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
 
   Rangei perimeter_snippet = os_heat_distribute(visible_tile_list.num_perimeter);
   for each_in_range (tile, perimeter, perimeter_snippet) {
-    Vec2 p0 = d_grid_to_world(&gs->dungeon, tile->grid_pos);
+    Vec2 p0 = d_grid_to_world(tile->grid_pos);
     Quat rot = {0};
     Quat ceil_rot = {0};
     Vec3 ceil_pos = v3(p0.x, ceil_height+0.006f, p0.y);
@@ -616,18 +614,18 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
       ceil_pos.y += 0.005f;
       if (tile->requires_ceil_adjustment) {
         ceil_rot = axis_angle(v3(0,1,0), M_PI32);
-        ceil_pos.x += gs->dungeon.grid_dim;
+        ceil_pos.x += gs->dungeon->grid_dim;
       }
     } else {
       rot = gs->forward_wall_rot;
       ceil_rot = rot;
       if (tile->requires_ceil_adjustment) {
         ceil_rot = qinv(rot);
-        ceil_pos.z -= gs->dungeon.grid_dim;
+        ceil_pos.z -= gs->dungeon->grid_dim;
       }
     }
     for (u64 i = 0; i < wall_height; ++i) {
-      f32 y = i * gs->dungeon.grid_dim;
+      f32 y = i * gs->dungeon->grid_dim;
       Vec3 world_pos = v3(p0.x, y, p0.y);
       r_push_quad(.pos = world_pos, .sprite = tile->sprite, .rot = rot);
     }

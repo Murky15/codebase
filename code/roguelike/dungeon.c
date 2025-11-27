@@ -1,3 +1,10 @@
+global Dungeon *current_dungeon;
+
+function void
+d_select (Dungeon *dungeon) {
+  current_dungeon = dungeon;
+}
+
 function b32
 d_edges_are_equal (D_Edge a, D_Edge b) {
   return ((a.p0.x == b.p0.x) && (a.p0.y == b.p0.y) && (a.p1.x == b.p1.x) && (a.p1.y == b.p1.y)) ||
@@ -246,11 +253,11 @@ d_gaussian_next (f64 mu, f64 sigma) {
 }
 
 function Dungeon_Room*
-d_push_room (Arena *arena, Dungeon *dungeon, Dungeon_Room room) {
+d_push_room (Arena *arena, Dungeon_Room room) {
   Dungeon_Room *node = arena_pushn(arena, Dungeon_Room, 1);
   *node = room;
-  sll_queue_push(dungeon->first, dungeon->last, node);
-  dungeon->num_rooms++;
+  sll_queue_push(current_dungeon->first, current_dungeon->last, node);
+  current_dungeon->num_rooms++;
 
   return node;
 }
@@ -279,36 +286,36 @@ d_point_in_rect (Vec2 p, Rect r) {
 }
 
 function Dungeon_Tile*
-d_index_tile (Dungeon *dungeon, Vec2 index) {
-  s64 x = index.x + dungeon->width/2;
-  s64 y = index.y + dungeon->height/2;
-  assert (x < dungeon->width && x >= 0);
-  assert (y < dungeon->height && y >= 0);
+d_index_tile (Vec2 index) {
+  s64 x = index.x + current_dungeon->width/2;
+  s64 y = index.y + current_dungeon->height/2;
+  assert (x < current_dungeon->width && x >= 0);
+  assert (y < current_dungeon->height && y >= 0);
 
-  return &dungeon->tiles[y * dungeon->width + x];
+  return &current_dungeon->tiles[y * current_dungeon->width + x];
 }
 
 function Dungeon_Tile*
-d_index_tile_from_world (Dungeon *dungeon, Vec2 p) {
-  p = v2muls(p, 1.f/dungeon->grid_dim);
-  s64 x = p.x + dungeon->width/2;
-  s64 y = p.y + dungeon->height/2;
-  assert (x < dungeon->width && x >= 0);
-  assert (y < dungeon->height && y >= 0);
+d_index_tile_from_world (Vec2 p) {
+  p = v2muls(p, 1.f/current_dungeon->grid_dim);
+  s64 x = p.x + current_dungeon->width/2;
+  s64 y = p.y + current_dungeon->height/2;
+  assert (x < current_dungeon->width && x >= 0);
+  assert (y < current_dungeon->height && y >= 0);
 
-  return &dungeon->tiles[y * dungeon->width + x];
+  return &current_dungeon->tiles[y * current_dungeon->width + x];
 }
 
 function Vec2
-d_grid_to_world (Dungeon *dungeon, Vec2 index) {
-  index = v2muls(index, dungeon->grid_dim);
+d_grid_to_world (Vec2 index) {
+  index = v2muls(index, current_dungeon->grid_dim);
 
   return index;
 }
 
 function Vec2
-d_world_to_grid (Dungeon *dungeon, Vec2 p) {
-  p = v2muls(p, 1.f/dungeon->grid_dim);
+d_world_to_grid (Vec2 p) {
+  p = v2muls(p, 1.f/current_dungeon->grid_dim);
   p.x = roundf(p.x);
   p.y = roundf(p.y);
 
@@ -316,8 +323,8 @@ d_world_to_grid (Dungeon *dungeon, Vec2 p) {
 }
 
 function Dungeon_Room*
-d_get_room_at_pos (Dungeon *dungeon, Vec2 p) {
-  Dungeon_Tile *tile = d_index_tile_from_world(dungeon, p);
+d_get_room_at_pos (Vec2 p) {
+  Dungeon_Tile *tile = d_index_tile_from_world(p);
 
   return tile->room;
 }
@@ -360,7 +367,7 @@ d_tile_list_remove (Dungeon_Tile_List *list, Dungeon_Tile_Node *n) {
 }
 
 function Dungeon_Slice*
-d_process_slice (Arena *arena, Dungeon_Map *tree, Dungeon *d, u64 max_tiles_per_slice, Rect bounds) {
+d_process_slice (Arena *arena, Dungeon_Map *tree, u64 max_tiles_per_slice, Rect bounds) {
   Dungeon_Slice *slice = arena_pushn(arena, Dungeon_Slice, 1);
   slice->bounds = bounds;
   slice->is_leaf = true;
@@ -368,7 +375,7 @@ d_process_slice (Arena *arena, Dungeon_Map *tree, Dungeon *d, u64 max_tiles_per_
   u64 arena_restore_pos = arena_pos(arena);
   for (s64 y = bounds.y; y <= bounds.y + bounds.height; ++y) {
     for (s64 x = bounds.x; x <= bounds.x + bounds.width; ++x) {
-      Dungeon_Tile *tile = d_index_tile(d, v2(x,y));
+      Dungeon_Tile *tile = d_index_tile(v2(x,y));
       if (slice->tiles.count < max_tiles_per_slice) {
         d_tile_list_push(arena, &slice->tiles, tile);
       } else {
@@ -386,10 +393,10 @@ d_process_slice (Arena *arena, Dungeon_Map *tree, Dungeon *d, u64 max_tiles_per_
     Rect b1 = {.xy = v2add(bounds.xy, v2(new_size.x)), .zw = new_size};
     Rect b2 = {.xy = v2add(bounds.xy, new_size), .zw = new_size};
     Rect b3 = {.xy = v2add(bounds.xy, v2(.y=new_size.y)), .zw = new_size};
-    slice->south_west = d_process_slice(arena, tree, d, max_tiles_per_slice, b0);
-    slice->south_east = d_process_slice(arena, tree, d, max_tiles_per_slice, b1);
-    slice->north_east = d_process_slice(arena, tree, d, max_tiles_per_slice, b2);
-    slice->north_west = d_process_slice(arena, tree, d, max_tiles_per_slice, b3);
+    slice->south_west = d_process_slice(arena, tree, max_tiles_per_slice, b0);
+    slice->south_east = d_process_slice(arena, tree, max_tiles_per_slice, b1);
+    slice->north_east = d_process_slice(arena, tree, max_tiles_per_slice, b2);
+    slice->north_west = d_process_slice(arena, tree, max_tiles_per_slice, b3);
   } else {
     tree->num_leaves++;
   }
@@ -399,12 +406,12 @@ d_process_slice (Arena *arena, Dungeon_Map *tree, Dungeon *d, u64 max_tiles_per_
 }
 
 function Dungeon_Map
-d_partition_dungeon (Arena *arena, Dungeon *d, u64 max_tiles_per_slice) {
+d_partition_dungeon (Arena *arena, u64 max_tiles_per_slice) {
   Dungeon_Map result = {0};
-  f32 half_width = d->width / 2.f;
-  f32 half_height = d->height / 2.f;
-  Rect initial_bounds = {-half_width, -half_height, d->width-1, d->height-1};
-  result.root = d_process_slice(arena, &result, d, max_tiles_per_slice, initial_bounds);
+  f32 half_width = current_dungeon->width / 2.f;
+  f32 half_height = current_dungeon->height / 2.f;
+  Rect initial_bounds = {-half_width, -half_height, current_dungeon->width-1, current_dungeon->height-1};
+  result.root = d_process_slice(arena, &result, max_tiles_per_slice, initial_bounds);
 
   return result;
 }
@@ -496,13 +503,14 @@ d_query_range (Arena *arena, Dungeon_Map tree, Rect grid_range, b32 include_full
   return *result;
 }
 
-function Dungeon
+function Dungeon*
 d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
-  Dungeon result = {0};
-  result.width = p->map_width;
-  result.height = p->map_height;
-  result.grid_dim = p->grid_dim;
-  result.tiles = arena_pushn(arena, Dungeon_Tile, result.width * result.height);
+  Dungeon *result = arena_pushn(arena, Dungeon, 1);
+  d_select(result);
+  result->width = p->map_width;
+  result->height = p->map_height;
+  result->grid_dim = p->grid_dim;
+  result->tiles = arena_pushn(arena, Dungeon_Tile, result->width * result->height);
   Temp_Arena scratch;
   ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
     // NOTE: Step 1: Place rooms.
@@ -528,7 +536,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         if (grid_pos.x + grid_size.x > half_width || grid_pos.y + grid_size.y > half_height) {
           clear = false;
         } else {
-          for each_in_list (room, &result) {
+          for each_in_list (room, result) {
             // TODO: Sloppy and lazy, could be made much better
             Vec2 border = v2muls(v2(p->room_width_border, p->room_height_border), p->grid_dim);
             Vec2 new_pos = v2sub(world_pos, border);
@@ -546,12 +554,12 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
           new_room.world_size = world_size;
           new_room.grid_pos   = grid_pos;
           new_room.grid_size  = grid_size;
-          Dungeon_Room *new_room_ptr = d_push_room(arena, &result, new_room);
+          Dungeon_Room *new_room_ptr = d_push_room(arena, new_room);
 
           grid_pos = v2add(grid_pos, v2(half_width, half_height));
           for (u64 y = grid_pos.y; y < grid_pos.y + grid_size.y; ++y) {
             for (u64 x = grid_pos.x; x < grid_pos.x + grid_size.x; ++x) {
-              Dungeon_Tile *tile = &result.tiles[y * result.width + x];
+              Dungeon_Tile *tile = &result->tiles[y * result->width + x];
               tile->flags |= DUNGEON_TILE_ROOM;
               tile->room = new_room_ptr;
             }
@@ -565,15 +573,15 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
     }
 
     // NOTE: Step two: Triangulate and obtain mst.
-    Vec2 *room_midpoints = arena_pushn(scratch.arena, Vec2, result.num_rooms);
-    for each_in_list (room, &result) {
-      u64 i = room - result.first;
+    Vec2 *room_midpoints = arena_pushn(scratch.arena, Vec2, result->num_rooms);
+    for each_in_list (room, result) {
+      u64 i = room - result->first;
       room_midpoints[i] = v2add(room->world_pos, v2muls(room->world_size, 0.5f));
     }
 
     D_Triangle super = d_make_triangle(v2(-100000, -100000), v2(0, 100000), v2(100000, -100000));
-    D_Edge_List bw_result = d_bowyer_watson_triangulate(scratch.arena, room_midpoints, result.num_rooms, super);
-    D_Edge_List pathway = d_prim_mst(scratch.arena, bw_result, result.num_rooms);
+    D_Edge_List bw_result = d_bowyer_watson_triangulate(scratch.arena, room_midpoints, result->num_rooms, super);
+    D_Edge_List pathway = d_prim_mst(scratch.arena, bw_result, result->num_rooms);
 
     // Add some edges back to improve dungeon quality
     for each_in_list (edge, &bw_result) {
@@ -586,13 +594,13 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
     // NOTE: Step three: Connect rooms based on MST.
     s64 onside_width = p->hallway_width / 2;
     for each_in_list (path, &pathway) {
-      Dungeon_Room *r1 = d_get_room_at_pos(&result, path->p0);
-      Dungeon_Room *r2 = d_get_room_at_pos(&result, path->p1);
+      Dungeon_Room *r1 = d_get_room_at_pos(path->p0);
+      Dungeon_Room *r2 = d_get_room_at_pos(path->p1);
       // We don't need this yet
       //r1->connections[r1->num_connections++] = r2;
       //r2->connections[r2->num_connections++] = r1;
 
-      Vec2 mp = d_world_to_grid(&result, v2muls(v2add(path->p0, path->p1), 0.5f));
+      Vec2 mp = d_world_to_grid(v2muls(v2add(path->p0, path->p1), 0.5f));
       Vec2 r1_p0 = r1->grid_pos;
       Vec2 r1_p1 = v2add(r1->grid_pos, r1->grid_size);
       Vec2 r2_p0 = r2->grid_pos;
@@ -607,7 +615,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         }
         for (s64 y = r1_p0.y; y < r2_p0.y; ++y) {
           for (s64 x = mp.x - onside_width; x <= mp.x + onside_width; ++x) {
-            Dungeon_Tile *tile = d_index_tile(&result, v2(x, y));
+            Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
             }
@@ -619,7 +627,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         }
         for (s64 x = r1_p0.x; x < r2_p0.x; ++x) {
           for (s64 y = mp.y - onside_width; y <= mp.y + onside_width; ++y) {
-            Dungeon_Tile *tile = d_index_tile(&result, v2(x, y));
+            Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
             }
@@ -627,8 +635,8 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         }
       } else {
         // Otherwise, we need to create an L-shaped path connecting the room midpoints
-        Vec2 p0 = d_world_to_grid(&result, path->p0);
-        Vec2 p1 = d_world_to_grid(&result, path->p1);
+        Vec2 p0 = d_world_to_grid(path->p0);
+        Vec2 p1 = d_world_to_grid(path->p1);
 
         s64 minx = min(p0.x, p1.x);
         s64 maxx = max(p0.x, p1.x);
@@ -648,7 +656,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
 
         for (s64 x = minx; x <= maxx + onside_width; ++x) {
           for (s64 y = hy - onside_width; y <= hy + onside_width; ++y) {
-            Dungeon_Tile *tile = d_index_tile(&result, v2(x, y));
+            Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
             }
@@ -657,7 +665,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
 
         for (s64 y = miny; y <= maxy + onside_width; ++y) {
           for (s64 x = hx - onside_width; x <= hx + onside_width; ++x) {
-            Dungeon_Tile *tile = d_index_tile(&result, v2(x, y));
+            Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
             }
@@ -675,11 +683,11 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
     // NOTE: Step five: Determine perimeter (good enough first pass)
     // While we're at it, we can set the grid positions of all tiles.
 
-    for (u64 y = 0; y < (u64)result.height; ++y) {
+    for (u64 y = 0; y < (u64)result->height; ++y) {
       b32 inside_polygon = false;
-      for (u64 x = 0; x < (u64)result.width; ++x) {
-        Dungeon_Tile *tile = &result.tiles[y * result.width + x];
-        Dungeon_Tile *prev_tile = &result.tiles[y * result.width + (x-1)];
+      for (u64 x = 0; x < (u64)result->width; ++x) {
+        Dungeon_Tile *tile = &result->tiles[y * result->width + x];
+        Dungeon_Tile *prev_tile = &result->tiles[y * result->width + (x-1)];
         Dungeon_Perimeter *perim = 0;
         if (tile->flags && !inside_polygon) {
           perim = tile->perim;
@@ -710,11 +718,11 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
       }
     }
 
-    for (u64 x = 0; x < (u64)result.width; ++x) {
+    for (u64 x = 0; x < (u64)result->width; ++x) {
       b32 inside_polygon = false;
-      for (u64 y = 0; y < (u64)result.height; ++y) {
-        Dungeon_Tile *tile = &result.tiles[y * result.width + x];
-        Dungeon_Tile *prev_tile = &result.tiles[(y-1) * result.width + x];
+      for (u64 y = 0; y < (u64)result->height; ++y) {
+        Dungeon_Tile *tile = &result->tiles[y * result->width + x];
+        Dungeon_Tile *prev_tile = &result->tiles[(y-1) * result->width + x];
         Dungeon_Perimeter *perim = 0;
         if (tile->flags && !inside_polygon) {
           perim = &tile->perim[tile->on_perimeter++];
@@ -732,7 +740,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
     }
 
     // NOTE: Final step: Create dungeon map
-    result.map = d_partition_dungeon(arena, &result, p->max_tiles_per_map_slice);
+    result->map = d_partition_dungeon(arena, p->max_tiles_per_map_slice);
   }
 
   return result;
@@ -746,10 +754,10 @@ d_astar_heuristic (Dungeon_Tile *tile, Dungeon_Tile *goal) {
 }
 
 function Dungeon_Tile_List
-d_astar_calculate_path (Arena *arena, Dungeon *d, Dungeon_Tile *start, Dungeon_Tile *end) {
-  #define gscore(t) astar_map[((s64)(t)->grid_pos.y+d->height/2)*d->width+((s64)(t)->grid_pos.x+d->width/2)].gscore
-  #define fscore(t) astar_map[((s64)(t)->grid_pos.y+d->height/2)*d->width+((s64)(t)->grid_pos.x+d->width/2)].fscore
-  #define came_from(t) astar_map[((s64)(t)->grid_pos.y+d->height/2)*d->width+((s64)(t)->grid_pos.x+d->width/2)].came_from
+d_astar_calculate_path (Arena *arena, Dungeon_Tile *start, Dungeon_Tile *end) {
+  #define gscore(t) astar_map[((s64)(t)->grid_pos.y+current_dungeon->height/2)*current_dungeon->width+((s64)(t)->grid_pos.x+current_dungeon->width/2)].gscore
+  #define fscore(t) astar_map[((s64)(t)->grid_pos.y+current_dungeon->height/2)*current_dungeon->width+((s64)(t)->grid_pos.x+current_dungeon->width/2)].fscore
+  #define came_from(t) astar_map[((s64)(t)->grid_pos.y+current_dungeon->height/2)*current_dungeon->width+((s64)(t)->grid_pos.x+current_dungeon->width/2)].came_from
 
   assert (start->flags && end->flags);
 
@@ -757,7 +765,7 @@ d_astar_calculate_path (Arena *arena, Dungeon *d, Dungeon_Tile *start, Dungeon_T
 
   Temp_Arena scratch;
   ldefer (scratch=get_scratch(&arena, 1), release_scratch(scratch)) {
-    u64 map_size = d->width * d->height;
+    u64 map_size = current_dungeon->width * current_dungeon->height;
     AStar_Tile *astar_map = arena_pushn(scratch.arena, AStar_Tile, map_size);
     for each_in_arrayc (tile, astar_map, (s64)map_size) {
       tile->gscore = INFINITY;
@@ -793,17 +801,17 @@ d_astar_calculate_path (Arena *arena, Dungeon *d, Dungeon_Tile *start, Dungeon_T
 
       Dungeon_Tile *neighbors[] = {
         // Right, Left, Up, Down
-        d_index_tile(d, v2add(current->grid_pos, v2(1))),
-        d_index_tile(d, v2sub(current->grid_pos, v2(1))),
-        d_index_tile(d, v2add(current->grid_pos, v2(.y=1))),
-        d_index_tile(d, v2sub(current->grid_pos, v2(.y=1))),
+        d_index_tile(v2add(current->grid_pos, v2(1))),
+        d_index_tile(v2sub(current->grid_pos, v2(1))),
+        d_index_tile(v2add(current->grid_pos, v2(.y=1))),
+        d_index_tile(v2sub(current->grid_pos, v2(.y=1))),
 
         // Bottom Left, Bottom Right, Top Right, Top Left
         // NOTE: These should be conditionally included
-        d_index_tile(d, v2add(current->grid_pos, v2(-1,-1))),
-        d_index_tile(d, v2add(current->grid_pos, v2(1,-1))),
-        d_index_tile(d, v2add(current->grid_pos, v2(1,1))),
-        d_index_tile(d, v2add(current->grid_pos, v2(-1,1))),
+        d_index_tile(v2add(current->grid_pos, v2(-1,-1))),
+        d_index_tile(v2add(current->grid_pos, v2(1,-1))),
+        d_index_tile(v2add(current->grid_pos, v2(1,1))),
+        d_index_tile(v2add(current->grid_pos, v2(-1,1))),
       };
       for each_in_array (neighbor, neighbors) {
         if ((*neighbor)->flags) {
