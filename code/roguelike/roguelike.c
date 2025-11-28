@@ -31,6 +31,8 @@
     Verify this. Also, what is a good spin count for Critical sections?
   - [X] Vector swizzle *macros*: xz(Vec3) -> Vec2
 
+  - [ ] Ditch CRT rand functions for CPU intrinsic
+
   - [ ] Instead of a simple AABB check for determining the visible range, I should
     instead use a point-in-polygon function to support angles rotated around y-axis.
   - [ ] Make wall hight a property per room / hallway for more interesting visuals
@@ -419,6 +421,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       gs->entities[1] = enemy;
       gs->num_entities = 2;
     }
+    os_heat_sync();
   }
 
   // NOTE: Process received input
@@ -542,10 +545,7 @@ extern void
 roguelike_draw (Thread_Context *tctx, void *game_state) {
   Game_State *gs = (Game_State*)game_state;
   Renderer_VTable *r = &gs->rvtbl;
-  if (!dll_is_loaded) {
-    dll_is_loaded = true;
-    os_set_thread_context(*tctx);
-  }
+  assert (dll_is_loaded);
 
   r->prep();
 
