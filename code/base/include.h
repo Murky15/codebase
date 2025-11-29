@@ -8,5 +8,6 @@
 #include "types.h"
 #include "memory.h"
 #include "strings.h"
+#include "rand.h"
 
 #endif // BASE_INCLUDE_H

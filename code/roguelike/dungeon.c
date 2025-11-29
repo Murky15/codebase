@@ -242,10 +242,10 @@ function f64
 d_gaussian_next (f64 mu, f64 sigma) {
   f64 U;
   while (true) {
-    U = (f64)rand() / RAND_MAX;
+    U = (f64)rand_next() / u64_max;
     if (U > 0) break;
   }
-  f64 V = (f64)rand() / RAND_MAX;
+  f64 V = (f64)rand_next() / u64_max;
   f64 R = sqrt(-2 * log(U));
   f64 Z = R * cos(2*M_PI*V);
 
@@ -326,7 +326,7 @@ function Dungeon_Room*
 d_get_room_at_pos (Vec2 p) {
   Dungeon_Tile *tile = d_index_tile_from_world(p);
 
-  return tile->room;
+  return tile->room_or_hallway;
 }
 
 function void
@@ -527,8 +527,8 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
       u64 max_tries = 2;
       u64 attempt = 0;
       while (attempt < max_tries) {
-        f32 x = (f32)(rand() % p->map_width) - half_width;
-        f32 y = (f32)(rand() % p->map_height) - half_height;
+        f32 x = (f32)(rand_next() % p->map_width) - half_width;
+        f32 y = (f32)(rand_next() % p->map_height) - half_height;
         Vec2 grid_pos = v2(x,y);
         Vec2 world_pos = v2muls(grid_pos, p->grid_dim);
 
@@ -561,7 +561,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
             for (u64 x = grid_pos.x; x < grid_pos.x + grid_size.x; ++x) {
               Dungeon_Tile *tile = &result->tiles[y * result->width + x];
               tile->flags |= DUNGEON_TILE_ROOM;
-              tile->room = new_room_ptr;
+              tile->room_or_hallway = new_room_ptr;
             }
           }
 
@@ -585,7 +585,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
 
     // Add some edges back to improve dungeon quality
     for each_in_list (edge, &bw_result) {
-      u64 val = (rand() % 100) + 1;
+      u64 val = (rand_next() % 100) + 1;
       if (val <= p->percent_edges_included) {
         d_push_edge_if_unique(scratch.arena, &pathway, *edge);
       }
@@ -596,9 +596,9 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
     for each_in_list (path, &pathway) {
       Dungeon_Room *r1 = d_get_room_at_pos(path->p0);
       Dungeon_Room *r2 = d_get_room_at_pos(path->p1);
-      // We don't need this yet
-      //r1->connections[r1->num_connections++] = r2;
-      //r2->connections[r2->num_connections++] = r1;
+
+      Dungeon_Room new_hallway = {.is_hallway = true, .c1 = r1, .c2 = r2};
+      Dungeon_Room *new_hallway_ptr = d_push_room(arena, new_hallway);
 
       Vec2 mp = d_world_to_grid(v2muls(v2add(path->p0, path->p1), 0.5f));
       Vec2 r1_p0 = r1->grid_pos;
@@ -618,6 +618,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
             Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
+              tile->room_or_hallway = new_hallway_ptr;
             }
           }
         }
@@ -630,6 +631,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
             Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
+              tile->room_or_hallway = new_hallway_ptr;
             }
           }
         }
@@ -644,7 +646,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         s64 maxy = max(p0.y, p1.y);
 
         // TODO: We should determine which L-path is the shortest and use that (based on taxicab distance).
-        s64 alternate_start_y = rand() % 2;
+        s64 alternate_start_y = rand_next() % 2;
         s64 hy, hx;
         if (alternate_start_y) {
           hy = p0.x == minx ? p0.y : p1.y;
@@ -659,6 +661,9 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
             Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
+              tile->hallway_section = 0;
+              tile->room_or_hallway = new_hallway_ptr;
+
             }
           }
         }
@@ -668,6 +673,8 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
             Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
+              tile->hallway_section = 1;
+              tile->room_or_hallway = new_hallway_ptr;
             }
           }
         }
@@ -706,12 +713,12 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
 
         tile->grid_pos = v2(x - half_width, y - half_height);
         if (tile->flags) {
-          u64 val = (rand() % 100) + 1;
+          u64 val = (rand_next() % 100) + 1;
           u64 sprite_idx = 0;
           if (val <= p->percent_tiles_cracked) {
             // TODO: Maybe I could add some way to rotate the tile to increase
             // variation.
-            sprite_idx = (rand() % (array_count(floors)-1)) + 1;
+            sprite_idx = (rand_next() % (array_count(floors)-1)) + 1;
           }
           tile->sprite = floors[sprite_idx];
         }
@@ -767,7 +774,7 @@ d_astar_calculate_path (Arena *arena, Dungeon_Tile *start, Dungeon_Tile *end) {
   ldefer (scratch=get_scratch(&arena, 1), release_scratch(scratch)) {
     u64 map_size = current_dungeon->width * current_dungeon->height;
     AStar_Tile *astar_map = arena_pushn(scratch.arena, AStar_Tile, map_size);
-    for each_in_arrayc (tile, astar_map, (s64)map_size) {
+    for each_in_arrayc (tile, astar_map, map_size) {
       tile->gscore = INFINITY;
       tile->fscore = INFINITY;
       tile->came_from = 0;

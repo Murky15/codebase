@@ -151,8 +151,8 @@
 
 // for...
 #define each_in_list(i,lp) (typeof((lp)->first)(i)=(lp)->first;(i);(i)=(i)->next)
-#define each_in_arrayc(i,a,c) (typeof(&(a)[0])(i)=(a);((i)-(a))<(c);(i)+=1)
-#define each_in_array(i,a) each_in_arrayc(i,a,array_count(a))
+#define each_in_arrayc(i,a,c) (typeof(&(a)[0])(i)=(a);((i)-(a))<(s64)(c);(i)+=1)
+#define each_in_array(i,a) each_in_arrayc((i),(a),array_count(a))
 #define each_in_range(i,a,r) (typeof(&(a)[0])(i)=&(a)[(r).first];((i)-(a))<(r).last;(i)+=1)
 
 //- @note: Linked list macros

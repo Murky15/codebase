@@ -1,4 +1,4 @@
-// raddbg 0.9.23 user file
+// raddbg 0.9.21 user file
 
 recent_project: path: "root.raddbg_project"
 recent_project: path: path
@@ -15,8 +15,8 @@ window:
       0.345830: watch: selected expression: "query:types"
       0.347294:
       {
-        watch: expression: "query:threads"
-        watch: selected expression: "query:breakpoints"
+        watch: selected expression: "query:threads"
+        watch: expression: "query:breakpoints"
         watch: expression: "query:watch_pins"
       }
       0.056876:
@@ -62,23 +62,33 @@ window:
       }
       text:
       {
+        selected
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 473
+        cursor_line: 465
         cursor_column: 1
-        mark_line: 473
+        mark_line: 465
         mark_column: 1
       }
       text:
       {
-        selected
         expression: "file:\"W:/code/roguelike/dungeon.c\".data"
         project: "W:/misc/root.raddbg_project"
         query: input: ""
-        cursor_line: 754
+        cursor_line: 479
+        cursor_column: 12
+        mark_line: 479
+        mark_column: 12
+      }
+      text:
+      {
+        expression: "file:\"W:/code/base/rand.c\".data"
+        auto: 1
+        query: input: ""
+        cursor_line: 9
         cursor_column: 1
-        mark_line: 754
+        mark_line: 9
         mark_column: 1
       }
     }
@@ -88,12 +98,12 @@ window:
       {
         watch:
         {
+          selected
           expression: "query:locals"
           normal: 0.372132 0.627868 0.250000
         }
         watch:
         {
-          selected
           expression: ""
           normal: 0.335916 0.353108 0.310976
           watch: new_gscore
@@ -102,6 +112,9 @@ window:
           watch: "astar_map[((s64)(start)->grid_pos.y+d->height/2) * d->width + ((s64)(start)->grid_pos.x+d->width/2)].came_from"
           watch: start
           watch: current
+          watch: "player.pos.x"
+          watch: "player.pos.z"
+          watch: result
         }
         watch: expression: "query:type_views"
       }
@@ -109,7 +122,7 @@ window:
     }
   }
   split_x
-  pos: 192 162
+  pos: 484 312
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }

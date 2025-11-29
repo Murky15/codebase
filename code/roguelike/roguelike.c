@@ -20,6 +20,7 @@
   - [X] Separate game & platform
   - [X] Hot Reloading
   - [ ] Profiling (probably a codebase addition)
+  - [X] Ditch CRT rand functions for CPU intrinsic
 
   - [X] Deprecate vector construction functions in favor of compound literals
       and also typedef all vectors to be their construction name
@@ -31,8 +32,6 @@
     Verify this. Also, what is a good spin count for Critical sections?
   - [X] Vector swizzle *macros*: xz(Vec3) -> Vec2
 
-  - [ ] Ditch CRT rand functions for CPU intrinsic
-
   - [ ] Instead of a simple AABB check for determining the visible range, I should
     instead use a point-in-polygon function to support angles rotated around y-axis.
   - [ ] Make wall hight a property per room / hallway for more interesting visuals
@@ -40,6 +39,7 @@
     This means that each inward corner should only be added to the list of perimeters once
     to prevent z-flimmering.
   - [ ] Debug wireframe renderer for hitboxes
+  - [ ] HUD
   - [ ] Audio
 */
 
@@ -295,9 +295,6 @@ draw_entity (Entity *e, Renderer_VTable *r) {
 extern void*
 roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always single threaded */
   os_set_thread_context(*tctx);
-  u64 seed = os_query_clock();
-  srand(seed);
-  printf("Seed: %llu\n", seed);
   Game_State *gs = arena_pushn(init.perm, Game_State, 1);
 
   String8 asset_path = str8_pushf(init.frame, "%.*s0x72_DungeonTilesetII_v1.7", str8_expand(init.asset_dir));
@@ -327,10 +324,12 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     | ENTITY_FLAG_COLLISION;
 
   player.pos = v3(0,1,0);
+
   while (d_index_tile_from_world(xz(player.pos))->flags == DUNGEON_TILE_EMPTY) {
-    player.pos.x = (rand() % dungeon->width) - dungeon->width/2;
-    player.pos.z = (rand() % dungeon->height) - dungeon->height/2;
+    player.pos.x = (f32)(rand_next() % dungeon->width) - dungeon->width/2;
+    player.pos.z = (f32)(rand_next() % dungeon->height) - dungeon->height/2;
   }
+
   player.seconds_to_rotate = 0.12f;
   player.idle = get_sprite(sprites, str8_lit("knight_m_idle_anim"));
   player.idle.seconds_to_complete = 0.5f;
@@ -401,7 +400,6 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     dll_is_loaded = true;
     os_set_thread_context(*tctx);
     if (runner_id() == 0) {
-      srand(os_query_clock());
       d_select(gs->dungeon);
 
       Entity enemy = {0};
@@ -445,7 +443,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       // NOTE: Find Hero
       Entity *target_hero = get_entity(new_state.target_hero);
       if (target_hero == 0) {
-        for each_in_arrayc (it, gs->entities, (s64)gs->num_entities) {
+        for each_in_arrayc (it, gs->entities, gs->num_entities) {
           if (it->class == ENTITY_CLASS_HERO) {
             new_state.target_hero = create_entity_reference(it);
             target_hero = it;
@@ -453,19 +451,28 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           }
         }
       }
-      // Only calculate path if player & entity are not in the same room, otherwise just go off of the player's position?
+      Vec2 next_pos = v2();
       Dungeon_Tile *hero_tile = d_index_tile_from_world(xz(target_hero->pos));
-      Dungeon_Tile *potential_overlap = d_index_tile_from_world(v2add(xz(new_state.pos), v2(new_state.bbox.width)));
-      Dungeon_Tile_List path_to_hero = d_astar_calculate_path(gs->frame, current_tile, hero_tile);
-      if (new_state.path_end == 0 || new_state.path_end != hero_tile) {
-        new_state.path_start = current_tile;
-        new_state.path_end = hero_tile;
-        new_state.path_pos = path_to_hero.first;
+      if ((hero_tile->room_or_hallway != current_tile->room_or_hallway) ||
+          (hero_tile->hallway_section != current_tile->hallway_section)) {
+        Dungeon_Tile_List path_to_hero = d_astar_calculate_path(gs->frame, current_tile, hero_tile);
+        if (new_state.path_end == 0 || new_state.path_end != hero_tile) {
+          new_state.path_start = current_tile;
+          new_state.path_end = hero_tile;
+        }
+        if (path_to_hero.count > 1) {
+          Dungeon_Tile_Node *path_pos = path_to_hero.first->next;
+
+          f32 dist_to_next_tile = v2dist(xz(new_state.pos), d_grid_to_world(path_pos->tile->grid_pos));
+          // TODO: This should be a configurable quantity
+          if (dist_to_next_tile <= gs->dungeon->grid_dim && path_pos->next) {
+            path_pos = path_pos->next;
+          }
+          next_pos = d_grid_to_world(path_pos->tile->grid_pos);
+        }
+      } else {
+        next_pos = xz(target_hero->pos);
       }
-      if ((current_tile == new_state.path_pos->tile || potential_overlap == new_state.path_pos->tile) && new_state.path_pos->next) {
-        new_state.path_pos = new_state.path_pos->next;
-      }
-      Vec2 next_pos = d_grid_to_world(new_state.path_pos->tile->grid_pos);
       Vec2 move_dir = v2sub(next_pos, xz(new_state.pos));
       if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
       new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));

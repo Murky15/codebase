@@ -7,6 +7,12 @@
 # define ENABLE_ASSERT 0
 #endif
 
+#ifndef OS_NO_ENTRY
+# define OS_NO_ENTRY 0
+#endif
+
+// NOTE: Define: OS_NUM_THREADS to control how many threads the bootstrap entry launches for execution
+
 // @note: Compilers
 
 #if defined(__clang__)

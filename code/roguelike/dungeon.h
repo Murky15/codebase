@@ -57,27 +57,42 @@ struct D_Vertex {
 
 typedef struct Dungeon_Room {
   struct Dungeon_Room *next;
+  b32 is_hallway;
 
   // This should probably be a linked list
   //struct Dungeon_Room *connections[DUNGEON_ROOM_MAX_CONNECTIONS];
   //u64 num_connections;
+  union {
+    // If room...
+    struct {
+      Vec2 world_pos;
+      Vec2 world_size;
 
-  Vec2 world_pos;
-  Vec2 world_size;
+      Vec2 grid_pos;
+      Vec2 grid_size;
+    };
 
-  Vec2 grid_pos;
-  Vec2 grid_size;
+    // If hallway...
+    struct Dungeon_Room *connections[2];
+    struct {
+      struct Dungeon_Room *c1;
+      struct Dungeon_Room *c2;
+    };
+  };
 } Dungeon_Room;
 
 typedef struct Dungeon_Perimeter {
   Vec2 offset;
   b32 lateral;
-  b32 side; // 0 - left, 1 - right
+  u8 side; // 0 - left, 1 - right
 } Dungeon_Perimeter;
 
 typedef struct Dungeon_Tile {
   Dungeon_Tile_Flags flags;
-  Dungeon_Room *room;
+  Dungeon_Room *room_or_hallway;
+  // NOTE: This is for L-shaped hallways, or any hallway for that matter
+  // with turns so we know which section of the hallway we are referring to
+  u8 hallway_section;
   Sprite sprite;
   Vec2 grid_pos;
   u64 on_perimeter;
