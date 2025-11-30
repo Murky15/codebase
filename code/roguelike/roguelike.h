@@ -3,11 +3,13 @@
 
 // NOTE: Game<-->platform interface
 
-typedef void (*r_create_and_bind_texture_type)(PNG_Bitmap_RGBA,b32);
-typedef void (*r_prep_type)(void);
-typedef void (*r_update_transform_type)(Mat4);
-typedef void (*r_push_quad_type)(Push_Quad_Params);
-typedef void (*r_present_type)(Push_Quad_Params);
+typedef R_Texture_2D (*r_create_texture_type)(PNG_Bitmap_RGBA,b32);
+typedef void         (*r_bind_texture_type)(R_Texture_2D);
+typedef void         (*r_prep_type)(void);
+typedef void         (*r_update_transform_type)(Mat4);
+typedef void         (*r_push_quad_type)(Push_Quad_Params);
+typedef void         (*r_draw_quads_type)(void);
+typedef void         (*r_present_type)(Push_Quad_Params);
 
 typedef struct Push_Quad_Params {
   Vec3 pos;
@@ -26,10 +28,12 @@ typedef struct Push_Quad_Params {
   })
 
 typedef struct Renderer_VTable {
-  r_create_and_bind_texture_type create_and_bind_texture;
+  r_create_texture_type create_texture;
+  r_bind_texture_type bind_texture;
   r_prep_type prep;
   r_update_transform_type update_transform;
   r_push_quad_type push_quad;
+  r_draw_quads_type draw_quads;
   r_present_type present;
 } Renderer_VTable;
 
@@ -194,7 +198,8 @@ function Cardinal_Dir to_cardinal(Vec2 dir);
 function Sprite*       get_atlas_slot(Texture_Atlas atlas, String8 key);
 function Sprite        get_sprite(Texture_Atlas atlas, String8 key);
 function Atlas_Coords  make_atlas_coords_from_string(String8 coords);
-function Texture_Atlas load_textures(Arena *arena, String8 absolute_path_to_asset_dir);
+function Texture_Atlas load_textures(Arena *arena, String8 absolute_path_to_asset_dir, r_create_texture_type r_create_texture);
+function Texture_Atlas load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type r_create_texture);
 
 function Rect cam_calculate_visible_range(Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear);
 function void cam_set_target(Camera *cam, Entity *e, Camera_Track_Mode track_mode);

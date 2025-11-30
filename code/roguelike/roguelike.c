@@ -75,6 +75,7 @@ typedef struct Game_State {
 
   Dungeon *dungeon;
   Mat4 proj;
+  Mat4 ortho;
   Quat floor_rot;
   Quat forward_wall_rot;
 
@@ -140,7 +141,7 @@ make_atlas_coords_from_string (String8 coords) {
 }
 
 function Texture_Atlas
-load_textures (Arena *arena, String8 absolute_path_to_asset_dir) {
+load_textures (Arena *arena, String8 absolute_path_to_asset_dir, r_create_texture_type r_create_texture) {
   Texture_Atlas result = {0};
   Temp_Arena scratch;
   ldefer(scratch=get_scratch(&arena, 1),release_scratch(scratch)) {
@@ -174,13 +175,15 @@ load_textures (Arena *arena, String8 absolute_path_to_asset_dir) {
     String8 path_to_texture_data = str8_pushf(scratch.arena,
       "%.*s/0x72_DungeonTilesetII_v1.7.png", str8_expand(absolute_path_to_asset_dir));
     String8 texture_png_data = os_read_file(scratch.arena, path_to_texture_data, false);
-    result.raw_texture_data = png_decode(arena, texture_png_data);
+    PNG_Bitmap_RGBA bitmap = png_decode(arena, texture_png_data);
+    result.texture = r_create_texture(bitmap, true);
   }
+
   return result;
 }
 
 function Texture_Atlas
-load_font (Arena* arena, String8 absolute_path_to_bitmap) {
+load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type r_create_texture) {
   Texture_Atlas result = {0};
 
   // NOTE: Hard-coded monospace font dimensions in pixels
@@ -194,7 +197,7 @@ load_font (Arena* arena, String8 absolute_path_to_bitmap) {
     'P','Q','R','S','T','U','V','W','X','Y','Z','[','\\',']','^','_',
     '`','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o',
     'p','q','r','s','t','u','v','w','x','y','z','{','|','}','~','?',
-    '?','!','?','?','?','?','?','?','?','?','?','?','?','?','?','?',
+    '?','?','?','?','?','?','?','?','?','?','?','?','?','?','?','?',
     '?','?','?','?','?','?','?','?','?','?','?','?','?','?','?','?',
   };
 
@@ -206,12 +209,16 @@ load_font (Arena* arena, String8 absolute_path_to_bitmap) {
       exit(1);
     }
     PNG_Bitmap_RGBA bitmap = png_decode(arena, bitmap_data);
-    result.raw_texture_data = bitmap;
+    result.texture = r_create_texture(bitmap, false);
     result.num_sprites = (bitmap.width / glyph_width) * (bitmap.height / glyph_height);
     result.sprites = arena_pushn(arena, Sprite, result.num_sprites);
     u64 i = 0;
     for (u64 y = 0; y < bitmap.height; y += glyph_height) {
       for (u64 x = 0; x < bitmap.width; x += glyph_width) {
+        // NOTE: Get rid of these unhandled non-ascii characters
+        if (i >= 95) {
+          break;
+        }
         Atlas_Coords coords = {.offset = v2(x,y), .scale = v2(glyph_width, glyph_height)};
         u8 c = glyph_lookup[i];
         Sprite *sprite = &result.sprites[c];
@@ -339,6 +346,15 @@ draw_entity (Entity *e, Renderer_VTable *r) {
   r_push_quad(.pos = e->pos, .scale = texcoord.scale, .rot = rot, .rot_offset = v2(texcoord.scale.x/2.f, 0), .atlas_coords = texcoord);
 }
 
+function void
+draw_string (Texture_Atlas font_atlas, Vec2 pos, String8 string, Renderer_VTable *r) {
+  for (u64 i = 0; i < string.len; ++i) {
+    u8 c = string.str[i];
+    Atlas_Coords coords = font_atlas.sprites[c].coords[0];
+    r_push_quad(.pos = v3(pos.x+i*coords.scale.x*10,pos.y), .atlas_coords=coords, .scale=v2(60, 120));
+  }
+}
+
 extern void*
 roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always single threaded */
   os_set_thread_context(*tctx);
@@ -346,9 +362,9 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
 
   String8 asset_path = str8_pushf(init.frame, "%.*s0x72_DungeonTilesetII_v1.7", str8_expand(init.asset_dir));
   String8 font_path = str8_pushf(init.frame, "%.*smonogram/bitmap/monogram-bitmap.png", str8_expand(init.asset_dir));
-  Texture_Atlas sprites = load_textures(init.perm, asset_path);
-  Texture_Atlas font = load_font(init.perm, font_path);
-  init.rvtbl.create_and_bind_texture(sprites.raw_texture_data, true);
+  Texture_Atlas sprites = load_textures(init.perm, asset_path, init.rvtbl.create_texture);
+  Texture_Atlas font = load_font(init.perm, font_path, init.rvtbl.create_texture);
+  init.rvtbl.bind_texture(sprites.texture);
 
   Dungeon *dungeon = d_create(init.perm, sprites,
     .target_room_count = 500,
@@ -395,6 +411,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   f32 zfar = 500.f;
 
   Mat4 proj = m4perspective(fov_h, aspect_ratio, znear, zfar);
+  Mat4 ortho = m4orthographic(init.display_width, init.display_height, -1, 1);
   Camera cam = {0};
   cam.zoom = 200.f;
   cam.fov_h = fov_h;
@@ -417,6 +434,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   gs->font = font;
   gs->dungeon = dungeon;
   gs->proj = proj;
+  gs->ortho = ortho;
   gs->cam = cam;
   gs->floor_rot = floor_rot;
   gs->forward_wall_rot = forward_wall_rot;
@@ -599,8 +617,10 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
   Game_State *gs = (Game_State*)game_state;
   Renderer_VTable *r = &gs->rvtbl;
   assert (dll_is_loaded);
-
-  r->prep();
+  if (runner_id() == 0) {
+    r->prep();
+    r->bind_texture(gs->sprites.texture);
+  }
 
   Mat4 view = m4lookat(gs->cam.pos, gs->cam.focus, v3(0,1,0));
   Mat4 VP = m4mul(gs->proj, view);
@@ -696,6 +716,18 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
 
   os_heat_sync();
 
-  r->update_transform(VP);
-  r->present(true);
+  if (runner_id() == 0) {
+    r->update_transform(VP);
+    r->draw_quads();
+
+    r->update_transform(gs->ortho);
+    r->bind_texture(gs->font.texture);
+    draw_string(gs->font, v2(0, 0), str8_lit("Hello, World!"), r);
+    r->draw_quads();
+  }
+
+  if (runner_id() == 0) {
+    r->present(true);
+  }
+
 }

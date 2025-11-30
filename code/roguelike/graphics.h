@@ -19,7 +19,7 @@ typedef struct Sprite {
 } Sprite;
 
 typedef struct Texture_Atlas {
-  PNG_Bitmap_RGBA raw_texture_data;
+  R_Texture_2D texture;
   Sprite *sprites;
   u64 num_sprites;
 } Texture_Atlas;

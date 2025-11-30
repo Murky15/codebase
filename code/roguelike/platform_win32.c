@@ -349,8 +349,8 @@ r_init (HWND hwnd) {
   return v2i(render_width, render_height);
 }
 
-function void
-r_create_and_bind_texture (PNG_Bitmap_RGBA raw_texture_data, b32 generate_mipmaps) {
+function R_Texture_2D
+r_create_texture (PNG_Bitmap_RGBA raw_texture_data, b32 generate_mipmaps) {
   D3D11_TEXTURE2D_DESC tex_desc = {0};
   tex_desc.Width = raw_texture_data.width;
   tex_desc.Height = raw_texture_data.height;
@@ -376,30 +376,30 @@ r_create_and_bind_texture (PNG_Bitmap_RGBA raw_texture_data, b32 generate_mipmap
 
   ID3D11Device_CreateShaderResourceView(device, (ID3D11Resource*)tex, &tex_srv, &tex_view);
   ID3D11DeviceContext_GenerateMips(ctx, tex_view);
-  ID3D11DeviceContext_VSSetShaderResources(ctx, 0, 1, &tex_view);
-  ID3D11DeviceContext_PSSetShaderResources(ctx, 0, 1, &tex_view);
+
+  return (R_Texture_2D)tex_view;
+}
+
+function void
+r_bind_texture (R_Texture_2D tex_view) {
+  ID3D11DeviceContext_VSSetShaderResources(ctx, 0, 1, &(ID3D11ShaderResourceView*)tex_view);
+  ID3D11DeviceContext_PSSetShaderResources(ctx, 0, 1, &(ID3D11ShaderResourceView*)tex_view);
 }
 
 function void
 r_prep (void) {
-  if (runner_id() == 0) {
-    local_persist read_only f32 clear_color[4] = {0.1f, 0.2f, 0.3f, 1.f};
-    memory_zero(quads, num_quads);
-    num_quads = 0;
-    ID3D11DeviceContext_ClearDepthStencilView(ctx, depth_stencil_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.f, 0);
-    ID3D11DeviceContext_ClearRenderTargetView(ctx, render_target_view, clear_color);
-  }
+  local_persist read_only f32 clear_color[4] = {0.1f, 0.2f, 0.3f, 1.f};
+  ID3D11DeviceContext_ClearDepthStencilView(ctx, depth_stencil_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.f, 0);
+  ID3D11DeviceContext_ClearRenderTargetView(ctx, render_target_view, clear_color);
 }
 
 function void
 r_update_transform (Mat4 m) {
-  if (runner_id() == 0) {
-    D3D11_MAPPED_SUBRESOURCE constant_buffer = {0};
-    Uniforms new_transform_data = {m};
-    ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)uniforms, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer);
-    memcpy(constant_buffer.pData, &new_transform_data, sizeof(Uniforms));
-    ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)uniforms, 0);
-  }
+  D3D11_MAPPED_SUBRESOURCE constant_buffer = {0};
+  Uniforms new_transform_data = {m};
+  ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)uniforms, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer);
+  memcpy(constant_buffer.pData, &new_transform_data, sizeof(Uniforms));
+  ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)uniforms, 0);
 }
 
 function void
@@ -427,18 +427,21 @@ r_push_quad_ (Push_Quad_Params *p) {
 }
 
 function void
+r_draw_quads (void) {
+  D3D11_MAPPED_SUBRESOURCE instances = {0};
+
+  ID3D11DeviceContext_OMSetRenderTargets(ctx, 1, &render_target_view, depth_stencil_view);
+  ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instances);
+  memcpy(instances.pData, quads, sizeof(Instance_Data) * num_quads);
+  ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)instance_buffer, 0);
+  ID3D11DeviceContext_DrawIndexedInstanced(ctx, 6, num_quads, 0, 0, 0);
+  memory_zero(quads, num_quads);
+  num_quads = 0;
+}
+
+function void
 r_present (b32 enable_vsync) {
-  if (runner_id() == 0) {
-    D3D11_MAPPED_SUBRESOURCE instances = {0};
-
-    ID3D11DeviceContext_OMSetRenderTargets(ctx, 1, &render_target_view, depth_stencil_view);
-    ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instances);
-    memcpy(instances.pData, quads, sizeof(Instance_Data) * num_quads);
-    ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)instance_buffer, 0);
-    ID3D11DeviceContext_DrawIndexedInstanced(ctx, 6, num_quads, 0, 0, 0);
-
-    IDXGISwapChain_Present(swap_chain, enable_vsync, 0);
-  }
+  IDXGISwapChain_Present(swap_chain, enable_vsync, 0);
 }
 
 function void
@@ -492,7 +495,7 @@ os_entry (void) {
       str8_lit(WIN32_ROGUELIKE_SOURCE_PATH),
       str8_lit(WIN32_ROGUELIKE_ASSET_PATH),
       render_width, render_height,
-      (Renderer_VTable){r_create_and_bind_texture, r_prep, r_update_transform, r_push_quad_, r_present}
+      (Renderer_VTable){r_create_texture, r_bind_texture, r_prep, r_update_transform, r_push_quad_, r_draw_quads, r_present}
       });
 
   }
