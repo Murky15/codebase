@@ -1,7 +1,7 @@
 // raddbg 0.9.21 project file
 
-recent_file: path: "../code/roguelike/roguelike.c"
 recent_file: path: "../code/roguelike/dungeon.c"
+recent_file: path: "../code/roguelike/roguelike.c"
 recent_file: path: "../code/base/rand.c"
 recent_file: path: "../code/os/win32/thread.c"
 recent_file: path: "../code/os/win32/entry.c"
@@ -53,9 +53,4 @@ breakpoint:
   source_location: "../code/roguelike/roguelike.c:250:1"
   hit_count: 0
   enabled: 0
-}
-breakpoint:
-{
-  source_location: "../code/roguelike/roguelike.c:352:1"
-  hit_count: 1
 }

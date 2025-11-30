@@ -96,7 +96,7 @@ typedef struct Dungeon_Tile {
   Sprite sprite;
   Vec2 grid_pos;
   u64 on_perimeter;
-  Dungeon_Perimeter perim[2];
+  Dungeon_Perimeter perim[3];
 } Dungeon_Tile;
 
 typedef struct Dungeon_Perimeter_Tile {

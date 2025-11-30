@@ -66,6 +66,7 @@ typedef struct Game_State {
   Arena *perm;
   Arena *frame;
   Renderer_VTable rvtbl;
+  Vec2 render_dim;
 
   Texture_Atlas sprites;
   Texture_Atlas font;
@@ -216,7 +217,7 @@ load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type 
     for (u64 y = 0; y < bitmap.height; y += glyph_height) {
       for (u64 x = 0; x < bitmap.width; x += glyph_width) {
         // NOTE: Get rid of these unhandled non-ascii characters
-        if (i >= 95) {
+        if (i > 94) {
           break;
         }
         Atlas_Coords coords = {.offset = v2(x,y), .scale = v2(glyph_width, glyph_height)};
@@ -442,6 +443,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   gs->spr_ceil = spr_ceil;
   gs->ceil_color = ceil_color;
   gs->rvtbl = init.rvtbl;
+  gs->render_dim = v2(init.display_width, init.display_height);
 
   return (void*)gs;
 }
@@ -722,7 +724,7 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
 
     r->update_transform(gs->ortho);
     r->bind_texture(gs->font.texture);
-    draw_string(gs->font, v2(0, 0), str8_lit("Hello, World!"), r);
+    draw_string(gs->font, v2(-gs->render_dim.width/2.f), str8_lit("Hello, World!"), r);
     r->draw_quads();
   }
 

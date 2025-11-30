@@ -471,7 +471,7 @@ d_query_range (Arena *arena, Dungeon_Map tree, Rect grid_range, b32 include_full
           Dungeon_Tile *tile = tile_node->tile;
           Rect r0 = {.xy = tile->grid_pos, .zw = v2(1,1)};
           if (include_full_chunk || d_rects_intersect(r0, grid_range)) {
-            assert (tile->on_perimeter <= 2);
+            assert (tile->on_perimeter <= 3);
             InterlockedAdd64(&result->num_perimeter, tile->on_perimeter);
             os_heat_begin_critical_section(); // TODO: Would this be more performant if I moved it to outside the for?
             d_tile_list_push(arena, result, tile);
@@ -615,6 +615,8 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         }
         for (s64 y = r1_p0.y; y < r2_p0.y; ++y) {
           for (s64 x = mp.x - onside_width; x <= mp.x + onside_width; ++x) {
+            x = clamp(x, -half_width, half_width);
+            y = clamp(y, -half_height, half_height);
             Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
@@ -628,6 +630,8 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         }
         for (s64 x = r1_p0.x; x < r2_p0.x; ++x) {
           for (s64 y = mp.y - onside_width; y <= mp.y + onside_width; ++y) {
+            x = clamp(x, -half_width, half_width);
+            y = clamp(y, -half_height, half_height);
             Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
@@ -658,18 +662,21 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
 
         for (s64 x = minx; x <= maxx + onside_width; ++x) {
           for (s64 y = hy - onside_width; y <= hy + onside_width; ++y) {
+            x = clamp(x, -half_width, half_width);
+            y = clamp(y, -half_height, half_height);
             Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
               tile->hallway_section = 0;
               tile->room_or_hallway = new_hallway_ptr;
-
             }
           }
         }
 
         for (s64 y = miny; y <= maxy + onside_width; ++y) {
           for (s64 x = hx - onside_width; x <= hx + onside_width; ++x) {
+            x = clamp(x, -half_width, half_width);
+            y = clamp(y, -half_height, half_height);
             Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
@@ -697,12 +704,10 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         Dungeon_Tile *prev_tile = &result->tiles[y * result->width + (x-1)];
         Dungeon_Perimeter *perim = 0;
         if (tile->flags && !inside_polygon) {
-          perim = tile->perim;
-          tile->on_perimeter++;
+          perim = &tile->perim[tile->on_perimeter++];
           perim->offset = v2(0,1);
         } else if (tile->flags == 0 && inside_polygon) {
-          perim = prev_tile->perim;
-          prev_tile->on_perimeter++;
+          perim = &prev_tile->perim[prev_tile->on_perimeter++];
           perim->offset = v2(1,1);
         }
         if (perim) {
@@ -733,9 +738,10 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         Dungeon_Perimeter *perim = 0;
         if (tile->flags && !inside_polygon) {
           perim = &tile->perim[tile->on_perimeter++];
-
+          assert(tile->on_perimeter <= 3);
         } else if (tile->flags == 0 && inside_polygon) {
           perim = &prev_tile->perim[prev_tile->on_perimeter++];
+          assert(prev_tile->on_perimeter <= 3);
           perim->offset = v2(.y=1);
         }
         if (perim) {
