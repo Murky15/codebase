@@ -163,9 +163,6 @@ struct Entity {
 
   // For Monsters
   Entity_Ref target_hero;
-  Dungeon_Tile_List path;
-  Dungeon_Tile *path_start;
-  Dungeon_Tile *path_end;
 };
 
 typedef u32 Camera_Track_Mode;

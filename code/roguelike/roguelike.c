@@ -68,6 +68,7 @@ typedef struct Game_State {
   Renderer_VTable rvtbl;
 
   Texture_Atlas sprites;
+  Texture_Atlas font;
   Sprite spr_wall_mid;
   Sprite spr_ceil;
   Vec4 ceil_color;
@@ -175,6 +176,52 @@ load_textures (Arena *arena, String8 absolute_path_to_asset_dir) {
     String8 texture_png_data = os_read_file(scratch.arena, path_to_texture_data, false);
     result.raw_texture_data = png_decode(arena, texture_png_data);
   }
+  return result;
+}
+
+function Texture_Atlas
+load_font (Arena* arena, String8 absolute_path_to_bitmap) {
+  Texture_Atlas result = {0};
+
+  // NOTE: Hard-coded monospace font dimensions in pixels
+  // and characters *in-order*
+  local_persist read_only u64 glyph_width  = 6;
+  local_persist read_only u64 glyph_height = 12;
+  local_persist read_only u8 glyph_lookup[] = {
+    ' ','!','"','#','$','%','&','\'','(',')','*','+',',','-','.','/',
+    '0','1','2','3','4','5','6','7','8','9',':',';','<','=','>','?',
+    '@','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O',
+    'P','Q','R','S','T','U','V','W','X','Y','Z','[','\\',']','^','_',
+    '`','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o',
+    'p','q','r','s','t','u','v','w','x','y','z','{','|','}','~','?',
+    '?','!','?','?','?','?','?','?','?','?','?','?','?','?','?','?',
+    '?','?','?','?','?','?','?','?','?','?','?','?','?','?','?','?',
+  };
+
+  Temp_Arena scratch;
+  ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+    String8 bitmap_data = os_read_file(scratch.arena, absolute_path_to_bitmap, false);
+    if (bitmap_data.len == 0) {
+      printf("Unable to find font!\n");
+      exit(1);
+    }
+    PNG_Bitmap_RGBA bitmap = png_decode(arena, bitmap_data);
+    result.raw_texture_data = bitmap;
+    result.num_sprites = (bitmap.width / glyph_width) * (bitmap.height / glyph_height);
+    result.sprites = arena_pushn(arena, Sprite, result.num_sprites);
+    u64 i = 0;
+    for (u64 y = 0; y < bitmap.height; y += glyph_height) {
+      for (u64 x = 0; x < bitmap.width; x += glyph_width) {
+        Atlas_Coords coords = {.offset = v2(x,y), .scale = v2(glyph_width, glyph_height)};
+        u8 c = glyph_lookup[i];
+        Sprite *sprite = &result.sprites[c];
+        sprite->name = str8_cstring((const char*)&c);
+        sprite->coords[0] = coords;
+        ++i;
+      }
+    }
+  }
+
   return result;
 }
 
@@ -298,7 +345,9 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   Game_State *gs = arena_pushn(init.perm, Game_State, 1);
 
   String8 asset_path = str8_pushf(init.frame, "%.*s0x72_DungeonTilesetII_v1.7", str8_expand(init.asset_dir));
+  String8 font_path = str8_pushf(init.frame, "%.*smonogram/bitmap/monogram-bitmap.png", str8_expand(init.asset_dir));
   Texture_Atlas sprites = load_textures(init.perm, asset_path);
+  Texture_Atlas font = load_font(init.perm, font_path);
   init.rvtbl.create_and_bind_texture(sprites.raw_texture_data, true);
 
   Dungeon *dungeon = d_create(init.perm, sprites,
@@ -365,6 +414,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   gs->perm = init.perm;
   gs->frame = init.frame;
   gs->sprites = sprites;
+  gs->font = font;
   gs->dungeon = dungeon;
   gs->proj = proj;
   gs->cam = cam;
@@ -456,10 +506,6 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       if ((hero_tile->room_or_hallway != current_tile->room_or_hallway) ||
           (hero_tile->hallway_section != current_tile->hallway_section)) {
         Dungeon_Tile_List path_to_hero = d_astar_calculate_path(gs->frame, current_tile, hero_tile);
-        if (new_state.path_end == 0 || new_state.path_end != hero_tile) {
-          new_state.path_start = current_tile;
-          new_state.path_end = hero_tile;
-        }
         if (path_to_hero.count > 1) {
           Dungeon_Tile_Node *path_pos = path_to_hero.first->next;
 

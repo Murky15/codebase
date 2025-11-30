@@ -322,6 +322,24 @@ r_init (HWND hwnd) {
   ID3D11DeviceContext_OMSetBlendState(ctx, blend_state, 0, 0xFFFFFFFF);
   ID3D11DeviceContext_OMSetRenderTargets(ctx, 1, &render_target_view, depth_stencil_view);
 
+  D3D11_SAMPLER_DESC sampler_desc;
+  sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+  sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+  sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+  sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+  sampler_desc.MinLOD = 0;
+  sampler_desc.MaxLOD = D3D11_FLOAT32_MAX;
+  sampler_desc.MipLODBias = 0.f;
+  sampler_desc.MaxAnisotropy = 16;
+  sampler_desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+  sampler_desc.BorderColor[0] = 1.f;
+  sampler_desc.BorderColor[1] = 1.f;
+  sampler_desc.BorderColor[2] = 1.f;
+  sampler_desc.BorderColor[3] = 1.f;
+  ID3D11SamplerState *sampler;
+  ID3D11Device_CreateSamplerState(device, &sampler_desc, &sampler);
+  ID3D11DeviceContext_PSSetSamplers(ctx, 0, 1, &sampler);
+
   com_release(back_buffer);
   com_release(vs_code_blob);
   com_release(ps_code_blob);
@@ -360,24 +378,6 @@ r_create_and_bind_texture (PNG_Bitmap_RGBA raw_texture_data, b32 generate_mipmap
   ID3D11DeviceContext_GenerateMips(ctx, tex_view);
   ID3D11DeviceContext_VSSetShaderResources(ctx, 0, 1, &tex_view);
   ID3D11DeviceContext_PSSetShaderResources(ctx, 0, 1, &tex_view);
-
-  D3D11_SAMPLER_DESC sampler_desc;
-  sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-  sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-  sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-  sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-  sampler_desc.MinLOD = 0;
-  sampler_desc.MaxLOD = D3D11_FLOAT32_MAX;
-  sampler_desc.MipLODBias = 0.f;
-  sampler_desc.MaxAnisotropy = 16;
-  sampler_desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-  sampler_desc.BorderColor[0] = 1.f;
-  sampler_desc.BorderColor[1] = 1.f;
-  sampler_desc.BorderColor[2] = 1.f;
-  sampler_desc.BorderColor[3] = 1.f;
-  ID3D11SamplerState *sampler;
-  ID3D11Device_CreateSamplerState(device, &sampler_desc, &sampler);
-  ID3D11DeviceContext_PSSetSamplers(ctx, 0, 1, &sampler);
 }
 
 function void

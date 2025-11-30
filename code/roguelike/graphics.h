@@ -1,6 +1,8 @@
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
 
+typedef void* R_Texture_2D;
+
 typedef struct Atlas_Coords {
   Vec2 scale;
   Vec2 offset;
