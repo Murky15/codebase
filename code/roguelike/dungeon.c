@@ -615,8 +615,8 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         }
         for (s64 y = r1_p0.y; y < r2_p0.y; ++y) {
           for (s64 x = mp.x - onside_width; x <= mp.x + onside_width; ++x) {
-            x = clamp(x, -half_width, half_width);
-            y = clamp(y, -half_height, half_height);
+            x = clamp(x, -half_width, half_width-1);
+            y = clamp(y, -half_height, half_height-1);
             Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
@@ -630,8 +630,8 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
         }
         for (s64 x = r1_p0.x; x < r2_p0.x; ++x) {
           for (s64 y = mp.y - onside_width; y <= mp.y + onside_width; ++y) {
-            x = clamp(x, -half_width, half_width);
-            y = clamp(y, -half_height, half_height);
+            x = clamp(x, -half_width, half_width-1);
+            y = clamp(y, -half_height, half_height-1);
             Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
@@ -662,8 +662,8 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
 
         for (s64 x = minx; x <= maxx + onside_width; ++x) {
           for (s64 y = hy - onside_width; y <= hy + onside_width; ++y) {
-            x = clamp(x, -half_width, half_width);
-            y = clamp(y, -half_height, half_height);
+            x = clamp(x, -half_width, half_width-1);
+            y = clamp(y, -half_height, half_height-1);
             Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;
@@ -675,8 +675,8 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
 
         for (s64 y = miny; y <= maxy + onside_width; ++y) {
           for (s64 x = hx - onside_width; x <= hx + onside_width; ++x) {
-            x = clamp(x, -half_width, half_width);
-            y = clamp(y, -half_height, half_height);
+            x = clamp(x, -half_width, half_width-1);
+            y = clamp(y, -half_height, half_height-1);
             Dungeon_Tile *tile = d_index_tile(v2(x, y));
             if ((tile->flags & DUNGEON_TILE_ROOM) == 0) {
               tile->flags |= DUNGEON_TILE_HALLWAY;

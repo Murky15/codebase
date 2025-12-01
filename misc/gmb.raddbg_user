@@ -39,6 +39,7 @@ window:
       }
       0.25:
       {
+        selected
         watch:
         {
           expression: "query:call_stack"
@@ -49,7 +50,6 @@ window:
     }
     0.397996:
     {
-      selected
       text:
       {
         expression: "file:\"W:/code/roguelike/platform_win32.c\".data"
@@ -84,10 +84,10 @@ window:
           input: assert
           cmd: search
         }
-        cursor_line: 742
-        cursor_column: 57
-        mark_line: 742
-        mark_column: 57
+        cursor_line: 667
+        cursor_column: 1
+        mark_line: 667
+        mark_column: 1
       }
       text:
       {
