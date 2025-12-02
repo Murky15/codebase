@@ -150,9 +150,10 @@ struct Entity {
 
   // Position / Orientation
   Vec3 pos;
-  Vec2 bbox;
   Cardinal_Dir dir;
   f32 speed;
+  Vec2 bbox_lat;
+  Vec2 bbox_col;
 
   // Rotation animation
   f32 start_angle;
