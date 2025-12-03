@@ -403,9 +403,10 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   player.run.seconds_to_complete = 0.5f;
   //player.bbox.width = player.idle.coords[0].scale.width;
   //player.bbox.height = dungeon->grid_dim/4.f;
+  //player.bbox_lat = v2(player.idle.coords[0].scale.width-1, bbox_size);
+  //player.bbox_col = v2(bbox_size, 1);
   f32 bbox_size = dungeon->grid_dim/4.f;
-  player.bbox_lat = v2(player.idle.coords[0].scale.width-1, bbox_size);
-  player.bbox_col = v2(bbox_size, 1);
+  player.bbox = v4(.xy=xz(player.pos), .zw=player.idle.coords[0].scale);
   player.speed = PLAYER_MOVE_SPEED;
   gs->entities[gs->num_entities++] = player;
 
@@ -508,7 +509,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
   // NOTE: Update all entities
   Rangei entity_snippet = os_heat_distribute(gs->num_entities);
   for each_in_range (e, gs->entities, entity_snippet) {
-    Entity new_state = *e;
+    Entity old_state = *e;
+    Entity new_state = old_state;
 
     if (new_state.flags & ENTITY_FLAG_INPUT_SENSITIVE) {
       new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
@@ -552,6 +554,9 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
 
     if (new_state.flags & ENTITY_FLAG_COLLISION) {
       /* NOTE: Handle wall collisions
+
+      Attempt 1: Very prone to phasing due to frame rate
+
       Dungeon_Tile *left = d_index_tile_from_world(xz(new_state.pos));
       if (left->flags == DUNGEON_TILE_EMPTY) {
         Vec2 intersect_pos = d_grid_to_world(v2add(left->grid_pos, v2(1)));
@@ -588,7 +593,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
         f32 y_offset = intersect_pos.y - (new_state.pos.z - new_state.bbox.height/2.f);
         new_state.pos.z += y_offset;
       }
-      */
+
+      Attempt 2: Somewhat prone to phasing, but still not very good, and the bounding box is huge
 
       for (s64 y = -1; y <= 1; ++y) {
         for (s64 x = -1; x <= 1; ++x) {
@@ -635,6 +641,12 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
 
             new_state.pos.x += x_offset;
           }
+        }
+      }
+      */
+      for (s64 y = -1; y <= 1; ++y) {
+        for (s64 x = -1; x <= 1; ++x) {
+          
         }
       }
     }
@@ -784,7 +796,7 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
 
   if (runner_id() == 0) {
     r->present(true);
-    Sleep(33);
+    Sleep(60);
   }
 
 }

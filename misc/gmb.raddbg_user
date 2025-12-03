@@ -1,4 +1,4 @@
-// raddbg 0.9.23 user file
+// raddbg 0.9.21 user file
 
 recent_project: path: "root.raddbg_project"
 recent_project: path: path
@@ -67,76 +67,76 @@ window:
         project: "W:/misc/root.raddbg_project"
         query:
         {
-          input: "new_state.bbox_lat.height"
-          cmd: search
+          input: "_rects_intersect(tile_rec"
+            cmd: search
+          }
+          cursor_line: 612
+          cursor_column: 59
+          mark_line: 612
+          mark_column: 34
         }
-        cursor_line: 612
-        cursor_column: 59
-        mark_line: 612
-        mark_column: 34
-      }
-      text:
-      {
-        expression: "file:\"W:/code/roguelike/dungeon.c\".data"
-        project: "W:/misc/root.raddbg_project"
-        query:
+        text:
         {
-          input: ""
-          cmd: search
-        }
-        cursor_line: 293
-        cursor_column: 1
-        mark_line: 293
-        mark_column: 1
-      }
-      text:
-      {
-        expression: "file:\"W:/code/base/rand.c\".data"
-        auto: 1
-        query: input: ""
-        cursor_line: 9
-        cursor_column: 1
-        mark_line: 9
-        mark_column: 1
-      }
-    }
-    0.307635:
-    {
-      0.647769:
-      {
-        watch:
-        {
-          selected
-          expression: "query:locals"
-          normal: 0.372132 0.627868 0.250000
-        }
-        watch:
-        {
-          expression: ""
-          normal: 0.335916 0.353108 0.310976
+          expression: "file:\"W:/code/roguelike/dungeon.c\".data"
+          project: "W:/misc/root.raddbg_project"
           query:
           {
+            input: ""
             cmd: search
-            input: assert
           }
-          watch: tile
-          watch: prev_tile
-          watch: tile
-          watch: tile
-          watch: tile
-          watch: perim
+          cursor_line: 293
+          cursor_column: 1
+          mark_line: 293
+          mark_column: 1
         }
-        watch: expression: "query:type_views"
+        text:
+        {
+          expression: "file:\"W:/code/base/rand.c\".data"
+          auto: 1
+          query: input: ""
+          cursor_line: 9
+          cursor_column: 1
+          mark_line: 9
+          mark_column: 1
+        }
       }
-      0.352231: watch: selected expression: "query:targets"
+      0.307635:
+      {
+        0.647769:
+        {
+          watch:
+          {
+            selected
+            expression: "query:locals"
+            normal: 0.372132 0.627868 0.250000
+          }
+          watch:
+          {
+            expression: ""
+            normal: 0.335916 0.353108 0.310976
+            query:
+            {
+              cmd: search
+              input: assert
+            }
+            watch: tile
+            watch: prev_tile
+            watch: tile
+            watch: tile
+            watch: tile
+            watch: perim
+          }
+          watch: expression: "query:type_views"
+        }
+        0.352231: watch: selected expression: "query:targets"
+      }
     }
+    split_x
+    pos: 484 312
+    monitor: "\\\\.\\DISPLAY1"
+    font_size: 11
+    maximized
   }
-  split_x
-  pos: 192 162
-  monitor: "\\\\.\\DISPLAY1"
-  font_size: 11
-  maximized
-}
 keybindings:
 {
   { kill_all f5 shift }
