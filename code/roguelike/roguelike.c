@@ -392,7 +392,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   //player.bbox.height = dungeon->grid_dim/4.f;
   //player.bbox_lat = v2(player.idle.coords[0].scale.width-1, bbox_size);
   //player.bbox_col = v2(bbox_size, 1);
-  player.bbox = v2(player.idle.coords[0].scale.x, 5.f);
+  player.bbox = v2(player.idle.coords[0].scale.x, 6.f);
   player.speed = PLAYER_MOVE_SPEED;
   gs->entities[gs->num_entities++] = player;
 
@@ -453,6 +453,8 @@ get_entity (Entity_Ref ref) {
   return result;
 }
 
+global f32 delta_time;
+
 extern void
 roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Package input) {
   Game_State *gs = (Game_State*)game_state;
@@ -483,6 +485,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     }
     os_heat_sync();
   }
+
+  delta_time = dt;
 
   // NOTE: Process received input
   Vec2 move_dir = {0};
@@ -539,97 +543,6 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     }
 
     if (new_state.flags & ENTITY_FLAG_COLLISION) {
-      /* NOTE: Handle wall collisions
-
-      Attempt 1: Very prone to phasing due to frame rate
-
-      Dungeon_Tile *left = d_index_tile_from_world(xz(new_state.pos));
-      if (left->flags == DUNGEON_TILE_EMPTY) {
-        Vec2 intersect_pos = d_grid_to_world(v2add(left->grid_pos, v2(1)));
-        f32 x_offset = intersect_pos.x - new_state.pos.x;
-        new_state.pos.x += x_offset;
-      }
-      Dungeon_Tile *right = d_index_tile_from_world(v2add(xz(new_state.pos), v2(new_state.bbox.width)));
-      if (right->flags == DUNGEON_TILE_EMPTY) {
-        Vec2 intersect_pos = d_grid_to_world(right->grid_pos);
-        f32 x_offset = (new_state.pos.x + new_state.bbox.width) - intersect_pos.x;
-        new_state.pos.x -= x_offset;
-      }
-      Dungeon_Tile *top_left = d_index_tile_from_world(v2add(xz(new_state.pos), v2(.y=new_state.bbox.height/2.f)));
-      if (top_left->flags == DUNGEON_TILE_EMPTY) {
-        Vec2 intersect_pos = d_grid_to_world(top_left->grid_pos);
-        f32 y_offset = (new_state.pos.z + new_state.bbox.height/2.f) - intersect_pos.y;
-        new_state.pos.z -= y_offset;
-      }
-      Dungeon_Tile *top_right = d_index_tile_from_world(v2add(xz(new_state.pos), v2(new_state.bbox.width-1,new_state.bbox.height/2.f)));
-      if (top_right->flags == DUNGEON_TILE_EMPTY) {
-        Vec2 intersect_pos = d_grid_to_world(top_right->grid_pos);
-        f32 y_offset = (new_state.pos.z + new_state.bbox.height/2.f) - intersect_pos.y;
-        new_state.pos.z -= y_offset;
-      }
-      Dungeon_Tile *bottom_left = d_index_tile_from_world(v2sub(xz(new_state.pos), v2(.y=new_state.bbox.height/2.f)));
-      if (bottom_left->flags == DUNGEON_TILE_EMPTY) {
-        Vec2 intersect_pos = d_grid_to_world(v2add(bottom_left->grid_pos, v2(.y=1)));
-        f32 y_offset = intersect_pos.y - (new_state.pos.z - new_state.bbox.height/2.f);
-        new_state.pos.z += y_offset;
-      }
-      Dungeon_Tile *bottom_right = d_index_tile_from_world(v2add(xz(new_state.pos), v2(new_state.bbox.width-1,-new_state.bbox.height/2.f)));
-      if (bottom_right->flags == DUNGEON_TILE_EMPTY) {
-        Vec2 intersect_pos = d_grid_to_world(v2add(bottom_right->grid_pos, v2(.y=1)));
-        f32 y_offset = intersect_pos.y - (new_state.pos.z - new_state.bbox.height/2.f);
-        new_state.pos.z += y_offset;
-      }
-
-      Attempt 2: Somewhat prone to phasing, but still not very good, and the bounding box is huge
-
-      for (s64 y = -1; y <= 1; ++y) {
-        for (s64 x = -1; x <= 1; ++x) {
-          f32 x_offset = 0, y_offset = 0;
-          Vec2 grid_pos = d_world_to_grid(xz(new_state.pos));
-          Vec2 pos_to_check = v2add(grid_pos, v2(x,y));
-          pos_to_check.x = clamp(pos_to_check.x, -gs->dungeon->width/2.f, (gs->dungeon->width/2.f)-1);
-          pos_to_check.y = clamp(pos_to_check.y, -gs->dungeon->height/2.f, (gs->dungeon->height/2.f)-1);
-          Dungeon_Tile *tile_to_check = d_index_tile(pos_to_check);
-          if (tile_to_check->flags == DUNGEON_TILE_EMPTY) {
-            Vec2 tile_pos = d_grid_to_world(tile_to_check->grid_pos);
-            Rect tile_rect = v4(.xy=tile_pos,.zw=v2(gs->dungeon->grid_dim,gs->dungeon->grid_dim));
-
-            Rect top = v4(.xy = xz(new_state.pos), .zw = new_state.bbox_lat);
-            Rect bottom = v4(.xy = v2(new_state.pos.x, new_state.pos.z-new_state.bbox_lat.height), .zw = new_state.bbox_lat);
-            b32 top_intersect = d_rects_intersect(tile_rect, top);
-            b32 bot_intersect = d_rects_intersect(tile_rect, bottom);
-            f32 y_offset_top = tile_rect.y - (top.y + top.height);
-            f32 y_offset_bot = (tile_rect.y + tile_rect.height) - bottom.y;
-            if (top_intersect && bot_intersect) {
-              if (y_offset_bot > gs->dungeon->grid_dim)
-                bot_intersect = false;
-              else
-                top_intersect = false;
-            }
-            if (top_intersect) {
-              y_offset = y_offset_top;
-            }
-            if (bot_intersect) {
-              y_offset = y_offset_bot;
-            }
-            new_state.pos.z += y_offset;
-
-            Rect right = v4(.xy = v2(new_state.pos.x + new_state.bbox_lat.width, new_state.pos.z), .zw = new_state.bbox_col);
-            Rect left = v4(.xy = v2(new_state.pos.x-new_state.bbox_col.width, new_state.pos.z), .zw = new_state.bbox_col);
-            b32 right_intersect = d_rects_intersect(tile_rect, right);
-            b32 left_intersect = d_rects_intersect(tile_rect, left);
-            if (right_intersect) {
-              x_offset += tile_rect.x - (right.x + right.width);
-            }
-            if (left_intersect) {
-              x_offset += (tile_rect.x + tile_rect.width) - left.x;
-            }
-
-            new_state.pos.x += x_offset;
-          }
-        }
-      }
-      */
       Vec2 grid_pos = d_world_to_grid(xz(new_state.pos));
       for (s64 y = -1; y <= 1; ++y) {
         for (s64 x = -1; x <= 1; ++x) {
@@ -641,22 +554,21 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             Vec2 tile_pos = d_grid_to_world(tile_to_check->grid_pos);
             Rect tile_rect = v4(.xy=tile_pos,.zw=v2(gs->dungeon->grid_dim,gs->dungeon->grid_dim));
             Rect collision_rect = {0};
-            if (d_rects_intersect(tile_rect, v4(.xy=xz(new_state.pos), .zw=new_state.bbox), &collision_rect)) {
-              // So we have a collision, but on what side?
-              // Well, by taking the difference between the new position and the old position
-              // we can see in which direction the collision actually occured with some quick testing.
-              Vec3 move_amt = v3sub(new_state.pos, old_state.pos);
-              Vec3 test_hori = v3add(old_state.pos, v3(.x=move_amt.x));
-              Vec3 test_vert = v3add(old_state.pos, v3(.z=move_amt.z));
-              b32  hintersect = d_rects_intersect(tile_rect, v4(.xy=xz(test_hori), .zw=new_state.bbox), 0);
-              b32  vintersect = d_rects_intersect(tile_rect, v4(.xy=xz(test_vert), .zw=new_state.bbox), 0);
+            // Ugly while loop, but it is necessary in cases where the tile rect engulfs the entity's bounding box
+            while (d_rects_intersect(tile_rect, v4(.xy=v2(new_state.pos.x, new_state.pos.z - new_state.bbox.height/2.f), .zw=new_state.bbox), &collision_rect)) {
+              Vec3 move_amt   = v3sub(new_state.pos, old_state.pos);
+              Vec3 test_hori  = v3add(old_state.pos, v3(.x=move_amt.x));
+              Vec3 test_vert  = v3add(old_state.pos, v3(.z=move_amt.z));
+              b32  hintersect = d_rects_intersect(tile_rect, v4(.xy=v2(test_hori.x, test_hori.z - new_state.bbox.height/2.f), .zw=new_state.bbox), 0);
+              b32  vintersect = d_rects_intersect(tile_rect, v4(.xy=v2(test_vert.x, test_vert.z - new_state.bbox.height/2.f), .zw=new_state.bbox), 0);
               if (vintersect) {
                 f32 flip = new_state.dir.y > 0 ? -1 : 1;
                 new_state.pos.z += collision_rect.height * flip;
-              }
-              if (hintersect) {
+              } else if (hintersect) {
                 f32 flip = new_state.dir.x > 0 ? -1 : 1;
                 new_state.pos.x += collision_rect.width * flip;
+              } else {
+                break;
               }
             }
           }
@@ -803,13 +715,12 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
 
     r->update_transform(gs->ortho);
     r->bind_texture(gs->font.texture);
-    //draw_string(gs->font, v2(-gs->render_dim.width/2.f), str8_lit("Hello, World!"), r);
+    draw_string(gs->font, v2(-gs->render_dim.width/2.f), str8_pushf(gs->frame, "FPS: %f", 1000.f/delta_time), r);
     r->draw_quads();
   }
 
   if (runner_id() == 0) {
     r->present(true);
-    Sleep(33);
   }
 
 }
