@@ -159,9 +159,10 @@ typedef struct Dungeon {
 } Dungeon;
 
 // NOTE: Helpers
+// TODO: These should probably be moved into the codebase "types" section
 function u64               d_v2hash(Vec2 v);
-function b32               d_rects_intersect_expanded(Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1);
-function b32               d_rects_intersect(Rect r0, Rect r1);
+function b32               d_rects_intersect_expanded(Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1, Vec2 *opt_out_ip, Vec2 *opt_out_is);
+function b32               d_rects_intersect(Rect r0, Rect r1, Rect *opt_out_overlap);
 function b32               d_point_in_rect(Vec2 p, Rect r);
 function f64               d_gaussian_next(f64 mu, f64 sigma);
 
@@ -171,12 +172,12 @@ function void              d_push_edge(Arena *arena, D_Edge_List *edges, D_Edge 
 function void              d_push_edge_if_unique(Arena *arena, D_Edge_List *edges, D_Edge e);
 function void              d_polygon_push_triangle_edges(Arena *arena, D_Edge_List *p, D_Triangle triangle);
 
-// NOTE: D_Triangle Manipulation
+// NOTE: Triangle Manipulation
 function D_Triangle        d_make_triangle(Vec2 p0, Vec2 p1, Vec2 p2);
 function void              d_mesh_push_triangle(Arena *arena, D_Triangle_Mesh *mesh, D_Triangle triangle);
 function b32               d_shared_vertex(D_Triangle a, D_Triangle b);
 
-// NOTE: D_Vertex Manipulation
+// NOTE: Vertex Manipulation
 function D_Vertex*         d_get_vertex(D_Vertex *vertices, u64 num_vertices, Vec2 v);
 function void              d_push_vertex_if_unique(Arena *arena, D_Vertex_Neighborhood *n, D_Vertex *v);
 

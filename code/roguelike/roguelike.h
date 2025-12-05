@@ -66,19 +66,6 @@ typedef struct Game_VTable {
 
 // NOTE: Game data
 
-typedef u32 Cardinal_Dir;
-enum {
-  NORTH = (1 << 0),
-  SOUTH = (1 << 1),
-  EAST  = (1 << 2),
-  WEST  = (1 << 3),
-
-  NORTHEAST = NORTH | EAST,
-  NORTHWEST = NORTH | WEST,
-  SOUTHEAST = SOUTH | EAST,
-  SOUTHWEST = SOUTH | WEST,
-};
-
 typedef u64 Entity_Flags;
 enum {
   ENTITY_FLAG_INPUT_SENSITIVE = (1 << 0),
@@ -150,9 +137,9 @@ struct Entity {
 
   // Position / Orientation
   Vec3 pos;
-  Cardinal_Dir dir;
+  Vec2 dir;
   f32 speed;
-  Rect bbox;
+  Vec2 bbox;
 
   // Rotation animation
   f32 start_angle;
@@ -192,8 +179,6 @@ typedef struct Camera {
   Entity_Ref tracking;
   Camera_Track_Mode track_mode;
 } Camera;
-
-function Cardinal_Dir to_cardinal(Vec2 dir);
 
 function Sprite*       get_atlas_slot(Texture_Atlas atlas, String8 key);
 function Sprite        get_sprite(Texture_Atlas atlas, String8 key);

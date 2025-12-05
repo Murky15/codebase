@@ -88,19 +88,6 @@ typedef struct Game_State {
 
 global threadvar b32 dll_is_loaded = false;
 
-function Cardinal_Dir
-to_cardinal (Vec2 dir) {
-  Cardinal_Dir result = 0;
-  if (dir.x != 0) {
-    result |= dir.x > 0 ? EAST : WEST;
-  }
-  if (dir.y != 0) {
-    result |= dir.y > 0 ? NORTH : SOUTH;
-  }
-
-  return result;
-}
-
 // These could probably be named better
 function Sprite*
 get_atlas_slot (Texture_Atlas atlas, String8 key) {
@@ -317,7 +304,7 @@ draw_entity (Entity *e, Renderer_VTable *r) {
   Sprite *anim = &e->run;
   Sprite *prev_anim = &e->idle;
   if (e->flags & ENTITY_FLAG_ANIMATE_SPRITES) {
-    if (e->dir == 0) {
+    if (e->dir.x == 0 && e->dir.y == 0) {
       swap(anim, prev_anim);
     }
     if (prev_anim->started_at || anim->started_at == 0) {
@@ -405,8 +392,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   //player.bbox.height = dungeon->grid_dim/4.f;
   //player.bbox_lat = v2(player.idle.coords[0].scale.width-1, bbox_size);
   //player.bbox_col = v2(bbox_size, 1);
-  f32 bbox_size = dungeon->grid_dim/4.f;
-  player.bbox = v4(.xy=xz(player.pos), .zw=player.idle.coords[0].scale);
+  player.bbox = v2(player.idle.coords[0].scale.x, 5.f);
   player.speed = PLAYER_MOVE_SPEED;
   gs->entities[gs->num_entities++] = player;
 
@@ -475,7 +461,6 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     os_set_thread_context(*tctx);
     if (runner_id() == 0) {
       d_select(gs->dungeon);
-
       /*
       Entity enemy = {0};
       enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES
@@ -494,6 +479,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       gs->entities[1] = enemy;
       gs->num_entities = 2;
       */
+
     }
     os_heat_sync();
   }
@@ -514,7 +500,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
 
     if (new_state.flags & ENTITY_FLAG_INPUT_SENSITIVE) {
       new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
-      new_state.dir = to_cardinal(move_dir);
+      new_state.dir = move_dir;
     } else {
       Dungeon_Tile *current_tile = d_index_tile_from_world(xz(new_state.pos));
       // NOTE: Find Hero
@@ -549,7 +535,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       Vec2 move_dir = v2sub(next_pos, xz(new_state.pos));
       if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
       new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
-      new_state.dir = to_cardinal(move_dir);
+      new_state.dir = move_dir;
     }
 
     if (new_state.flags & ENTITY_FLAG_COLLISION) {
@@ -644,17 +630,44 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
         }
       }
       */
+      Vec2 grid_pos = d_world_to_grid(xz(new_state.pos));
       for (s64 y = -1; y <= 1; ++y) {
         for (s64 x = -1; x <= 1; ++x) {
-          
+          Vec2 pos_to_check = v2add(grid_pos, v2(x,y));
+          pos_to_check.x = clamp(pos_to_check.x, -gs->dungeon->width/2.f, (gs->dungeon->width/2.f)-1);
+          pos_to_check.y = clamp(pos_to_check.y, -gs->dungeon->height/2.f, (gs->dungeon->height/2.f)-1);
+          Dungeon_Tile *tile_to_check = d_index_tile(pos_to_check);
+          if (tile_to_check->flags == DUNGEON_TILE_EMPTY) {
+            Vec2 tile_pos = d_grid_to_world(tile_to_check->grid_pos);
+            Rect tile_rect = v4(.xy=tile_pos,.zw=v2(gs->dungeon->grid_dim,gs->dungeon->grid_dim));
+            Rect collision_rect = {0};
+            if (d_rects_intersect(tile_rect, v4(.xy=xz(new_state.pos), .zw=new_state.bbox), &collision_rect)) {
+              // So we have a collision, but on what side?
+              // Well, by taking the difference between the new position and the old position
+              // we can see in which direction the collision actually occured with some quick testing.
+              Vec3 move_amt = v3sub(new_state.pos, old_state.pos);
+              Vec3 test_hori = v3add(old_state.pos, v3(.x=move_amt.x));
+              Vec3 test_vert = v3add(old_state.pos, v3(.z=move_amt.z));
+              b32  hintersect = d_rects_intersect(tile_rect, v4(.xy=xz(test_hori), .zw=new_state.bbox), 0);
+              b32  vintersect = d_rects_intersect(tile_rect, v4(.xy=xz(test_vert), .zw=new_state.bbox), 0);
+              if (vintersect) {
+                f32 flip = new_state.dir.y > 0 ? -1 : 1;
+                new_state.pos.z += collision_rect.height * flip;
+              }
+              if (hintersect) {
+                f32 flip = new_state.dir.x > 0 ? -1 : 1;
+                new_state.pos.x += collision_rect.width * flip;
+              }
+            }
+          }
         }
       }
     }
 
     if (new_state.flags & ENTITY_FLAG_ANIMATE_ROTATIONS) {
-      if (new_state.dir & EAST) {
+      if (new_state.dir.x > 0) {
         new_state.end_angle = 0;
-      } else if (new_state.dir & WEST) {
+      } else if (new_state.dir.x < 0) {
         new_state.end_angle = M_PI32;
       }
 
@@ -796,7 +809,7 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
 
   if (runner_id() == 0) {
     r->present(true);
-    Sleep(60);
+    Sleep(33);
   }
 
 }

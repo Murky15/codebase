@@ -263,16 +263,31 @@ d_push_room (Arena *arena, Dungeon_Room room) {
 }
 
 function b32
-d_rects_intersect_expanded (Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1) {
-  return  (p0.x + s0.x > p1.x) &&
-          (p1.x + s1.x > p0.x) &&
-          (p0.y + s0.y > p1.y) &&
-          (p1.y + s1.y > p0.y);
+d_rects_intersect_expanded (Vec2 p0, Vec2 s0, Vec2 p1, Vec2 s1, Vec2 *opt_out_ip, Vec2 *opt_out_is) {
+  b32 is_intersecting = (p0.x + s0.x > p1.x) &&
+                        (p1.x + s1.x > p0.x) &&
+                        (p0.y + s0.y > p1.y) &&
+                        (p1.y + s1.y > p0.y);
+
+  if (is_intersecting && opt_out_ip) {
+    Vec2 ip = v2(max(p0.x,p1.x),max(p0.y,p1.y));
+    f32 w0 = p0.x + s0.x;
+    f32 w1 = p1.x + s1.x;
+    f32 h0 = p0.y + s0.y;
+    f32 h1 = p1.y + s1.y;
+    Vec2 is = {0};
+    is.x = w0 < w1 ? w0 - ip.x : w1 - ip.x;
+    is.y = h0 < h1 ? h0 - ip.y : h1 - ip.y;
+    *opt_out_ip = ip;
+    *opt_out_is = is;
+  }
+
+  return is_intersecting;
 }
 
 function b32
-d_rects_intersect (Rect r0, Rect r1) {
-  return d_rects_intersect_expanded(r0.xy, r0.zw, r1.xy, r1.zw);
+d_rects_intersect (Rect r0, Rect r1, Rect *opt_out_overlap) {
+  return d_rects_intersect_expanded(r0.xy, r0.zw, r1.xy, r1.zw, &opt_out_overlap->xy, &opt_out_overlap->zw);
 }
 
 function b32
@@ -466,11 +481,11 @@ d_query_range (Arena *arena, Dungeon_Map tree, Rect grid_range, b32 include_full
 
     Dungeon_Slice *slice = next_slice_to_check[slice_idx];
     if (slice->is_leaf) {
-      if (d_rects_intersect(slice->bounds, grid_range)) {
+      if (d_rects_intersect(slice->bounds, grid_range, 0)) {
         for each_in_list (tile_node, &slice->tiles) {
           Dungeon_Tile *tile = tile_node->tile;
           Rect r0 = {.xy = tile->grid_pos, .zw = v2(1,1)};
-          if (include_full_chunk || d_rects_intersect(r0, grid_range)) {
+          if (include_full_chunk || d_rects_intersect(r0, grid_range, 0)) {
             assert (tile->on_perimeter <= 3);
             InterlockedAdd64(&result->num_perimeter, tile->on_perimeter);
             os_heat_begin_critical_section(); // TODO: Would this be more performant if I moved it to outside the for?
@@ -543,7 +558,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
             Vec2 new_size = v2add(world_size, border);
             Vec2 room_pos = v2sub(room->world_pos, border);
             Vec2 room_size = v2add(room->world_size, border);
-            if (d_rects_intersect_expanded(new_pos, new_size, room_pos, room_size)) {
+            if (d_rects_intersect_expanded(new_pos, new_size, room_pos, room_size, 0, 0)) {
               clear = false;
               break;
             }
