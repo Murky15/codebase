@@ -64,3 +64,13 @@ debug_info:
   path: "W:/build/roguelike_new.pdb"
   timestamp: 66200319068404
 }
+breakpoint:
+{
+  source_location: "../code/roguelike/roguelike.c:753:1"
+  hit_count: 1
+}
+breakpoint:
+{
+  source_location: "../code/roguelike/roguelike.c:752:1"
+  hit_count: 0
+}

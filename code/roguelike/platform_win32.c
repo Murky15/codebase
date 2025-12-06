@@ -411,7 +411,9 @@ r_push_quad_ (Push_Quad_Params *p) {
   Atlas_Coords coords = p->atlas_coords;
   if (p->sprite.name.len) {
     coords = p->sprite.coords[0];
-    scale = coords.scale;
+    if (scale.x == 1 && scale.y == 1) {
+      scale = coords.scale;
+    }
   }
   Mat4 T = m4translate(p->pos);
   Mat4 R = m4rotate(p->rot);

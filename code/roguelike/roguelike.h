@@ -73,6 +73,7 @@ enum {
   ENTITY_FLAG_ANIMATE_ROTATIONS = (1 << 2),
   ENTITY_FLAG_DRAWABLE = (1 << 3),
   ENTITY_FLAG_COLLISION = (1 << 4),
+  ENTITY_FLAG_DRAW_HEALTH = (1 << 5),
 };
 
 typedef u32 Entity_Class;
@@ -144,6 +145,7 @@ struct Entity {
   // Stats
   f32 hp;
   f32 hp_max;
+  u64 num_heart_containers;
 
   // Rotation animation
   f32 start_angle;

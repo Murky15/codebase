@@ -77,6 +77,9 @@ typedef struct Game_State {
   Texture_Atlas font;
   Sprite spr_wall_mid;
   Sprite spr_ceil;
+  Sprite spr_heart_full;
+  Sprite spr_heart_half;
+  Sprite spr_heart_empty;
   Vec4 ceil_color;
 
   Dungeon *dungeon;
@@ -350,7 +353,7 @@ draw_string (Texture_Atlas font_atlas, Vec2 pos, String8 string, f32 scale) {
     u8 c = string.str[i];
     Atlas_Coords coords = font_atlas.sprites[c].coords[0];
     f32 glyph_height_scale = glyph_scale * (coords.scale.height / coords.scale.width);
-    r_push_quad(.pos = v3(pos.x+i*(coords.scale.x+glyph_scale),pos.y), .atlas_coords=coords, .scale=v2(glyph_scale,glyph_height_scale));
+    r_push_quad(.pos = v3(pos.x+i*glyph_scale,pos.y), .atlas_coords=coords, .scale=v2(glyph_scale,glyph_height_scale));
   }
 }
 
@@ -385,7 +388,8 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     | ENTITY_FLAG_ANIMATE_SPRITES
     | ENTITY_FLAG_ANIMATE_ROTATIONS
     | ENTITY_FLAG_DRAWABLE
-    | ENTITY_FLAG_COLLISION;
+    | ENTITY_FLAG_COLLISION
+    | ENTITY_FLAG_DRAW_HEALTH;
 
   player.pos = v3(0,1,0);
   while (d_index_tile_from_world(xz(player.pos))->flags == DUNGEON_TILE_EMPTY) {
@@ -400,7 +404,9 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   player.run.seconds_to_complete = 0.5f;
   player.bbox = v2(player.idle.coords[0].scale.x, 6.f);
   player.speed = PLAYER_MOVE_SPEED;
-  player.hp = player.hp_max = 100.f;
+  player.hp = 80.f;
+  player.hp_max = 100.f;
+  player.num_heart_containers = 4;
   gs->entities[gs->num_entities++] = player;
 
   f32 fov_h = M_PI32/4.f;
@@ -424,6 +430,9 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   // NOTE: This sprite pack comes with a variety of sprites, but we can only use a few of them because of the 3D perspective
   Sprite spr_wall_mid = get_sprite(sprites, str8_lit("wall_mid"));
   Sprite spr_ceil = get_sprite(sprites, str8_lit("wall_top_mid"));
+  Sprite spr_heart_full = get_sprite(sprites, str8_lit("ui_heart_full"));
+  Sprite spr_heart_half = get_sprite(sprites, str8_lit("ui_heart_half"));
+  Sprite spr_heart_empty = get_sprite(sprites, str8_lit("ui_heart_empty"));
   Vec4 ceil_color = v4(0.13f,0.13f,0.13f,1);
 
   gs->perm = init.perm;
@@ -438,6 +447,9 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   gs->forward_wall_rot = forward_wall_rot;
   gs->spr_wall_mid = spr_wall_mid;
   gs->spr_ceil = spr_ceil;
+  gs->spr_heart_full = spr_heart_full;
+  gs->spr_heart_half = spr_heart_half;
+  gs->spr_heart_empty = spr_heart_empty;
   gs->ceil_color = ceil_color;
   gs->rvtbl = init.rvtbl;
   gs->render_dim = v2(init.display_width, init.display_height);
@@ -718,12 +730,39 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
 
     // NOTE: Draw HUD
     r->update_transform(gs->ortho);
-
   }
 
+  os_heat_sync();
 
+  for each_in_range (e, gs->entities, entity_snippet) {
+    if (e->flags & ENTITY_FLAG_DRAW_HEALTH) {
+      f32 heart_hud_scale = gs->render_dim.width * 0.04f;
+      f32 heart_gap_size = gs->render_dim.width * 0.005f;
+      f32 heart_hud_step = (heart_hud_scale + heart_gap_size);
+      f32 full_width = e->num_heart_containers * heart_hud_step;
+      Vec3 pos = v3((gs->render_dim.width/2.f) - full_width, (gs->render_dim.height/2.f) - heart_hud_step);
+
+      f32 hp_per_container = e->hp_max / e->num_heart_containers;
+      f32 current_hp = e->hp;
+
+      for (u64 i = 0; i < e->num_heart_containers; ++i) {
+        Sprite heart = gs->spr_heart_full;
+        current_hp -= hp_per_container;
+        if (current_hp <= -hp_per_container) {
+          heart = gs->spr_heart_empty;
+        } else if (current_hp < -hp_per_container/2.f) {
+          heart = gs->spr_heart_half;
+        }
+        r_push_quad(.pos = v3add(pos, v3(i*heart_hud_step)), .scale = v2(heart_hud_scale, heart_hud_scale), .sprite = heart);
+      }
+    }
+  }
+
+  os_heat_sync();
 
   if (runner_id() == 0) {
+    r->draw_quads();
+
     r->bind_texture(gs->font.texture);
     f32 text_scale = 0.03f;
     draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 2 * gs->render_dim.width),
