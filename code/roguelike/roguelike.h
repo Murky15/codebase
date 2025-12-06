@@ -141,6 +141,10 @@ struct Entity {
   f32 speed;
   Vec2 bbox;
 
+  // Stats
+  f32 hp;
+  f32 hp_max;
+
   // Rotation animation
   f32 start_angle;
   f32 end_angle;
@@ -190,6 +194,7 @@ function Rect cam_calculate_visible_range(Camera cam, f32 fov_h, f32 aspect_rati
 function void cam_set_target(Camera *cam, Entity *e, Camera_Track_Mode track_mode);
 function void cam_update_tracking(Camera *cam, f32 dt);
 
-function void draw_entity(Entity *e, Renderer_VTable *r);
+function void draw_entity(Entity *e);
+function void draw_string(Texture_Atlas font_atlas, Vec2 pos, String8 string, f32 scale);
 
 #endif // ROGUELIKE_H

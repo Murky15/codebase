@@ -41,6 +41,11 @@
   - [ ] Debug wireframe renderer for hitboxes
   - [ ] HUD
   - [ ] Audio
+  - [ ] Clean up entity pathfinding
+
+  For bosses, instead of a health bar, we can still just use the hearts.
+  We should display them at the top-middle portion of the screen but every time you hit the boss it doesn't
+  immediately split the heart it will have like a little shake effect for a few hits before breaking.
 */
 
 #define OS_NO_ENTRY 1
@@ -87,6 +92,8 @@ typedef struct Game_State {
 } Game_State;
 
 global threadvar b32 dll_is_loaded = false;
+global Game_State *gs;
+global f32 g_delta_time;
 
 // These could probably be named better
 function Sprite*
@@ -300,7 +307,8 @@ cam_update_tracking (Camera *cam, f32 dt) {
 }
 
 function void
-draw_entity (Entity *e, Renderer_VTable *r) {
+draw_entity (Entity *e) {
+  Renderer_VTable *r = &gs->rvtbl;
   Sprite *anim = &e->run;
   Sprite *prev_anim = &e->idle;
   if (e->flags & ENTITY_FLAG_ANIMATE_SPRITES) {
@@ -335,11 +343,14 @@ draw_entity (Entity *e, Renderer_VTable *r) {
 }
 
 function void
-draw_string (Texture_Atlas font_atlas, Vec2 pos, String8 string, Renderer_VTable *r) {
+draw_string (Texture_Atlas font_atlas, Vec2 pos, String8 string, f32 scale) {
+  Renderer_VTable *r = &gs->rvtbl;
+  f32 glyph_scale = scale * gs->render_dim.width;
   for (u64 i = 0; i < string.len; ++i) {
     u8 c = string.str[i];
     Atlas_Coords coords = font_atlas.sprites[c].coords[0];
-    r_push_quad(.pos = v3(pos.x+i*coords.scale.x*10,pos.y), .atlas_coords=coords, .scale=v2(60, 120));
+    f32 glyph_height_scale = glyph_scale * (coords.scale.height / coords.scale.width);
+    r_push_quad(.pos = v3(pos.x+i*(coords.scale.x+glyph_scale),pos.y), .atlas_coords=coords, .scale=v2(glyph_scale,glyph_height_scale));
   }
 }
 
@@ -377,7 +388,6 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     | ENTITY_FLAG_COLLISION;
 
   player.pos = v3(0,1,0);
-
   while (d_index_tile_from_world(xz(player.pos))->flags == DUNGEON_TILE_EMPTY) {
     player.pos.x = (f32)(rand_next() % dungeon->width) - dungeon->width/2;
     player.pos.z = (f32)(rand_next() % dungeon->height) - dungeon->height/2;
@@ -388,12 +398,9 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   player.idle.seconds_to_complete = 0.5f;
   player.run  = get_sprite(sprites, str8_lit("knight_m_run_anim"));
   player.run.seconds_to_complete = 0.5f;
-  //player.bbox.width = player.idle.coords[0].scale.width;
-  //player.bbox.height = dungeon->grid_dim/4.f;
-  //player.bbox_lat = v2(player.idle.coords[0].scale.width-1, bbox_size);
-  //player.bbox_col = v2(bbox_size, 1);
   player.bbox = v2(player.idle.coords[0].scale.x, 6.f);
   player.speed = PLAYER_MOVE_SPEED;
+  player.hp = player.hp_max = 100.f;
   gs->entities[gs->num_entities++] = player;
 
   f32 fov_h = M_PI32/4.f;
@@ -453,17 +460,15 @@ get_entity (Entity_Ref ref) {
   return result;
 }
 
-global f32 delta_time;
-
 extern void
 roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Package input) {
-  Game_State *gs = (Game_State*)game_state;
   if (!dll_is_loaded) {
     dll_is_loaded = true;
     os_set_thread_context(*tctx);
     if (runner_id() == 0) {
+      Game_State *new_game_state = (Game_State*)game_state;
+      gs = new_game_state;
       d_select(gs->dungeon);
-      /*
       Entity enemy = {0};
       enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES
         | ENTITY_FLAG_ANIMATE_ROTATIONS
@@ -478,15 +483,11 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       enemy.speed = MONSTER_MOVE_SPEED;
       enemy.bbox.width = enemy.idle.coords[0].scale.width;
       enemy.bbox.height = gs->dungeon->grid_dim/2.f;
-      gs->entities[1] = enemy;
-      gs->num_entities = 2;
-      */
-
+      gs->entities[1] = (Entity){0};
+      gs->num_entities = 1;
     }
     os_heat_sync();
   }
-
-  delta_time = dt;
 
   // NOTE: Process received input
   Vec2 move_dir = {0};
@@ -518,7 +519,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           }
         }
       }
-      Vec2 next_pos = v2();
+      Vec2 next_pos = v2(0);
       Dungeon_Tile *hero_tile = d_index_tile_from_world(xz(target_hero->pos));
       if ((hero_tile->room_or_hallway != current_tile->room_or_hallway) ||
           (hero_tile->hallway_section != current_tile->hallway_section)) {
@@ -602,6 +603,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
 
   if (runner_id() == 0) {
     cam_update_tracking(&gs->cam, dt);
+
+    g_delta_time = dt;
   }
 }
 
@@ -703,7 +706,7 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
   Rangei entity_snippet = os_heat_distribute(gs->num_entities);
   for each_in_range (e, gs->entities, entity_snippet) {
     if (e->flags & ENTITY_FLAG_DRAWABLE) {
-      draw_entity(e, r);
+      draw_entity(e);
     }
   }
 
@@ -713,14 +716,20 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
     r->update_transform(VP);
     r->draw_quads();
 
+    // NOTE: Draw HUD
     r->update_transform(gs->ortho);
-    r->bind_texture(gs->font.texture);
-    draw_string(gs->font, v2(-gs->render_dim.width/2.f), str8_pushf(gs->frame, "FPS: %f", 1000.f/delta_time), r);
-    r->draw_quads();
+
   }
+
+
 
   if (runner_id() == 0) {
+    r->bind_texture(gs->font.texture);
+    f32 text_scale = 0.03f;
+    draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 2 * gs->render_dim.width),
+      str8_pushf(gs->frame, "FPS: %f", 1000.f/g_delta_time), text_scale);
+    r->draw_quads();
+
     r->present(true);
   }
-
 }
