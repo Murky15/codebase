@@ -404,9 +404,9 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   player.run.seconds_to_complete = 0.5f;
   player.bbox = v2(player.idle.coords[0].scale.x, 6.f);
   player.speed = PLAYER_MOVE_SPEED;
-  player.hp = 80.f;
-  player.hp_max = 100.f;
-  player.num_heart_containers = 4;
+  player.hp = 75.f;
+  player.hp_max = 75.f;
+  player.num_heart_containers = 3;
   gs->entities[gs->num_entities++] = player;
 
   f32 fov_h = M_PI32/4.f;
@@ -764,7 +764,7 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
     r->draw_quads();
 
     r->bind_texture(gs->font.texture);
-    f32 text_scale = 0.03f;
+    f32 text_scale = 0.025f;
     draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 2 * gs->render_dim.width),
       str8_pushf(gs->frame, "FPS: %f", 1000.f/g_delta_time), text_scale);
     r->draw_quads();
