@@ -54,15 +54,18 @@ window:
       {
         expression: "file:\"W:/code/roguelike/platform_win32.c\".data"
         project: "W:/misc/root.raddbg_project"
-        query: input: ""
-        cursor_line: 533
+        query:
+        {
+          input: ""
+          cmd: search
+        }
+        cursor_line: 133
         cursor_column: 1
-        mark_line: 533
+        mark_line: 133
         mark_column: 1
       }
       text:
       {
-        selected
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query:
@@ -91,12 +94,13 @@ window:
       }
       text:
       {
-        expression: "file:\"W:/code/base/rand.c\".data"
+        selected
+        expression: "file:\"W:/code/roguelike/graphics_ogl.c\".data"
         auto: 1
         query: input: ""
-        cursor_line: 9
+        cursor_line: 21
         cursor_column: 1
-        mark_line: 9
+        mark_line: 21
         mark_column: 1
       }
     }
@@ -127,6 +131,7 @@ window:
           watch: perim
           watch: checks
           watch: move_amt
+          watch: num_config
         }
         watch: expression: "query:type_views"
       }
