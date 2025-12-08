@@ -7,19 +7,10 @@ typedef R_Texture_2D (*r_create_texture_type)(PNG_Bitmap_RGBA,b32);
 typedef void         (*r_bind_texture_type)(R_Texture_2D);
 typedef void         (*r_prep_type)(void);
 typedef void         (*r_update_transform_type)(Mat4);
-typedef void         (*r_push_quad_type)(Push_Quad_Params);
+typedef void         (*r_push_quad_type)(Push_Quad_Params*);
 typedef void         (*r_draw_quads_type)(void);
-typedef void         (*r_present_type)(Push_Quad_Params);
+typedef void         (*r_present_type)(b32);
 
-typedef struct Push_Quad_Params {
-  Vec3 pos;
-  Vec2 scale;
-  Vec2 rot_offset;
-  Vec4 col;
-  Quat rot;
-  Atlas_Coords atlas_coords;
-  Sprite sprite;
-} Push_Quad_Params;
 #define r_push_quad(...) r->push_quad(&(Push_Quad_Params){ \
   .scale = v2(1,1), \
   .col = v4(1,1,1,1), \

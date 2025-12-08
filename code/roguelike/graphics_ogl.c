@@ -31,6 +31,9 @@ r_init (R_Window canvas) {
   eglQuerySurface(display, surface, EGL_WIDTH,  &width);
   eglQuerySurface(display, surface, EGL_HEIGHT, &height);
 
+  GLuint vertex_buffer;
+  glGenBuffers(1, &vertex_buffer);
+
   return v2i(width, height);
 }
 
@@ -56,7 +59,28 @@ r_update_transform (Mat4 m) {
 
 function void
 r_push_quad_ (Push_Quad_Params *p) {
+  R_Instance_Data *next_inst;
+  next_inst = &quads[InterlockedIncrement64(&num_quads)-1];
 
+  Vec2 scale = p->scale;
+  Atlas_Coords coords = p->atlas_coords;
+  if (p->sprite.name.len) {
+    coords = p->sprite.coords[0];
+    if (scale.x == 1 && scale.y == 1) {
+      scale = coords.scale;
+    }
+  }
+  Mat4 T = m4translate(p->pos);
+  Mat4 R = m4rotate(p->rot);
+  R = m4mul(m4translate(v3(.xy=p->rot_offset)), R);
+  R = m4mul(R, m4translate(v3(-p->rot_offset.x, -p->rot_offset.y, 0)));
+  Mat4 S = m4scale(v3(.xy=scale));
+  Mat4 world = m4mul(T,R);
+  world = m4mul(world,S);
+
+  next_inst->world = world;
+  next_inst->atlas_coords = coords;
+  next_inst->color = p->col;
 }
 
 function void
