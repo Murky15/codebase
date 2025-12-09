@@ -15,7 +15,7 @@ r_init (R_Window canvas) {
     EGL_NONE
   };
   local_persist read_only EGLint context_attributes[] = {
-    EGL_CONTEXT_MAJOR_VERSION, 2,
+    EGL_CONTEXT_MAJOR_VERSION, 3,
     EGL_CONTEXT_MINOR_VERSION, 0,
     EGL_NONE
   };
