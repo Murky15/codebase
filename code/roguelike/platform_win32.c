@@ -16,7 +16,7 @@
 #include <windows.h>
 #include <shlwapi.h>
 #include <EGL/egl.h>
-#include <GLES2/gl2.h>
+#include <GLES3/gl31.h>
 #include <stdlib.h>
 #include <stdio.h>
 #define ENABLE_ASSERT 1

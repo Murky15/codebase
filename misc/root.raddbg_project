@@ -58,11 +58,10 @@ breakpoint:
 debug_info:
 {
   path: "W:/build/roguelike_platform_win32.pdb"
-  timestamp: 66200533258551
+  timestamp: 66200534181258
 }
 debug_info:
 {
   path: "W:/build/roguelike_new.pdb"
-  timestamp: 66200533101285
+  timestamp: 66200534181053
 }
-breakpoint: source_location: "../code/roguelike/graphics_ogl.c:16:1"
