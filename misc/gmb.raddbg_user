@@ -98,10 +98,10 @@ window:
         expression: "file:\"W:/code/roguelike/graphics_ogl.c\".data"
         auto: 1
         query: input: ""
-        cursor_line: 21
-        cursor_column: 1
-        mark_line: 21
-        mark_column: 1
+        cursor_line: 20
+        cursor_column: 59
+        mark_line: 20
+        mark_column: 59
       }
     }
     0.259997:

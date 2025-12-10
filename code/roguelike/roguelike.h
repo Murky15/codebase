@@ -152,6 +152,9 @@ struct Entity {
   Sprite idle;
   Sprite run;
 
+  // Misc
+  Entity_Ref weapon;
+
   // For Monsters
   Entity_Ref target_hero;
 };
