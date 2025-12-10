@@ -615,8 +615,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             5. Rotate sword to face this point
           */
 
-          cursor_ndc = v2div(input.cursor, gs->render_dim);
-          //cursor_ndc = v2
+          cursor_ndc = v2div(input.cursor, v2muls(gs->render_dim, 0.5f));
+          cursor_ndc = v2sub(cursor_ndc, v2(1,1));
 
         }
       } break;
