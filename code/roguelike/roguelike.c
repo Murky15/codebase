@@ -51,6 +51,8 @@
 /* NOTE
   What if nobody starts with any weapons and the player just has to
   punch their way to the nearest chest. Can heroes pick up weapons from monsters?
+
+  What if there was a weapon that you could throw and retreive like Thor's hammer?
 */
 
 #define OS_NO_ENTRY 1
@@ -99,9 +101,16 @@ typedef struct Game_State {
   Entity entities[MAX_ENTITIES];
 } Game_State;
 
+// NOTE: Actual useful globals
 global threadvar b32 dll_is_loaded = false;
 global Game_State *gs;
-global f32 g_delta_time;
+
+// NOTE: Debug globals (must be cleaned up)
+global f32  g_delta_time;
+global Vec2 g_cursor;
+global b32  g_action_primary;
+
+global Vec2 cursor_ndc;
 
 // These could probably be named better
 function Sprite*
@@ -360,13 +369,16 @@ draw_entity (Entity *e) {
     anim->current_frame = 0;
   }
 
-  Quat rot = axis_angle(v3(0,1,0), e->rotation_angle);
+  Quat rot = e->rot;
+  if (e->flags & ENTITY_FLAG_ANIMATE_ROTATIONS) {
+    rot = axis_angle(v3(0,1,0), e->rotation_angle);
+  }
   Atlas_Coords texcoord = anim->coords[anim->current_frame];
   r_push_quad(.pos = e->pos, .scale = texcoord.scale, .rot = rot, .rot_offset = v2(texcoord.scale.x/2.f, 0), .atlas_coords = texcoord);
 }
 
 function void
-draw_string (Texture_Atlas font_atlas, Vec2 pos, String8 string, f32 scale) {
+draw_string (Texture_Atlas font_atlas, Vec2 pos, f32 scale, String8 string) {
   Renderer_VTable *r = &gs->rvtbl;
   f32 glyph_scale = scale * gs->render_dim.width;
   for (u64 i = 0; i < string.len; ++i) {
@@ -507,10 +519,10 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       sword.class = ENTITY_CLASS_WEAPON;
       sword.pos = gs->entities[0].pos;
       sword.idle = get_sprite(gs->sprites, str8_lit("weapon_knight_sword"));
+      sword.parent = create_entity_reference(&gs->entities[0]);
+      sword.rot = gs->floor_rot;
       gs->entities[gs->num_entities++] = sword;
-      Entity *weapon = &gs->entities[gs->num_entities-1];
-      Entity_Ref weapon_ref = create_entity_reference(weapon);
-      gs->entities[0].weapon = weapon_ref;
+
     }
     os_heat_sync();
   }
@@ -524,56 +536,90 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
   if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
 
   // NOTE: Update all entities
+  b32 *done_updating = 0;
+  if (runner_id() == 0) {
+    done_updating = arena_pushn(gs->frame, b32, gs->num_entities);
+  }
+  os_heat_sync_ptr(done_updating, 0);
+
   Rangei entity_snippet = os_heat_distribute(gs->num_entities);
   for each_in_range (e, gs->entities, entity_snippet) {
     Entity old_state = *e;
     Entity new_state = old_state;
-    Entity *weapon = get_entity(new_state.weapon);
-    Entity old_weapon;
-    Entity new_weapon;
-    if (weapon) {
-      old_weapon = *weapon;
-      new_weapon = old_weapon;
-    }
 
-    if (new_state.flags & ENTITY_FLAG_INPUT_SENSITIVE) {
-      new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
-      new_state.dir = move_dir;
-    } else if (new_state.class == ENTITY_CLASS_MONSTER) {
-      Dungeon_Tile *current_tile = d_index_tile_from_world(xz(new_state.pos));
-      // NOTE: Find Hero
-      Entity *target_hero = get_entity(new_state.target_hero);
-      if (target_hero == 0) {
-        for each_in_arrayc (it, gs->entities, gs->num_entities) {
-          if (it->class == ENTITY_CLASS_HERO) {
-            new_state.target_hero = create_entity_reference(it);
-            target_hero = it;
-            break;
+    switch (new_state.class) {
+      case ENTITY_CLASS_HERO: {
+        if (new_state.flags & ENTITY_FLAG_INPUT_SENSITIVE) {
+          new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
+          new_state.dir = move_dir;
+        }
+      } break;
+
+      case ENTITY_CLASS_MONSTER: {
+        Dungeon_Tile *current_tile = d_index_tile_from_world(xz(new_state.pos));
+        // NOTE: Find Hero
+        Entity *target_hero = get_entity(new_state.target_hero);
+        if (target_hero == 0) {
+          for each_in_arrayc (it, gs->entities, gs->num_entities) {
+            if (it->class == ENTITY_CLASS_HERO) {
+              new_state.target_hero = create_entity_reference(it);
+              target_hero = it;
+              break;
+            }
           }
         }
-      }
-      Vec2 next_pos = v2(0);
-      Dungeon_Tile *hero_tile = d_index_tile_from_world(xz(target_hero->pos));
-      if ((hero_tile->room_or_hallway != current_tile->room_or_hallway) ||
-          (hero_tile->hallway_section != current_tile->hallway_section)) {
-        Dungeon_Tile_List path_to_hero = d_astar_calculate_path(gs->frame, current_tile, hero_tile);
-        if (path_to_hero.count > 1) {
-          Dungeon_Tile_Node *path_pos = path_to_hero.first->next;
+        Vec2 next_pos = v2(0);
+        Dungeon_Tile *hero_tile = d_index_tile_from_world(xz(target_hero->pos));
+        if ((hero_tile->room_or_hallway != current_tile->room_or_hallway) ||
+            (hero_tile->hallway_section != current_tile->hallway_section)) {
+          Dungeon_Tile_List path_to_hero = d_astar_calculate_path(gs->frame, current_tile, hero_tile);
+          if (path_to_hero.count > 1) {
+            Dungeon_Tile_Node *path_pos = path_to_hero.first->next;
 
-          f32 dist_to_next_tile = v2dist(xz(new_state.pos), d_grid_to_world(path_pos->tile->grid_pos));
-          // TODO: This should be a configurable quantity
-          if (dist_to_next_tile <= gs->dungeon->grid_dim && path_pos->next) {
-            path_pos = path_pos->next;
+            f32 dist_to_next_tile = v2dist(xz(new_state.pos), d_grid_to_world(path_pos->tile->grid_pos));
+            // TODO: This should be a configurable quantity
+            if (dist_to_next_tile <= gs->dungeon->grid_dim && path_pos->next) {
+              path_pos = path_pos->next;
+            }
+            next_pos = d_grid_to_world(path_pos->tile->grid_pos);
           }
-          next_pos = d_grid_to_world(path_pos->tile->grid_pos);
+        } else {
+          next_pos = xz(target_hero->pos);
         }
-      } else {
-        next_pos = xz(target_hero->pos);
-      }
-      Vec2 move_dir = v2sub(next_pos, xz(new_state.pos));
-      if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
-      new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
-      new_state.dir = move_dir;
+        Vec2 move_dir = v2sub(next_pos, xz(new_state.pos));
+        if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
+        new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
+        new_state.dir = move_dir;
+      } break;
+
+      case ENTITY_CLASS_WEAPON: {
+        // TODO: This is very naive. We first obtain the parent handle, then spin until the parent is done updating.
+        // This is drastically inefficient long-term and can really slow down our update cycle. Ideally this thread would
+        // find a way to come back to this task later and try again to maximize work efficiency.
+        // Or instead of distributing the indices evenly we switch to the uneven-time task model of grabbing more work as it is available.
+        // I like the latter more as it is much cleaner and allows us to keep this code snippet the same while still giving us the performance benefit.
+        // I would also like to profile this.
+        Entity *parent = get_entity(new_state.parent);
+        while (parent && !done_updating[parent-gs->entities]) {
+          parent = get_entity(new_state.parent);
+        }
+        if (parent) {
+          new_state.pos = v3add(parent->pos, v3(parent->bbox.width/4.f, parent->idle.coords[0].scale.height/4.f));
+
+          /*
+            NOTE: Now for the rotation...
+            1. Convert mouse coords into NDC space
+            2. Multiply by inverse of view-proj matrix
+            3. Create line that passes through camera center and this point in world space
+            4. Test for intersection with floor
+            5. Rotate sword to face this point
+          */
+
+          cursor_ndc = v2div(input.cursor, gs->render_dim);
+          //cursor_ndc = v2
+
+        }
+      } break;
     }
 
     if (new_state.flags & ENTITY_FLAG_COLLISION) {
@@ -610,10 +656,6 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       }
     }
 
-    if (weapon) {
-      new_weapon.pos = v3add(new_state.pos, v3(new_state.bbox.width/4.f, 0, -1));
-    }
-
     if (new_state.flags & ENTITY_FLAG_ANIMATE_ROTATIONS) {
       if (new_state.dir.x > 0) {
         new_state.end_angle = 0;
@@ -635,18 +677,15 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     }
 
     // NOTE: Update Entity state
-    if (weapon) {
-      *weapon = new_weapon;
-    } else {
-      new_state.weapon = (Entity_Ref){0};
-    }
     *e = new_state;
+    done_updating[e-gs->entities] = true;
   }
 
   if (runner_id() == 0) {
     cam_update_tracking(&gs->cam, dt);
-
     g_delta_time = dt;
+    g_cursor = input.cursor;
+    g_action_primary = input.action_primary;
   }
 }
 
@@ -794,9 +833,12 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
     r->draw_quads();
 
     r->bind_texture(gs->font.texture);
-    f32 text_scale = 0.025f;
-    draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 2 * gs->render_dim.width),
-      str8_pushf(gs->frame, "FPS: %f", 1000.f/g_delta_time), text_scale);
+    f32 text_scale = 0.02f;
+    // TODO: Display string builder to help with UI layout
+    draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 2 * gs->render_dim.width), text_scale,
+      str8_pushf(gs->frame, "FPS: %f", 1000.f/g_delta_time));
+    draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 4 * gs->render_dim.width), text_scale,
+      str8_pushf(gs->frame, "Cursor: (%f, %f)", cursor_ndc.x, cursor_ndc.y));
     r->draw_quads();
 
     r->present(true);

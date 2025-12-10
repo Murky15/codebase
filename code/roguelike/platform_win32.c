@@ -14,6 +14,7 @@
 #define CINTERFACE
 #define COBJMACROS
 #include <windows.h>
+#include <windowsx.h>
 #include <shlwapi.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -38,7 +39,9 @@
 # include "graphics_d3d11.c"
 #endif
 
-global b32 move_forward, move_back, strafe_left, strafe_right;
+global b32 move_forward, move_back, strafe_left, strafe_right, mouse_click;
+global f32 mouse_x, mouse_y;
+global Vec2i render_dim;
 
 function LRESULT
 WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
@@ -59,7 +62,15 @@ WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
       if (wParam == 'D') {
         strafe_right = key_down;
       }
+      return 0;
+    }
 
+    case WM_LBUTTONUP:   fallthrough
+    case WM_LBUTTONDOWN: fallthrough
+    case WM_MOUSEMOVE: {
+      mouse_click = (wParam & 0x0001);
+      mouse_x = (f32)GET_X_LPARAM(lParam);
+      mouse_y = (f32)GET_Y_LPARAM(lParam);
       return 0;
     }
   }
@@ -135,7 +146,7 @@ os_entry (void) {
 
     HINSTANCE hInstance = GetModuleHandle(NULL);
     HWND hwnd = win32_create_window(hInstance);
-    Vec2i render_dim = r_init(hwnd);
+    render_dim = r_init(hwnd);
     f32 render_width = render_dim.width;
     f32 render_height = render_dim.height;
 
@@ -175,13 +186,19 @@ os_entry (void) {
 
       win32_update_game_dll(&game_dll, game);
 
-      // Update TODO: Parallelize
       now = os_query_clock();
       dt = os_get_elapsed_ms(last, now);
       last = now;
     }
     os_heat_sync_ptr(dt, 0);
-    game->tick(os_get_thread_context(), gs, dt, (Game_Input_Package){move_forward, move_back, strafe_left, strafe_right});
+    Game_Input_Package game_input = {0};
+    game_input.move_forward = move_forward;
+    game_input.move_back    = move_back;
+    game_input.strafe_left  = strafe_left;
+    game_input.strafe_right = strafe_right;
+    game_input.action_primary = mouse_click;
+    game_input.cursor = v2(mouse_x, render_dim.height - mouse_y);
+    game->tick(os_get_thread_context(), gs, dt, game_input);
     os_heat_sync();
 
     // Render

@@ -43,6 +43,9 @@ typedef struct Game_Input_Package {
   b32 move_back;
   b32 strafe_left;
   b32 strafe_right;
+
+  b32 action_primary;
+  Vec2 cursor;
 } Game_Input_Package;
 
 typedef void *(*roguelike_init_type)(Thread_Context*,Game_Init_Package);
@@ -135,6 +138,7 @@ struct Entity {
   Vec2 dir;
   f32 speed;
   Vec2 bbox;
+  Quat rot;
 
   // Stats
   f32 hp;
@@ -159,7 +163,7 @@ struct Entity {
   Sprite run;
 
   // Misc
-  Entity_Ref weapon;
+  Entity_Ref parent;
 
   // For Monsters
   Entity_Ref target_hero;
@@ -203,6 +207,6 @@ function void cam_set_target(Camera *cam, Entity *e, Camera_Track_Mode track_mod
 function void cam_update_tracking(Camera *cam, f32 dt);
 
 function void draw_entity(Entity *e);
-function void draw_string(Texture_Atlas font_atlas, Vec2 pos, String8 string, f32 scale);
+function void draw_string(Texture_Atlas font_atlas, Vec2 pos, f32 scale, String8 string);
 
 #endif // ROGUELIKE_H

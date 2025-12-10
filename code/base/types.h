@@ -140,6 +140,7 @@ typedef struct Quad3D {
 #define xz(v) v2((v).x,(v).z)
 
 //- @note: Vectors
+// TODO: Can we inline these?
 core_function b32  v2exact(Vec2 a, Vec2 b);
 core_function b32  v2approx(Vec2 a, Vec2 b);
 core_function f32  v2len(Vec2 v);
@@ -150,6 +151,8 @@ core_function f32  v2angle(Vec2 a, Vec2 b);
 core_function f32  v2dist(Vec2 a, Vec2 b);
 core_function Vec2 v2sub(Vec2 a, Vec2 b);
 core_function Vec2 v2add(Vec2 a, Vec2 b);
+core_function Vec2 v2mul(Vec2 a, Vec2 b);
+core_function Vec2 v2div(Vec2 a, Vec2 b);
 core_function Vec2 v2muls(Vec2 v, f32 s);
 core_function Vec2 v2norm(Vec2 v);
 
@@ -160,6 +163,8 @@ core_function f32  v3dot(Vec3 a, Vec3 b);
 core_function f32  v3dist(Vec3 a, Vec3 b);
 core_function Vec3 v3sub(Vec3 a, Vec3 b);
 core_function Vec3 v3add(Vec3 a, Vec3 b);
+core_function Vec3 v3mul(Vec3 a, Vec3 b);
+core_function Vec3 v3div(Vec3 a, Vec3 b);
 core_function Vec3 v3muls(Vec3 v, f32 s);
 core_function Vec3 v3norm(Vec3 v);
 core_function Vec3 v3cross(Vec3 a, Vec3 b);

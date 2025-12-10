@@ -26,6 +26,16 @@ v2add (Vec2 a, Vec2 b) {
 }
 
 core_function Vec2
+v2mul (Vec2 a, Vec2 b) {
+  return v2(a.x * b.x, a.y * b.y);
+}
+
+core_function Vec2
+v2div (Vec2 a, Vec2 b) {
+  return v2(a.x / b.x, a.y / b.y);
+}
+
+core_function Vec2
 v2muls (Vec2 v, f32 s) {
   return v2(v.x * s, v.y * s);
 }
@@ -87,6 +97,16 @@ v3sub (Vec3 a, Vec3 b) {
 core_function Vec3
 v3add (Vec3 a, Vec3 b) {
   return v3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+
+core_function Vec3
+v3mul (Vec3 a, Vec3 b) {
+  return v3(a.x * b.x, a.y * b.y, a.z * b.z);
+}
+
+core_function Vec3
+v3div (Vec3 a, Vec3 b) {
+  return v3(a.x / b.x, a.y / b.y, a.z / b.z);
 }
 
 core_function Vec3

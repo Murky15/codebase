@@ -10,7 +10,7 @@ os_bootstrap_thread (void *params) {
 }
 
 int
-main (int argc, char **argv) {
+WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
   /*
   TODO:
   -[ ] Tune arenas
