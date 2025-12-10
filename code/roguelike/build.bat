@@ -18,8 +18,7 @@ set out=-Fe
 set defines=-DWIN32_ROGUELIKE_SOURCE_PATH=\"%source%\" -DWIN32_ROGUELIKE_ASSET_PATH=\"%assets%\"
 
 set compile=%compiler% %defines% %debug% %warn% %ignore% -I%source%..
-set platform_includes=-I%source%google_angle/include
-set platform_link=-link User32.lib d3d11.lib dxgi.lib dxguid.lib D3DCompiler.lib Winmm.lib Shlwapi.lib %source%google_angle/bin/libEGL.dll.lib %source%google_angle/bin/libGLESv2.dll.lib
+set platform_link=-link User32.lib d3d11.lib dxgi.lib dxguid.lib D3DCompiler.lib Winmm.lib Shlwapi.lib
 set game_link=-link -INCREMENTAL:NO -DLL -EXPORT:roguelike_init -EXPORT:roguelike_tick -EXPORT:roguelike_draw
 
 if not exist build mkdir build
@@ -27,6 +26,6 @@ pushd build
 echo Building game dll...
 %compile% %source%roguelike.c %out%roguelike_new.dll %game_link% || exit /b 1
 echo Building platform layer...
-%compile% %platform_includes% %source%platform_win32.c %out%roguelike_platform_win32.exe %platform_link% || exit /b 1
+%compile% %source%platform_win32.c %out%roguelike_platform_win32.exe %platform_link% || exit /b 1
 echo Done
 popd

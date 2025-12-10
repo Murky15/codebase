@@ -128,7 +128,7 @@ struct Entity {
   u64 gen;
   Entity_Flags flags;
   Entity_Class class;
-  Entity_Type type;
+  Entity_Type  type;
 
   // Position / Orientation
   Vec3 pos;
@@ -140,6 +140,12 @@ struct Entity {
   f32 hp;
   f32 hp_max;
   u64 num_heart_containers;
+
+  f32 damage;
+  f32 knockback;
+  f32 durability;
+  f32 max_durability;
+  // TODO: Some way to classify what kinds of entities can hold this weapon.
 
   // Rotation animation
   f32 start_angle;
@@ -188,6 +194,9 @@ function Sprite        get_sprite(Texture_Atlas atlas, String8 key);
 function Atlas_Coords  make_atlas_coords_from_string(String8 coords);
 function Texture_Atlas load_textures(Arena *arena, String8 absolute_path_to_asset_dir, r_create_texture_type r_create_texture);
 function Texture_Atlas load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type r_create_texture);
+
+function Entity_Ref create_entity_reference(Entity *e);
+function Entity*    get_entity(Entity_Ref ref);
 
 function Rect cam_calculate_visible_range(Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear);
 function void cam_set_target(Camera *cam, Entity *e, Camera_Track_Mode track_mode);

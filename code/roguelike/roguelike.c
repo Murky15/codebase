@@ -48,6 +48,11 @@
   immediately split the heart it will have like a little shake effect for a few hits before breaking.
 */
 
+/* NOTE
+  What if nobody starts with any weapons and the player just has to
+  punch their way to the nearest chest. Can heroes pick up weapons from monsters?
+*/
+
 #define OS_NO_ENTRY 1
 #define ENABLE_ASSERT 1
 #define DEBUG 1
@@ -230,6 +235,21 @@ load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type 
   return result;
 }
 
+function Entity_Ref
+create_entity_reference (Entity *e) {
+  return (Entity_Ref){e->gen, e};
+}
+
+function Entity*
+get_entity (Entity_Ref ref) {
+  Entity *result = 0;
+  if (ref.e && ref.e->gen == ref.gen) {
+    result = ref.e;
+  }
+
+  return result;
+}
+
 function Rect
 cam_calculate_visible_range (Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear) {
   // Calculate corners of the near plane
@@ -274,7 +294,7 @@ cam_calculate_visible_range (Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear)
 
 function void
 cam_set_target (Camera *cam, Entity *e, Camera_Track_Mode track_mode) {
-  Entity_Ref ref = {e->gen, e};
+  Entity_Ref ref = create_entity_reference(e);
   cam->tracking = ref;
   cam->track_mode = track_mode;
 
@@ -457,21 +477,6 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   return (void*)gs;
 }
 
-function Entity_Ref
-create_entity_reference (Entity *e) {
-  return (Entity_Ref){e->gen, e};
-}
-
-function Entity*
-get_entity (Entity_Ref ref) {
-  Entity *result = 0;
-  if (ref.e && ref.e->gen == ref.gen) {
-    result = ref.e;
-  }
-
-  return result;
-}
-
 extern void
 roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Package input) {
   if (!dll_is_loaded) {
@@ -484,8 +489,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       Entity enemy = {0};
       enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES
         | ENTITY_FLAG_ANIMATE_ROTATIONS
-        | ENTITY_FLAG_DRAWABLE
         | ENTITY_FLAG_COLLISION;
+      enemy.class = 0;
       enemy.pos = gs->entities[0].pos;
       enemy.seconds_to_rotate = 0.12f;
       enemy.idle = get_sprite(gs->sprites, str8_lit("skelet_idle_anim"));
@@ -495,8 +500,17 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       enemy.speed = MONSTER_MOVE_SPEED;
       enemy.bbox.width = enemy.idle.coords[0].scale.width;
       enemy.bbox.height = gs->dungeon->grid_dim/2.f;
-      gs->entities[1] = (Entity){0};
-      gs->num_entities = 1;
+      gs->entities[gs->num_entities++] = enemy;
+
+      Entity sword = {0};
+      sword.flags = ENTITY_FLAG_DRAWABLE | ENTITY_FLAG_HARMFUL;
+      sword.class = ENTITY_CLASS_WEAPON;
+      sword.pos = gs->entities[0].pos;
+      sword.idle = get_sprite(gs->sprites, str8_lit("weapon_knight_sword"));
+      gs->entities[gs->num_entities++] = sword;
+      Entity *weapon = &gs->entities[gs->num_entities-1];
+      Entity_Ref weapon_ref = create_entity_reference(weapon);
+      gs->entities[0].weapon = weapon_ref;
     }
     os_heat_sync();
   }
@@ -514,11 +528,18 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
   for each_in_range (e, gs->entities, entity_snippet) {
     Entity old_state = *e;
     Entity new_state = old_state;
+    Entity *weapon = get_entity(new_state.weapon);
+    Entity old_weapon;
+    Entity new_weapon;
+    if (weapon) {
+      old_weapon = *weapon;
+      new_weapon = old_weapon;
+    }
 
     if (new_state.flags & ENTITY_FLAG_INPUT_SENSITIVE) {
       new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
       new_state.dir = move_dir;
-    } else {
+    } else if (new_state.class == ENTITY_CLASS_MONSTER) {
       Dungeon_Tile *current_tile = d_index_tile_from_world(xz(new_state.pos));
       // NOTE: Find Hero
       Entity *target_hero = get_entity(new_state.target_hero);
@@ -589,6 +610,10 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       }
     }
 
+    if (weapon) {
+      new_weapon.pos = v3add(new_state.pos, v3(new_state.bbox.width/4.f, 0, -1));
+    }
+
     if (new_state.flags & ENTITY_FLAG_ANIMATE_ROTATIONS) {
       if (new_state.dir.x > 0) {
         new_state.end_angle = 0;
@@ -610,6 +635,11 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     }
 
     // NOTE: Update Entity state
+    if (weapon) {
+      *weapon = new_weapon;
+    } else {
+      new_state.weapon = (Entity_Ref){0};
+    }
     *e = new_state;
   }
 

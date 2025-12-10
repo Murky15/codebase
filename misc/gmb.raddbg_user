@@ -66,6 +66,7 @@ window:
       }
       text:
       {
+        selected
         expression: "file:\"W:/code/roguelike/roguelike.c\".data"
         project: "W:/misc/root.raddbg_project"
         query:
@@ -73,9 +74,9 @@ window:
           input: ""
           cmd: search
         }
-        cursor_line: 576
+        cursor_line: 532
         cursor_column: 1
-        mark_line: 576
+        mark_line: 532
         mark_column: 1
       }
       text:
@@ -87,14 +88,13 @@ window:
           input: ""
           cmd: search
         }
-        cursor_line: 314
+        cursor_line: 790
         cursor_column: 1
-        mark_line: 314
+        mark_line: 790
         mark_column: 1
       }
       text:
       {
-        selected
         expression: "file:\"W:/code/roguelike/graphics_ogl.c\".data"
         auto: 1
         query: input: ""
@@ -139,7 +139,7 @@ window:
     }
   }
   split_x
-  pos: 484 312
+  pos: 192 162
   monitor: "\\\\.\\DISPLAY1"
   font_size: 11
   maximized

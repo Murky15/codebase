@@ -15,8 +15,6 @@
 #define COBJMACROS
 #include <windows.h>
 #include <shlwapi.h>
-#include <EGL/egl.h>
-#include <GLES3/gl31.h>
 #include <stdlib.h>
 #include <stdio.h>
 #define ENABLE_ASSERT 1
@@ -34,10 +32,11 @@
 #include <base/include.c>
 #include <os/include.c>
 #include <file/png.c>
-#include "graphics_ogl.c"
-
-#define com_release(I) if(I) IUnknown_Release(I)
-//#define com_release(T)
+#if GRAPHICS_FORCE_OPENGL
+# include "graphics_ogl.c"
+#else
+# include "graphics_d3d11.c"
+#endif
 
 global b32 move_forward, move_back, strafe_left, strafe_right;
 

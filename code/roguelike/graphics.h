@@ -1,6 +1,9 @@
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
 
+typedef void* R_Texture_2D;
+typedef void* R_Window;
+
 typedef struct Atlas_Coords {
   Vec2 scale;
   Vec2 offset;
@@ -15,9 +18,6 @@ typedef struct Sprite {
   f32 started_at;
   f32 seconds_to_complete;
 } Sprite;
-
-typedef void* R_Texture_2D;
-typedef void* R_Window;
 
 typedef struct Texture_Atlas {
   R_Texture_2D texture;
@@ -55,17 +55,6 @@ function void         r_prep(void);
 function void         r_update_transform(Mat4 m);
 function void         r_draw_quads(void);
 function void         r_present(b32 enable_vsync);
-typedef struct Push_Quad_Params {
-  Vec3 pos;
-  Vec2 scale;
-  Vec2 rot_offset;
-  Vec4 col;
-  Quat rot;
-  Atlas_Coords atlas_coords;
-  Sprite sprite;
-} Push_Quad_Params;
-function void         r_push_quad_(Push_Quad_Params *p);
-
 typedef struct Push_Quad_Params {
   Vec3 pos;
   Vec2 scale;

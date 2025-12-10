@@ -1,13 +1,12 @@
-/* Backup of the native d3d11 renderer */
-
 #include <dxgi.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
 
 #define R_MAX_QUADS 512*512
+#define com_release(I) if(I) IUnknown_Release(I)
 
-global Instance_Data quads[R_MAX_QUADS];
-global u64 num_quads;
+global R_Instance_Data r_quads[R_MAX_QUADS];
+global u64 r_num_quads;
 
 global ID3D11Device *device;
 global ID3D11DeviceContext *ctx;
@@ -19,7 +18,6 @@ global ID3D11Buffer *instance_buffer;
 
 function String8
 d3d11_buffer_from_blob (ID3DBlob *blob) {
-  // COM makes no sense
   String8 result = {0};
   if (blob) {
     result = str8(ID3D10Blob_GetBufferPointer(blob), ID3D10Blob_GetBufferSize(blob));
@@ -132,7 +130,7 @@ r_init (HWND hwnd) {
   ID3D11Buffer *ibuffer;
   ID3D11Device_CreateBuffer(device, &index_desc, &index_res, &ibuffer);
   D3D11_BUFFER_DESC instance_desc = {0};
-  instance_desc.ByteWidth = sizeof(Instance_Data) * R_MAX_QUADS;
+  instance_desc.ByteWidth = sizeof(R_Instance_Data) * R_MAX_QUADS;
   instance_desc.Usage = D3D11_USAGE_DYNAMIC;
   instance_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
   instance_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -140,14 +138,14 @@ r_init (HWND hwnd) {
   ID3D11InputLayout *input_layout;
   ID3D11Device_CreateInputLayout(device, input_layout_desc, array_count(input_layout_desc), vs_code.str, vs_code.len, &input_layout);
   ID3D11Buffer *vertex_buffers[] = {vbuffer, instance_buffer};
-  u32 strides[] = {sizeof(R_Vertex), sizeof(Instance_Data)};
+  u32 strides[] = {sizeof(R_Vertex), sizeof(R_Instance_Data)};
   u32 offsets[] = {0,0};
   ID3D11DeviceContext_IASetInputLayout(ctx, input_layout);
   ID3D11DeviceContext_IASetVertexBuffers(ctx, 0, array_count(vertex_buffers), vertex_buffers, strides, offsets);
   ID3D11DeviceContext_IASetIndexBuffer(ctx, ibuffer, DXGI_FORMAT_R32_UINT, 0);
   ID3D11DeviceContext_IASetPrimitiveTopology(ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   D3D11_BUFFER_DESC uniforms_desc = {0};
-  uniforms_desc.ByteWidth = sizeof(Uniforms);
+  uniforms_desc.ByteWidth = sizeof(R_Uniforms);
   uniforms_desc.Usage = D3D11_USAGE_DYNAMIC;
   uniforms_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
   uniforms_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -289,16 +287,16 @@ r_prep (void) {
 function void
 r_update_transform (Mat4 m) {
   D3D11_MAPPED_SUBRESOURCE constant_buffer = {0};
-  Uniforms new_transform_data = {m};
+  R_Uniforms new_transform_data = {m};
   ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)uniforms, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer);
-  memcpy(constant_buffer.pData, &new_transform_data, sizeof(Uniforms));
+  memcpy(constant_buffer.pData, &new_transform_data, sizeof(R_Uniforms));
   ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)uniforms, 0);
 }
 
 function void
 r_push_quad_ (Push_Quad_Params *p) {
-  Instance_Data *next_inst;
-  next_inst = &quads[InterlockedIncrement64(&num_quads)-1];
+  R_Instance_Data *next_inst;
+  next_inst = &r_quads[InterlockedIncrement64(&r_num_quads)-1];
 
   Vec2 scale = p->scale;
   Atlas_Coords coords = p->atlas_coords;
@@ -327,11 +325,11 @@ r_draw_quads (void) {
 
   ID3D11DeviceContext_OMSetRenderTargets(ctx, 1, &render_target_view, depth_stencil_view);
   ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instances);
-  memcpy(instances.pData, quads, sizeof(Instance_Data) * num_quads);
+  memcpy(instances.pData, r_quads, sizeof(R_Instance_Data) * r_num_quads);
   ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)instance_buffer, 0);
-  ID3D11DeviceContext_DrawIndexedInstanced(ctx, 6, num_quads, 0, 0, 0);
-  memory_zero(quads, num_quads);
-  num_quads = 0;
+  ID3D11DeviceContext_DrawIndexedInstanced(ctx, 6, r_num_quads, 0, 0, 0);
+  memory_zero(r_quads, r_num_quads);
+  r_num_quads = 0;
 }
 
 function void
