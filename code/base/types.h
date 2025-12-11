@@ -183,6 +183,8 @@ core_function Mat4 m4sub(Mat4 a, Mat4 b);
 core_function Mat4 m4mul(Mat4 a, Mat4 b);
 core_function Mat4 m4muls(Mat4 m, f32 s);
 core_function Vec4 m4mulv(Mat4 m, Vec4 v);
+core_function Mat4 m4transpose(Mat4 m);
+core_function Mat4 m4invert(Mat4 m);
 
 core_function Mat4 m4scale(Vec3 s);
 core_function Mat4 m4rotate(Quat r);

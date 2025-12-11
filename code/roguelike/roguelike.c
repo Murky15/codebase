@@ -104,13 +104,11 @@ typedef struct Game_State {
 // NOTE: Actual useful globals
 global threadvar b32 dll_is_loaded = false;
 global Game_State *gs;
+global Mat4 vp;
 
 // NOTE: Debug globals (must be cleaned up)
 global f32  g_delta_time;
-global Vec2 g_cursor;
-global b32  g_action_primary;
-
-global Vec2 cursor_ndc;
+global Vec3 floor_pos;
 
 // These could probably be named better
 function Sprite*
@@ -245,7 +243,7 @@ load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type 
 }
 
 function Entity_Ref
-create_entity_reference (Entity *e) {
+make_ref (Entity *e) {
   return (Entity_Ref){e->gen, e};
 }
 
@@ -303,7 +301,7 @@ cam_calculate_visible_range (Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear)
 
 function void
 cam_set_target (Camera *cam, Entity *e, Camera_Track_Mode track_mode) {
-  Entity_Ref ref = create_entity_reference(e);
+  Entity_Ref ref = make_ref(e);
   cam->tracking = ref;
   cam->track_mode = track_mode;
 
@@ -336,6 +334,19 @@ cam_update_tracking (Camera *cam, f32 dt) {
     cam->focus = v3lerp(cam->focus, v3add(tracking->pos, v3(cam->offset.x)), t);
     cam->visible_range.xy = v2add(cam->visible_range.xy, v2sub(xz(cam->focus), prev_focus));
   }
+}
+
+function Vec3
+cam_raycast_to_floor (Camera cam, Mat4 vp, Vec2 screen_pos) {
+  Vec2 ndc = v2div(screen_pos, v2muls(gs->render_dim, 0.5f));
+  ndc = v2sub(ndc, v2(1,1));
+  Mat4 vp_inverse = m4invert(vp);
+  Vec4 screen_pos_transformed = m4mulv(vp_inverse, v4(.xy = ndc, .zw=v2(0.f,1.f))); // NOTE: Here 0.f is the min-depth for d3d11
+  Vec3 world_pos = v3muls(screen_pos_transformed.xyz, 1.f/screen_pos_transformed.w);
+  Vec3 ray_dir = v3sub(world_pos, cam.pos);
+  f32 t = -cam.pos.y / ray_dir.y;
+
+  return v3add(cam.pos, v3muls(ray_dir,t));
 }
 
 function void
@@ -519,8 +530,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       sword.class = ENTITY_CLASS_WEAPON;
       sword.pos = gs->entities[0].pos;
       sword.idle = get_sprite(gs->sprites, str8_lit("weapon_knight_sword"));
-      sword.parent = create_entity_reference(&gs->entities[0]);
-      sword.rot = gs->floor_rot;
+      sword.parent = make_ref(&gs->entities[0]);
+      sword.rot = qmul(axis_angle(v3(.y=1), M_PI32/2.f), gs->floor_rot);
       gs->entities[gs->num_entities++] = sword;
 
     }
@@ -562,7 +573,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
         if (target_hero == 0) {
           for each_in_arrayc (it, gs->entities, gs->num_entities) {
             if (it->class == ENTITY_CLASS_HERO) {
-              new_state.target_hero = create_entity_reference(it);
+              new_state.target_hero = make_ref(it);
               target_hero = it;
               break;
             }
@@ -604,20 +615,18 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           parent = get_entity(new_state.parent);
         }
         if (parent) {
-          new_state.pos = v3add(parent->pos, v3(parent->bbox.width/4.f, parent->idle.coords[0].scale.height/4.f));
+          new_state.pos = v3add(parent->pos, v3(parent->bbox.width/4.f + 5, parent->idle.coords[0].scale.height/4.f));
 
           /*
             NOTE: Now for the rotation...
-            1. Convert mouse coords into NDC space
-            2. Multiply by inverse of view-proj matrix
-            3. Create line that passes through camera center and this point in world space
-            4. Test for intersection with floor
-            5. Rotate sword to face this point
+            1. [X] Convert mouse coords into NDC space
+            2. [X] Multiply by inverse of view-proj matrix
+            3. [X] Create line that passes through camera center and this point in world space
+            4. [X] Test for intersection with floor
+            5. [ ] Rotate sword to face this point
           */
 
-          cursor_ndc = v2div(input.cursor, v2muls(gs->render_dim, 0.5f));
-          cursor_ndc = v2sub(cursor_ndc, v2(1,1));
-
+          floor_pos = cam_raycast_to_floor(gs->cam, vp, input.cursor);
         }
       } break;
     }
@@ -684,8 +693,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
   if (runner_id() == 0) {
     cam_update_tracking(&gs->cam, dt);
     g_delta_time = dt;
-    g_cursor = input.cursor;
-    g_action_primary = input.action_primary;
+    Mat4 view = m4lookat(gs->cam.pos, gs->cam.focus, v3(0,1,0));
+    vp = m4mul(gs->proj, view);
   }
 }
 
@@ -699,8 +708,11 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
     r->bind_texture(gs->sprites.texture);
   }
 
+  /*
+  NOTE: Moved to game tick
   Mat4 view = m4lookat(gs->cam.pos, gs->cam.focus, v3(0,1,0));
   Mat4 VP = m4mul(gs->proj, view);
+  */
 
   Rect player_visible_range;
   player_visible_range.xy = d_world_to_grid(gs->cam.visible_range.xy);
@@ -794,7 +806,7 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
   os_heat_sync();
 
   if (runner_id() == 0) {
-    r->update_transform(VP);
+    r->update_transform(vp);
     r->draw_quads();
 
     // NOTE: Draw HUD
@@ -838,7 +850,9 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
     draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 2 * gs->render_dim.width), text_scale,
       str8_pushf(gs->frame, "FPS: %f", 1000.f/g_delta_time));
     draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 4 * gs->render_dim.width), text_scale,
-      str8_pushf(gs->frame, "Cursor: (%f, %f)", cursor_ndc.x, cursor_ndc.y));
+      str8_pushf(gs->frame, "Floor pos: (%f, %f, %f)", floor_pos.x, floor_pos.y, floor_pos.z));
+    draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 6 * gs->render_dim.width), text_scale,
+      str8_pushf(gs->frame, "Player pos: (%f, %f, %f)", gs->entities[0].pos.x, gs->entities[0].pos.y, gs->entities[0].pos.z));
     r->draw_quads();
 
     r->present(true);

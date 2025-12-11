@@ -199,7 +199,7 @@ function Atlas_Coords  make_atlas_coords_from_string(String8 coords);
 function Texture_Atlas load_textures(Arena *arena, String8 absolute_path_to_asset_dir, r_create_texture_type r_create_texture);
 function Texture_Atlas load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type r_create_texture);
 
-function Entity_Ref create_entity_reference(Entity *e);
+function Entity_Ref make_ref(Entity *e);
 function Entity*    get_entity(Entity_Ref ref);
 
 function Rect cam_calculate_visible_range(Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear);
