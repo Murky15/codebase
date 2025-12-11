@@ -93,7 +93,6 @@
 # define max(a,b) ((a) > (b) ? (a) : (b))
 #endif
 #define clamp(a,min,max) ((a) < (min) ? (min) : (a) > (max) ? (max) : (a))
-#define sign(x) (fabs(x)/(x))
 
 #define array_count(a) (sizeof(a) / sizeof(a[0]))
 #define swap(a, b) stmnt( typeof(a) __temp = a; a = b; b = __temp; )
