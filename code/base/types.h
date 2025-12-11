@@ -61,8 +61,8 @@ make_array_type(f64);
 # define M_PI  3.1415926535897932384626433
 #endif
 #define M_PI32 ((f32)M_PI)
-#define rad2deg (180.f/M_PI32)
-#define deg2rad (M_PI32/180.f)
+#define RAD2DEG (180.f/M_PI32)
+#define DEG2RAD (M_PI32/180.f)
 
 typedef union Vec2 {
   struct { f32 x, y; };

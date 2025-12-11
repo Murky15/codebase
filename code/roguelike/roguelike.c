@@ -108,7 +108,7 @@ global Mat4 vp;
 
 // NOTE: Debug globals (must be cleaned up)
 global f32  g_delta_time;
-global Vec3 floor_pos;
+global f32 angle;
 
 // These could probably be named better
 function Sprite*
@@ -530,6 +530,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       sword.class = ENTITY_CLASS_WEAPON;
       sword.pos = gs->entities[0].pos;
       sword.idle = get_sprite(gs->sprites, str8_lit("weapon_knight_sword"));
+      sword.bbox = sword.idle.coords[0].scale;
       sword.parent = make_ref(&gs->entities[0]);
       sword.rot = qmul(axis_angle(v3(.y=1), M_PI32/2.f), gs->floor_rot);
       gs->entities[gs->num_entities++] = sword;
@@ -615,7 +616,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           parent = get_entity(new_state.parent);
         }
         if (parent) {
-          new_state.pos = v3add(parent->pos, v3(parent->bbox.width/4.f + 5, parent->idle.coords[0].scale.height/4.f));
+          new_state.pos = v3add(parent->pos, v3(parent->bbox.width/4.f + 5, parent->idle.coords[0].scale.height/4.f, -new_state.bbox.width/4.f));
 
           /*
             NOTE: Now for the rotation...
@@ -626,7 +627,12 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             5. [ ] Rotate sword to face this point
           */
 
-          floor_pos = cam_raycast_to_floor(gs->cam, vp, input.cursor);
+          if (parent->flags & ENTITY_FLAG_INPUT_SENSITIVE) {
+            Vec3 floor_pos = cam_raycast_to_floor(gs->cam, vp, input.cursor);
+            Vec2 weapon_dir = v2sub(v2(new_state.pos.x + new_state.bbox.height, new_state.pos.z), xz(parent->pos));
+            Vec2 cursor_dir = v2sub(xz(floor_pos), xz(parent->pos));
+            angle = acosf(v2dot(weapon_dir, cursor_dir) / (v2len(weapon_dir)*v2len(cursor_dir)));
+          }
         }
       } break;
     }
@@ -850,9 +856,7 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
     draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 2 * gs->render_dim.width), text_scale,
       str8_pushf(gs->frame, "FPS: %f", 1000.f/g_delta_time));
     draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 4 * gs->render_dim.width), text_scale,
-      str8_pushf(gs->frame, "Floor pos: (%f, %f, %f)", floor_pos.x, floor_pos.y, floor_pos.z));
-    draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 6 * gs->render_dim.width), text_scale,
-      str8_pushf(gs->frame, "Player pos: (%f, %f, %f)", gs->entities[0].pos.x, gs->entities[0].pos.y, gs->entities[0].pos.z));
+      str8_pushf(gs->frame, "Angle: %f", angle * RAD2DEG));
     r->draw_quads();
 
     r->present(true);
