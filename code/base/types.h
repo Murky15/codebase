@@ -100,7 +100,7 @@ typedef union Vec3i {
 typedef union Vec4 {
   struct { f32 x, y, z, w; };
   struct { Vec2 xy, zw; };
-  struct { Vec3 xyz; };
+  struct { Vec3 xyz; f32 w1; };
 
   struct { Vec2 min, max; };
   struct { Vec2 xy1; f32 width, height; };

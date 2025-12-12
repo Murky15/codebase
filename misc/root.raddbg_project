@@ -1,0 +1,25 @@
+// raddbg 0.9.25 project file
+
+recent_file: path: "../code/roguelike/roguelike.c"
+recent_file: path: "../code/os/win32/entry.c"
+target:
+{
+  executable: "../build/roguelike_platform_win32.exe"
+  working_directory: "../build/"
+  enabled: 1
+}
+debug_info:
+{
+  path: "W:/build/roguelike_platform_win32.pdb"
+  timestamp: 66200885682225
+}
+breakpoint:
+{
+  source_location: "../code/roguelike/roguelike.c:634:1"
+  hit_count: 1
+}
+debug_info:
+{
+  path: "W:/build/roguelike_new.pdb"
+  timestamp: 66200885681988
+}

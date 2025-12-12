@@ -532,7 +532,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       sword.idle = get_sprite(gs->sprites, str8_lit("weapon_knight_sword"));
       sword.bbox = sword.idle.coords[0].scale;
       sword.parent = make_ref(&gs->entities[0]);
-      sword.rot = qmul(axis_angle(v3(.y=1), M_PI32/2.f), gs->floor_rot);
+      //sword.rot = qmul(axis_angle(v3(.y=1), M_PI32/2.f), gs->floor_rot);
       gs->entities[gs->num_entities++] = sword;
 
     }
@@ -615,8 +615,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
         while (parent && !done_updating[parent-gs->entities]) {
           parent = get_entity(new_state.parent);
         }
-        if (parent) {
-          new_state.pos = v3add(parent->pos, v3(parent->bbox.width/4.f + 5, parent->idle.coords[0].scale.height/4.f, -new_state.bbox.width/4.f));
+        if (parent && parent->flags & ENTITY_FLAG_INPUT_SENSITIVE) {
 
           /*
             NOTE: Now for the rotation...
@@ -627,12 +626,21 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             5. [ ] Rotate sword to face this point
           */
 
-          if (parent->flags & ENTITY_FLAG_INPUT_SENSITIVE) {
-            Vec3 floor_pos = cam_raycast_to_floor(gs->cam, vp, input.cursor);
-            Vec2 weapon_dir = v2sub(v2(new_state.pos.x + new_state.bbox.height, new_state.pos.z), xz(parent->pos));
-            Vec2 cursor_dir = v2sub(xz(floor_pos), xz(parent->pos));
-            angle = acosf(v2dot(weapon_dir, cursor_dir) / (v2len(weapon_dir)*v2len(cursor_dir)));
-          }
+          new_state.pos = v3add(parent->pos, v3(parent->bbox.width/4.f + 5, parent->idle.coords[0].scale.height/4.f, -new_state.bbox.width/4.f));
+          Vec3 parent_pos_center = v3(.x1 = parent->pos.x + parent->bbox.width/4.f, .yz = parent->pos.yz);
+          Vec3 floor_pos = cam_raycast_to_floor(gs->cam, vp, input.cursor);
+          Vec2 cursor_dir = v2sub(xz(floor_pos), xz(parent_pos_center));
+          Vec2 weapon_dir = v2sub(xz(new_state.pos), xz(parent_pos_center));
+          Vec2 point_dir = v2sub(v2add(xz(new_state.pos), v2(new_state.bbox.width/2.f, new_state.bbox.height)), xz(parent_pos_center));
+          angle = atan2(cursor_dir.y, cursor_dir.x);
+          f32 angle_offset = atan2(point_dir.y, point_dir.x) - atan2(weapon_dir.y, weapon_dir.x);
+          Quat rotation = axis_angle(v3(.y=1), -angle);
+          Quat point_rotation = axis_angle(v3(.y=1), -angle + angle_offset);
+          Mat4 rot_matrix = m4rotate(rotation);
+          rot_matrix = m4mul(m4translate(parent_pos_center), rot_matrix);
+          rot_matrix = m4mul(rot_matrix, m4translate(v3muls(parent_pos_center, -1.f)));
+          new_state.pos = m4mulv(rot_matrix, v4(.xyz = new_state.pos, .w1 = 1)).xyz;
+          new_state.rot = qmul(point_rotation, gs->floor_rot);
         }
       } break;
     }
@@ -695,6 +703,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     *e = new_state;
     done_updating[e-gs->entities] = true;
   }
+
+  os_heat_sync();
 
   if (runner_id() == 0) {
     cam_update_tracking(&gs->cam, dt);
