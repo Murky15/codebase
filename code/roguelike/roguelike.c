@@ -107,8 +107,7 @@ global Game_State *gs;
 global Mat4 vp;
 
 // NOTE: Debug globals (must be cleaned up)
-global f32  g_delta_time;
-global f32 angle;
+global f32 g_delta_time;
 
 // These could probably be named better
 function Sprite*
@@ -627,20 +626,24 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
 
           // NOTE: This will never be perfectly centered on the point of the sword because it depends on the texture coordinates,
           // but this is close enough.
+          /*
+          NOTE: I think this idea looked better in my head but now that it's actually done I'm not really a big fan.
+
           Vec3 parent_center = v3(.x1 = parent->pos.x + parent->idle.coords[0].scale.width/4.f, .yz = parent->pos.yz);
-          new_state.pos = v3add(parent_center, v3(.y=parent->idle.coords[0].scale.height/4.f, .z=parent->idle.coords[0].scale.width/2.f));
           Vec3 floor_pos = cam_raycast_to_floor(gs->cam, vp, input.cursor);
+          new_state.pos = v3add(parent_center, v3(.y=parent->idle.coords[0].scale.height/4.f, .z=parent->idle.coords[0].scale.width/2.f));
           Vec2 cursor_dir = v2sub(xz(floor_pos), v2(new_state.pos.x + new_state.bbox.width/2.f, new_state.pos.z));
           f32 cursor_angle = atan2(cursor_dir.y, cursor_dir.x);
+          Vec2 pointer_dir = v2sub(xz(floor_pos), v2add(xz(new_state.pos), v2(new_state.bbox.width/2.f, new_state.bbox.height/4.f)));
+          f32 pointer_angle = atan2(pointer_dir.y, pointer_dir.x);
+          Quat pointer_rotation = axis_angle(v3(.y=1), -pointer_angle + M_PI32/2.f);
           Quat cursor_rotation = axis_angle(v3(.y=1), -cursor_angle + M_PI32/2.f);
           Mat4 rot_matrix = m4rotate(cursor_rotation);
           rot_matrix = m4mul(m4translate(parent_center), rot_matrix);
           rot_matrix = m4mul(rot_matrix, m4translate(v3muls(parent_center, -1.f)));
           new_state.pos = m4mulv(rot_matrix, v4(.xyz = new_state.pos, .w1 = 1)).xyz;
-          Vec2 pointer_dir = v2sub(xz(floor_pos), v2add(xz(new_state.pos), v2(new_state.bbox.width/2.f, new_state.bbox.height/4.f)));
-          f32 pointer_angle = atan2(pointer_dir.y, pointer_dir.x);
-          Quat pointer_rotation = axis_angle(v3(.y=1), -pointer_angle + M_PI32/2.f);
           new_state.rot = qmul(pointer_rotation, gs->floor_rot);
+          */
         }
       } break;
     }
@@ -865,8 +868,6 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
     // TODO: Display string builder to help with UI layout
     draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 2 * gs->render_dim.width), text_scale,
       str8_pushf(gs->frame, "FPS: %f", 1000.f/g_delta_time));
-    draw_string(gs->font, v2(-gs->render_dim.width/2.f, gs->render_dim.height/2.f - text_scale * 4 * gs->render_dim.width), text_scale,
-      str8_pushf(gs->frame, "Angle: %f", angle * RAD2DEG));
     r->draw_quads();
 
     r->present(true);
