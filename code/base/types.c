@@ -193,7 +193,7 @@ qpow (Quat q, f32 e) {
 
 core_function Quat
 slerp (Quat a, Quat b, f32 t) {
-  return qmul(a, pow(qmul(qinv(a), b), t));
+  return qmul(a, qpow(qmul(qinv(a), b), t));
 }
 
 core_function Mat4
