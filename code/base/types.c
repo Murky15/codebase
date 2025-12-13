@@ -183,6 +183,19 @@ qinv (Quat q) {
   return comp_lit(Quat, -q.x, -q.y, -q.z, q.w);
 }
 
+core_function Quat
+qpow (Quat q, f32 e) {
+  f32 half_theta = acosf(q.w);
+  Vec3 n = v3norm(q.xyz);
+
+  return axis_angle(n, 2 * half_theta * e);
+}
+
+core_function Quat
+slerp (Quat a, Quat b, f32 t) {
+  return qmul(a, pow(qmul(qinv(a), b), t));
+}
+
 core_function Mat4
 m4i (void) {
   local_persist read_only Mat4 r = {

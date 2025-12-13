@@ -39,9 +39,13 @@
     This means that each inward corner should only be added to the list of perimeters once
     to prevent z-flimmering.
   - [ ] Debug wireframe renderer for hitboxes
-  - [ ] HUD
+  - [X] HUD
   - [ ] Audio
+  - [X] Mouse Input
   - [ ] Clean up entity pathfinding
+  - [ ] More robust physics system for movement.
+    This would make properties like knockback way more interesting
+  - [ ] Simple sword combat
 
   For bosses, instead of a health bar, we can still just use the hearts.
   We should display them at the top-middle portion of the screen but every time you hit the boss it doesn't
@@ -644,6 +648,18 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           new_state.pos = m4mulv(rot_matrix, v4(.xyz = new_state.pos, .w1 = 1)).xyz;
           new_state.rot = qmul(pointer_rotation, gs->floor_rot);
           */
+          Vec3 parent_center = v3(.x1 = parent->pos.x + parent->idle.coords[0].scale.width/4.f, .yz = parent->pos.yz);
+          Vec3 floor_pos = cam_raycast_to_floor(gs->cam, vp, input.cursor);
+          Vec3 pos_diff = v3sub(floor_pos, parent_center);
+          f32 angle = -M_PI32/6.f;
+          f32 xpos = parent->idle.coords[0].scale.width/4.f;
+          if (pos_diff.x < 0) {
+            angle = -angle;
+            xpos = -xpos;
+          }
+          new_state.pos = v3add(parent_center, v3(0, parent->idle.coords[0].scale.height/6.f, 5));
+          new_state.rot = axis_angle(v3(.z=1), angle);
+          //unused(floor_pos);
         }
       } break;
     }
