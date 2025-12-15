@@ -568,6 +568,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       sword.bbox = sword.idle.coords[0].scale;
       sword.parent = make_ref(&gs->entities[0]);
       sword.scale_mul = 0.75f;
+      sword.swing_angle = M_PI32;
+      sword.seconds_to_swing = 5.f;
       gs->entities[gs->num_entities++] = sword;
 
     }
@@ -659,20 +661,25 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           Vec3 pos_offset = v3(2*parent_width/3.f, parent_height/6.f + bob, -0.1f);
           new_state.pos = v3add(parent_center, pos_offset);
           new_state.rot = qi();
-          if (down(action_primary)) {
-            // TODO: move to entity struct
-            f32 swing_angle = M_PI32;
-
-            // NOTE: Not a perfect lock to cursor because of inaccuracies in the sprites, but good enough.
+          if (pressed(action_primary)) {
+            // NOTE: We can make this more accurate by taking the angle, setting the position rotation,
+            // retaking the angle based on the adjusted sprite origin, and then rotating based on that.
+            // However, this will still not be a perfect lock to cursor because of inaccuracies in the sprites,
+            // so what we have now is good enough.
             Vec3 floor_pos = cam_raycast_to_floor(gs->cam, vp, new_input.cursor);
             Vec3 pos_dir = v3norm(v3sub(floor_pos, new_state.pos));
-            new_state.pos = v3add(parent_center, v3muls(pos_dir, parent_width/2.f));
             new_state.pos.y = pos_offset.y - bob;
             f32 point_angle = atan2(-pos_dir.z, pos_dir.x);
             Quat point_rot = axis_angle(v3(.y=1), point_angle + M_PI32/2.f);
+            Quat pos_rot = axis_angle(v3(.y=1), point_angle);
+            Mat4 rot = m4mul(m4translate(parent_center), m4rotate(pos_rot));
+            rot = m4mul(rot, m4translate(v3muls(parent_center, -1)));
+            new_state.pos = m4mulv(rot, v4(.xyz=new_state.pos,.w1=1)).xyz;
             new_state.rot = qmul(point_rot, gs->floor_rot);
             new_state.rot_offset = v3(new_state.idle.coords[0].scale.width/2.f);
           }
+
+
         }
       } break;
     }

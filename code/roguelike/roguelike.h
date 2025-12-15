@@ -160,12 +160,14 @@ struct Entity {
   f32 started_flipping_at;
   f32 flip_angle;
 
-  // Rotation animation
-  Quat start_rotation;
-  Quat end_rotation;
-  f32 seconds_to_rotate;
-  f32 started_rotating_at;
-
+  // Sword swing animation
+  f32 swing_angle;
+  f32 seconds_to_swing;
+  f32 started_swing_at;
+  Quat start_point_rotation;
+  Quat end_point_rotation;
+  Quat start_pos_rotation;
+  Quat end_pos_rotation;
 
   // Sprites
   Sprite idle;
