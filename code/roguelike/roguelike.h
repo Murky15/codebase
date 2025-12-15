@@ -164,10 +164,10 @@ struct Entity {
   f32 swing_angle;
   f32 seconds_to_swing;
   f32 started_swing_at;
-  Quat start_point_rotation;
-  Quat end_point_rotation;
-  Quat start_pos_rotation;
-  Quat end_pos_rotation;
+  Quat start_point_rot;
+  Quat end_point_rot;
+  Quat start_pos_rot;
+  Quat end_pos_rot;
 
   // Sprites
   Sprite idle;

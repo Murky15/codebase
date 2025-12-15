@@ -569,7 +569,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       sword.parent = make_ref(&gs->entities[0]);
       sword.scale_mul = 0.75f;
       sword.swing_angle = M_PI32;
-      sword.seconds_to_swing = 5.f;
+      sword.seconds_to_swing = 0.2f;
       gs->entities[gs->num_entities++] = sword;
 
     }
@@ -661,7 +661,22 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           Vec3 pos_offset = v3(2*parent_width/3.f, parent_height/6.f + bob, -0.1f);
           new_state.pos = v3add(parent_center, pos_offset);
           new_state.rot = qi();
-          if (pressed(action_primary)) {
+          if (new_state.started_swing_at) {
+            f64 clock = os_clock_seconds();
+            f64 rot_amt = norm(clock, new_state.started_swing_at, new_state.started_swing_at + new_state.seconds_to_swing);
+            if (rot_amt <= 1.f) {
+              Quat pos_rot = slerp(new_state.start_pos_rot, new_state.end_pos_rot, rot_amt);
+              Quat point_rot = slerp(new_state.start_point_rot, new_state.end_point_rot, pow(rot_amt,2));
+              Mat4 rot = m4mul(m4translate(parent_center), m4rotate(pos_rot));
+              rot = m4mul(rot, m4translate(v3muls(parent_center, -1)));
+              new_state.pos = m4mulv(rot, v4(.xyz=new_state.pos,.w1=1)).xyz;
+              new_state.pos.y -= bob;
+              new_state.rot = qmul(point_rot, gs->floor_rot);
+              new_state.rot_offset = v3(new_state.idle.coords[0].scale.width/2.f);
+            } else {
+              new_state.started_swing_at = 0;
+            }
+          } else if (pressed(action_primary)) {
             // NOTE: We can make this more accurate by taking the angle, setting the position rotation,
             // retaking the angle based on the adjusted sprite origin, and then rotating based on that.
             // However, this will still not be a perfect lock to cursor because of inaccuracies in the sprites,
@@ -670,16 +685,13 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             Vec3 pos_dir = v3norm(v3sub(floor_pos, new_state.pos));
             new_state.pos.y = pos_offset.y - bob;
             f32 point_angle = atan2(-pos_dir.z, pos_dir.x);
-            Quat point_rot = axis_angle(v3(.y=1), point_angle + M_PI32/2.f);
-            Quat pos_rot = axis_angle(v3(.y=1), point_angle);
-            Mat4 rot = m4mul(m4translate(parent_center), m4rotate(pos_rot));
-            rot = m4mul(rot, m4translate(v3muls(parent_center, -1)));
-            new_state.pos = m4mulv(rot, v4(.xyz=new_state.pos,.w1=1)).xyz;
-            new_state.rot = qmul(point_rot, gs->floor_rot);
-            new_state.rot_offset = v3(new_state.idle.coords[0].scale.width/2.f);
+            f32 half_swing = new_state.swing_angle/2.f;
+            new_state.start_pos_rot = axis_angle(v3(.y=1), point_angle - half_swing);
+            new_state.end_pos_rot = axis_angle(v3(.y=1), point_angle + half_swing);
+            new_state.start_point_rot = axis_angle(v3(.y=1), point_angle - half_swing + M_PI32/2.f);
+            new_state.end_point_rot = axis_angle(v3(.y=1), point_angle + half_swing + M_PI32/2.f);
+            new_state.started_swing_at = os_clock_seconds();
           }
-
-
         }
       } break;
     }
