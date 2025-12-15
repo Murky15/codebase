@@ -42,6 +42,7 @@
 global b32 move_forward, move_back, strafe_left, strafe_right, mouse_click;
 global f32 mouse_x, mouse_y;
 global Vec2i render_dim;
+global Game_Input_Package old_input, new_input;
 
 function LRESULT
 WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
@@ -173,6 +174,7 @@ os_entry (void) {
   for (;;) {
     if (runner_id() == 0) { // TODO: Can we parallelize *anything* in the message loop?
       arena_clear(frame);
+      old_input = new_input;
 
       // Input
       for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
@@ -191,14 +193,13 @@ os_entry (void) {
       last = now;
     }
     os_heat_sync_ptr(dt, 0);
-    Game_Input_Package game_input = {0};
-    game_input.move_forward = move_forward;
-    game_input.move_back    = move_back;
-    game_input.strafe_left  = strafe_left;
-    game_input.strafe_right = strafe_right;
-    game_input.action_primary = mouse_click;
-    game_input.cursor = v2(mouse_x, render_dim.height - mouse_y);
-    game->tick(os_get_thread_context(), gs, dt, game_input);
+    new_input.move_forward = move_forward;
+    new_input.move_back    = move_back;
+    new_input.strafe_left  = strafe_left;
+    new_input.strafe_right = strafe_right;
+    new_input.action_primary = mouse_click;
+    new_input.cursor = v2(mouse_x, render_dim.height - mouse_y);
+    game->tick(os_get_thread_context(), gs, dt, old_input, new_input);
     os_heat_sync();
 
     // Render

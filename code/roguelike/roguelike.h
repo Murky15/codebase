@@ -49,7 +49,7 @@ typedef struct Game_Input_Package {
 } Game_Input_Package;
 
 typedef void *(*roguelike_init_type)(Thread_Context*,Game_Init_Package);
-typedef void  (*roguelike_tick_type)(Thread_Context*,void*,f32,Game_Input_Package);
+typedef void  (*roguelike_tick_type)(Thread_Context*,void*,f32,Game_Input_Package,Game_Input_Package);
 typedef void  (*roguelike_draw_type)(Thread_Context*,void*);
 
 typedef struct Game_VTable {
@@ -136,7 +136,7 @@ struct Entity {
   // Position / Orientation
   Vec3 pos;
   Vec2 dir;
-  f32 speed;
+  Vec2 old_dir;
   Vec2 bbox;
   Quat rot;
 
@@ -144,23 +144,34 @@ struct Entity {
   f32 hp;
   f32 hp_max;
   u64 num_heart_containers;
+  f32 speed;
 
   f32 damage;
   f32 knockback;
   f32 durability;
   f32 max_durability;
+
   // TODO: Some way to classify what kinds of entities can hold this weapon.
 
+  // Flip animation
+  f32 start_flip_angle;
+  f32 end_flip_angle;
+  f32 seconds_to_flip;
+  f32 started_flipping_at;
+  f32 flip_angle;
+
   // Rotation animation
-  f32 start_angle;
-  f32 end_angle;
+  Quat start_rotation;
+  Quat end_rotation;
   f32 seconds_to_rotate;
   f32 started_rotating_at;
-  f32 rotation_angle;
+
 
   // Sprites
   Sprite idle;
   Sprite run;
+  f32 scale_mul;
+  Vec3 rot_offset;
 
   // Misc
   Entity_Ref parent;

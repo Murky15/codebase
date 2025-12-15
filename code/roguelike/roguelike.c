@@ -32,16 +32,17 @@
     Verify this. Also, what is a good spin count for Critical sections?
   - [X] Vector swizzle *macros*: xz(Vec3) -> Vec2
 
-  - [ ] Instead of a simple AABB check for determining the visible range, I should
+  - [O] Instead of a simple AABB check for determining the visible range, I should
     instead use a point-in-polygon function to support angles rotated around y-axis.
   - [ ] Make wall hight a property per room / hallway for more interesting visuals
   - [ ] For inward map corners, use the actual cornered ceiling sprite to patch the hole.
     This means that each inward corner should only be added to the list of perimeters once
     to prevent z-flimmering.
-  - [ ] Debug wireframe renderer for hitboxes
+  - [O] Debug wireframe renderer for hitboxes
   - [X] HUD
   - [ ] Audio
   - [X] Mouse Input
+  - [ ] Old new_input & new new_input
   - [ ] Clean up entity pathfinding
   - [ ] More robust physics system for movement.
     This would make properties like knockback way more interesting
@@ -357,12 +358,14 @@ draw_entity (Entity *e) {
   Renderer_VTable *r = &gs->rvtbl;
   Sprite *anim = &e->run;
   Sprite *prev_anim = &e->idle;
+  f64 clock = os_clock_seconds();
+
   if (e->flags & ENTITY_FLAG_ANIMATE_SPRITES) {
     if (e->dir.x == 0 && e->dir.y == 0) {
       swap(anim, prev_anim);
     }
     if (prev_anim->started_at || anim->started_at == 0) {
-      anim->started_at = os_clock_seconds();
+      anim->started_at = clock;
       anim->current_frame = 0;
 
       prev_anim->started_at = 0;
@@ -370,7 +373,7 @@ draw_entity (Entity *e) {
 
     f32 seconds_per_frame = anim->seconds_to_complete / anim->num_frames;
     f32 current_step = anim->started_at + seconds_per_frame * anim->current_frame;
-    f32 now = os_clock_seconds();
+    f32 now = clock;
     if (now - current_step >= seconds_per_frame) {
       anim->current_frame++;
       if (anim->current_frame == anim->num_frames) {
@@ -383,12 +386,32 @@ draw_entity (Entity *e) {
     anim->current_frame = 0;
   }
 
+  if (e->flags & ENTITY_FLAG_ANIMATE_ROTATIONS) {
+    if (e->dir.x > 0) {
+      e->end_flip_angle = 0;
+    } else if (e->dir.x < 0) {
+      e->end_flip_angle = M_PI32;
+    }
+
+    if (!almost_equal(e->flip_angle, e->end_flip_angle)) {
+      if (!e->started_flipping_at) {
+        e->started_flipping_at = clock;
+      }
+      f64 current_time = clock;
+      f64 rot_amt = cnorm(current_time, e->started_flipping_at, e->started_flipping_at + e->seconds_to_flip);
+      e->flip_angle = lerp(e->start_flip_angle, e->end_flip_angle, rot_amt);
+    } else {
+      e->start_flip_angle = e->end_flip_angle;
+      e->started_flipping_at = 0;
+    }
+  }
+
   Quat rot = e->rot;
   if (e->flags & ENTITY_FLAG_ANIMATE_ROTATIONS) {
-    rot = axis_angle(v3(0,1,0), e->rotation_angle);
+    rot = axis_angle(v3(0,1,0), e->flip_angle);
   }
   Atlas_Coords texcoord = anim->coords[anim->current_frame];
-  r_push_quad(.pos = e->pos, .scale = texcoord.scale, .rot = rot, .rot_offset = v2(texcoord.scale.x/2.f, 0), .atlas_coords = texcoord);
+  r_push_quad(.pos = e->pos, .scale = v2muls(texcoord.scale, e->scale_mul), .rot = rot, .rot_offset = e->rot_offset, .atlas_coords = texcoord);
 }
 
 function void
@@ -443,7 +466,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     player.pos.z = (f32)(rand_next() % dungeon->height) - dungeon->height/2;
   }
 
-  player.seconds_to_rotate = 0.12f;
+  player.seconds_to_flip = 0.12f;
   player.idle = get_sprite(sprites, str8_lit("knight_m_idle_anim"));
   player.idle.seconds_to_complete = 0.5f;
   player.run  = get_sprite(sprites, str8_lit("knight_m_run_anim"));
@@ -453,6 +476,8 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   player.hp = 75.f;
   player.hp_max = 75.f;
   player.num_heart_containers = 3;
+  player.scale_mul = 1;
+  player.rot_offset = v3(player.idle.coords[0].scale.x/2.f);
   gs->entities[gs->num_entities++] = player;
 
   f32 fov_h = M_PI32/4.f;
@@ -504,7 +529,12 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
 }
 
 extern void
-roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Package input) {
+roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Package old_input, Game_Input_Package new_input) {
+  #define down(k)     (new_input.k)
+  #define up(k)       (!down(k))
+  #define pressed(k)  (old_input.k == 0 && new_input.k)
+  #define released(k) (old_input.k && new_input.k == 0)
+
   if (!dll_is_loaded) {
     dll_is_loaded = true;
     os_set_thread_context(*tctx);
@@ -518,7 +548,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
         | ENTITY_FLAG_COLLISION;
       enemy.class = 0;
       enemy.pos = gs->entities[0].pos;
-      enemy.seconds_to_rotate = 0.12f;
+      enemy.seconds_to_flip = 0.12f;
       enemy.idle = get_sprite(gs->sprites, str8_lit("skelet_idle_anim"));
       enemy.idle.seconds_to_complete = 0.5f;
       enemy.run = get_sprite(gs->sprites, str8_lit("skelet_run_anim"));
@@ -526,6 +556,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       enemy.speed = MONSTER_MOVE_SPEED;
       enemy.bbox.width = enemy.idle.coords[0].scale.width;
       enemy.bbox.height = gs->dungeon->grid_dim/2.f;
+      enemy.scale_mul = 1;
+      enemy.rot_offset = v3(enemy.idle.coords[0].scale.width/2.f);
       gs->entities[gs->num_entities++] = enemy;
 
       Entity sword = {0};
@@ -535,6 +567,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       sword.idle = get_sprite(gs->sprites, str8_lit("weapon_knight_sword"));
       sword.bbox = sword.idle.coords[0].scale;
       sword.parent = make_ref(&gs->entities[0]);
+      sword.scale_mul = 0.75f;
       gs->entities[gs->num_entities++] = sword;
 
     }
@@ -543,10 +576,10 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
 
   // NOTE: Process received input
   Vec2 move_dir = {0};
-  if (input.move_forward) move_dir.y += 1;
-  if (input.strafe_left)  move_dir.x -= 1;
-  if (input.move_back)    move_dir.y -= 1;
-  if (input.strafe_right) move_dir.x += 1;
+  if (down(move_forward)) move_dir.y += 1;
+  if (down(strafe_left))  move_dir.x -= 1;
+  if (down(move_back))    move_dir.y -= 1;
+  if (down(strafe_right)) move_dir.x += 1;
   if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
 
   // NOTE: Update all entities
@@ -618,48 +651,28 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           parent = get_entity(new_state.parent);
         }
         if (parent && parent->flags & ENTITY_FLAG_INPUT_SENSITIVE) {
+          f32 parent_width = parent->idle.coords[0].scale.width;
+          f32 parent_height = parent->idle.coords[0].scale.height;
+          Vec3 parent_center = v3(.x1 = parent->pos.x + parent_width/6.f, .yz = parent->pos.yz);
+          // TODO: I want this tied to parent velocity
+          f32 bob = 2 * sin(15 * os_clock_seconds());
+          Vec3 pos_offset = v3(2*parent_width/3.f, parent_height/6.f + bob, -0.1f);
+          new_state.pos = v3add(parent_center, pos_offset);
+          new_state.rot = qi();
+          if (down(action_primary)) {
+            // TODO: move to entity struct
+            f32 swing_angle = M_PI32;
 
-          /*
-            NOTE: Now for the rotation...
-            1. [X] Convert mouse coords into NDC space
-            2. [X] Multiply by inverse of view-proj matrix
-            3. [X] Create line that passes through camera center and this point in world space
-            4. [X] Test for intersection with floor
-            5. [X] Rotate sword to face this point
-          */
-
-          // NOTE: This will never be perfectly centered on the point of the sword because it depends on the texture coordinates,
-          // but this is close enough.
-          /*
-          NOTE: I think this idea looked better in my head but now that it's actually done I'm not really a big fan.
-
-          Vec3 parent_center = v3(.x1 = parent->pos.x + parent->idle.coords[0].scale.width/4.f, .yz = parent->pos.yz);
-          Vec3 floor_pos = cam_raycast_to_floor(gs->cam, vp, input.cursor);
-          new_state.pos = v3add(parent_center, v3(.y=parent->idle.coords[0].scale.height/4.f, .z=parent->idle.coords[0].scale.width/2.f));
-          Vec2 cursor_dir = v2sub(xz(floor_pos), v2(new_state.pos.x + new_state.bbox.width/2.f, new_state.pos.z));
-          f32 cursor_angle = atan2(cursor_dir.y, cursor_dir.x);
-          Vec2 pointer_dir = v2sub(xz(floor_pos), v2add(xz(new_state.pos), v2(new_state.bbox.width/2.f, new_state.bbox.height/4.f)));
-          f32 pointer_angle = atan2(pointer_dir.y, pointer_dir.x);
-          Quat pointer_rotation = axis_angle(v3(.y=1), -pointer_angle + M_PI32/2.f);
-          Quat cursor_rotation = axis_angle(v3(.y=1), -cursor_angle + M_PI32/2.f);
-          Mat4 rot_matrix = m4rotate(cursor_rotation);
-          rot_matrix = m4mul(m4translate(parent_center), rot_matrix);
-          rot_matrix = m4mul(rot_matrix, m4translate(v3muls(parent_center, -1.f)));
-          new_state.pos = m4mulv(rot_matrix, v4(.xyz = new_state.pos, .w1 = 1)).xyz;
-          new_state.rot = qmul(pointer_rotation, gs->floor_rot);
-          */
-          Vec3 parent_center = v3(.x1 = parent->pos.x + parent->idle.coords[0].scale.width/4.f, .yz = parent->pos.yz);
-          Vec3 floor_pos = cam_raycast_to_floor(gs->cam, vp, input.cursor);
-          Vec3 pos_diff = v3sub(floor_pos, parent_center);
-          f32 angle = -M_PI32/6.f;
-          f32 xpos = parent->idle.coords[0].scale.width/4.f;
-          if (pos_diff.x < 0) {
-            angle = -angle;
-            xpos = -xpos;
+            // NOTE: Not a perfect lock to cursor because of inaccuracies in the sprites, but good enough.
+            Vec3 floor_pos = cam_raycast_to_floor(gs->cam, vp, new_input.cursor);
+            Vec3 pos_dir = v3norm(v3sub(floor_pos, new_state.pos));
+            new_state.pos = v3add(parent_center, v3muls(pos_dir, parent_width/2.f));
+            new_state.pos.y = pos_offset.y - bob;
+            f32 point_angle = atan2(-pos_dir.z, pos_dir.x);
+            Quat point_rot = axis_angle(v3(.y=1), point_angle + M_PI32/2.f);
+            new_state.rot = qmul(point_rot, gs->floor_rot);
+            new_state.rot_offset = v3(new_state.idle.coords[0].scale.width/2.f);
           }
-          new_state.pos = v3add(parent_center, v3(0, parent->idle.coords[0].scale.height/6.f, 5));
-          new_state.rot = axis_angle(v3(.z=1), angle);
-          //unused(floor_pos);
         }
       } break;
     }
@@ -698,28 +711,9 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       }
     }
 
-    if (new_state.flags & ENTITY_FLAG_ANIMATE_ROTATIONS) {
-      if (new_state.dir.x > 0) {
-        new_state.end_angle = 0;
-      } else if (new_state.dir.x < 0) {
-        new_state.end_angle = M_PI32;
-      }
-
-      if (!almost_equal(new_state.rotation_angle, new_state.end_angle)) {
-        if (!new_state.started_rotating_at) {
-          new_state.started_rotating_at = os_clock_seconds();
-        }
-        f64 current_time = os_clock_seconds();
-        f64 rot_amt = cnorm(current_time, new_state.started_rotating_at, new_state.started_rotating_at + new_state.seconds_to_rotate);
-        new_state.rotation_angle = lerp(new_state.start_angle, new_state.end_angle, rot_amt);
-      } else {
-        new_state.start_angle = new_state.end_angle;
-        new_state.started_rotating_at = 0;
-      }
-    }
-
     // NOTE: Update Entity state
     *e = new_state;
+    e->old_dir = old_state.dir;
     done_updating[e-gs->entities] = true;
   }
 
@@ -731,6 +725,11 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     Mat4 view = m4lookat(gs->cam.pos, gs->cam.focus, v3(0,1,0));
     vp = m4mul(gs->proj, view);
   }
+
+  #undef down
+  #undef up
+  #undef pressed
+  #undef released
 }
 
 extern void

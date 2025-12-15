@@ -58,9 +58,10 @@ function void         r_present(b32 enable_vsync);
 typedef struct Push_Quad_Params {
   Vec3 pos;
   Vec2 scale;
-  Vec2 rot_offset;
+  Vec3 rot_offset;
   Vec4 col;
   Quat rot;
+
   Atlas_Coords atlas_coords;
   Sprite sprite;
 } Push_Quad_Params;

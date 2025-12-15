@@ -308,8 +308,8 @@ r_push_quad_ (Push_Quad_Params *p) {
   }
   Mat4 T = m4translate(p->pos);
   Mat4 R = m4rotate(p->rot);
-  R = m4mul(m4translate(v3(.xy=p->rot_offset)), R);
-  R = m4mul(R, m4translate(v3(-p->rot_offset.x, -p->rot_offset.y, 0)));
+  R = m4mul(m4translate(p->rot_offset), R);
+  R = m4mul(R, m4translate(v3muls(p->rot_offset, -1)));
   Mat4 S = m4scale(v3(.xy=scale));
   Mat4 world = m4mul(T,R);
   world = m4mul(world,S);

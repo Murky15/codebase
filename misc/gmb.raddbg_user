@@ -6,7 +6,7 @@ window:
   size: 2003.199951 1152.000000
   panels:
   {
-    0.85:
+    0.765933:
     {
       0.80:
       {
@@ -58,10 +58,10 @@ window:
               input: ""
               cmd: search
             }
-            cursor_line: 634
-            cursor_column: 1
-            mark_line: 634
-            mark_column: 1
+            cursor_line: 413
+            cursor_column: 52
+            mark_line: 413
+            mark_column: 52
           }
         }
       }
@@ -94,13 +94,18 @@ window:
         }
       }
     }
-    0.15:
+    0.234067:
     {
       0.50:
       {
         selected
         watch: expression: "query:targets"
-        watch: selected expression: ""
+        watch:
+        {
+          selected
+          expression: ""
+          watch: anim
+        }
       }
       0.50:
       {
@@ -116,7 +121,7 @@ window:
   }
   split_x
   pos: 260 260
-  monitor: "\\\\.\\DISPLAY12"
+  monitor: "\\\\.\\DISPLAY6"
   maximized
 }
 keybindings:
