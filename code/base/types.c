@@ -495,6 +495,14 @@ m4rotate (Quat r) {
 }
 
 core_function Mat4
+m4rotate_around (Quat r, Vec3 p) {
+  Mat4 m = m4mul(m4translate(p), m4rotate(r));
+  m = m4mul(m, m4translate(v3muls(p, -1.f)));
+
+  return m;
+}
+
+core_function Mat4
 m4translate (Vec3 t) {
   Mat4 r = m4i();
   r.i[0][3] = t.x;

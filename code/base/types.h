@@ -190,6 +190,7 @@ core_function Mat4 m4invert(Mat4 m);
 
 core_function Mat4 m4scale(Vec3 s);
 core_function Mat4 m4rotate(Quat r);
+core_function Mat4 m4rotate_around(Quat r, Vec3 p);
 core_function Mat4 m4translate(Vec3 t);
 
 // These are all left handed

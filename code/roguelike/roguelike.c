@@ -546,12 +546,12 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES
         | ENTITY_FLAG_ANIMATE_ROTATIONS
         | ENTITY_FLAG_COLLISION;
-      enemy.class = 0;
+      //enemy.class = ENTITY_CLASS_MONSTER;
       enemy.pos = gs->entities[0].pos;
       enemy.seconds_to_flip = 0.12f;
-      enemy.idle = get_sprite(gs->sprites, str8_lit("skelet_idle_anim"));
+      enemy.idle = get_sprite(gs->sprites, str8_lit("big_zombie_idle_anim"));
       enemy.idle.seconds_to_complete = 0.5f;
-      enemy.run = get_sprite(gs->sprites, str8_lit("skelet_run_anim"));
+      enemy.run = get_sprite(gs->sprites, str8_lit("big_zombie_run_anim"));
       enemy.run.seconds_to_complete = 0.5f;
       enemy.speed = MONSTER_MOVE_SPEED;
       enemy.bbox.width = enemy.idle.coords[0].scale.width;
@@ -569,7 +569,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       sword.parent = make_ref(&gs->entities[0]);
       sword.scale_mul = 0.75f;
       sword.swing_angle = M_PI32;
-      sword.seconds_to_swing = 0.2f;
+      sword.seconds_to_swing = 0.25f;
       gs->entities[gs->num_entities++] = sword;
 
     }
@@ -661,26 +661,59 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           Vec3 pos_offset = v3(2*parent_width/3.f, parent_height/6.f + bob, -0.1f);
           new_state.pos = v3add(parent_center, pos_offset);
           new_state.rot = qi();
-          if (new_state.started_swing_at) {
+          if (new_state.slash_phase) {
             f64 clock = os_clock_seconds();
-            f64 rot_amt = norm(clock, new_state.started_swing_at, new_state.started_swing_at + new_state.seconds_to_swing);
-            if (rot_amt <= 1.f) {
-              Quat pos_rot = slerp(new_state.start_pos_rot, new_state.end_pos_rot, rot_amt);
-              Quat point_rot = slerp(new_state.start_point_rot, new_state.end_point_rot, pow(rot_amt,2));
-              Mat4 rot = m4mul(m4translate(parent_center), m4rotate(pos_rot));
-              rot = m4mul(rot, m4translate(v3muls(parent_center, -1)));
-              new_state.pos = m4mulv(rot, v4(.xyz=new_state.pos,.w1=1)).xyz;
-              new_state.pos.y -= bob;
-              new_state.rot = qmul(point_rot, gs->floor_rot);
-              new_state.rot_offset = v3(new_state.idle.coords[0].scale.width/2.f);
-            } else {
-              new_state.started_swing_at = 0;
+            switch (new_state.slash_phase) {
+              case ATTACK_PHASE_ANTICIPATION: {
+                f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + 0.6);
+                Quat pos_rot = slerp(qi(), new_state.start_pos_rot, rot_amt);
+                Quat point_rot = slerp(qi(), new_state.start_point_rot, rot_amt);
+                Mat4 rot = m4rotate_around(pos_rot, parent_center);
+                new_state.pos = m4mulv(rot, v4(.xyz=new_state.pos,.w1=1)).xyz;
+                new_state.pos.y -= bob;
+                new_state.rot = qmul(point_rot, gs->floor_rot);
+                new_state.rot_offset = v3(new_state.idle.coords[0].scale.width/2.f);
+                if (rot_amt >= 1.f) {
+                  new_state.slash_phase = ATTACK_PHASE_ACTION;
+                  new_state.started_swing_at = clock;
+                }
+              } break;
+
+              case ATTACK_PHASE_ACTION: {
+                f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + new_state.seconds_to_swing);
+                Quat pos_rot = slerp(new_state.start_pos_rot, new_state.end_pos_rot, rot_amt);
+                Quat point_rot = slerp(new_state.start_point_rot, new_state.end_point_rot, rot_amt);
+                Mat4 rot = m4rotate_around(pos_rot, parent_center);
+                new_state.pos = m4mulv(rot, v4(.xyz=new_state.pos,.w1=1)).xyz;
+                new_state.pos.y -= bob;
+                new_state.rot = qmul(point_rot, gs->floor_rot);
+                new_state.rot_offset = v3(new_state.idle.coords[0].scale.width/2.f);
+                if (rot_amt >= 1.f) {
+                  new_state.slash_phase = ATTACK_PHASE_RECOVERY;
+                  new_state.started_swing_at = clock;
+                }
+              } break;
+
+              case ATTACK_PHASE_RECOVERY: {
+                f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + 0.6);
+                Quat pos_rot = slerp(new_state.end_pos_rot, qi(), rot_amt);
+                Quat point_rot = slerp(new_state.end_point_rot, qi(), rot_amt);
+                Mat4 rot = m4rotate_around(pos_rot, parent_center);
+                new_state.pos = m4mulv(rot, v4(.xyz=new_state.pos,.w1=1)).xyz;
+                new_state.pos.y -= bob;
+                new_state.rot = qmul(point_rot, gs->floor_rot);
+                new_state.rot_offset = v3(new_state.idle.coords[0].scale.width/2.f);
+                if (rot_amt >= 1.f) {
+                  new_state.slash_phase = ATTACK_PHASE_NULL;
+                }
+              }
             }
           } else if (pressed(action_primary)) {
             // NOTE: We can make this more accurate by taking the angle, setting the position rotation,
             // retaking the angle based on the adjusted sprite origin, and then rotating based on that.
             // However, this will still not be a perfect lock to cursor because of inaccuracies in the sprites,
             // so what we have now is good enough.
+            new_state.slash_phase = ATTACK_PHASE_ANTICIPATION;
             Vec3 floor_pos = cam_raycast_to_floor(gs->cam, vp, new_input.cursor);
             Vec3 pos_dir = v3norm(v3sub(floor_pos, new_state.pos));
             new_state.pos.y = pos_offset.y - bob;
@@ -741,7 +774,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
   if (runner_id() == 0) {
     cam_update_tracking(&gs->cam, dt);
     g_delta_time = dt;
-    Mat4 view = m4lookat(gs->cam.pos, gs->cam.focus, v3(0,1,0));
+    Mat4 view = m4lookat(gs->cam.pos, gs->cam.focus, v3(.y=1));
     vp = m4mul(gs->proj, view);
   }
 

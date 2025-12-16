@@ -119,6 +119,16 @@ enum {
   ENTITY_TYPE_COUNT
 };
 
+typedef u32 Attack_Phase;
+enum {
+  ATTACK_PHASE_NULL = 0,
+  ATTACK_PHASE_ANTICIPATION,
+  ATTACK_PHASE_ACTION,
+  ATTACK_PHASE_RECOVERY,
+
+  ATTACK_PHASE_COUNT
+};
+
 typedef struct Entity Entity;
 
 typedef struct Entity_Ref {
@@ -161,6 +171,7 @@ struct Entity {
   f32 flip_angle;
 
   // Sword swing animation
+  Attack_Phase slash_phase;
   f32 swing_angle;
   f32 seconds_to_swing;
   f32 started_swing_at;
