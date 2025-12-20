@@ -665,13 +665,13 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             f64 clock = os_clock_seconds();
             switch (new_state.slash_phase) {
               case ATTACK_PHASE_ANTICIPATION: {
-                f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + 0.6);
+                f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + 0.3f);
                 Quat pos_rot = slerp(qi(), new_state.start_pos_rot, rot_amt);
-                Quat point_rot = slerp(qi(), new_state.start_point_rot, rot_amt);
+                Quat point_rot = slerp(qi(), new_state.start_point_rot, pow(rot_amt,2));
                 Mat4 rot = m4rotate_around(pos_rot, parent_center);
                 new_state.pos = m4mulv(rot, v4(.xyz=new_state.pos,.w1=1)).xyz;
                 new_state.pos.y -= bob;
-                new_state.rot = qmul(point_rot, gs->floor_rot);
+                new_state.rot = point_rot;
                 new_state.rot_offset = v3(new_state.idle.coords[0].scale.width/2.f);
                 if (rot_amt >= 1.f) {
                   new_state.slash_phase = ATTACK_PHASE_ACTION;
@@ -686,7 +686,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
                 Mat4 rot = m4rotate_around(pos_rot, parent_center);
                 new_state.pos = m4mulv(rot, v4(.xyz=new_state.pos,.w1=1)).xyz;
                 new_state.pos.y -= bob;
-                new_state.rot = qmul(point_rot, gs->floor_rot);
+                new_state.rot = point_rot;
                 new_state.rot_offset = v3(new_state.idle.coords[0].scale.width/2.f);
                 if (rot_amt >= 1.f) {
                   new_state.slash_phase = ATTACK_PHASE_RECOVERY;
@@ -695,13 +695,13 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
               } break;
 
               case ATTACK_PHASE_RECOVERY: {
-                f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + 0.6);
-                Quat pos_rot = slerp(new_state.end_pos_rot, qi(), rot_amt);
-                Quat point_rot = slerp(new_state.end_point_rot, qi(), rot_amt);
+                f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + 0.5f);
+                Quat pos_rot = slerp(new_state.end_pos_rot, new_state.end_pos_rot.w > 0 ? qi() : qneg(qi()), rot_amt);
+                Quat point_rot = slerp(new_state.end_point_rot, new_state.end_point_rot.w > 0 ? qi() : qneg(qi()), pow(rot_amt,2));
                 Mat4 rot = m4rotate_around(pos_rot, parent_center);
                 new_state.pos = m4mulv(rot, v4(.xyz=new_state.pos,.w1=1)).xyz;
                 new_state.pos.y -= bob;
-                new_state.rot = qmul(point_rot, gs->floor_rot);
+                new_state.rot = point_rot;
                 new_state.rot_offset = v3(new_state.idle.coords[0].scale.width/2.f);
                 if (rot_amt >= 1.f) {
                   new_state.slash_phase = ATTACK_PHASE_NULL;
@@ -721,13 +721,13 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             f32 half_swing = new_state.swing_angle/2.f;
             f32 start_angle = point_angle - half_swing;
             f32 end_angle = point_angle + half_swing;
-            if (point_angle < 0) {
+            if (point_angle < 0.f) {
               swap(start_angle, end_angle);
             }
             new_state.start_pos_rot = axis_angle(v3(.y=1), start_angle);
             new_state.end_pos_rot = axis_angle(v3(.y=1), end_angle);
-            new_state.start_point_rot = axis_angle(v3(.y=1), start_angle + M_PI32/2.f);
-            new_state.end_point_rot = axis_angle(v3(.y=1), end_angle + M_PI32/2.f);
+            new_state.start_point_rot = qmul(axis_angle(v3(.y=1), start_angle + M_PI32/2.f), gs->floor_rot);
+            new_state.end_point_rot = qmul(axis_angle(v3(.y=1), end_angle + M_PI32/2.f), gs->floor_rot);
             new_state.started_swing_at = os_clock_seconds();
           }
         }

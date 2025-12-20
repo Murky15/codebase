@@ -155,6 +155,11 @@ axis_angle (Vec3 v, f32 t) {
 }
 
 core_function Quat
+qneg (Quat q) {
+  return comp_lit(Quat, -q.x, -q.y, -q.z, -q.w);
+}
+
+core_function Quat
 qnorm (Quat q) {
   f32 len = sqrtf(q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w);
   if (len == 0) { return comp_lit(Quat, 0,0,0,1); }
