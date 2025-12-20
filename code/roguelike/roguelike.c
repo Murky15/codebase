@@ -570,6 +570,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       sword.scale_mul = 0.75f;
       sword.swing_angle = M_PI32;
       sword.seconds_to_swing = 0.25f;
+      sword.seconds_for_anticipation = 0.3f;
+      sword.seconds_for_recovery = 0.5f;
       gs->entities[gs->num_entities++] = sword;
 
     }
@@ -665,7 +667,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             f64 clock = os_clock_seconds();
             switch (new_state.slash_phase) {
               case ATTACK_PHASE_ANTICIPATION: {
-                f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + 0.3f);
+                f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + new_state.seconds_for_anticipation);
                 Quat pos_rot = slerp(qi(), new_state.start_pos_rot, rot_amt);
                 Quat point_rot = slerp(qi(), new_state.start_point_rot, pow(rot_amt,2));
                 Mat4 rot = m4rotate_around(pos_rot, parent_center);
@@ -682,7 +684,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
               case ATTACK_PHASE_ACTION: {
                 f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + new_state.seconds_to_swing);
                 Quat pos_rot = slerp(new_state.start_pos_rot, new_state.end_pos_rot, rot_amt);
-                Quat point_rot = slerp(new_state.start_point_rot, new_state.end_point_rot, rot_amt);
+                Quat point_rot = slerp(new_state.start_point_rot, new_state.end_point_rot, pow(rot_amt,2));
                 Mat4 rot = m4rotate_around(pos_rot, parent_center);
                 new_state.pos = m4mulv(rot, v4(.xyz=new_state.pos,.w1=1)).xyz;
                 new_state.pos.y -= bob;
@@ -695,7 +697,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
               } break;
 
               case ATTACK_PHASE_RECOVERY: {
-                f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + 0.5f);
+                f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + new_state.seconds_for_recovery);
                 Quat pos_rot = slerp(new_state.end_pos_rot, new_state.end_pos_rot.w > 0 ? qi() : qneg(qi()), rot_amt);
                 Quat point_rot = slerp(new_state.end_point_rot, new_state.end_point_rot.w > 0 ? qi() : qneg(qi()), pow(rot_amt,2));
                 Mat4 rot = m4rotate_around(pos_rot, parent_center);
