@@ -16,10 +16,5 @@ debug_info:
 debug_info:
 {
   path: "W:/build/roguelike_new.pdb"
-  timestamp: 66201647344379
-}
-breakpoint:
-{
-  source_location: "../code/roguelike/roguelike.c:701:1"
-  hit_count: 1
+  timestamp: 66201647946298
 }

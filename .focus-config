@@ -1,0 +1,22 @@
+[24]  # Version number. Do not delete.
+
+[[workspace]]
+code
+
+[ignore]
+.svn
+.git
+.\geometry_compiler\**
+
+[[build commands]]
+build_working_dir: ..\
+run_working_dir: ..\build
+error_regex: ^(?P<file>.*)\((?P<line>\d+),?(?P<col>\d+)?\)[ ]?: (?P<type>fatal error|error|warning) (?P<msg>.*)$
+auto_jump_to_error: true
+
+[Build Roguelike]
+build_command: %BUILD_WORKING_DIR%\code\roguelike\build.bat
+key_binding: F1
+[Run Roguelike]
+run_command: %RUN_WORKING_DIR%\roguelike_platform_win32.exe
+key_binding: F2

@@ -20,6 +20,7 @@ window:
           }
           0.50:
           {
+            selected
             watch: expression: "query:breakpoints"
             watch: expression: "query:watch_pins"
             text:
@@ -37,7 +38,6 @@ window:
         }
         0.75:
         {
-          selected
           getting_started
           text:
           {

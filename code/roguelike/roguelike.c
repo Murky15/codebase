@@ -569,9 +569,9 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       sword.parent = make_ref(&gs->entities[0]);
       sword.scale_mul = 0.75f;
       sword.swing_angle = M_PI32;
-      sword.seconds_to_swing = 0.25f;
-      sword.seconds_for_anticipation = 0.3f;
-      sword.seconds_for_recovery = 0.5f;
+      sword.seconds_to_swing = 0.2f;
+      sword.seconds_for_anticipation = 0.2f;
+      sword.seconds_for_recovery = 0.2f;
       gs->entities[gs->num_entities++] = sword;
 
     }
