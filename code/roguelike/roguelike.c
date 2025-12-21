@@ -41,12 +41,13 @@
   - [O] Debug wireframe renderer for hitboxes
   - [X] HUD
   - [ ] Audio
+  - [ ] Lighting & Shadows
   - [X] Mouse Input
-  - [ ] Old new_input & new new_input
+  - [X] Old input & new input
   - [ ] Clean up entity pathfinding
   - [ ] More robust physics system for movement.
     This would make properties like knockback way more interesting
-  - [ ] Simple sword combat
+  - [X] BASIC sword animation
 
   For bosses, instead of a health bar, we can still just use the hearts.
   We should display them at the top-middle portion of the screen but every time you hit the boss it doesn't
@@ -564,14 +565,14 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       sword.flags = ENTITY_FLAG_DRAWABLE | ENTITY_FLAG_HARMFUL;
       sword.class = ENTITY_CLASS_WEAPON;
       sword.pos = gs->entities[0].pos;
-      sword.idle = get_sprite(gs->sprites, str8_lit("weapon_knight_sword"));
+      sword.idle = get_sprite(gs->sprites, str8_lit("weapon_katana"));
       sword.bbox = sword.idle.coords[0].scale;
       sword.parent = make_ref(&gs->entities[0]);
       sword.scale_mul = 0.75f;
       sword.swing_angle = M_PI32;
-      sword.seconds_to_swing = 0.2f;
-      sword.seconds_for_anticipation = 0.2f;
-      sword.seconds_for_recovery = 0.2f;
+      sword.seconds_to_swing = 0.15f;
+      sword.seconds_for_anticipation = 0.25f;
+      sword.seconds_for_recovery = 0.4f;
       gs->entities[gs->num_entities++] = sword;
 
     }
@@ -665,11 +666,12 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           new_state.rot = qi();
           if (new_state.slash_phase) {
             f64 clock = os_clock_seconds();
+            // TODO: Should this be in the draw entity function?
             switch (new_state.slash_phase) {
               case ATTACK_PHASE_ANTICIPATION: {
                 f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + new_state.seconds_for_anticipation);
                 Quat pos_rot = slerp(qi(), new_state.start_pos_rot, rot_amt);
-                Quat point_rot = slerp(qi(), new_state.start_point_rot, pow(rot_amt,2));
+                Quat point_rot = slerp(qi(), new_state.start_point_rot, pow(rot_amt,3));
                 Mat4 rot = m4rotate_around(pos_rot, parent_center);
                 new_state.pos = m4mulv(rot, v4(.xyz=new_state.pos,.w1=1)).xyz;
                 new_state.pos.y -= bob;
@@ -699,7 +701,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
               case ATTACK_PHASE_RECOVERY: {
                 f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + new_state.seconds_for_recovery);
                 Quat pos_rot = slerp(new_state.end_pos_rot, new_state.end_pos_rot.w > 0 ? qi() : qneg(qi()), rot_amt);
-                Quat point_rot = slerp(new_state.end_point_rot, new_state.end_point_rot.w > 0 ? qi() : qneg(qi()), pow(rot_amt,2));
+                Quat point_rot = slerp(new_state.end_point_rot, new_state.end_point_rot.w > 0 ? qi() : qneg(qi()), pow(rot_amt,3));
                 Mat4 rot = m4rotate_around(pos_rot, parent_center);
                 new_state.pos = m4mulv(rot, v4(.xyz=new_state.pos,.w1=1)).xyz;
                 new_state.pos.y -= bob;
@@ -723,9 +725,9 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             f32 half_swing = new_state.swing_angle/2.f;
             f32 start_angle = point_angle - half_swing;
             f32 end_angle = point_angle + half_swing;
-            if (point_angle < 0.f) {
+            /*if (point_angle < 0.f) {
               swap(start_angle, end_angle);
-            }
+            }*/
             new_state.start_pos_rot = axis_angle(v3(.y=1), start_angle);
             new_state.end_pos_rot = axis_angle(v3(.y=1), end_angle);
             new_state.start_point_rot = qmul(axis_angle(v3(.y=1), start_angle + M_PI32/2.f), gs->floor_rot);
