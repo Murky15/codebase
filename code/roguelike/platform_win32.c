@@ -15,6 +15,7 @@
 #define COBJMACROS
 #include <windows.h>
 #include <windowsx.h>
+#include <mmdeviceapi.h>
 #include <shlwapi.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -150,6 +151,10 @@ os_entry (void) {
     render_dim = r_init(hwnd);
     f32 render_width = render_dim.width;
     f32 render_height = render_dim.height;
+
+    // NOTE: Initialize audio
+    IMMDeviceEnumerator *audio_device_enumerator;
+    CoCreateInstance(&CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, &IID_IMMDeviceEnumerator, (void**)&audio_device_enumerator);
 
     game = arena_pushn(perm, Game_VTable, 1);
     win32_update_game_dll(&game_dll, game);

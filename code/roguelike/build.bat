@@ -18,7 +18,7 @@ set out=-Fe
 set defines=-DWIN32_ROGUELIKE_SOURCE_PATH=\"%source%\" -DWIN32_ROGUELIKE_ASSET_PATH=\"%assets%\"
 
 set compile=%compiler% %defines% %debug% %warn% %ignore% -I%source%..
-set platform_link=-link -SUBSYSTEM:WINDOWS User32.lib d3d11.lib dxgi.lib dxguid.lib D3DCompiler.lib Winmm.lib Shlwapi.lib
+set platform_link=-link -SUBSYSTEM:WINDOWS User32.lib d3d11.lib dxgi.lib dxguid.lib D3DCompiler.lib Winmm.lib Shlwapi.lib Ole32.lib 
 set game_link=-link -INCREMENTAL:NO -DLL -EXPORT:roguelike_init -EXPORT:roguelike_tick -EXPORT:roguelike_draw
 
 if not exist build mkdir build

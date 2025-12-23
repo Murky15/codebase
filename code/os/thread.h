@@ -26,9 +26,8 @@ TODO: I want to implement platform-independent threading here
 But like the good programmer I am I will wait to see what kind of patterns emerge
 from my game code before making the API.
 
--[ ] Mutexes / Critical sections
+-[X] Mutexes / Critical sections
 -[X] Barriers
--[ ] Semaphores
 -[ ] Interlocked variable access
 */
 
