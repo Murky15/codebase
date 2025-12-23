@@ -46,8 +46,8 @@ os_heat_distribute(u64 num_items) {
   u64 extra_work = num_items % num_runners();
   b32 thread_has_excess = (runner_id() < extra_work);
   u64 amount_excess = thread_has_excess ? runner_id() : extra_work;
-  u64 start = runner_id() * work_per_thread + amount_excess;
-  u64 end = start + work_per_thread + !!thread_has_excess;
+  s32 start = runner_id() * work_per_thread + amount_excess;
+  s32 end = start + work_per_thread + !!thread_has_excess;
 
   return comp_lit(Rangei, start, end);
 }

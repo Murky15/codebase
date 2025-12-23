@@ -41,7 +41,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
       Thread_Init_Package *p = &params[i];
       Thread_Heat heat = comp_lit(Thread_Heat, i, num_threads, default_barrier, default_mutex, broadcast_buffer);
       p->tctx.heat = heat;
-      threads[i] = (HANDLE)_beginthread(os_bootstrap_thread, 0, p);
+      threads[i] = (HANDLE)_beginthread((_beginthread_proc_type)os_bootstrap_thread, 0, p);
     }
 
     for (u64 i = 0; i < num_threads; ++i) {

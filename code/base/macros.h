@@ -59,11 +59,11 @@
 # endif
 #endif
 
-#if ENABLE_ASSERT
-# define static_assert(c,id) typedef u8 glue(static_assert, id)[(c)?1:-1]
+#if DEBUG
+# define d_static_assert(c,id) typedef int glue(static_assert, id)[(c)?1:-1]
 # define assert(c) stmnt( if(!(c)) { assert_break(); } )
 #else
-# define static_assert(c, id)
+# define d_static_assert(c, id)
 # define assert(c)
 #endif
 

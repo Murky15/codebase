@@ -62,7 +62,6 @@
 */
 
 #define OS_NO_ENTRY 1
-#define ENABLE_ASSERT 1
 #define DEBUG 1
 #include <base/include.h>
 #include <os/include.h>
@@ -453,7 +452,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     .max_tiles_per_map_slice = 512);
 
   Entity player = {0};
-  player.class = ENTITY_CLASS_HERO;
+  player.eclass = ENTITY_CLASS_HERO;
   player.flags = ENTITY_FLAG_INPUT_SENSITIVE
     | ENTITY_FLAG_ANIMATE_SPRITES
     | ENTITY_FLAG_ANIMATE_ROTATIONS
@@ -563,7 +562,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
 
       Entity sword = {0};
       sword.flags = ENTITY_FLAG_DRAWABLE | ENTITY_FLAG_HARMFUL;
-      sword.class = ENTITY_CLASS_WEAPON;
+      sword.eclass = ENTITY_CLASS_WEAPON;
       sword.pos = gs->entities[0].pos;
       sword.idle = get_sprite(gs->sprites, str8_lit("weapon_katana"));
       sword.bbox = sword.idle.coords[0].scale;
@@ -599,7 +598,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     Entity old_state = *e;
     Entity new_state = old_state;
 
-    switch (new_state.class) {
+    switch (new_state.eclass) {
       case ENTITY_CLASS_HERO: {
         if (new_state.flags & ENTITY_FLAG_INPUT_SENSITIVE) {
           new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
@@ -613,7 +612,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
         Entity *target_hero = get_entity(new_state.target_hero);
         if (target_hero == 0) {
           for each_in_arrayc (it, gs->entities, gs->num_entities) {
-            if (it->class == ENTITY_CLASS_HERO) {
+            if (it->eclass == ENTITY_CLASS_HERO) {
               new_state.target_hero = make_ref(it);
               target_hero = it;
               break;

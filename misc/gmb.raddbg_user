@@ -120,7 +120,7 @@ window:
     }
   }
   split_x
-  pos: 260 260
+  pos: 250 144
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }

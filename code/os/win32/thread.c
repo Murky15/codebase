@@ -10,12 +10,12 @@ os_barrier_create (Arena *arena, u64 num_threads) {
 
 core_function void
 os_barrier_wait (Thread_Barrier barrier) {
-  EnterSynchronizationBarrier(ptr_from_int(barrier.opaque_data), 0);
+  EnterSynchronizationBarrier((LPSYNCHRONIZATION_BARRIER)ptr_from_int(barrier.opaque_data), 0);
 }
 
 core_function void
 os_barrier_invalidate (Thread_Barrier barrier) {
-  DeleteSynchronizationBarrier(ptr_from_int(barrier.opaque_data));
+  DeleteSynchronizationBarrier((LPSYNCHRONIZATION_BARRIER)ptr_from_int(barrier.opaque_data));
 }
 
 core_function Thread_Mutex
@@ -30,17 +30,17 @@ os_mutex_create (Arena *arena) {
 
 core_function void
 os_mutex_claim (Thread_Mutex mutex) {
-  EnterCriticalSection(ptr_from_int(mutex.opaque_data));
+  EnterCriticalSection((LPCRITICAL_SECTION)ptr_from_int(mutex.opaque_data));
 }
 
 core_function void
 os_mutex_release (Thread_Mutex mutex) {
-  LeaveCriticalSection(ptr_from_int(mutex.opaque_data));
+  LeaveCriticalSection((LPCRITICAL_SECTION)ptr_from_int(mutex.opaque_data));
 }
 
 core_function void
 os_mutex_invalidate (Thread_Mutex mutex) {
-  DeleteCriticalSection(ptr_from_int(mutex.opaque_data));
+  DeleteCriticalSection((LPCRITICAL_SECTION)ptr_from_int(mutex.opaque_data));
 }
 
 core_function u64

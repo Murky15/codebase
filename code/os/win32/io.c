@@ -87,7 +87,7 @@ os_search_directory_and_read_files (Arena *arena, String8 path, String8 query) {
     String8 query_str = str8_list_join(scratch.arena, query_str_list, &join_opts);
 
     WIN32_FIND_DATA data;
-    HANDLE cursor = FindFirstFile(query_str.str, &data);
+    HANDLE cursor = FindFirstFile((LPCSTR)query_str.str, &data);
     if (cursor != INVALID_HANDLE_VALUE) {
         do {
             String8 file_name = str8_push_copy(arena, str8_cstring(data.cFileName));

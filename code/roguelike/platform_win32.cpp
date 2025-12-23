@@ -10,16 +10,13 @@
 // NOTE: Headers
 
 //#define UNICODE
-#define D3D11_NO_HELPERS
-#define CINTERFACE
-#define COBJMACROS
 #include <windows.h>
 #include <windowsx.h>
 #include <mmdeviceapi.h>
 #include <shlwapi.h>
 #include <stdlib.h>
 #include <stdio.h>
-#define ENABLE_ASSERT 1
+
 #define DEBUG 1
 #include <base/include.h>
 #include <os/include.h>
@@ -37,7 +34,7 @@
 #if GRAPHICS_FORCE_OPENGL
 # include "graphics_ogl.c"
 #else
-# include "graphics_d3d11.c"
+# include "graphics_d3d11.cpp"
 #endif
 
 global b32 move_forward, move_back, strafe_left, strafe_right, mouse_click;
@@ -82,15 +79,15 @@ WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
 
 function HWND
 win32_create_window (HINSTANCE hInstance) {
-  WNDCLASSEX class = {
-    .style = CS_OWNDC,
+  WNDCLASSEX wndclass = {
     .cbSize = sizeof(WNDCLASSEX),
+    .style = CS_OWNDC,
     .lpfnWndProc = WndProc,
     .hInstance = hInstance,
     .hCursor = LoadCursor(0, IDC_ARROW),
     .lpszClassName = TEXT("MainWindowClass"),
   };
-  RegisterClassEx(&class);
+  RegisterClassEx(&wndclass);
 
   HWND hwnd = CreateWindowEx(
     0,
@@ -154,17 +151,17 @@ os_entry (void) {
 
     // NOTE: Initialize audio
     IMMDeviceEnumerator *audio_device_enumerator;
-    CoCreateInstance(&CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, &IID_IMMDeviceEnumerator, (void**)&audio_device_enumerator);
+    CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&audio_device_enumerator);
 
     game = arena_pushn(perm, Game_VTable, 1);
     win32_update_game_dll(&game_dll, game);
 
-    gs = game->init(os_get_thread_context(),(Game_Init_Package){
+    gs = game->init(os_get_thread_context(),{
       perm, frame,
       str8_lit(WIN32_ROGUELIKE_SOURCE_PATH),
       str8_lit(WIN32_ROGUELIKE_ASSET_PATH),
       render_width, render_height,
-      (Renderer_VTable){r_create_texture, r_bind_texture, r_prep, r_update_transform, r_push_quad_, r_draw_quads, r_present}
+      {r_create_texture, r_bind_texture, r_prep, r_update_transform, r_push_quad_, r_draw_quads, r_present}
       });
 
   }

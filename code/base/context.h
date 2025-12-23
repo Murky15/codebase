@@ -3,10 +3,6 @@
 
 // @note: Build options
 
-#ifndef ENABLE_ASSERT
-# define ENABLE_ASSERT 0
-#endif
-
 #ifndef OS_NO_ENTRY
 # define OS_NO_ENTRY 0
 #endif

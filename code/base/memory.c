@@ -24,7 +24,7 @@ extern bool VirtualFree(void*,size_t,u32);
 # error "Memory backend not implemented for this OS!"
 #endif
 
-static_assert(PAGE_TABLE_SIZE >= sizeof(Arena), check_arena_size);
+d_static_assert(PAGE_TABLE_SIZE >= sizeof(Arena), check_arena_size);
 
 core_function Arena*
 arena_alloc_fixed (void *buff, u64 size) {

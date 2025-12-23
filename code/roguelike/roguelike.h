@@ -140,7 +140,7 @@ struct Entity {
   // Header
   u64 gen;
   Entity_Flags flags;
-  Entity_Class class;
+  Entity_Class eclass;
   Entity_Type  type;
 
   // Position / Orientation

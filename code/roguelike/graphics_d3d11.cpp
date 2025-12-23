@@ -3,7 +3,7 @@
 #include <d3dcompiler.h>
 
 #define R_MAX_QUADS 512*512
-#define com_release(I) if(I) IUnknown_Release(I)
+#define com_release(I) if(I) (I)->Release()
 
 global R_Instance_Data r_quads[R_MAX_QUADS];
 global u64 r_num_quads;
@@ -20,7 +20,7 @@ function String8
 d3d11_buffer_from_blob (ID3DBlob *blob) {
   String8 result = {0};
   if (blob) {
-    result = str8(ID3D10Blob_GetBufferPointer(blob), ID3D10Blob_GetBufferSize(blob));
+    result = str8((u8*)blob->GetBufferPointer(), blob->GetBufferSize());
   }
 
   return result;
@@ -69,18 +69,18 @@ r_init (HWND hwnd) {
                                 &device, 0, &ctx);
 
   ID3D11Texture2D *back_buffer;
-  IDXGISwapChain_GetBuffer(swap_chain, 0, &IID_ID3D11Texture2D, &back_buffer);
-  ID3D11Device_CreateRenderTargetView(device, (ID3D11Resource*)back_buffer, 0, &render_target_view);
+  swap_chain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&back_buffer);
+  device->CreateRenderTargetView((ID3D11Resource*)back_buffer, 0, &render_target_view);
   D3D11_TEXTURE2D_DESC back_buffer_desc = {0};
-  ID3D11Texture2D_GetDesc(back_buffer, &back_buffer_desc);
+  back_buffer->GetDesc(&back_buffer_desc);
   u64 render_width = back_buffer_desc.Width;
   u64 render_height = back_buffer_desc.Height;
 
   // Compile & create shaders
   ID3DBlob *vs_code_blob, *ps_code_blob;
   ID3DBlob *vs_errors_blob, *ps_errors_blob;
-  HRESULT vs_comp_result = D3DCompileFromFile(L""WIN32_ROGUELIKE_SOURCE_PATH"shaders.hlsl", 0, 0, "vs_main", "vs_5_0", D3DCOMPILE_DEBUG, 0, &vs_code_blob, &vs_errors_blob);
-  HRESULT ps_comp_result = D3DCompileFromFile(L""WIN32_ROGUELIKE_SOURCE_PATH"shaders.hlsl", 0, 0, "ps_main", "ps_5_0", D3DCOMPILE_DEBUG, 0, &ps_code_blob, &ps_errors_blob);
+  HRESULT vs_comp_result = D3DCompileFromFile(WIN32_ROGUELIKE_SOURCE_PATH_WIDE"shaders.hlsl", 0, 0, "vs_main", "vs_5_0", D3DCOMPILE_DEBUG, 0, &vs_code_blob, &vs_errors_blob);
+  HRESULT ps_comp_result = D3DCompileFromFile(WIN32_ROGUELIKE_SOURCE_PATH_WIDE"shaders.hlsl", 0, 0, "ps_main", "ps_5_0", D3DCOMPILE_DEBUG, 0, &ps_code_blob, &ps_errors_blob);
   String8 vs_code, ps_code, vs_errors, ps_errors;
 
   if (vs_comp_result) {
@@ -109,10 +109,10 @@ r_init (HWND hwnd) {
 
   ID3D11VertexShader *vertex_shader;
   ID3D11PixelShader *pixel_shader;
-  ID3D11Device_CreateVertexShader(device, vs_code.str, vs_code.len, 0, &vertex_shader);
-  ID3D11Device_CreatePixelShader(device, ps_code.str, ps_code.len, 0, &pixel_shader);
-  ID3D11DeviceContext_VSSetShader(ctx, vertex_shader, 0, 0);
-  ID3D11DeviceContext_PSSetShader(ctx, pixel_shader, 0, 0);
+  device->CreateVertexShader(vs_code.str, vs_code.len, 0, &vertex_shader);
+  device->CreatePixelShader(ps_code.str, ps_code.len, 0, &pixel_shader);
+  ctx->VSSetShader(vertex_shader, 0, 0);
+  ctx->PSSetShader(pixel_shader, 0, 0);
 
   // IA
   D3D11_BUFFER_DESC vertex_desc = {0};
@@ -121,36 +121,37 @@ r_init (HWND hwnd) {
   D3D11_SUBRESOURCE_DATA vertex_res = {0};
   vertex_res.pSysMem = quad_vertices;
   ID3D11Buffer *vbuffer;
-  ID3D11Device_CreateBuffer(device, &vertex_desc, &vertex_res, &vbuffer);
+  device->CreateBuffer(&vertex_desc, &vertex_res, &vbuffer);
   D3D11_BUFFER_DESC index_desc = {0};
   index_desc.ByteWidth = sizeof(u32) * array_count(quad_indices);
   index_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
   D3D11_SUBRESOURCE_DATA index_res = {0};
   index_res.pSysMem = quad_indices;
   ID3D11Buffer *ibuffer;
-  ID3D11Device_CreateBuffer(device, &index_desc, &index_res, &ibuffer);
+  device->CreateBuffer(&index_desc, &index_res, &ibuffer);
   D3D11_BUFFER_DESC instance_desc = {0};
   instance_desc.ByteWidth = sizeof(R_Instance_Data) * R_MAX_QUADS;
   instance_desc.Usage = D3D11_USAGE_DYNAMIC;
   instance_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
   instance_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-  ID3D11Device_CreateBuffer(device, &instance_desc, 0, &instance_buffer);
+  device->CreateBuffer(&instance_desc, 0, &instance_buffer);
   ID3D11InputLayout *input_layout;
-  ID3D11Device_CreateInputLayout(device, input_layout_desc, array_count(input_layout_desc), vs_code.str, vs_code.len, &input_layout);
+  device->CreateInputLayout(input_layout_desc, array_count(input_layout_desc), vs_code.str, vs_code.len, &input_layout);
   ID3D11Buffer *vertex_buffers[] = {vbuffer, instance_buffer};
   u32 strides[] = {sizeof(R_Vertex), sizeof(R_Instance_Data)};
   u32 offsets[] = {0,0};
-  ID3D11DeviceContext_IASetInputLayout(ctx, input_layout);
-  ID3D11DeviceContext_IASetVertexBuffers(ctx, 0, array_count(vertex_buffers), vertex_buffers, strides, offsets);
-  ID3D11DeviceContext_IASetIndexBuffer(ctx, ibuffer, DXGI_FORMAT_R32_UINT, 0);
-  ID3D11DeviceContext_IASetPrimitiveTopology(ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  ctx->IASetInputLayout(input_layout);
+  ctx->IASetVertexBuffers(0, array_count(vertex_buffers), vertex_buffers, strides, offsets);
+  ctx->IASetIndexBuffer(ibuffer, DXGI_FORMAT_R32_UINT, 0);
+  ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
   D3D11_BUFFER_DESC uniforms_desc = {0};
   uniforms_desc.ByteWidth = sizeof(R_Uniforms);
   uniforms_desc.Usage = D3D11_USAGE_DYNAMIC;
   uniforms_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
   uniforms_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-  ID3D11Device_CreateBuffer(device, &uniforms_desc, 0, &uniforms);
-  ID3D11DeviceContext_VSSetConstantBuffers(ctx, 0, 1, &uniforms);
+  device->CreateBuffer(&uniforms_desc, 0, &uniforms);
+  ctx->VSSetConstantBuffers(0, 1, &uniforms);
 
   // Rasterizer
   D3D11_VIEWPORT viewport = {0};
@@ -158,15 +159,16 @@ r_init (HWND hwnd) {
   viewport.Height = back_buffer_desc.Height;
   viewport.MinDepth = 0;
   viewport.MaxDepth = 1;
-  ID3D11DeviceContext_RSSetViewports(ctx, 1, &viewport);
+  ctx->RSSetViewports(1, &viewport);
+
   D3D11_RASTERIZER_DESC rstate_desc = {0};
   rstate_desc.CullMode = D3D11_CULL_NONE;
   rstate_desc.FrontCounterClockwise = 1;
   rstate_desc.DepthClipEnable = 1;
   rstate_desc.FillMode = D3D11_FILL_SOLID;
   ID3D11RasterizerState *rstate;
-  ID3D11Device_CreateRasterizerState(device, &rstate_desc, &rstate);
-  ID3D11DeviceContext_RSSetState(ctx, rstate);
+  device->CreateRasterizerState(&rstate_desc, &rstate);
+  ctx->RSSetState(rstate);
 
   // OM
   D3D11_TEXTURE2D_DESC depth_texture_desc = {0};
@@ -179,7 +181,7 @@ r_init (HWND hwnd) {
   depth_texture_desc.SampleDesc.Quality = 0;
   depth_texture_desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
   ID3D11Texture2D *depth_stencil_texture;
-  ID3D11Device_CreateTexture2D(device, &depth_texture_desc, 0, &depth_stencil_texture);
+  device->CreateTexture2D(&depth_texture_desc, 0, &depth_stencil_texture);
   D3D11_DEPTH_STENCIL_DESC depth_stencil_desc = {0};
   depth_stencil_desc.DepthEnable = 1;
   depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
@@ -193,12 +195,12 @@ r_init (HWND hwnd) {
   depth_stencil_desc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
   depth_stencil_desc.BackFace = depth_stencil_desc.FrontFace;
   ID3D11DepthStencilState *depth_stencil_state;
-  ID3D11Device_CreateDepthStencilState(device, &depth_stencil_desc, &depth_stencil_state);
-  ID3D11DeviceContext_OMSetDepthStencilState(ctx, depth_stencil_state, 1);
+  device->CreateDepthStencilState(&depth_stencil_desc, &depth_stencil_state);
+  ctx->OMSetDepthStencilState(depth_stencil_state, 1);
   D3D11_DEPTH_STENCIL_VIEW_DESC depth_stencil_view_desc = {0};
   depth_stencil_view_desc.Format = depth_texture_desc.Format;
   depth_stencil_view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-  ID3D11Device_CreateDepthStencilView(device, (ID3D11Resource*)depth_stencil_texture, &depth_stencil_view_desc, &depth_stencil_view);
+  device->CreateDepthStencilView((ID3D11Resource*)depth_stencil_texture, &depth_stencil_view_desc, &depth_stencil_view);
   D3D11_BLEND_DESC blend_desc = {0};
   blend_desc.RenderTarget[0].BlendEnable = 1;
   blend_desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
@@ -209,9 +211,9 @@ r_init (HWND hwnd) {
   blend_desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
   blend_desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
   ID3D11BlendState *blend_state;
-  ID3D11Device_CreateBlendState(device, &blend_desc, &blend_state);
-  ID3D11DeviceContext_OMSetBlendState(ctx, blend_state, 0, 0xFFFFFFFF);
-  ID3D11DeviceContext_OMSetRenderTargets(ctx, 1, &render_target_view, depth_stencil_view);
+  device->CreateBlendState(&blend_desc, &blend_state);
+  ctx->OMSetBlendState(blend_state, 0, 0xFFFFFFFF);
+  ctx->OMSetRenderTargets(1, &render_target_view, depth_stencil_view);
 
   D3D11_SAMPLER_DESC sampler_desc;
   sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -228,8 +230,8 @@ r_init (HWND hwnd) {
   sampler_desc.BorderColor[2] = 1.f;
   sampler_desc.BorderColor[3] = 1.f;
   ID3D11SamplerState *sampler;
-  ID3D11Device_CreateSamplerState(device, &sampler_desc, &sampler);
-  ID3D11DeviceContext_PSSetSamplers(ctx, 0, 1, &sampler);
+  device->CreateSamplerState(&sampler_desc, &sampler);
+  ctx->PSSetSamplers(0, 1, &sampler);
 
   com_release(back_buffer);
   com_release(vs_code_blob);
@@ -237,7 +239,7 @@ r_init (HWND hwnd) {
   com_release(vs_errors_blob);
   com_release(ps_errors_blob);
 
-  return v2i(render_width, render_height);
+  return v2i((s32)render_width, (s32)render_height);
 }
 
 function R_Texture_2D
@@ -262,41 +264,41 @@ r_create_texture (PNG_Bitmap_RGBA raw_texture_data, b32 generate_mipmaps) {
 
   ID3D11Texture2D *tex;
   ID3D11ShaderResourceView *tex_view;
-  ID3D11Device_CreateTexture2D(device, &tex_desc, NULL, &tex);
-  ID3D11DeviceContext_UpdateSubresource(ctx, (ID3D11Resource*)tex, 0, NULL, raw_texture_data.pixels, raw_texture_data.width * sizeof(u32), 0);
+  device->CreateTexture2D(&tex_desc, NULL, &tex);
+  ctx->UpdateSubresource((ID3D11Resource*)tex, 0, NULL, raw_texture_data.pixels, raw_texture_data.width * sizeof(u32), 0);
 
-  ID3D11Device_CreateShaderResourceView(device, (ID3D11Resource*)tex, &tex_srv, &tex_view);
-  ID3D11DeviceContext_GenerateMips(ctx, tex_view);
+  device->CreateShaderResourceView((ID3D11Resource*)tex, &tex_srv, &tex_view);
+  ctx->GenerateMips(tex_view);
 
   return (R_Texture_2D)tex_view;
 }
 
 function void
 r_bind_texture (R_Texture_2D tex_view) {
-  ID3D11DeviceContext_VSSetShaderResources(ctx, 0, 1, &(ID3D11ShaderResourceView*)tex_view);
-  ID3D11DeviceContext_PSSetShaderResources(ctx, 0, 1, &(ID3D11ShaderResourceView*)tex_view);
+  ctx->VSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&tex_view);
+  ctx->PSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&tex_view);
 }
 
 function void
 r_prep (void) {
   local_persist read_only f32 clear_color[4] = {0.1f, 0.2f, 0.3f, 1.f};
-  ID3D11DeviceContext_ClearDepthStencilView(ctx, depth_stencil_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.f, 0);
-  ID3D11DeviceContext_ClearRenderTargetView(ctx, render_target_view, clear_color);
+  ctx->ClearDepthStencilView(depth_stencil_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.f, 0);
+  ctx->ClearRenderTargetView(render_target_view, clear_color);
 }
 
 function void
 r_update_transform (Mat4 m) {
   D3D11_MAPPED_SUBRESOURCE constant_buffer = {0};
   R_Uniforms new_transform_data = {m};
-  ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)uniforms, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer);
+  ctx->Map((ID3D11Resource*)uniforms, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer);
   memcpy(constant_buffer.pData, &new_transform_data, sizeof(R_Uniforms));
-  ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)uniforms, 0);
+  ctx->Unmap((ID3D11Resource*)uniforms, 0);
 }
 
 function void
 r_push_quad_ (Push_Quad_Params *p) {
   R_Instance_Data *next_inst;
-  next_inst = &r_quads[InterlockedIncrement64(&r_num_quads)-1];
+  next_inst = &r_quads[InterlockedIncrement64((volatile LONG64*)&r_num_quads)-1];
 
   Vec2 scale = p->scale;
   Atlas_Coords coords = p->atlas_coords;
@@ -323,16 +325,16 @@ function void
 r_draw_quads (void) {
   D3D11_MAPPED_SUBRESOURCE instances = {0};
 
-  ID3D11DeviceContext_OMSetRenderTargets(ctx, 1, &render_target_view, depth_stencil_view);
-  ID3D11DeviceContext_Map(ctx, (ID3D11Resource*)instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instances);
+  ctx->OMSetRenderTargets(1, &render_target_view, depth_stencil_view);
+  ctx->Map((ID3D11Resource*)instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instances);
   memcpy(instances.pData, r_quads, sizeof(R_Instance_Data) * r_num_quads);
-  ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource*)instance_buffer, 0);
-  ID3D11DeviceContext_DrawIndexedInstanced(ctx, 6, r_num_quads, 0, 0, 0);
+  ctx->Unmap((ID3D11Resource*)instance_buffer, 0);
+  ctx->DrawIndexedInstanced(6, r_num_quads, 0, 0, 0);
   memory_zero(r_quads, r_num_quads);
   r_num_quads = 0;
 }
 
 function void
 r_present (b32 enable_vsync) {
-  IDXGISwapChain_Present(swap_chain, enable_vsync, 0);
+  swap_chain->Present(enable_vsync, 0);
 }

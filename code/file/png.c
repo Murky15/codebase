@@ -257,8 +257,8 @@ png_zlib_inflate (Arena *arena, String8 deflated) {
                 }
                 assert (code_lengths[256] != 0);
 
-                u32Array litlen_data = comp_lit(u32Array, .count = hlit, .array = code_lengths);
-                u32Array dist_data = comp_lit(u32Array, .count = hdist, .array = code_lengths + hlit);
+                u32Array litlen_data = comp_lit(u32Array,. array = code_lengths, .count = hlit,);
+                u32Array dist_data = comp_lit(u32Array, .array = code_lengths + hlit, .count = hdist);
                 litlen_dict = huffman_make(scratch.arena, litlen_data, HUFFMAN_MAX_CODE_SIZE);
                 dist_dict = huffman_make(scratch.arena, dist_data, HUFFMAN_MAX_CODE_SIZE);
             } else {
