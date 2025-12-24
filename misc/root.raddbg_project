@@ -1,5 +1,6 @@
 // raddbg 0.9.25 project file
 
+recent_file: path: "../code/roguelike/platform_win32.cpp"
 recent_file: path: "../code/roguelike/roguelike.c"
 recent_file: path: "../code/os/win32/entry.c"
 target:
@@ -11,10 +12,10 @@ target:
 debug_info:
 {
   path: "W:/build/roguelike_platform_win32.pdb"
-  timestamp: 66201647049966
+  timestamp: 66201936244147
 }
 debug_info:
 {
   path: "W:/build/roguelike_new.pdb"
-  timestamp: 66201647946298
+  timestamp: 66201936243758
 }

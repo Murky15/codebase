@@ -6,7 +6,7 @@ window:
   size: 2003.199951 1152.000000
   panels:
   {
-    0.765933:
+    0.547758:
     {
       0.80:
       {
@@ -20,7 +20,6 @@ window:
           }
           0.50:
           {
-            selected
             watch: expression: "query:breakpoints"
             watch: expression: "query:watch_pins"
             text:
@@ -41,17 +40,17 @@ window:
           getting_started
           text:
           {
-            expression: "file:\"W:/code/os/win32/entry.c\".data"
+            selected
+            expression: "file:\"W:/code/roguelike/platform_win32.cpp\".data"
             auto: 1
             query: input: ""
-            cursor_line: 13
+            cursor_line: 231
             cursor_column: 1
-            mark_line: 13
+            mark_line: 231
             mark_column: 1
           }
           text:
           {
-            selected
             expression: "file:\"W:/code/roguelike/roguelike.c\".data"
             project: "W:/misc/root.raddbg_project"
             query:
@@ -59,10 +58,10 @@ window:
               input: ""
               cmd: search
             }
-            cursor_line: 701
-            cursor_column: 1
-            mark_line: 701
-            mark_column: 1
+            cursor_line: 693
+            cursor_column: 40
+            mark_line: 693
+            mark_column: 40
           }
         }
       }
@@ -95,16 +94,19 @@ window:
         }
       }
     }
-    0.234067:
+    0.452242:
     {
       0.50:
       {
+        selected
         watch: expression: "query:targets"
         watch:
         {
           selected
           expression: ""
           watch: "point_rot.w"
+          watch: mix_format_ex
+          watch: audio_buffer
         }
       }
       0.50:

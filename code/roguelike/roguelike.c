@@ -31,6 +31,7 @@
   - [X] It looks like the game is most performant with spin count = 0 for barriers?
     Verify this. Also, what is a good spin count for Critical sections?
   - [X] Vector swizzle *macros*: xz(Vec3) -> Vec2
+  - [ ] Conversion routines between strings and wide strings
 
   - [O] Instead of a simple AABB check for determining the visible range, I should
     instead use a point-in-polygon function to support angles rotated around y-axis.

@@ -7,12 +7,16 @@
 # error "WIN32_ROGUELIKE_ASSET_PATH is undefined"
 #endif
 
+// NOTE: REFERENCE_TIMEs are expressed in 100-nanosecond units
+#define REFTIMES_PER_SEC 10000000
+
 // NOTE: Headers
 
 //#define UNICODE
 #include <windows.h>
 #include <windowsx.h>
 #include <mmdeviceapi.h>
+#include <audioclient.h>
 #include <shlwapi.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -41,6 +45,12 @@ global b32 move_forward, move_back, strafe_left, strafe_right, mouse_click;
 global f32 mouse_x, mouse_y;
 global Vec2i render_dim;
 global Game_Input_Package old_input, new_input;
+
+global IAudioRenderClient *audio_renderer;
+global IAudioClient *audio_client;
+global WAVEFORMATEX *mix_format;
+global WAVEFORMATEXTENSIBLE *mix_format_ex;
+global u32 audio_buffer_size_frames;
 
 function LRESULT
 WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
@@ -150,8 +160,24 @@ os_entry (void) {
     f32 render_height = render_dim.height;
 
     // NOTE: Initialize audio
-    IMMDeviceEnumerator *audio_device_enumerator;
+    REFERENCE_TIME requested_duration = 0; // REFTIMES_PER_SEC;
+    IMMDeviceEnumerator *audio_device_enumerator = NULL;
+    IMMDevice *speaker = NULL;
     CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&audio_device_enumerator);
+    audio_device_enumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &speaker);
+    speaker->Activate(__uuidof(IAudioClient), CLSCTX_ALL, NULL, (void**)&audio_client);
+    audio_client->GetMixFormat(&mix_format);
+    if (audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED, 0, requested_duration, 0, mix_format, NULL) != S_OK) {
+      printf("Unable to initialize audio!\n");
+      exit(1);
+    }
+    if (mix_format->wFormatTag == WAVE_FORMAT_EXTENSIBLE) {
+      mix_format_ex = (WAVEFORMATEXTENSIBLE*)mix_format;
+    }
+    assert(mix_format_ex->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT);
+    audio_client->GetService(__uuidof(IAudioRenderClient), (void**)&audio_renderer);
+    audio_client->GetBufferSize(&audio_buffer_size_frames);
+    audio_client->Start();
 
     game = arena_pushn(perm, Game_VTable, 1);
     win32_update_game_dll(&game_dll, game);
@@ -181,6 +207,7 @@ os_entry (void) {
       // Input
       for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
         if (msg.message == WM_QUIT) {
+          audio_client->Stop();
           ExitProcess(0);
         }
 
@@ -193,7 +220,32 @@ os_entry (void) {
       now = os_query_clock();
       dt = os_get_elapsed_ms(last, now);
       last = now;
+
+      // NOTE: Render test data
+      u32 audio_padding_frames = 0;
+      audio_client->GetCurrentPadding(&audio_padding_frames);
+      u32 frames_to_write = audio_buffer_size_frames - audio_padding_frames;
+      // u32 bytes_to_write = frames_to_write * mix_format->nBlockAlign;
+      u8 *audio_buffer = 0;
+      assert (audio_renderer->GetBuffer(frames_to_write, &audio_buffer) == S_OK);
+      f32 *write_cursor = (f32*)audio_buffer;
+      local_persist f32 phase;
+      local_persist f32 freq;
+      freq = move_forward ? 220 : 268;
+      f32 phase_inc = 2 * M_PI * freq / mix_format->nSamplesPerSec;
+      for (u32 frame = 0; frame < frames_to_write; ++frame) {
+        // NOTE: Assume two channels
+        f32 sample = sinf(phase);
+        phase += phase_inc;
+        if (phase >= 2.f * M_PI) {
+          phase -= 2.f * M_PI32;
+        }
+        *(write_cursor++) = sample;
+        *(write_cursor++) = sample;
+      }
+      audio_renderer->ReleaseBuffer(frames_to_write, 0);
     }
+
     os_heat_sync_ptr(dt, 0);
     new_input.move_forward = move_forward;
     new_input.move_back    = move_back;
