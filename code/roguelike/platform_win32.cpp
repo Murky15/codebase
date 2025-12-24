@@ -9,6 +9,7 @@
 
 // NOTE: REFERENCE_TIMEs are expressed in 100-nanosecond units
 #define REFTIMES_PER_SEC 10000000
+#define REFTIMES_PER_MS  10000
 
 // NOTE: Headers
 
@@ -160,7 +161,7 @@ os_entry (void) {
     f32 render_height = render_dim.height;
 
     // NOTE: Initialize audio
-    REFERENCE_TIME requested_duration = 0; // REFTIMES_PER_SEC;
+    REFERENCE_TIME requested_duration = 0; //REFTIMES_PER_SEC;
     IMMDeviceEnumerator *audio_device_enumerator = NULL;
     IMMDevice *speaker = NULL;
     CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&audio_device_enumerator);
@@ -177,6 +178,11 @@ os_entry (void) {
     assert(mix_format_ex->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT);
     audio_client->GetService(__uuidof(IAudioRenderClient), (void**)&audio_renderer);
     audio_client->GetBufferSize(&audio_buffer_size_frames);
+    REFERENCE_TIME audio_period;
+    audio_client->GetDevicePeriod(&audio_period, NULL);
+    f32 audio_period_ms = (f32)audio_period / REFTIMES_PER_MS;
+    f32 buffer_size_ms = ((f32)audio_buffer_size_frames / mix_format->nSamplesPerSec) * 1000.f;
+
     audio_client->Start();
 
     game = arena_pushn(perm, Game_VTable, 1);
@@ -225,7 +231,6 @@ os_entry (void) {
       u32 audio_padding_frames = 0;
       audio_client->GetCurrentPadding(&audio_padding_frames);
       u32 frames_to_write = audio_buffer_size_frames - audio_padding_frames;
-      // u32 bytes_to_write = frames_to_write * mix_format->nBlockAlign;
       u8 *audio_buffer = 0;
       assert (audio_renderer->GetBuffer(frames_to_write, &audio_buffer) == S_OK);
       f32 *write_cursor = (f32*)audio_buffer;

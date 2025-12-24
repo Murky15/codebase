@@ -43,10 +43,14 @@ window:
             selected
             expression: "file:\"W:/code/roguelike/platform_win32.cpp\".data"
             auto: 1
-            query: input: ""
-            cursor_line: 231
+            query:
+            {
+              input: ""
+              cmd: search
+            }
+            cursor_line: 186
             cursor_column: 1
-            mark_line: 231
+            mark_line: 186
             mark_column: 1
           }
           text:
@@ -107,7 +111,23 @@ window:
           watch: "point_rot.w"
           watch: mix_format_ex
           watch: audio_buffer
+          query:
+          {
+            cmd: search
+            input: ms
+          }
+          watch: audio_period_ms
+          watch: audio_buffer_size_frames
+          watch: "audio_buffer_size_frames\\"
+          watch: audio_buffer_size_frames
+          watch: "audio_buffer_size_frames/mix_format.nSamplesPerSec"
+          watch: frame
+          watch: frame
+          watch: frame
+          watch: frame
+          watch: dhjskad
         }
+        watch: expression: "query:locals"
       }
       0.50:
       {
@@ -124,7 +144,6 @@ window:
   split_x
   pos: 250 144
   monitor: "\\\\.\\DISPLAY1"
-  maximized
 }
 keybindings:
 {
