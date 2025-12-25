@@ -97,8 +97,11 @@
 #define array_count(a) (sizeof(a) / sizeof(a[0]))
 #define swap(a, b) stmnt( typeof(a) __temp = a; a = b; b = __temp; )
 
+#define read_le16(x)  ((((u8*)(x))[1] << 8) | (((u8*)(x))[0]))
+#define read_le32(x)  ((((u8*)(x))[3] << 24) | (((u8*)(x))[2] << 16) | (((u8*)(x))[1] << 8) | (((u8*)(x))[0]))
 #define be_to_le16(x) ((((u8*)(x))[0] << 8) | (((u8*)(x))[1]))
 #define be_to_le32(x) ((((u8*)(x))[0] << 24) | (((u8*)(x))[1] << 16) | (((u8*)(x))[2] << 8) | (((u8*)(x))[3]))
+
 
 #if ARCH_X64
 # define reverse_byte(x) (((x) * 0x0202020202ULL & 0x010884422010ULL) % 1023)

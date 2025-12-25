@@ -26,6 +26,7 @@
 #include <base/include.h>
 #include <os/include.h>
 #include <file/png.h>
+#include <file/wav.h>
 
 #include "graphics.h"
 #include "dungeon.h"
@@ -36,6 +37,7 @@
 #include <base/include.c>
 #include <os/include.c>
 #include <file/png.c>
+#include <file/wav.c>
 #if GRAPHICS_FORCE_OPENGL
 # include "graphics_ogl.c"
 #else
@@ -49,9 +51,9 @@ global Game_Input_Package old_input, new_input;
 
 global IAudioRenderClient *audio_renderer;
 global IAudioClient *audio_client;
-global WAVEFORMATEX *mix_format;
-global WAVEFORMATEXTENSIBLE *mix_format_ex;
+global WAVEFORMATEX mix_format;
 global u32 audio_buffer_size_frames;
+global Wave_Data test_wav;
 
 function LRESULT
 WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
@@ -167,22 +169,25 @@ os_entry (void) {
     CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&audio_device_enumerator);
     audio_device_enumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &speaker);
     speaker->Activate(__uuidof(IAudioClient), CLSCTX_ALL, NULL, (void**)&audio_client);
-    audio_client->GetMixFormat(&mix_format);
-    if (audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED, 0, requested_duration, 0, mix_format, NULL) != S_OK) {
+    //audio_client->GetMixFormat(&mix_format);
+    mix_format.wFormatTag = WAVE_FORMAT_PCM;
+    mix_format.nChannels = 2;
+    mix_format.nSamplesPerSec = 44100;
+    mix_format.wBitsPerSample = 16;
+    mix_format.nBlockAlign = (mix_format.nChannels * mix_format.wBitsPerSample) / 8;
+    mix_format.nAvgBytesPerSec = mix_format.nSamplesPerSec * mix_format.nBlockAlign;
+    if (audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_RATEADJUST | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY, requested_duration, 0, &mix_format, NULL) != S_OK) {
       printf("Unable to initialize audio!\n");
       exit(1);
     }
-    if (mix_format->wFormatTag == WAVE_FORMAT_EXTENSIBLE) {
-      mix_format_ex = (WAVEFORMATEXTENSIBLE*)mix_format;
-    }
-    assert(mix_format_ex->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT);
     audio_client->GetService(__uuidof(IAudioRenderClient), (void**)&audio_renderer);
     audio_client->GetBufferSize(&audio_buffer_size_frames);
     REFERENCE_TIME audio_period;
     audio_client->GetDevicePeriod(&audio_period, NULL);
     f32 audio_period_ms = (f32)audio_period / REFTIMES_PER_MS;
-    f32 buffer_size_ms = ((f32)audio_buffer_size_frames / mix_format->nSamplesPerSec) * 1000.f;
-
+    f32 buffer_size_ms = ((f32)audio_buffer_size_frames / mix_format.nSamplesPerSec) * 1000.f;
+    String8 raw_test_wav_data = os_read_file(frame, str8_lit("W:/code/file/wav_tests/test2.wav"), false);
+    test_wav = wav_load(perm, raw_test_wav_data);
     audio_client->Start();
 
     game = arena_pushn(perm, Game_VTable, 1);
@@ -233,20 +238,21 @@ os_entry (void) {
       u32 frames_to_write = audio_buffer_size_frames - audio_padding_frames;
       u8 *audio_buffer = 0;
       assert (audio_renderer->GetBuffer(frames_to_write, &audio_buffer) == S_OK);
-      f32 *write_cursor = (f32*)audio_buffer;
-      local_persist f32 phase;
-      local_persist f32 freq;
-      freq = move_forward ? 220 : 268;
-      f32 phase_inc = 2 * M_PI * freq / mix_format->nSamplesPerSec;
+      s16 *write_cursor = (s16*)audio_buffer;
+      local_persist u32 sample_idx;
+      //local_persist f32 phase;
+      //f32 phase_inc = 2 * M_PI32 * 256 / mix_format.nSamplesPerSec;
       for (u32 frame = 0; frame < frames_to_write; ++frame) {
-        // NOTE: Assume two channels
+        // NOTE: Assume two channels (for now)
+        /*
         f32 sample = sinf(phase);
         phase += phase_inc;
         if (phase >= 2.f * M_PI) {
           phase -= 2.f * M_PI32;
         }
-        *(write_cursor++) = sample;
-        *(write_cursor++) = sample;
+        */
+        *(write_cursor++) = ((s16*)test_wav.sample_buffer)[sample_idx++];
+        *(write_cursor++) = ((s16*)test_wav.sample_buffer)[sample_idx++];
       }
       audio_renderer->ReleaseBuffer(frames_to_write, 0);
     }

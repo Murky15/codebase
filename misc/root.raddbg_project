@@ -1,6 +1,8 @@
 // raddbg 0.9.25 project file
 
 recent_file: path: "../code/roguelike/platform_win32.cpp"
+recent_file: path: "../code/file/wav.c"
+recent_file: path: "../code/base/strings.c"
 recent_file: path: "../code/roguelike/roguelike.c"
 recent_file: path: "../code/os/win32/entry.c"
 target:
@@ -12,7 +14,7 @@ target:
 debug_info:
 {
   path: "W:/build/roguelike_platform_win32.pdb"
-  timestamp: 66201998932179
+  timestamp: 66202074477397
 }
 debug_info:
 {
@@ -21,6 +23,6 @@ debug_info:
 }
 breakpoint:
 {
-  source_location: "../code/roguelike/platform_win32.cpp:183:1"
+  source_location: "../code/file/wav.c:5:1"
   hit_count: 1
 }

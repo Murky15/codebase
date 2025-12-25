@@ -37,6 +37,7 @@ window:
         }
         0.75:
         {
+          selected
           getting_started
           text:
           {
@@ -48,9 +49,9 @@ window:
               input: ""
               cmd: search
             }
-            cursor_line: 186
+            cursor_line: 188
             cursor_column: 1
-            mark_line: 186
+            mark_line: 188
             mark_column: 1
           }
           text:
@@ -102,11 +103,9 @@ window:
     {
       0.50:
       {
-        selected
         watch: expression: "query:targets"
         watch:
         {
-          selected
           expression: ""
           watch: "point_rot.w"
           watch: mix_format_ex
@@ -127,7 +126,7 @@ window:
           watch: frame
           watch: dhjskad
         }
-        watch: expression: "query:locals"
+        watch: selected expression: "query:locals"
       }
       0.50:
       {
