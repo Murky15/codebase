@@ -6,7 +6,7 @@ window:
   size: 2003.199951 1152.000000
   panels:
   {
-    0.547758:
+    0.656645:
     {
       0.80:
       {
@@ -41,32 +41,38 @@ window:
           getting_started
           text:
           {
-            selected
-            expression: "file:\"W:/code/roguelike/platform_win32.cpp\".data"
+            expression: "file:\"W:/code/os/win32/entry.c\".data"
             auto: 1
-            query:
-            {
-              input: ""
-              cmd: search
-            }
-            cursor_line: 188
+            query: input: ""
+            cursor_line: 13
             cursor_column: 1
-            mark_line: 188
+            mark_line: 13
             mark_column: 1
           }
           text:
           {
             expression: "file:\"W:/code/roguelike/roguelike.c\".data"
             project: "W:/misc/root.raddbg_project"
+            query: input: ""
+            cursor_line: 1
+            cursor_column: 1
+            mark_line: 1
+            mark_column: 1
+          }
+          text:
+          {
+            selected
+            expression: "file:\"W:/code/roguelike/platform_win32.cpp\".data"
+            project: "W:/misc/root.raddbg_project"
             query:
             {
-              input: ""
+              input: mix_
               cmd: search
             }
-            cursor_line: 693
-            cursor_column: 40
-            mark_line: 693
-            mark_column: 40
+            cursor_line: 182
+            cursor_column: 6
+            mark_line: 173
+            mark_column: 5
           }
         }
       }
@@ -99,34 +105,18 @@ window:
         }
       }
     }
-    0.452242:
+    0.343355:
     {
       0.50:
       {
         watch: expression: "query:targets"
         watch:
         {
+          selected
           expression: ""
-          watch: "point_rot.w"
-          watch: mix_format_ex
-          watch: audio_buffer
-          query:
-          {
-            cmd: search
-            input: ms
-          }
-          watch: audio_period_ms
-          watch: audio_buffer_size_frames
-          watch: "audio_buffer_size_frames\\"
-          watch: audio_buffer_size_frames
-          watch: "audio_buffer_size_frames/mix_format.nSamplesPerSec"
-          watch: frame
-          watch: frame
-          watch: frame
-          watch: frame
-          watch: dhjskad
+          watch: test_wav
+          watch: background_music
         }
-        watch: selected expression: "query:locals"
       }
       0.50:
       {
@@ -143,6 +133,7 @@ window:
   split_x
   pos: 250 144
   monitor: "\\\\.\\DISPLAY1"
+  maximized
 }
 keybindings:
 {

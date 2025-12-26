@@ -186,7 +186,7 @@ os_entry (void) {
     audio_client->GetDevicePeriod(&audio_period, NULL);
     f32 audio_period_ms = (f32)audio_period / REFTIMES_PER_MS;
     f32 buffer_size_ms = ((f32)audio_buffer_size_frames / mix_format.nSamplesPerSec) * 1000.f;
-    String8 raw_test_wav_data = os_read_file(frame, str8_lit("W:/code/file/wav_tests/test2.wav"), false);
+    String8 raw_test_wav_data = os_read_file(frame, str8_lit("W:/code/file/wav_tests/test3.wav"), false);
     test_wav = wav_load(perm, raw_test_wav_data);
     audio_client->Start();
 
