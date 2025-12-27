@@ -66,13 +66,13 @@ window:
             project: "W:/misc/root.raddbg_project"
             query:
             {
-              input: mix_
+              input: ""
               cmd: search
             }
-            cursor_line: 182
-            cursor_column: 6
-            mark_line: 173
-            mark_column: 5
+            cursor_line: 539
+            cursor_column: 1
+            mark_line: 539
+            mark_column: 1
           }
         }
       }
@@ -95,11 +95,7 @@ window:
         }
         0.40:
         {
-          watch:
-          {
-            expression: "query:call_stack"
-            selected
-          }
+          watch: selected expression: "query:call_stack"
           watch: expression: "query:modules"
           tabs_on_bottom
         }
@@ -112,11 +108,12 @@ window:
         watch: expression: "query:targets"
         watch:
         {
-          selected
           expression: ""
           watch: test_wav
           watch: background_music
+          watch: buffer_space_ms
         }
+        watch: selected expression: "query:locals"
       }
       0.50:
       {

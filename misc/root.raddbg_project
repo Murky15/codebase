@@ -13,15 +13,10 @@ target:
 debug_info:
 {
   path: "W:/build/roguelike_platform_win32.pdb"
-  timestamp: 66202108385912
+  timestamp: 66202199990399
 }
 debug_info:
 {
   path: "W:/build/roguelike_new.pdb"
-  timestamp: 66202108343402
-}
-breakpoint:
-{
-  source_location: "../code/roguelike/platform_win32.cpp:192:1"
-  hit_count: 1
+  timestamp: 66202199990002
 }

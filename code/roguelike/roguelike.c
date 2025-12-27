@@ -67,7 +67,8 @@
 #include <base/include.h>
 #include <os/include.h>
 #include <file/png.h>
-#include "graphics.h"
+#include <file/wav.h>
+#include "media.h"
 #include "dungeon.h"
 #include "roguelike.h"
 
@@ -432,8 +433,8 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   os_set_thread_context(*tctx);
   Game_State *gs = arena_pushn(init.perm, Game_State, 1);
 
-  String8 asset_path = str8_pushf(init.frame, "%.*s0x72_DungeonTilesetII_v1.7", str8_expand(init.asset_dir));
-  String8 font_path = str8_pushf(init.frame, "%.*smonogram/bitmap/monogram-bitmap.png", str8_expand(init.asset_dir));
+  String8 asset_path = str8_pushf(init.frame, "%.*sArt/Sprites", str8_expand(init.asset_dir));
+  String8 font_path = str8_pushf(init.frame, "%.*sArt/Fonts/monogram-bitmap.png", str8_expand(init.asset_dir));
   Texture_Atlas sprites = load_textures(init.perm, asset_path, init.rvtbl.create_texture);
   Texture_Atlas font = load_font(init.perm, font_path, init.rvtbl.create_texture);
   init.rvtbl.bind_texture(sprites.texture);
@@ -947,6 +948,6 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
       str8_pushf(gs->frame, "FPS: %f", 1000.f/g_delta_time));
     r->draw_quads();
 
-    r->present(true);
+    r->present(false);
   }
 }
