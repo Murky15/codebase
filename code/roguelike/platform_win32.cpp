@@ -45,11 +45,6 @@
 #include <file/png.c>
 #include <file/wav.c>
 
-global b32 move_forward, move_back, strafe_left, strafe_right, mouse_click;
-global f32 mouse_x, mouse_y;
-global Vec2i render_dim;
-global Game_Input_Package old_input, new_input;
-
 global struct {
   IAudioClient *client;
   IAudioRenderClient *renderer;
@@ -59,18 +54,28 @@ global struct {
   u32 buffer_size_frames;
 
   Wave_Data test_wav;
+  a_sample_callback_type get_game_samples;
 } g_audio;
 
 global R_Instance_Data r_quads[R_MAX_QUADS];
 global u64 r_num_quads;
 
-global ID3D11Device *device;
-global ID3D11DeviceContext *ctx;
-global IDXGISwapChain *swap_chain;
-global ID3D11RenderTargetView *render_target_view;
-global ID3D11DepthStencilView *depth_stencil_view;
-global ID3D11Buffer *uniforms;
-global ID3D11Buffer *instance_buffer;
+global struct {
+  ID3D11Device *device;
+  ID3D11DeviceContext *ctx;
+  IDXGISwapChain *swap_chain;
+
+  ID3D11RenderTargetView *render_target_view;
+  ID3D11DepthStencilView *depth_stencil_view;
+
+  ID3D11Buffer *uniforms;
+  ID3D11Buffer *instance_buffer;
+} g_d3d;
+
+global b32 move_forward, move_back, strafe_left, strafe_right, mouse_click;
+global f32 mouse_x, mouse_y;
+global Vec2i render_dim;
+global Game_Input_Package old_input, new_input;
 
 function LRESULT
 WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
@@ -185,12 +190,12 @@ r_init (HWND hwnd) {
                                 &feature_level,
                                 1,
                                 D3D11_SDK_VERSION,
-                                &sd, &swap_chain,
-                                &device, 0, &ctx);
+                                &sd, &g_d3d.swap_chain,
+                                &g_d3d.device, 0, &g_d3d.ctx);
 
   ID3D11Texture2D *back_buffer;
-  swap_chain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&back_buffer);
-  device->CreateRenderTargetView((ID3D11Resource*)back_buffer, 0, &render_target_view);
+  g_d3d.swap_chain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&back_buffer);
+  g_d3d.device->CreateRenderTargetView((ID3D11Resource*)back_buffer, 0, &g_d3d.render_target_view);
   D3D11_TEXTURE2D_DESC back_buffer_desc = {0};
   back_buffer->GetDesc(&back_buffer_desc);
   u64 render_width = back_buffer_desc.Width;
@@ -229,10 +234,10 @@ r_init (HWND hwnd) {
 
   ID3D11VertexShader *vertex_shader;
   ID3D11PixelShader *pixel_shader;
-  device->CreateVertexShader(vs_code.str, vs_code.len, 0, &vertex_shader);
-  device->CreatePixelShader(ps_code.str, ps_code.len, 0, &pixel_shader);
-  ctx->VSSetShader(vertex_shader, 0, 0);
-  ctx->PSSetShader(pixel_shader, 0, 0);
+  g_d3d.device->CreateVertexShader(vs_code.str, vs_code.len, 0, &vertex_shader);
+  g_d3d.device->CreatePixelShader(ps_code.str, ps_code.len, 0, &pixel_shader);
+  g_d3d.ctx->VSSetShader(vertex_shader, 0, 0);
+  g_d3d.ctx->PSSetShader(pixel_shader, 0, 0);
 
   // IA
   D3D11_BUFFER_DESC vertex_desc = {0};
@@ -241,37 +246,37 @@ r_init (HWND hwnd) {
   D3D11_SUBRESOURCE_DATA vertex_res = {0};
   vertex_res.pSysMem = quad_vertices;
   ID3D11Buffer *vbuffer;
-  device->CreateBuffer(&vertex_desc, &vertex_res, &vbuffer);
+  g_d3d.device->CreateBuffer(&vertex_desc, &vertex_res, &vbuffer);
   D3D11_BUFFER_DESC index_desc = {0};
   index_desc.ByteWidth = sizeof(u32) * array_count(quad_indices);
   index_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
   D3D11_SUBRESOURCE_DATA index_res = {0};
   index_res.pSysMem = quad_indices;
   ID3D11Buffer *ibuffer;
-  device->CreateBuffer(&index_desc, &index_res, &ibuffer);
+  g_d3d.device->CreateBuffer(&index_desc, &index_res, &ibuffer);
   D3D11_BUFFER_DESC instance_desc = {0};
   instance_desc.ByteWidth = sizeof(R_Instance_Data) * R_MAX_QUADS;
   instance_desc.Usage = D3D11_USAGE_DYNAMIC;
   instance_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
   instance_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-  device->CreateBuffer(&instance_desc, 0, &instance_buffer);
+  g_d3d.device->CreateBuffer(&instance_desc, 0, &g_d3d.instance_buffer);
   ID3D11InputLayout *input_layout;
-  device->CreateInputLayout(input_layout_desc, array_count(input_layout_desc), vs_code.str, vs_code.len, &input_layout);
-  ID3D11Buffer *vertex_buffers[] = {vbuffer, instance_buffer};
+  g_d3d.device->CreateInputLayout(input_layout_desc, array_count(input_layout_desc), vs_code.str, vs_code.len, &input_layout);
+  ID3D11Buffer *vertex_buffers[] = {vbuffer, g_d3d.instance_buffer};
   u32 strides[] = {sizeof(R_Vertex), sizeof(R_Instance_Data)};
   u32 offsets[] = {0,0};
-  ctx->IASetInputLayout(input_layout);
-  ctx->IASetVertexBuffers(0, array_count(vertex_buffers), vertex_buffers, strides, offsets);
-  ctx->IASetIndexBuffer(ibuffer, DXGI_FORMAT_R32_UINT, 0);
-  ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  g_d3d.ctx->IASetInputLayout(input_layout);
+  g_d3d.ctx->IASetVertexBuffers(0, array_count(vertex_buffers), vertex_buffers, strides, offsets);
+  g_d3d.ctx->IASetIndexBuffer(ibuffer, DXGI_FORMAT_R32_UINT, 0);
+  g_d3d.ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
   D3D11_BUFFER_DESC uniforms_desc = {0};
   uniforms_desc.ByteWidth = sizeof(R_Uniforms);
   uniforms_desc.Usage = D3D11_USAGE_DYNAMIC;
   uniforms_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
   uniforms_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-  device->CreateBuffer(&uniforms_desc, 0, &uniforms);
-  ctx->VSSetConstantBuffers(0, 1, &uniforms);
+  g_d3d.device->CreateBuffer(&uniforms_desc, 0, &g_d3d.uniforms);
+  g_d3d.ctx->VSSetConstantBuffers(0, 1, &g_d3d.uniforms);
 
   // Rasterizer
   D3D11_VIEWPORT viewport = {0};
@@ -279,7 +284,7 @@ r_init (HWND hwnd) {
   viewport.Height = back_buffer_desc.Height;
   viewport.MinDepth = 0;
   viewport.MaxDepth = 1;
-  ctx->RSSetViewports(1, &viewport);
+  g_d3d.ctx->RSSetViewports(1, &viewport);
 
   D3D11_RASTERIZER_DESC rstate_desc = {0};
   rstate_desc.CullMode = D3D11_CULL_NONE;
@@ -287,8 +292,8 @@ r_init (HWND hwnd) {
   rstate_desc.DepthClipEnable = 1;
   rstate_desc.FillMode = D3D11_FILL_SOLID;
   ID3D11RasterizerState *rstate;
-  device->CreateRasterizerState(&rstate_desc, &rstate);
-  ctx->RSSetState(rstate);
+  g_d3d.device->CreateRasterizerState(&rstate_desc, &rstate);
+  g_d3d.ctx->RSSetState(rstate);
 
   // OM
   D3D11_TEXTURE2D_DESC depth_texture_desc = {0};
@@ -301,7 +306,7 @@ r_init (HWND hwnd) {
   depth_texture_desc.SampleDesc.Quality = 0;
   depth_texture_desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
   ID3D11Texture2D *depth_stencil_texture;
-  device->CreateTexture2D(&depth_texture_desc, 0, &depth_stencil_texture);
+  g_d3d.device->CreateTexture2D(&depth_texture_desc, 0, &depth_stencil_texture);
   D3D11_DEPTH_STENCIL_DESC depth_stencil_desc = {0};
   depth_stencil_desc.DepthEnable = 1;
   depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
@@ -315,12 +320,12 @@ r_init (HWND hwnd) {
   depth_stencil_desc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
   depth_stencil_desc.BackFace = depth_stencil_desc.FrontFace;
   ID3D11DepthStencilState *depth_stencil_state;
-  device->CreateDepthStencilState(&depth_stencil_desc, &depth_stencil_state);
-  ctx->OMSetDepthStencilState(depth_stencil_state, 1);
+  g_d3d.device->CreateDepthStencilState(&depth_stencil_desc, &depth_stencil_state);
+  g_d3d.ctx->OMSetDepthStencilState(depth_stencil_state, 1);
   D3D11_DEPTH_STENCIL_VIEW_DESC depth_stencil_view_desc = {0};
   depth_stencil_view_desc.Format = depth_texture_desc.Format;
   depth_stencil_view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-  device->CreateDepthStencilView((ID3D11Resource*)depth_stencil_texture, &depth_stencil_view_desc, &depth_stencil_view);
+  g_d3d.device->CreateDepthStencilView((ID3D11Resource*)depth_stencil_texture, &depth_stencil_view_desc, &g_d3d.depth_stencil_view);
   D3D11_BLEND_DESC blend_desc = {0};
   blend_desc.RenderTarget[0].BlendEnable = 1;
   blend_desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
@@ -331,9 +336,9 @@ r_init (HWND hwnd) {
   blend_desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
   blend_desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
   ID3D11BlendState *blend_state;
-  device->CreateBlendState(&blend_desc, &blend_state);
-  ctx->OMSetBlendState(blend_state, 0, 0xFFFFFFFF);
-  ctx->OMSetRenderTargets(1, &render_target_view, depth_stencil_view);
+  g_d3d.device->CreateBlendState(&blend_desc, &blend_state);
+  g_d3d.ctx->OMSetBlendState(blend_state, 0, 0xFFFFFFFF);
+  g_d3d.ctx->OMSetRenderTargets(1, &g_d3d.render_target_view, g_d3d.depth_stencil_view);
 
   D3D11_SAMPLER_DESC sampler_desc;
   sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -350,8 +355,8 @@ r_init (HWND hwnd) {
   sampler_desc.BorderColor[2] = 1.f;
   sampler_desc.BorderColor[3] = 1.f;
   ID3D11SamplerState *sampler;
-  device->CreateSamplerState(&sampler_desc, &sampler);
-  ctx->PSSetSamplers(0, 1, &sampler);
+  g_d3d.device->CreateSamplerState(&sampler_desc, &sampler);
+  g_d3d.ctx->PSSetSamplers(0, 1, &sampler);
 
   com_release(back_buffer);
   com_release(vs_code_blob);
@@ -384,35 +389,35 @@ r_create_texture (PNG_Bitmap_RGBA raw_texture_data, b32 generate_mipmaps) {
 
   ID3D11Texture2D *tex;
   ID3D11ShaderResourceView *tex_view;
-  device->CreateTexture2D(&tex_desc, NULL, &tex);
-  ctx->UpdateSubresource((ID3D11Resource*)tex, 0, NULL, raw_texture_data.pixels, raw_texture_data.width * sizeof(u32), 0);
+  g_d3d.device->CreateTexture2D(&tex_desc, NULL, &tex);
+  g_d3d.ctx->UpdateSubresource((ID3D11Resource*)tex, 0, NULL, raw_texture_data.pixels, raw_texture_data.width * sizeof(u32), 0);
 
-  device->CreateShaderResourceView((ID3D11Resource*)tex, &tex_srv, &tex_view);
-  ctx->GenerateMips(tex_view);
+  g_d3d.device->CreateShaderResourceView((ID3D11Resource*)tex, &tex_srv, &tex_view);
+  g_d3d.ctx->GenerateMips(tex_view);
 
   return (R_Texture_2D)tex_view;
 }
 
 function void
 r_bind_texture (R_Texture_2D tex_view) {
-  ctx->VSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&tex_view);
-  ctx->PSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&tex_view);
+  g_d3d.ctx->VSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&tex_view);
+  g_d3d.ctx->PSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&tex_view);
 }
 
 function void
 r_prep () {
   local_persist read_only f32 clear_color[4] = {0.1f, 0.2f, 0.3f, 1.f};
-  ctx->ClearDepthStencilView(depth_stencil_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.f, 0);
-  ctx->ClearRenderTargetView(render_target_view, clear_color);
+  g_d3d.ctx->ClearDepthStencilView(g_d3d.depth_stencil_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.f, 0);
+  g_d3d.ctx->ClearRenderTargetView(g_d3d.render_target_view, clear_color);
 }
 
 function void
 r_update_transform (Mat4 m) {
   D3D11_MAPPED_SUBRESOURCE constant_buffer = {0};
   R_Uniforms new_transform_data = {m};
-  ctx->Map((ID3D11Resource*)uniforms, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer);
+  g_d3d.ctx->Map((ID3D11Resource*)g_d3d.uniforms, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer);
   memcpy(constant_buffer.pData, &new_transform_data, sizeof(R_Uniforms));
-  ctx->Unmap((ID3D11Resource*)uniforms, 0);
+  g_d3d.ctx->Unmap((ID3D11Resource*)g_d3d.uniforms, 0);
 }
 
 function void
@@ -445,18 +450,18 @@ function void
 r_draw_quads () {
   D3D11_MAPPED_SUBRESOURCE instances = {0};
 
-  ctx->OMSetRenderTargets(1, &render_target_view, depth_stencil_view);
-  ctx->Map((ID3D11Resource*)instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instances);
+  g_d3d.ctx->OMSetRenderTargets(1, &g_d3d.render_target_view, g_d3d.depth_stencil_view);
+  g_d3d.ctx->Map((ID3D11Resource*)g_d3d.instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instances);
   memcpy(instances.pData, r_quads, sizeof(R_Instance_Data) * r_num_quads);
-  ctx->Unmap((ID3D11Resource*)instance_buffer, 0);
-  ctx->DrawIndexedInstanced(6, r_num_quads, 0, 0, 0);
+  g_d3d.ctx->Unmap((ID3D11Resource*)g_d3d.instance_buffer, 0);
+  g_d3d.ctx->DrawIndexedInstanced(6, r_num_quads, 0, 0, 0);
   memory_zero(r_quads, r_num_quads);
   r_num_quads = 0;
 }
 
 function void
 r_present (b32 enable_vsync) {
-  swap_chain->Present(enable_vsync, 0);
+  g_d3d.swap_chain->Present(enable_vsync, 0);
 }
 
 function void
@@ -468,10 +473,10 @@ win32_init_audio (f32 target_seconds_per_frame) {
   // NOTE: CD-Quality, also most common format used by .wav files
   // TODO: Return to float format
   WAVEFORMATEX requested_mix_format = {};
-  requested_mix_format.wFormatTag = WAVE_FORMAT_PCM;
+  requested_mix_format.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
   requested_mix_format.nChannels = 2;
   requested_mix_format.nSamplesPerSec = 44100;
-  requested_mix_format.wBitsPerSample = 16;
+  requested_mix_format.wBitsPerSample = 32;
   requested_mix_format.nBlockAlign = (requested_mix_format.nChannels * requested_mix_format.wBitsPerSample) / 8;
   requested_mix_format.nAvgBytesPerSec = requested_mix_format.nSamplesPerSec * requested_mix_format.nBlockAlign;
   u32 init_flags = AUDCLNT_STREAMFLAGS_RATEADJUST | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
@@ -491,18 +496,23 @@ win32_init_audio (f32 target_seconds_per_frame) {
 }
 
 function void
-win32_start_audio_playback () {
+a_start_playback () {
   g_audio.client->Start();
 }
 
 function void
-win32_stop_audio_playback () {
+a_stop_playback () {
   g_audio.client->Stop();
 }
 
 function void
+a_register_sample_callback (a_sample_callback_type callback) {
+  g_audio.get_game_samples = callback;
+}
+
+function void
 win32_output_audio_samples () {
-   // NOTE: The best solution would be to handle this through a separate thread that just supplies audio,
+  // NOTE: The best solution would be to handle this through a separate thread that just supplies audio,
   // but since this program already has a unique threading structure I don't want to overcomplicate things
   // more than they already are.
 
@@ -514,23 +524,24 @@ win32_output_audio_samples () {
 
   // NOTE: Instead of trying to calculate audio delay here, the target delay is fed to audio initialization
   // which is then used to create the buffer. No more fighting WASAPI
+  Temp_Arena scratch;
+  ldefer (scratch=get_scratch(0,0), release_scratch(scratch)) {
+    u32 audio_padding_frames = 0;
+    g_audio.client->GetCurrentPadding(&audio_padding_frames);
+    u32 frames_to_write = g_audio.buffer_size_frames - audio_padding_frames;
 
-  u32 audio_padding_frames = 0;
-  g_audio.client->GetCurrentPadding(&audio_padding_frames);
-  u32 frames_to_write = g_audio.buffer_size_frames - audio_padding_frames;
+    u8 *audio_buffer = 0;
+    assert (g_audio.renderer->GetBuffer(frames_to_write, &audio_buffer) == S_OK);
+    f32 *write_cursor = (f32*)audio_buffer;
+    local_persist u32 sample_idx;
 
-  u8 *audio_buffer = 0;
-  assert (g_audio.renderer->GetBuffer(frames_to_write, &audio_buffer) == S_OK);
-  s16 *write_cursor = (s16*)audio_buffer;
-  local_persist u32 sample_idx;
-
-  // TODO: Change to memcpy?
-  for (u32 frame = 0; frame < frames_to_write; ++frame) {
-    for (u16 c = 0; c < g_audio.mix_format.nChannels; ++c) {
-      *(write_cursor++) = ((s16*)g_audio.test_wav.sample_buffer)[sample_idx++];
+    // TODO: Change to memcpy?
+    for (u32 frame = 0; frame < frames_to_write; ++frame) {
+      *(write_cursor++) = (f32)(((s16*)g_audio.test_wav.sample_buffer)[sample_idx++]) / s16_max;
+      *(write_cursor++) = (f32)(((s16*)g_audio.test_wav.sample_buffer)[sample_idx++]) / s16_max;
     }
+    g_audio.renderer->ReleaseBuffer(frames_to_write, 0);
   }
-  g_audio.renderer->ReleaseBuffer(frames_to_write, 0);
 }
 
 function void
@@ -590,10 +601,9 @@ os_entry () {
       str8_lit(WIN32_ROGUELIKE_SOURCE_PATH),
       str8_lit(WIN32_ROGUELIKE_ASSET_PATH),
       render_width, render_height,
-      {r_create_texture, r_bind_texture, r_prep, r_update_transform, r_push_quad_, r_draw_quads, r_present}
+      {r_create_texture, r_bind_texture, r_prep, r_update_transform, r_push_quad_, r_draw_quads, r_present},
+      {a_start_playback, a_stop_playback, a_register_sample_callback}
       });
-
-    win32_start_audio_playback();
   }
   os_heat_sync_ptr(gs, 0);
   os_heat_sync_ptr(game_dll, 0);
@@ -611,7 +621,7 @@ os_entry () {
       // Input
       for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
         if (msg.message == WM_QUIT) {
-          win32_stop_audio_playback();
+          a_stop_playback();
           ExitProcess(0);
         }
 

@@ -37,7 +37,6 @@ window:
         }
         0.75:
         {
-          selected
           getting_started
           text:
           {
@@ -51,17 +50,17 @@ window:
           }
           text:
           {
+            selected
             expression: "file:\"W:/code/roguelike/roguelike.c\".data"
             project: "W:/misc/root.raddbg_project"
             query: input: ""
-            cursor_line: 1
+            cursor_line: 505
             cursor_column: 1
-            mark_line: 1
+            mark_line: 505
             mark_column: 1
           }
           text:
           {
-            selected
             expression: "file:\"W:/code/roguelike/platform_win32.cpp\".data"
             project: "W:/misc/root.raddbg_project"
             query:
@@ -105,15 +104,16 @@ window:
     {
       0.50:
       {
+        selected
         watch: expression: "query:targets"
         watch:
         {
+          selected
           expression: ""
-          watch: test_wav
-          watch: background_music
-          watch: buffer_space_ms
+          watch: sound_effects
+          watch: bg_music
         }
-        watch: selected expression: "query:locals"
+        watch: expression: "query:locals"
       }
       0.50:
       {

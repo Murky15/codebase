@@ -30,13 +30,14 @@ typedef struct Texture_Atlas {
 } Texture_Atlas;
 
 typedef struct Sound {
-  Wave_Data raw_sound_data;
-  u64 cursor_pos;
-  b32 loop;
+  Wave_Data audio_data;
+  String8 name;
+  u64 local_cursor;
 } Sound;
 
 typedef struct Playlist {
-  int placeholder;
+  Sound *sounds;
+  u64 count;
 } Playlist;
 
 // NOTE: Graphics
@@ -64,13 +65,8 @@ global read_only R_Vertex r_quad_vertices[4] = {
 };
 global read_only u32 r_quad_indices[6] = {0, 1, 2, 2, 3, 0};
 
-function Vec2i        r_init(R_Window canvas);
-function R_Texture_2D r_create_texture(PNG_Bitmap_RGBA raw_texture_data, b32 generate_mipmaps);
-function void         r_bind_texture(R_Texture_2D tex_view);
-function void         r_prep(void);
-function void         r_update_transform(Mat4 m);
-function void         r_draw_quads(void);
-function void         r_present(b32 enable_vsync);
+// NOTE: Graphics API
+
 typedef struct Push_Quad_Params {
   Vec3 pos;
   Vec2 scale;
@@ -81,6 +77,50 @@ typedef struct Push_Quad_Params {
   Atlas_Coords atlas_coords;
   Sprite sprite;
 } Push_Quad_Params;
+
+typedef R_Texture_2D (*r_create_texture_type)(PNG_Bitmap_RGBA,b32);
+typedef void         (*r_bind_texture_type)(R_Texture_2D);
+typedef void         (*r_prep_type)(void);
+typedef void         (*r_update_transform_type)(Mat4);
+typedef void         (*r_push_quad_type)(Push_Quad_Params*);
+typedef void         (*r_draw_quads_type)(void);
+typedef void         (*r_present_type)(b32);
+
+typedef struct Renderer_VTable {
+  r_create_texture_type create_texture;
+  r_bind_texture_type bind_texture;
+  r_prep_type prep;
+  r_update_transform_type update_transform;
+  r_push_quad_type push_quad;
+  r_draw_quads_type draw_quads;
+  r_present_type present;
+} Renderer_VTable;
+
+function Vec2i        r_init(R_Window canvas);
+function R_Texture_2D r_create_texture(PNG_Bitmap_RGBA raw_texture_data, b32 generate_mipmaps);
+function void         r_bind_texture(R_Texture_2D tex_view);
+function void         r_prep(void);
+function void         r_update_transform(Mat4 m);
+function void         r_draw_quads(void);
+function void         r_present(b32 enable_vsync);
 function void         r_push_quad_(Push_Quad_Params *p);
+
+// NOTE: Sound API
+
+typedef void (*a_sample_callback_type)(f32*,u32);
+
+typedef void (*a_start_playback_type)(void);
+typedef void (*a_stop_playback_type)(void);
+typedef void (*a_register_sample_callback_type)(a_sample_callback_type);
+
+typedef struct Audio_VTable {
+  a_start_playback_type start_playback;
+  a_stop_playback_type stop_playback;
+  a_register_sample_callback_type register_sample_callback;
+} Audio_VTable;
+
+function void a_start_playback(void);
+function void a_stop_playback(void);
+function void a_register_sample_callback(a_sample_callback_type callback);
 
 #endif // GRAPHICS_H

@@ -75,6 +75,7 @@
 #include <base/include.c>
 #include <os/include.c>
 #include <file/png.c>
+#include <file/wav.c>
 #include "dungeon.c"
 
 #define PLAYER_MOVE_SPEED 0.15f
@@ -84,6 +85,7 @@
 typedef struct Game_State {
   Arena *perm;
   Arena *frame;
+  Audio_VTable avtbl;
   Renderer_VTable rvtbl;
   Vec2 render_dim;
 
@@ -242,6 +244,61 @@ load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type 
         sprite->coords[0] = coords;
         ++i;
       }
+    }
+  }
+
+  return result;
+}
+
+function Sound
+sound_from_wave (String8 name, Wave_Data raw_sound_data) {
+  Sound result = {0};
+  assert (
+    raw_sound_data.format == 1 &&
+    raw_sound_data.channels == 2 &&
+    raw_sound_data.frequency == 44100
+  );
+  result.audio_data = raw_sound_data;
+  result.name = name;
+
+  return result;
+}
+
+function Sound*
+get_playlist_slot (Playlist pl, String8 sound) {
+  Sound *result = 0;
+  u64 hash = str8_hash(sound) % pl.count;
+  while (true) {
+    Sound *found = &pl.sounds[hash];
+    if (str8_match(sound, found->name, 0) || found->name.len == 0) {
+      result = found;
+      break;
+    }
+    hash = (hash + 1) % pl.count;
+  }
+
+  return result;
+}
+
+function Sound
+find_sound (Playlist pl, String8 sound) {
+  return *get_playlist_slot(pl, sound);
+}
+
+function Playlist
+make_playlist_from_dir (Arena *arena, String8 absolute_path_to_audio) {
+  Playlist result = {0};
+  Temp_Arena scratch;
+  ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+    Directory_Search_Results audio_files = os_search_directory_and_read_files(scratch.arena, absolute_path_to_audio, str8_lit("*.wav"));
+    result.sounds = arena_pushn(arena, Sound, audio_files.count);
+    result.count = audio_files.count;
+
+    for each_in_list (wav_file, &audio_files) {
+      Wave_Data sound_data = wav_load(arena, wav_file->result.data);
+      Sound sound = sound_from_wave(str8_push_copy(arena, str8_chop(wav_file->result.name, 4)), sound_data);
+      Sound *slot = get_playlist_slot(result, sound.name);
+      *slot = sound;
     }
   }
 
@@ -428,6 +485,21 @@ draw_string (Texture_Atlas font_atlas, Vec2 pos, f32 scale, String8 string) {
   }
 }
 
+function void
+play_sound (Sound sound) {
+
+}
+
+function void
+run_playlist (Playlist pl) {
+
+}
+
+function void
+roguelike_audio_callback (f32 *sample_buffer, u32 samples_to_write) {
+
+}
+
 extern void*
 roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always single threaded */
   os_set_thread_context(*tctx);
@@ -438,6 +510,16 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   Texture_Atlas sprites = load_textures(init.perm, asset_path, init.rvtbl.create_texture);
   Texture_Atlas font = load_font(init.perm, font_path, init.rvtbl.create_texture);
   init.rvtbl.bind_texture(sprites.texture);
+
+  init.avtbl.register_sample_callback(roguelike_audio_callback);
+  init.avtbl.start_playback();
+
+  String8 sfx_path = str8_pushf(init.frame, "%.*sMusic/SFX", str8_expand(init.asset_dir));
+  String8 music_path = str8_pushf(init.frame, "%.*sMusic/Background", str8_expand(init.asset_dir));
+  Playlist sound_effects = make_playlist_from_dir(init.perm, sfx_path);
+  Playlist bg_music = make_playlist_from_dir(init.perm, music_path);
+  unused (sound_effects);
+  unused (bg_music);
 
   Dungeon *dungeon = d_create(init.perm, sprites,
     .target_room_count = 500,
@@ -525,6 +607,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   gs->spr_heart_empty = spr_heart_empty;
   gs->ceil_color = ceil_color;
   gs->rvtbl = init.rvtbl;
+  gs->avtbl = init.avtbl;
   gs->render_dim = v2(init.display_width, init.display_height);
 
   return (void*)gs;
@@ -543,6 +626,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     if (runner_id() == 0) {
       Game_State *new_game_state = (Game_State*)game_state;
       gs = new_game_state;
+      gs->avtbl.register_sample_callback(roguelike_audio_callback);
       d_select(gs->dungeon);
       Entity enemy = {0};
       enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES

@@ -3,30 +3,12 @@
 
 // NOTE: Game<-->platform interface
 
-typedef R_Texture_2D (*r_create_texture_type)(PNG_Bitmap_RGBA,b32);
-typedef void         (*r_bind_texture_type)(R_Texture_2D);
-typedef void         (*r_prep_type)(void);
-typedef void         (*r_update_transform_type)(Mat4);
-typedef void         (*r_push_quad_type)(Push_Quad_Params*);
-typedef void         (*r_draw_quads_type)(void);
-typedef void         (*r_present_type)(b32);
-
 #define r_push_quad(...) r->push_quad(&(Push_Quad_Params){ \
   .scale = v2(1,1), \
   .col = v4(1,1,1,1), \
   .rot = qi(), \
   __VA_ARGS__ \
   })
-
-typedef struct Renderer_VTable {
-  r_create_texture_type create_texture;
-  r_bind_texture_type bind_texture;
-  r_prep_type prep;
-  r_update_transform_type update_transform;
-  r_push_quad_type push_quad;
-  r_draw_quads_type draw_quads;
-  r_present_type present;
-} Renderer_VTable;
 
 typedef struct Game_Init_Package {
   Arena *perm;
@@ -36,6 +18,7 @@ typedef struct Game_Init_Package {
   f32 display_width;
   f32 display_height;
   Renderer_VTable rvtbl;
+  Audio_VTable avtbl;
 } Game_Init_Package;
 
 typedef struct Game_Input_Package {
@@ -224,6 +207,10 @@ function Sprite        get_sprite(Texture_Atlas atlas, String8 key);
 function Atlas_Coords  make_atlas_coords_from_string(String8 coords);
 function Texture_Atlas load_textures(Arena *arena, String8 absolute_path_to_asset_dir, r_create_texture_type r_create_texture);
 function Texture_Atlas load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type r_create_texture);
+function Sound         sound_from_wave(String8 name, Wave_Data raw_sound_data);
+function Sound*        get_playlist_slot(Playlist pl, String8 sound);
+function Sound         find_sound(Playlist pl, String8 sound);
+function Playlist      make_playlist_from_dir(Arena *arena, String8 absolute_path_to_audio);
 
 function Entity_Ref make_ref(Entity *e);
 function Entity*    get_entity(Entity_Ref ref);
