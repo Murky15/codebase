@@ -218,8 +218,13 @@ function Entity*    get_entity(Entity_Ref ref);
 function Rect cam_calculate_visible_range(Camera cam, f32 fov_h, f32 aspect_ratio, f32 znear);
 function void cam_set_target(Camera *cam, Entity *e, Camera_Track_Mode track_mode);
 function void cam_update_tracking(Camera *cam, f32 dt);
+function Vec3 cam_raycast_to_floor(Camera cam, Mat4 vp, Vec2 screen_pos);
 
 function void draw_entity(Entity *e);
 function void draw_string(Texture_Atlas font_atlas, Vec2 pos, f32 scale, String8 string);
+
+function void play_sound(Sound sound);
+function void run_playlist(Playlist pl);
+function void roguelike_audio_callback(f32 *sample_buffer, u32 samples_to_write);
 
 #endif // ROGUELIKE_H

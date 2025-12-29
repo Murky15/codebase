@@ -524,24 +524,16 @@ win32_output_audio_samples () {
 
   // NOTE: Instead of trying to calculate audio delay here, the target delay is fed to audio initialization
   // which is then used to create the buffer. No more fighting WASAPI
-  Temp_Arena scratch;
-  ldefer (scratch=get_scratch(0,0), release_scratch(scratch)) {
-    u32 audio_padding_frames = 0;
-    g_audio.client->GetCurrentPadding(&audio_padding_frames);
-    u32 frames_to_write = g_audio.buffer_size_frames - audio_padding_frames;
-
-    u8 *audio_buffer = 0;
-    assert (g_audio.renderer->GetBuffer(frames_to_write, &audio_buffer) == S_OK);
-    f32 *write_cursor = (f32*)audio_buffer;
-    local_persist u32 sample_idx;
-
-    // TODO: Change to memcpy?
-    for (u32 frame = 0; frame < frames_to_write; ++frame) {
-      *(write_cursor++) = (f32)(((s16*)g_audio.test_wav.sample_buffer)[sample_idx++]) / s16_max;
-      *(write_cursor++) = (f32)(((s16*)g_audio.test_wav.sample_buffer)[sample_idx++]) / s16_max;
-    }
-    g_audio.renderer->ReleaseBuffer(frames_to_write, 0);
-  }
+  u32 audio_padding_frames = 0;
+  u8 *audio_buffer = 0;
+  g_audio.client->GetCurrentPadding(&audio_padding_frames);
+  u32 frames_to_write = g_audio.buffer_size_frames - audio_padding_frames;
+  assert (g_audio.renderer->GetBuffer(frames_to_write, &audio_buffer) == S_OK);
+  f32 *write_cursor = (f32*)audio_buffer;
+  // NOTE: We could also use a scratch intermediate buffer here if we know that the platform
+  // format does not match the game format.
+  g_audio.get_game_samples(write_cursor, frames_to_write);
+  g_audio.renderer->ReleaseBuffer(frames_to_write, 0);
 }
 
 function void
@@ -558,9 +550,9 @@ win32_update_game_dll (HMODULE *game_code, Game_VTable *game_vtable) {
     *game_code = LoadLibrary(TEXT("roguelike.dll"));
     assert (*game_code);
 
-    game_vtable->init = (roguelike_init_type)GetProcAddress(*game_code, "roguelike_init");
-    game_vtable->tick = (roguelike_tick_type)GetProcAddress(*game_code, "roguelike_tick");
-    game_vtable->draw = (roguelike_draw_type)GetProcAddress(*game_code, "roguelike_draw");
+    game_vtable->init = (roguelike_init_type)GetProcAddress(*game_code, TEXT("roguelike_init"));
+    game_vtable->tick = (roguelike_tick_type)GetProcAddress(*game_code, TEXT("roguelike_tick"));
+    game_vtable->draw = (roguelike_draw_type)GetProcAddress(*game_code, TEXT("roguelike_draw"));
     if (game_vtable->init == NULL) {
       printf("Unable to load game code!\n");
       assert(0);

@@ -104,7 +104,6 @@ typedef struct Game_State {
   Quat floor_rot;
   Quat forward_wall_rot;
 
-  //Entity player;
   Camera cam;
   u64 num_entities;
   Entity entities[MAX_ENTITIES];
@@ -497,7 +496,18 @@ run_playlist (Playlist pl) {
 
 function void
 roguelike_audio_callback (f32 *sample_buffer, u32 samples_to_write) {
-
+  local_persist f32 phase;
+  f32 phase_inc = 2.f * M_PI32 * 220.f/44100.f;
+  f32 *cursor = sample_buffer;
+  for (u32 frame = 0; frame < samples_to_write; ++frame) {
+    f32 sample = sin(phase);
+    phase += phase_inc;
+    if (phase > 2.f * M_PI32) {
+      phase -= 2.f * M_PI32;
+    }
+    *(cursor++) = sample;
+    *(cursor++) = sample;
+  }
 }
 
 extern void*
