@@ -37,15 +37,16 @@ window:
         }
         0.75:
         {
+          selected
           getting_started
           text:
           {
-            expression: "file:\"W:/code/os/win32/entry.c\".data"
+            expression: "file:\"W:/code/base/memory.c\".data"
             auto: 1
             query: input: ""
-            cursor_line: 13
+            cursor_line: 64
             cursor_column: 1
-            mark_line: 13
+            mark_line: 64
             mark_column: 1
           }
           text:
@@ -54,9 +55,9 @@ window:
             expression: "file:\"W:/code/roguelike/roguelike.c\".data"
             project: "W:/misc/root.raddbg_project"
             query: input: ""
-            cursor_line: 505
+            cursor_line: 500
             cursor_column: 1
-            mark_line: 505
+            mark_line: 500
             mark_column: 1
           }
           text:
@@ -104,7 +105,6 @@ window:
     {
       0.50:
       {
-        selected
         watch: expression: "query:targets"
         watch:
         {
@@ -112,6 +112,11 @@ window:
           expression: ""
           watch: sound_effects
           watch: bg_music
+          watch: sound
+          watch: sample_left
+          watch: sample_right
+          watch: mixed_sample_left
+          watch: mixed_sample_right
         }
         watch: expression: "query:locals"
       }

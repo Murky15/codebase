@@ -22,7 +22,7 @@ set defines=%defines% -DWIN32_ROGUELIKE_SOURCE_PATH=\"%source%\" -DWIN32_ROGUELI
 set compile=%compiler% %defines% %debug% %warn% %ignore% -I%source%..
 set platform_opts=-std:c++20
 set platform_link=-link -SUBSYSTEM:WINDOWS User32.lib d3d11.lib dxgi.lib dxguid.lib D3DCompiler.lib Winmm.lib Shlwapi.lib Ole32.lib
-set game_link=-link -INCREMENTAL:NO -DLL -EXPORT:roguelike_init -EXPORT:roguelike_tick -EXPORT:roguelike_draw
+set game_link=-link -INCREMENTAL:NO -DLL -EXPORT:roguelike_init -EXPORT:roguelike_tick -EXPORT:roguelike_draw -EXPORT:roguelike_audio_callback
 
 if not exist build mkdir build
 pushd build

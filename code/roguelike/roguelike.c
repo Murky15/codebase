@@ -85,7 +85,6 @@
 typedef struct Game_State {
   Arena *perm;
   Arena *frame;
-  Audio_VTable avtbl;
   Renderer_VTable rvtbl;
   Vec2 render_dim;
 
@@ -97,6 +96,12 @@ typedef struct Game_State {
   Sprite spr_heart_half;
   Sprite spr_heart_empty;
   Vec4 ceil_color;
+
+  // Can easily be made into a queue of playlists.
+  Playlist active_playlist;
+  u64 active_sound_idx;
+  Sound_List sounds_to_play;
+  Sound *first_free_sound;
 
   Dungeon *dungeon;
   Mat4 proj;
@@ -251,6 +256,8 @@ load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type 
 
 function Sound
 sound_from_wave (String8 name, Wave_Data raw_sound_data) {
+  local_persist u64 id_counter;
+
   Sound result = {0};
   assert (
     raw_sound_data.format == 1 &&
@@ -258,6 +265,7 @@ sound_from_wave (String8 name, Wave_Data raw_sound_data) {
     raw_sound_data.frequency == 44100
   );
   result.audio_data = raw_sound_data;
+  result.id = id_counter++;
   result.name = name;
 
   return result;
@@ -291,6 +299,7 @@ make_playlist_from_dir (Arena *arena, String8 absolute_path_to_audio) {
   ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
     Directory_Search_Results audio_files = os_search_directory_and_read_files(scratch.arena, absolute_path_to_audio, str8_lit("*.wav"));
     result.sounds = arena_pushn(arena, Sound, audio_files.count);
+    result.played = arena_pushn(arena, b32, audio_files.count);
     result.count = audio_files.count;
 
     for each_in_list (wav_file, &audio_files) {
@@ -485,35 +494,124 @@ draw_string (Texture_Atlas font_atlas, Vec2 pos, f32 scale, String8 string) {
 }
 
 function void
-play_sound (Sound sound) {
+play_sound (Arena *arena, Sound sound, b32 loop) {
+  Sound *sound_slot = gs->first_free_sound;
+  if (sound_slot) {
+    gs->first_free_sound = sound_slot->next;
+    memory_zero(sound_slot, sizeof(Sound));
+  } else {
+    sound_slot = arena_pushn(arena, Sound, 1);
+  }
+  *sound_slot = sound;
+  sound_slot->loop = loop;
 
+  sll_queue_push(gs->sounds_to_play.first, gs->sounds_to_play.last, sound_slot);
+  gs->sounds_to_play.count += 1;
 }
 
+// TODO: Add transitions
 function void
-run_playlist (Playlist pl) {
+run_playlist (Arena *arena, Playlist pl, b32 loop, b32 shuffle) {
+  gs->active_playlist = pl;
+  gs->active_playlist.loop = loop;
+  gs->active_playlist.shuffle = shuffle;
+  gs->active_sound_idx = shuffle ? rand_next() % pl.count : 0;
+  gs->active_playlist.sounds_played = 0;
+  memory_zero(gs->active_playlist.played, sizeof(b32) * gs->active_playlist.count);
 
+  play_sound(arena, pl.sounds[gs->active_sound_idx], false);
 }
 
-function void
+function s32
+sign_extend(s32 v, s32 b) {
+  s32 shift = 32 - b;
+  return (v << shift) >> shift;
+}
+
+extern void
 roguelike_audio_callback (f32 *sample_buffer, u32 samples_to_write) {
-  local_persist f32 phase;
-  f32 phase_inc = 2.f * M_PI32 * 220.f/44100.f;
   f32 *cursor = sample_buffer;
   for (u32 frame = 0; frame < samples_to_write; ++frame) {
-    f32 sample = sin(phase);
-    phase += phase_inc;
-    if (phase > 2.f * M_PI32) {
-      phase -= 2.f * M_PI32;
+    f32 mixed_sample_left = 0, mixed_sample_right = 0;
+    Sound temp_sound = {0};
+    temp_sound.next = gs->sounds_to_play.first;
+    Sound *prev = &temp_sound;
+    // TODO: Need mutex here?
+    for each_in_list (sound, &gs->sounds_to_play) {
+      u16 bits_per_sample  = sound->audio_data.bits_per_sample;
+      u16 bytes_per_sample = bits_per_sample/8;
+      u64 buffer_size = sound->audio_data.sample_buffer_size;
+      s32 sample_left = 0, sample_right = 0;
+      assert (sound->local_cursor != buffer_size);
+      for (u16 b = 0; b < bytes_per_sample; ++b) {
+        sample_left  |= (sound->audio_data.sample_buffer[sound->local_cursor + b]) << (b*8);
+        sample_right |= (sound->audio_data.sample_buffer[sound->local_cursor + b + bytes_per_sample]) << (b*8);
+      }
+      sound->local_cursor += 2 * bytes_per_sample;
+
+      f32 divisor = bits_per_sample == 16 ? s16_max : bits_per_sample == 24 ? s24_max : 0;
+      assert (divisor != 0);
+      sample_left  = sign_extend(sample_left,  bits_per_sample);
+      sample_right = sign_extend(sample_right, bits_per_sample);
+      // TODO: relative audio can be achieved by multiplying this float value by a scalar [0,1]
+      mixed_sample_left  += ((f32)sample_left  / divisor);
+      mixed_sample_right += ((f32)sample_right / divisor);
+
+      if (sound->local_cursor == buffer_size) {
+        if (sound->loop) {
+          sound->local_cursor %= buffer_size;
+        } else {
+          u64 sound_id = sound->id;
+          if (gs->sounds_to_play.count == 1) {
+            gs->sounds_to_play.first = gs->sounds_to_play.last = 0;
+            gs->sounds_to_play.count = 0;
+            sound->next = gs->first_free_sound;
+            gs->first_free_sound = sound;
+          } else {
+            Sound *next_free = sound->next;
+            *sound = *sound->next;
+            next_free->next = gs->first_free_sound;
+            gs->first_free_sound = next_free;
+            gs->sounds_to_play.count -= 1;
+          }
+          if (sound_id == gs->active_playlist.sounds[gs->active_sound_idx].id) {
+            gs->active_playlist.played[gs->active_sound_idx] = true;
+            if (++gs->active_playlist.sounds_played == gs->active_playlist.count) {
+              if (gs->active_playlist.loop) {
+                run_playlist(gs->perm, gs->active_playlist, true, gs->active_playlist.shuffle);
+              } else {
+                gs->active_playlist = (Playlist){0};
+                gs->active_sound_idx = 0;
+              }
+            } else {
+              u64 bounds = gs->active_playlist.count - gs->active_playlist.sounds_played;
+              u64 new_song_idx = gs->active_playlist.shuffle ? rand_next() % bounds : gs->active_sound_idx + 1;
+              for (;gs->active_playlist.played[new_song_idx]; ++new_song_idx);
+              gs->active_sound_idx = new_song_idx;
+              play_sound(gs->perm, gs->active_playlist.sounds[gs->active_sound_idx], false);
+            }
+          }
+
+          if (gs->sounds_to_play.count > 1) {
+            sound = prev;
+            continue;
+          }
+        }
+      }
+
+      prev = sound;
     }
-    *(cursor++) = sample;
-    *(cursor++) = sample;
+
+    *(cursor++) = clamp(mixed_sample_left, -1.f, 1.f);
+    *(cursor++) = clamp(mixed_sample_right, -1.f, 1.f);
   }
 }
 
 extern void*
 roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always single threaded */
   os_set_thread_context(*tctx);
-  Game_State *gs = arena_pushn(init.perm, Game_State, 1);
+  Game_State *new_game_state = arena_pushn(init.perm, Game_State, 1);
+  gs = new_game_state;
 
   String8 asset_path = str8_pushf(init.frame, "%.*sArt/Sprites", str8_expand(init.asset_dir));
   String8 font_path = str8_pushf(init.frame, "%.*sArt/Fonts/monogram-bitmap.png", str8_expand(init.asset_dir));
@@ -521,13 +619,16 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   Texture_Atlas font = load_font(init.perm, font_path, init.rvtbl.create_texture);
   init.rvtbl.bind_texture(sprites.texture);
 
-  init.avtbl.register_sample_callback(roguelike_audio_callback);
-  init.avtbl.start_playback();
-
   String8 sfx_path = str8_pushf(init.frame, "%.*sMusic/SFX", str8_expand(init.asset_dir));
   String8 music_path = str8_pushf(init.frame, "%.*sMusic/Background", str8_expand(init.asset_dir));
   Playlist sound_effects = make_playlist_from_dir(init.perm, sfx_path);
   Playlist bg_music = make_playlist_from_dir(init.perm, music_path);
+
+  //Playlist test_music = make_playlist_from_dir(init.perm, str8_lit("W:/code/file/wav_tests"));
+  //Sound elliott_smith = find_sound(test_music, str8_lit("test2"));
+  //play_sound(init.perm, elliott_smith, true);
+  run_playlist(init.perm, bg_music, true, true);
+
   unused (sound_effects);
   unused (bg_music);
 
@@ -617,7 +718,6 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   gs->spr_heart_empty = spr_heart_empty;
   gs->ceil_color = ceil_color;
   gs->rvtbl = init.rvtbl;
-  gs->avtbl = init.avtbl;
   gs->render_dim = v2(init.display_width, init.display_height);
 
   return (void*)gs;
@@ -636,7 +736,6 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     if (runner_id() == 0) {
       Game_State *new_game_state = (Game_State*)game_state;
       gs = new_game_state;
-      gs->avtbl.register_sample_callback(roguelike_audio_callback);
       d_select(gs->dungeon);
       Entity enemy = {0};
       enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES

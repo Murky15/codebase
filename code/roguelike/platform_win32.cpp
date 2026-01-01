@@ -54,7 +54,6 @@ global struct {
   u32 buffer_size_frames;
 
   Wave_Data test_wav;
-  a_sample_callback_type get_game_samples;
 } g_audio;
 
 global R_Instance_Data r_quads[R_MAX_QUADS];
@@ -496,22 +495,17 @@ win32_init_audio (f32 target_seconds_per_frame) {
 }
 
 function void
-a_start_playback () {
+win32_start_audio_playback () {
   g_audio.client->Start();
 }
 
 function void
-a_stop_playback () {
+win32_stop_audio_playback () {
   g_audio.client->Stop();
 }
 
 function void
-a_register_sample_callback (a_sample_callback_type callback) {
-  g_audio.get_game_samples = callback;
-}
-
-function void
-win32_output_audio_samples () {
+win32_output_audio_samples (roguelike_audio_callback_type get_samples) {
   // NOTE: The best solution would be to handle this through a separate thread that just supplies audio,
   // but since this program already has a unique threading structure I don't want to overcomplicate things
   // more than they already are.
@@ -532,7 +526,7 @@ win32_output_audio_samples () {
   f32 *write_cursor = (f32*)audio_buffer;
   // NOTE: We could also use a scratch intermediate buffer here if we know that the platform
   // format does not match the game format.
-  g_audio.get_game_samples(write_cursor, frames_to_write);
+  get_samples(write_cursor, frames_to_write);
   g_audio.renderer->ReleaseBuffer(frames_to_write, 0);
 }
 
@@ -553,6 +547,7 @@ win32_update_game_dll (HMODULE *game_code, Game_VTable *game_vtable) {
     game_vtable->init = (roguelike_init_type)GetProcAddress(*game_code, TEXT("roguelike_init"));
     game_vtable->tick = (roguelike_tick_type)GetProcAddress(*game_code, TEXT("roguelike_tick"));
     game_vtable->draw = (roguelike_draw_type)GetProcAddress(*game_code, TEXT("roguelike_draw"));
+    game_vtable->audio_callback = (roguelike_audio_callback_type)GetProcAddress(*game_code, TEXT("roguelike_audio_callback"));
     if (game_vtable->init == NULL) {
       printf("Unable to load game code!\n");
       assert(0);
@@ -593,9 +588,10 @@ os_entry () {
       str8_lit(WIN32_ROGUELIKE_SOURCE_PATH),
       str8_lit(WIN32_ROGUELIKE_ASSET_PATH),
       render_width, render_height,
-      {r_create_texture, r_bind_texture, r_prep, r_update_transform, r_push_quad_, r_draw_quads, r_present},
-      {a_start_playback, a_stop_playback, a_register_sample_callback}
+      {r_create_texture, r_bind_texture, r_prep, r_update_transform, r_push_quad_, r_draw_quads, r_present}
       });
+
+    win32_start_audio_playback();
   }
   os_heat_sync_ptr(gs, 0);
   os_heat_sync_ptr(game_dll, 0);
@@ -613,7 +609,7 @@ os_entry () {
       // Input
       for (MSG msg; PeekMessage(&msg, 0, 0, 0, PM_REMOVE);) {
         if (msg.message == WM_QUIT) {
-          a_stop_playback();
+          win32_stop_audio_playback();
           ExitProcess(0);
         }
 
@@ -627,7 +623,7 @@ os_entry () {
       dt = os_get_elapsed_ms(last, now);
       last = now;
 
-      win32_output_audio_samples();
+      win32_output_audio_samples(game->audio_callback);
     }
 
     os_heat_sync_ptr(dt, 0);

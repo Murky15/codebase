@@ -199,4 +199,5 @@
 ((f)=(f)->next))
 #define sll_stack_pop(f) sll_stack_pop_n(f,next)
 
+
 #endif // BASE_MACROS_H

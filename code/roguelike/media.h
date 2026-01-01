@@ -30,14 +30,26 @@ typedef struct Texture_Atlas {
 } Texture_Atlas;
 
 typedef struct Sound {
+  struct Sound *next;
+  u64 id;
   Wave_Data audio_data;
   String8 name;
   u64 local_cursor;
+  b32 loop;
 } Sound;
+
+typedef struct Sound_List {
+  Sound *first, *last;
+  u64 count;
+} Sound_List;
 
 typedef struct Playlist {
   Sound *sounds;
+  b32 *played;
   u64 count;
+  u64 sounds_played;
+  b32 loop;
+  b32 shuffle;
 } Playlist;
 
 // NOTE: Graphics
@@ -104,23 +116,5 @@ function void         r_update_transform(Mat4 m);
 function void         r_draw_quads(void);
 function void         r_present(b32 enable_vsync);
 function void         r_push_quad_(Push_Quad_Params *p);
-
-// NOTE: Sound API
-
-typedef void (*a_sample_callback_type)(f32*,u32);
-
-typedef void (*a_start_playback_type)(void);
-typedef void (*a_stop_playback_type)(void);
-typedef void (*a_register_sample_callback_type)(a_sample_callback_type);
-
-typedef struct Audio_VTable {
-  a_start_playback_type start_playback;
-  a_stop_playback_type stop_playback;
-  a_register_sample_callback_type register_sample_callback;
-} Audio_VTable;
-
-function void a_start_playback(void);
-function void a_stop_playback(void);
-function void a_register_sample_callback(a_sample_callback_type callback);
 
 #endif // GRAPHICS_H

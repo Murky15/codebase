@@ -18,7 +18,6 @@ typedef struct Game_Init_Package {
   f32 display_width;
   f32 display_height;
   Renderer_VTable rvtbl;
-  Audio_VTable avtbl;
 } Game_Init_Package;
 
 typedef struct Game_Input_Package {
@@ -34,11 +33,13 @@ typedef struct Game_Input_Package {
 typedef void *(*roguelike_init_type)(Thread_Context*,Game_Init_Package);
 typedef void  (*roguelike_tick_type)(Thread_Context*,void*,f32,Game_Input_Package,Game_Input_Package);
 typedef void  (*roguelike_draw_type)(Thread_Context*,void*);
+typedef void  (*roguelike_audio_callback_type)(f32*,u32);
 
 typedef struct Game_VTable {
   roguelike_init_type init; /* NOTE: Always single threaded */
   roguelike_tick_type tick;
   roguelike_draw_type draw;
+  roguelike_audio_callback_type audio_callback;
 } Game_VTable;
 
 // NOTE: Game data
@@ -223,8 +224,7 @@ function Vec3 cam_raycast_to_floor(Camera cam, Mat4 vp, Vec2 screen_pos);
 function void draw_entity(Entity *e);
 function void draw_string(Texture_Atlas font_atlas, Vec2 pos, f32 scale, String8 string);
 
-function void play_sound(Sound sound);
-function void run_playlist(Playlist pl);
-function void roguelike_audio_callback(f32 *sample_buffer, u32 samples_to_write);
+function void play_sound(Arena *arena, Sound sound, b32 loop);
+function void run_playlist(Arena *arena, Playlist pl, b32 loop, b32 shuffle);
 
 #endif // ROGUELIKE_H
