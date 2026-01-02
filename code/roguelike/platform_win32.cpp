@@ -622,8 +622,6 @@ os_entry () {
       now = os_query_clock();
       dt = os_get_elapsed_ms(last, now);
       last = now;
-
-      win32_output_audio_samples(game->audio_callback);
     }
 
     os_heat_sync_ptr(dt, 0);
@@ -635,6 +633,11 @@ os_entry () {
     new_input.cursor = v2(mouse_x, render_dim.height - mouse_y);
     game->tick(os_get_thread_context(), gs, dt, old_input, new_input);
     os_heat_sync();
+
+    // Audio
+    if (runner_id() == 0) {
+      win32_output_audio_samples(game->audio_callback);
+    }
 
     // Render
     game->draw(os_get_thread_context(), gs);

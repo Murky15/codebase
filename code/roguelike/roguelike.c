@@ -739,6 +739,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       Game_State *new_game_state = (Game_State*)game_state;
       gs = new_game_state;
       d_select(gs->dungeon);
+
+      gs->num_entities = 1; // Player
       Entity enemy = {0};
       enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES
         | ENTITY_FLAG_ANIMATE_ROTATIONS
@@ -766,9 +768,9 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       sword.parent = make_ref(&gs->entities[0]);
       sword.scale_mul = 0.75f;
       sword.swing_angle = M_PI32;
-      sword.seconds_to_swing = 0.15f;
-      sword.seconds_for_anticipation = 0.25f;
-      sword.seconds_for_recovery = 0.4f;
+      sword.seconds_to_swing = 0.1f;
+      sword.seconds_for_anticipation = 0.175f;
+      sword.seconds_for_recovery = 0.314f;
       gs->entities[gs->num_entities++] = sword;
 
     }
