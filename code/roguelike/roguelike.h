@@ -121,13 +121,13 @@ typedef struct Entity_Ref {
 } Entity_Ref;
 
 struct Entity {
-  // Header
+  // NOTE: Header
   u64 gen;
   Entity_Flags flags;
   Entity_Class eclass;
   Entity_Type  type;
 
-  // Position / Orientation
+  // NOTE: Position / Orientation
   Vec3 pos;
   Vec2 dir;
   Vec2 old_dir;
@@ -147,14 +147,14 @@ struct Entity {
 
   // TODO: Some way to classify what kinds of entities can hold this weapon.
 
-  // Flip animation
+  // NOTE: Flip animation
   f32 start_flip_angle;
   f32 end_flip_angle;
   f32 seconds_to_flip;
   f32 started_flipping_at;
   f32 flip_angle;
 
-  // Sword swing animation
+  // NOTE: Sword swing animation
   Attack_Phase slash_phase;
   f32 swing_angle;
   f32 seconds_to_swing;
@@ -166,16 +166,16 @@ struct Entity {
   Quat start_pos_rot;
   Quat end_pos_rot;
 
-  // Sprites
+  // NOTE: Sprites
   Sprite idle;
   Sprite run;
   f32 scale_mul;
   Vec3 rot_offset;
 
-  // Misc
+  // NOTE: Misc
   Entity_Ref parent;
 
-  // For Monsters
+  // NOTE: For Monsters
   Entity_Ref target_hero;
 };
 

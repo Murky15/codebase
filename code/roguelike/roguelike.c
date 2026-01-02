@@ -83,13 +83,17 @@
 #define MAX_ENTITIES 256
 
 typedef struct Game_State {
+  // NOTE: Header
   Arena *perm;
   Arena *frame;
   Renderer_VTable rvtbl;
   Vec2 render_dim;
 
+  // NOTE: Asset cache
   Texture_Atlas sprites;
   Texture_Atlas font;
+  Playlist bg_music;
+  Playlist sfx;
   Sprite spr_wall_mid;
   Sprite spr_ceil;
   Sprite spr_heart_full;
@@ -97,18 +101,20 @@ typedef struct Game_State {
   Sprite spr_heart_empty;
   Vec4 ceil_color;
 
-  // Can easily be made into a queue of playlists.
-  Playlist active_playlist;
-  u64 active_sound_idx;
-  Sound_List sounds_to_play;
-  Sound *first_free_sound;
-
-  Dungeon *dungeon;
   Mat4 proj;
   Mat4 ortho;
   Quat floor_rot;
   Quat forward_wall_rot;
 
+  // NOTE: Audio engine
+  // TODO: Can easily be made into a queue of playlists.
+  Playlist active_playlist;
+  u64 active_sound_idx;
+  Sound_List sounds_to_play;
+  Sound *first_free_sound;
+
+  // NOTE: Game objects
+  Dungeon *dungeon;
   Camera cam;
   u64 num_entities;
   Entity entities[MAX_ENTITIES];
@@ -562,19 +568,22 @@ roguelike_audio_callback (f32 *sample_buffer, u32 samples_to_write) {
           sound->local_cursor %= buffer_size;
         } else {
           u64 sound_id = sound->id;
+          Sound *next = sound->next;
+          // TODO: Pull this out into a macro
           if (gs->sounds_to_play.count == 1) {
             gs->sounds_to_play.first = gs->sounds_to_play.last = 0;
-            gs->sounds_to_play.count = 0;
-            sound->next = gs->first_free_sound;
-            gs->first_free_sound = sound;
-          } else {
-            Sound *next_free = sound->next;
-            *sound = *sound->next;
-            next_free->next = gs->first_free_sound;
-            gs->first_free_sound = next_free;
-            gs->sounds_to_play.count -= 1;
+          } else if (gs->sounds_to_play.first == sound) {
+            gs->sounds_to_play.first = sound->next;
+          } else if (gs->sounds_to_play.last == sound) {
+            gs->sounds_to_play.last = prev;
+            gs->sounds_to_play.last->next = 0;
           }
-          if (sound_id == gs->active_playlist.sounds[gs->active_sound_idx].id) {
+          prev->next = next;
+          sound->next = gs->first_free_sound;
+          gs->first_free_sound = sound;
+          gs->sounds_to_play.count -= 1;
+
+          if (gs->active_playlist.count > 0 && sound_id == gs->active_playlist.sounds[gs->active_sound_idx].id) {
             gs->active_playlist.played[gs->active_sound_idx] = true;
             if (++gs->active_playlist.sounds_played == gs->active_playlist.count) {
               if (gs->active_playlist.loop) {
@@ -592,10 +601,8 @@ roguelike_audio_callback (f32 *sample_buffer, u32 samples_to_write) {
             }
           }
 
-          if (gs->sounds_to_play.count > 1) {
-            sound = prev;
-            continue;
-          }
+          sound = prev;
+          continue;
         }
       }
 
@@ -623,14 +630,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   String8 music_path = str8_pushf(init.frame, "%.*sMusic/Background", str8_expand(init.asset_dir));
   Playlist sound_effects = make_playlist_from_dir(init.perm, sfx_path);
   Playlist bg_music = make_playlist_from_dir(init.perm, music_path);
-
-  //Playlist test_music = make_playlist_from_dir(init.perm, str8_lit("W:/code/file/wav_tests"));
-  //Sound elliott_smith = find_sound(test_music, str8_lit("test2"));
-  //play_sound(init.perm, elliott_smith, true);
-  run_playlist(init.perm, bg_music, true, true);
-
-  unused (sound_effects);
-  unused (bg_music);
+  //run_playlist(init.perm, bg_music, true, true);
 
   Dungeon *dungeon = d_create(init.perm, sprites,
     .target_room_count = 500,
@@ -719,6 +719,8 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   gs->ceil_color = ceil_color;
   gs->rvtbl = init.rvtbl;
   gs->render_dim = v2(init.display_width, init.display_height);
+  gs->bg_music = bg_music;
+  gs->sfx = sound_effects;
 
   return (void*)gs;
 }
@@ -928,6 +930,8 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             new_state.start_point_rot = qmul(axis_angle(v3(.y=1), start_angle + M_PI32/2.f), gs->floor_rot);
             new_state.end_point_rot = qmul(axis_angle(v3(.y=1), end_angle + M_PI32/2.f), gs->floor_rot);
             new_state.started_swing_at = os_clock_seconds();
+
+            play_sound(gs->perm, find_sound(gs->sfx, str8_lit("07_human_atk_sword_1")), false);
           }
         }
       } break;
