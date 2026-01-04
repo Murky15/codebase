@@ -31,7 +31,7 @@ typedef struct Texture_Atlas {
 
 typedef struct Sound {
   struct Sound *next;
-  u64 id;
+  u64 _id;
   Wave_Data audio_data;
   String8 name;
   u64 local_cursor;

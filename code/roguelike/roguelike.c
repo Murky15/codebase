@@ -271,7 +271,7 @@ sound_from_wave (String8 name, Wave_Data raw_sound_data) {
     raw_sound_data.frequency == 44100
   );
   result.audio_data = raw_sound_data;
-  result.id = id_counter++;
+  result._id = id_counter++;
   result.name = name;
 
   return result;
@@ -567,7 +567,7 @@ roguelike_audio_callback (f32 *sample_buffer, u32 samples_to_write) {
         if (sound->loop) {
           sound->local_cursor %= buffer_size;
         } else {
-          u64 sound_id = sound->id;
+          u64 sound_id = sound->_id;
           Sound *next = sound->next;
           // TODO: Pull this out into a macro
           if (gs->sounds_to_play.count == 1) {
@@ -583,7 +583,7 @@ roguelike_audio_callback (f32 *sample_buffer, u32 samples_to_write) {
           gs->first_free_sound = sound;
           gs->sounds_to_play.count -= 1;
 
-          if (gs->active_playlist.count > 0 && sound_id == gs->active_playlist.sounds[gs->active_sound_idx].id) {
+          if (gs->active_playlist.count > 0 && sound_id == gs->active_playlist.sounds[gs->active_sound_idx]._id) {
             gs->active_playlist.played[gs->active_sound_idx] = true;
             if (++gs->active_playlist.sounds_played == gs->active_playlist.count) {
               if (gs->active_playlist.loop) {
@@ -630,7 +630,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   String8 music_path = str8_pushf(init.frame, "%.*sMusic/Background", str8_expand(init.asset_dir));
   Playlist sound_effects = make_playlist_from_dir(init.perm, sfx_path);
   Playlist bg_music = make_playlist_from_dir(init.perm, music_path);
-  //run_playlist(init.perm, bg_music, true, true);
+  run_playlist(init.perm, bg_music, true, true);
 
   Dungeon *dungeon = d_create(init.perm, sprites,
     .target_room_count = 500,

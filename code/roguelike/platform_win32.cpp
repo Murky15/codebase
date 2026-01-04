@@ -601,7 +601,7 @@ os_entry () {
 
   u64 last = os_query_clock(), now = 0;
   f32 dt = 0;
-  for (;;) {
+  while (true) {
     if (runner_id() == 0) { // TODO: Can we parallelize *anything* in the message loop?
       arena_clear(frame);
       old_input = new_input;
