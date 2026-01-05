@@ -744,13 +744,14 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       Entity enemy = {0};
       enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES
         | ENTITY_FLAG_ANIMATE_ROTATIONS
-        | ENTITY_FLAG_COLLISION;
-      //enemy.class = ENTITY_CLASS_MONSTER;
+        | ENTITY_FLAG_COLLISION
+        | ENTITY_FLAG_DRAWABLE;
+      enemy.eclass = ENTITY_CLASS_MONSTER;
       enemy.pos = gs->entities[0].pos;
       enemy.seconds_to_flip = 0.12f;
-      enemy.idle = get_sprite(gs->sprites, str8_lit("big_zombie_idle_anim"));
+      enemy.idle = get_sprite(gs->sprites, str8_lit("orc_warrior_idle_anim"));
       enemy.idle.seconds_to_complete = 0.5f;
-      enemy.run = get_sprite(gs->sprites, str8_lit("big_zombie_run_anim"));
+      enemy.run = get_sprite(gs->sprites, str8_lit("orc_warrior_run_anim"));
       enemy.run.seconds_to_complete = 0.5f;
       enemy.speed = MONSTER_MOVE_SPEED;
       enemy.bbox.width = enemy.idle.coords[0].scale.width;
