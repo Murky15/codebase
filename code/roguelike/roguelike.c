@@ -647,7 +647,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     .max_tiles_per_map_slice = 512);
 
   Entity player = {0};
-  player.eclass = ENTITY_CLASS_HERO;
+  player.class = ENTITY_CLASS_HERO;
   player.flags = ENTITY_FLAG_INPUT_SENSITIVE
     | ENTITY_FLAG_ANIMATE_SPRITES
     | ENTITY_FLAG_ANIMATE_ROTATIONS
@@ -744,9 +744,9 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       Entity enemy = {0};
       enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES
         | ENTITY_FLAG_ANIMATE_ROTATIONS
-        | ENTITY_FLAG_COLLISION
-        | ENTITY_FLAG_DRAWABLE;
-      enemy.eclass = ENTITY_CLASS_MONSTER;
+        | ENTITY_FLAG_COLLISION;
+       // | ENTITY_FLAG_DRAWABLE;
+      enemy.class = ENTITY_CLASS_MONSTER;
       enemy.pos = gs->entities[0].pos;
       enemy.seconds_to_flip = 0.12f;
       enemy.idle = get_sprite(gs->sprites, str8_lit("orc_warrior_idle_anim"));
@@ -762,7 +762,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
 
       Entity sword = {0};
       sword.flags = ENTITY_FLAG_DRAWABLE | ENTITY_FLAG_HARMFUL;
-      sword.eclass = ENTITY_CLASS_WEAPON;
+      sword.class = ENTITY_CLASS_WEAPON;
       sword.pos = gs->entities[0].pos;
       sword.idle = get_sprite(gs->sprites, str8_lit("weapon_katana"));
       sword.bbox = sword.idle.coords[0].scale;
@@ -798,7 +798,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     Entity old_state = *e;
     Entity new_state = old_state;
 
-    switch (new_state.eclass) {
+    switch (new_state.class) {
       case ENTITY_CLASS_HERO: {
         if (new_state.flags & ENTITY_FLAG_INPUT_SENSITIVE) {
           new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
@@ -812,7 +812,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
         Entity *target_hero = get_entity(new_state.target_hero);
         if (target_hero == 0) {
           for each_in_arrayc (it, gs->entities, gs->num_entities) {
-            if (it->eclass == ENTITY_CLASS_HERO) {
+            if (it->class == ENTITY_CLASS_HERO) {
               new_state.target_hero = make_ref(it);
               target_hero = it;
               break;
@@ -943,7 +943,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     if (new_state.flags & ENTITY_FLAG_COLLISION) {
       Vec2 grid_pos = d_world_to_grid(xz(new_state.pos));
       for (s64 y = -1; y <= 1; ++y) {
-        for (s64 x = -1; x <= 1; ++x) {
+        for (s64 x = -1; x <= 1; ++x) { // TODO: Must be fixed for larger enemies
           Vec2 pos_to_check = v2add(grid_pos, v2(x,y));
           pos_to_check.x = clamp(pos_to_check.x, -gs->dungeon->width/2.f, (gs->dungeon->width/2.f)-1);
           pos_to_check.y = clamp(pos_to_check.y, -gs->dungeon->height/2.f, (gs->dungeon->height/2.f)-1);

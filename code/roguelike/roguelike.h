@@ -43,7 +43,7 @@ typedef struct Game_VTable {
 } Game_VTable;
 
 // NOTE: Game data
-
+#if !PLATFORM_LAYER
 typedef u64 Entity_Flags;
 enum {
   ENTITY_FLAG_INPUT_SENSITIVE = (1 << 0),
@@ -124,7 +124,7 @@ struct Entity {
   // NOTE: Header
   u64 gen;
   Entity_Flags flags;
-  Entity_Class eclass;
+  Entity_Class class;
   Entity_Type  type;
 
   // NOTE: Position / Orientation
@@ -134,7 +134,7 @@ struct Entity {
   Vec2 bbox;
   Quat rot;
 
-  // Stats
+  // NOTE: Stats
   f32 hp;
   f32 hp_max;
   u64 num_heart_containers;
@@ -144,6 +144,11 @@ struct Entity {
   f32 knockback;
   f32 durability;
   f32 max_durability;
+
+  // NOTE: Physics
+  f32 mass;
+  f32 velocity;
+  f32 acceleration;
 
   // TODO: Some way to classify what kinds of entities can hold this weapon.
 
@@ -227,4 +232,5 @@ function void draw_string(Texture_Atlas font_atlas, Vec2 pos, f32 scale, String8
 function void play_sound(Arena *arena, Sound sound, b32 loop);
 function void run_playlist(Arena *arena, Playlist pl, b32 loop, b32 shuffle);
 
+#endif // !PLATFORM_LAYER
 #endif // ROGUELIKE_H

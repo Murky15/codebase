@@ -34,8 +34,8 @@
 #include <file/png.h>
 #include <file/wav.h>
 
+#define PLATFORM_LAYER 1
 #include "media.h"
-#include "dungeon.h"
 #include "roguelike.h"
 
 // NOTE: Source
