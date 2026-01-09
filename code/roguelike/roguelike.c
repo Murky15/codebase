@@ -153,8 +153,7 @@ get_sprite (Texture_Atlas atlas, String8 key) {
 function Atlas_Coords
 make_atlas_coords_from_string (String8 coords) {
   Atlas_Coords result = {0};
-  Temp_Arena scratch;
-  ldefer (scratch=get_scratch(0,0), release_scratch(scratch)) {
+  scratch_block (0,0) {
     String8List numbers = str8_split(scratch.arena, coords, 1, " ");
     Vec4 coords = {0};
     u64 i = 0;
@@ -171,8 +170,7 @@ make_atlas_coords_from_string (String8 coords) {
 function Texture_Atlas
 load_textures (Arena *arena, String8 absolute_path_to_asset_dir, r_create_texture_type r_create_texture) {
   Texture_Atlas result = {0};
-  Temp_Arena scratch;
-  ldefer(scratch=get_scratch(&arena, 1),release_scratch(scratch)) {
+  scratch_block (&arena, 1) {
     String8 path_to_atlas_data = str8_pushf(scratch.arena,
       "%.*s/tile_list_v1.7", str8_expand(absolute_path_to_asset_dir));
     String8 atlas_txt = os_read_file(arena, path_to_atlas_data, false);
@@ -229,8 +227,7 @@ load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type 
     '?','?','?','?','?','?','?','?','?','?','?','?','?','?','?','?',
   };
 
-  Temp_Arena scratch;
-  ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+  scratch_block (&arena,1) {
     String8 bitmap_data = os_read_file(scratch.arena, absolute_path_to_bitmap, false);
     if (bitmap_data.len == 0) {
       printf("Unable to find font!\n");
@@ -301,8 +298,7 @@ find_sound (Playlist pl, String8 sound) {
 function Playlist
 make_playlist_from_dir (Arena *arena, String8 absolute_path_to_audio) {
   Playlist result = {0};
-  Temp_Arena scratch;
-  ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+  scratch_block (&arena,1) {
     Directory_Search_Results audio_files = os_search_directory_and_read_files(scratch.arena, absolute_path_to_audio, str8_lit("*.wav"));
     result.sounds = arena_pushn(arena, Sound, audio_files.count);
     result.played = arena_pushn(arena, b32, audio_files.count);
@@ -1148,6 +1144,6 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
       str8_pushf(gs->frame, "FPS: %f", 1000.f/g_delta_time));
     r->draw_quads();
 
-    r->present(false);
+    r->present(true);
   }
 }
