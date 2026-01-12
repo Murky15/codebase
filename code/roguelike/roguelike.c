@@ -386,6 +386,7 @@ cam_set_target (Camera *cam, Entity *e, Camera_Track_Mode track_mode) {
   cam->pos = v3(cam->offset.x, cam->zoom, -cam->zoom);
   cam->focus = v3(cam->offset.x, e->pos.y, 0);
   cam->follow_dist = v3sub(cam->pos,cam->focus);
+  cam->visible_range = cam_calculate_visible_range(*cam, cam->fov_h, cam->aspect_ratio, cam->znear);
 }
 
 function void
@@ -676,7 +677,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   f32 fov_h = M_PI32/4.f;
   f32 aspect_ratio = init.display_width/init.display_height;
   f32 znear = 20.f;
-  f32 zfar = 500.f;
+  f32 zfar = 1000.f;
 
   Mat4 proj = m4perspective(fov_h, aspect_ratio, znear, zfar);
   Mat4 ortho = m4orthographic(init.display_width, init.display_height, -1, 1);
