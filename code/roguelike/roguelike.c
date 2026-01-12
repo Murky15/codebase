@@ -78,10 +78,14 @@
 #include <file/wav.c>
 #include "dungeon.c"
 
-#define PLAYER_MOVE_SPEED 0.15f
-#define MONSTER_MOVE_SPEED PLAYER_MOVE_SPEED/1.2f
-#define MAX_ENTITIES 256
+// NOTE: Game constants
 
+#define PLAYER_MOVE_SPEED 0.15f
+#define PLAYER_JUMP_SPEED 0.25f
+#define MONSTER_MOVE_SPEED PLAYER_MOVE_SPEED/1.2f
+#define GRAVITY 0.001f
+
+#define MAX_ENTITIES 128
 typedef struct Game_State {
   // NOTE: Header
   Arena *perm;
@@ -382,7 +386,6 @@ cam_set_target (Camera *cam, Entity *e, Camera_Track_Mode track_mode) {
   cam->pos = v3(cam->offset.x, cam->zoom, -cam->zoom);
   cam->focus = v3(cam->offset.x, e->pos.y, 0);
   cam->follow_dist = v3sub(cam->pos,cam->focus);
-  cam->visible_range = cam_calculate_visible_range(*cam, cam->fov_h, cam->aspect_ratio, cam->znear);
 }
 
 function void
@@ -663,7 +666,6 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   player.run  = get_sprite(sprites, str8_lit("knight_m_run_anim"));
   player.run.seconds_to_complete = 0.5f;
   player.bbox = v2(player.idle.coords[0].scale.x, 6.f);
-  player.speed = PLAYER_MOVE_SPEED;
   player.hp = 75.f;
   player.hp_max = 75.f;
   player.num_heart_containers = 3;
@@ -749,7 +751,6 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       enemy.idle.seconds_to_complete = 0.5f;
       enemy.run = get_sprite(gs->sprites, str8_lit("orc_warrior_run_anim"));
       enemy.run.seconds_to_complete = 0.5f;
-      enemy.speed = MONSTER_MOVE_SPEED;
       enemy.bbox.width = enemy.idle.coords[0].scale.width;
       enemy.bbox.height = gs->dungeon->grid_dim/2.f;
       enemy.scale_mul = 1;
@@ -797,7 +798,13 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     switch (new_state.class) {
       case ENTITY_CLASS_HERO: {
         if (new_state.flags & ENTITY_FLAG_INPUT_SENSITIVE) {
-          new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
+          if (pressed(jump)) {
+            new_state.velocity.y = PLAYER_JUMP_SPEED;
+          }
+          new_state.velocity.y = new_state.velocity.y - GRAVITY * dt;
+          new_state.pos.y = new_state.pos.y + new_state.velocity.y * dt;
+          new_state.pos.y = max(new_state.pos.y, 1.f);
+          new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
           new_state.dir = move_dir;
         }
       } break;
@@ -835,7 +842,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
         }
         Vec2 move_dir = v2sub(next_pos, xz(new_state.pos));
         if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
-        new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
+        new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * MONSTER_MOVE_SPEED));
         new_state.dir = move_dir;
       } break;
 

@@ -71,7 +71,7 @@ global struct {
   ID3D11Buffer *instance_buffer;
 } g_d3d;
 
-global b32 move_forward, move_back, strafe_left, strafe_right, mouse_click;
+global b32 move_forward, move_back, strafe_left, strafe_right, jump, mouse_click;
 global f32 mouse_x, mouse_y;
 global Vec2i render_dim;
 global Game_Input_Package old_input, new_input;
@@ -94,6 +94,9 @@ WndProc (HWND hwnd, u32 uMsg, WPARAM wParam, LPARAM lParam) {
       }
       if (wParam == 'D') {
         strafe_right = key_down;
+      }
+      if (wParam == ' ') {
+        jump = key_down;
       }
       return 0;
     }
@@ -629,6 +632,7 @@ os_entry () {
     new_input.move_back    = move_back;
     new_input.strafe_left  = strafe_left;
     new_input.strafe_right = strafe_right;
+    new_input.jump         = jump;
     new_input.action_primary = mouse_click;
     new_input.cursor = v2(mouse_x, render_dim.height - mouse_y);
     game->tick(os_get_thread_context(), gs, dt, old_input, new_input);

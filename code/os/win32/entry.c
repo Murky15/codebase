@@ -29,8 +29,7 @@ WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nSho
 
   timeBeginPeriod(1);
 
-  Temp_Arena scratch;
-  ldefer(scratch = get_scratch(0,0),release_scratch(scratch)) {
+  scratch_block (0,0) {
     HANDLE *threads = arena_pushn(scratch.arena, HANDLE, num_threads);
     Thread_Init_Package *params = arena_pushn(scratch.arena, Thread_Init_Package, num_threads);
     Thread_Barrier default_barrier = os_barrier_create(scratch.arena, num_threads);

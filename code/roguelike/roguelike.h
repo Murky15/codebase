@@ -25,6 +25,7 @@ typedef struct Game_Input_Package {
   b32 move_back;
   b32 strafe_left;
   b32 strafe_right;
+  b32 jump;
 
   b32 action_primary;
   Vec2 cursor;
@@ -130,6 +131,7 @@ struct Entity {
   // NOTE: Position / Orientation
   Vec3 pos;
   Vec2 dir;
+  Vec3 velocity;
   Vec2 old_dir;
   Vec2 bbox;
   Quat rot;
@@ -138,17 +140,12 @@ struct Entity {
   f32 hp;
   f32 hp_max;
   u64 num_heart_containers;
-  f32 speed;
+  f32 mass;
 
   f32 damage;
   f32 knockback;
   f32 durability;
   f32 max_durability;
-
-  // NOTE: Physics
-  f32 mass;
-  f32 velocity;
-  f32 acceleration;
 
   // TODO: Some way to classify what kinds of entities can hold this weapon.
 
