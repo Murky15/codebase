@@ -92,8 +92,7 @@ d_make_triangle (Vec2 p0, Vec2 p1, Vec2 p2) {
 function D_Edge_List
 d_bowyer_watson_triangulate (Arena *arena, Vec2 *points, u64 num_points, D_Triangle super) {
   D_Edge_List result = {0};
-  Temp_Arena scratch;
-  ldefer(scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+  scratch_block (&arena,1) {
     D_Triangle_Mesh delaunay = {0};
     d_mesh_push_triangle(scratch.arena, &delaunay, super);
     for (u64 i = 0; i < num_points; ++i) {
@@ -177,8 +176,7 @@ d_push_vertex_if_unique (Arena *arena, D_Vertex_Neighborhood *n, D_Vertex *v) {
 function D_Edge_List
 d_prim_mst (Arena *arena, D_Edge_List bw_result, u64 num_points) {
   D_Edge_List result = {0};
-  Temp_Arena scratch;
-  ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+  scratch_block (&arena,1) {
     D_Vertex *vertices = arena_pushn(scratch.arena, D_Vertex, num_points);
     for each_in_list (edge, &bw_result) {
       D_Vertex *v0 = d_get_vertex(vertices, num_points, edge->p0);
@@ -526,8 +524,7 @@ d_create_ (Arena *arena, Texture_Atlas textures, Dungeon_Create_Params *p) {
   result->height = p->map_height;
   result->grid_dim = p->grid_dim;
   result->tiles = arena_pushn(arena, Dungeon_Tile, result->width * result->height);
-  Temp_Arena scratch;
-  ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+  scratch_block (&arena,1) {
     // NOTE: Step 1: Place rooms.
     f32 half_width = (f32)p->map_width / 2.f;
     f32 half_height = (f32)p->map_height / 2.f;
@@ -791,8 +788,7 @@ d_astar_calculate_path (Arena *arena, Dungeon_Tile *start, Dungeon_Tile *end) {
 
   Dungeon_Tile_List result = {0};
 
-  Temp_Arena scratch;
-  ldefer (scratch=get_scratch(&arena, 1), release_scratch(scratch)) {
+  scratch_block (&arena,1) {
     u64 map_size = current_dungeon->width * current_dungeon->height;
     AStar_Tile *astar_map = arena_pushn(scratch.arena, AStar_Tile, map_size);
     for each_in_arrayc (tile, astar_map, map_size) {

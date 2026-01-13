@@ -150,6 +150,7 @@
 
 //- @note: Syntax helpers
 #define ldefer(start, end) for(int _i_ = ((start), 0); _i_ == 0; (_i_ += 1, (end)))
+#define scratch_block(c,n) for(Temp_Arena scratch = get_scratch((c),(n)), _i_ = zero_struct; _i_.pos == 0; _i_.pos += 1, release_scratch(scratch))
 
 // for...
 #define each_in_list(i,lp) (typeof((lp)->first)(i)=(lp)->first;(i);(i)=(i)->next)

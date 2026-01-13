@@ -78,10 +78,14 @@
 #include <file/wav.c>
 #include "dungeon.c"
 
-#define PLAYER_MOVE_SPEED 0.15f
-#define MONSTER_MOVE_SPEED PLAYER_MOVE_SPEED/1.2f
-#define MAX_ENTITIES 256
+// NOTE: Game constants
 
+#define PLAYER_MOVE_SPEED 0.15f
+#define PLAYER_JUMP_SPEED 0.25f
+#define MONSTER_MOVE_SPEED PLAYER_MOVE_SPEED/1.2f
+#define GRAVITY 0.001f
+
+#define MAX_ENTITIES 128
 typedef struct Game_State {
   // NOTE: Header
   Arena *perm;
@@ -153,8 +157,7 @@ get_sprite (Texture_Atlas atlas, String8 key) {
 function Atlas_Coords
 make_atlas_coords_from_string (String8 coords) {
   Atlas_Coords result = {0};
-  Temp_Arena scratch;
-  ldefer (scratch=get_scratch(0,0), release_scratch(scratch)) {
+  scratch_block (0,0) {
     String8List numbers = str8_split(scratch.arena, coords, 1, " ");
     Vec4 coords = {0};
     u64 i = 0;
@@ -171,8 +174,7 @@ make_atlas_coords_from_string (String8 coords) {
 function Texture_Atlas
 load_textures (Arena *arena, String8 absolute_path_to_asset_dir, r_create_texture_type r_create_texture) {
   Texture_Atlas result = {0};
-  Temp_Arena scratch;
-  ldefer(scratch=get_scratch(&arena, 1),release_scratch(scratch)) {
+  scratch_block (&arena, 1) {
     String8 path_to_atlas_data = str8_pushf(scratch.arena,
       "%.*s/tile_list_v1.7", str8_expand(absolute_path_to_asset_dir));
     String8 atlas_txt = os_read_file(arena, path_to_atlas_data, false);
@@ -229,8 +231,7 @@ load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type 
     '?','?','?','?','?','?','?','?','?','?','?','?','?','?','?','?',
   };
 
-  Temp_Arena scratch;
-  ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+  scratch_block (&arena,1) {
     String8 bitmap_data = os_read_file(scratch.arena, absolute_path_to_bitmap, false);
     if (bitmap_data.len == 0) {
       printf("Unable to find font!\n");
@@ -301,8 +302,7 @@ find_sound (Playlist pl, String8 sound) {
 function Playlist
 make_playlist_from_dir (Arena *arena, String8 absolute_path_to_audio) {
   Playlist result = {0};
-  Temp_Arena scratch;
-  ldefer (scratch=get_scratch(&arena,1),release_scratch(scratch)) {
+  scratch_block (&arena,1) {
     Directory_Search_Results audio_files = os_search_directory_and_read_files(scratch.arena, absolute_path_to_audio, str8_lit("*.wav"));
     result.sounds = arena_pushn(arena, Sound, audio_files.count);
     result.played = arena_pushn(arena, b32, audio_files.count);
@@ -667,7 +667,6 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   player.run  = get_sprite(sprites, str8_lit("knight_m_run_anim"));
   player.run.seconds_to_complete = 0.5f;
   player.bbox = v2(player.idle.coords[0].scale.x, 6.f);
-  player.speed = PLAYER_MOVE_SPEED;
   player.hp = 75.f;
   player.hp_max = 75.f;
   player.num_heart_containers = 3;
@@ -678,7 +677,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   f32 fov_h = M_PI32/4.f;
   f32 aspect_ratio = init.display_width/init.display_height;
   f32 znear = 20.f;
-  f32 zfar = 500.f;
+  f32 zfar = 1000.f;
 
   Mat4 proj = m4perspective(fov_h, aspect_ratio, znear, zfar);
   Mat4 ortho = m4orthographic(init.display_width, init.display_height, -1, 1);
@@ -753,7 +752,6 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       enemy.idle.seconds_to_complete = 0.5f;
       enemy.run = get_sprite(gs->sprites, str8_lit("orc_warrior_run_anim"));
       enemy.run.seconds_to_complete = 0.5f;
-      enemy.speed = MONSTER_MOVE_SPEED;
       enemy.bbox.width = enemy.idle.coords[0].scale.width;
       enemy.bbox.height = gs->dungeon->grid_dim/2.f;
       enemy.scale_mul = 1;
@@ -801,7 +799,13 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     switch (new_state.class) {
       case ENTITY_CLASS_HERO: {
         if (new_state.flags & ENTITY_FLAG_INPUT_SENSITIVE) {
-          new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
+          if (pressed(jump)) {
+            new_state.velocity.y = PLAYER_JUMP_SPEED;
+          }
+          new_state.velocity.y = new_state.velocity.y - GRAVITY * dt;
+          new_state.pos.y = new_state.pos.y + new_state.velocity.y * dt;
+          new_state.pos.y = max(new_state.pos.y, 1.f);
+          new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * PLAYER_MOVE_SPEED));
           new_state.dir = move_dir;
         }
       } break;
@@ -839,7 +843,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
         }
         Vec2 move_dir = v2sub(next_pos, xz(new_state.pos));
         if (v2len(move_dir) > 1) move_dir = v2norm(move_dir);
-        new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * new_state.speed));
+        new_state.pos = v3add(new_state.pos, v3muls(v3(move_dir.x, 0, move_dir.y), dt * MONSTER_MOVE_SPEED));
         new_state.dir = move_dir;
       } break;
 
@@ -1148,6 +1152,6 @@ roguelike_draw (Thread_Context *tctx, void *game_state) {
       str8_pushf(gs->frame, "FPS: %f", 1000.f/g_delta_time));
     r->draw_quads();
 
-    r->present(false);
+    r->present(true);
   }
 }
