@@ -59,7 +59,7 @@
   What if nobody starts with any weapons and the player just has to
   punch their way to the nearest chest. Can heroes pick up weapons from monsters?
 
-  What if there was a weapon that you could throw and retreive like Thor's hammer?
+  What if there was a weapon that you could throw and retrieve like Thor's hammer?
 */
 
 #define OS_NO_ENTRY 1
