@@ -1,15 +1,16 @@
 #import "Basic";
 #import "Window_Creation";
 #import "Input";
+#import "Simp";
 
 main :: () {
   window := create_window(1280, 720, "Untitled");
 
-  running := true;
-  while running {
+  while true {
     update_window_events();
+
     for events_this_frame {
-      if it.type == .QUIT then running = false;
+      if it.type == .QUIT then break;
     }
   }
 }

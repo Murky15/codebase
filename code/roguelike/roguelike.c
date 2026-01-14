@@ -924,14 +924,11 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             new_state.slash_phase = ATTACK_PHASE_ANTICIPATION;
             Vec3 floor_pos = cam_raycast_to_floor(gs->cam, vp, new_input.cursor);
             Vec3 pos_dir = v3norm(v3sub(floor_pos, new_state.pos));
-            new_state.pos.y = pos_offset.y - bob;
+            new_state.pos.y -= bob;
             f32 point_angle = atan2(-pos_dir.z, pos_dir.x);
             f32 half_swing = new_state.swing_angle/2.f;
             f32 start_angle = point_angle - half_swing;
             f32 end_angle = point_angle + half_swing;
-            /*if (point_angle < 0.f) {
-              swap(start_angle, end_angle);
-            }*/
             new_state.start_pos_rot = axis_angle(v3(.y=1), start_angle);
             new_state.end_pos_rot = axis_angle(v3(.y=1), end_angle);
             new_state.start_point_rot = qmul(axis_angle(v3(.y=1), start_angle + M_PI32/2.f), gs->floor_rot);
