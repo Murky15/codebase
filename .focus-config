@@ -3,16 +3,16 @@
 [[workspace]]
 code
 T:\Jai
-/Tools/Jai
+/home/gmb/Tools/jai
 
 [ignore]
 .svn
 .git
-.\geometry_compiler\**
+./geometry_compiler/**
 
 [[build commands]]
-build_working_dir: ..\
-run_working_dir: ..\build
+build_working_dir: %FILE_DIR%
+run_working_dir: %FILE_DIR%/build
 auto_jump_to_error: true
 
 [Build Roguelike]
@@ -25,10 +25,10 @@ key_binding: F2
 
 [Build Jai Game]
 error_regex: ^(?P<file>.*):(?P<line>\d+),(?P<col>\d+): (?P<type>Error|Warning|Info|...):* (?P<msg>.*)|^(?P<msg1>.*error LNK.*)
-build_command: jai -very_debug code\untitled_jai_project\main.jai -output_path %BUILD_WORKING_DIR%build -exe untitled_jai_game
+build_command: jai %BUILD_WORKING_DIR%/code/untitled_jai_project/main.jai -output_path %RUN_WORKING_DIR% -exe untitled_jai_game
 key_binding: F3
 [Run Jai Game]
-run_command: %RUN_WORKING_DIR%\untitled_jai_game
+run_command: %RUN_WORKING_DIR%/untitled_jai_game
 key_binding: F4
 
 
@@ -262,14 +262,13 @@ Alt-R                       toggle_regex_search
 # For example, if "move_up" is not defined in [editors], the one in the [common] section will be matched.
 
 Alt-X                       show_commands
-Ctrl-Shift-P                show_commands
 
 Ctrl-Alt-P                  switch_to_project
 
 Ctrl-F                      search_in_buffer
 Alt-F                       search_in_buffer_dropdown_mode
 
-Ctrl-Shift-,                open_file_by_name
+Ctrl-Shift-P                open_file_by_name
 Ctrl-O                      navigate_to_file
 Ctrl-Shift-O                navigate_to_file_from_root
 Ctrl-Tab                    switch_between_open_files
@@ -377,7 +376,7 @@ Shift-Ctrl-F8               go_to_previous_build_error_in_side_pane
 
 [[style]]
 
-theme: jellybeans
+theme: default
 
 [fonts]
 font:          default
