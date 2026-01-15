@@ -132,20 +132,17 @@ struct Entity {
   Vec3 pos;
   Vec2 dir;
   Vec3 velocity;
-  Vec2 old_dir;
   Vec2 bbox;
   Quat rot;
+  b32 jumping;
 
   // NOTE: Stats
   f32 hp;
   f32 hp_max;
   u64 num_heart_containers;
   f32 mass;
-
   f32 damage;
   f32 knockback;
-  f32 durability;
-  f32 max_durability;
 
   // TODO: Some way to classify what kinds of entities can hold this weapon.
 
@@ -174,10 +171,8 @@ struct Entity {
   f32 scale_mul;
   Vec3 rot_offset;
 
-  // NOTE: Misc
+  // NOTE: References
   Entity_Ref parent;
-
-  // NOTE: For Monsters
   Entity_Ref target_hero;
 };
 

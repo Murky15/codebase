@@ -50,6 +50,8 @@
     This would make properties like knockback way more interesting
   - [X] BASIC sword animation
 
+  - [ ] CACHE ALL SOUNDS WHEN WE FIND WHICH ONES ARE MOST FREQUENTLY USED!!!
+
   For bosses, instead of a health bar, we can still just use the hearts.
   We should display them at the top-middle portion of the screen but every time you hit the boss it doesn't
   immediately split the heart it will have like a little shake effect for a few hits before breaking.
@@ -799,8 +801,15 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     switch (new_state.class) {
       case ENTITY_CLASS_HERO: {
         if (new_state.flags & ENTITY_FLAG_INPUT_SENSITIVE) {
-          if (pressed(jump)) {
-            new_state.velocity.y = PLAYER_JUMP_SPEED;
+          if (almost_equal(new_state.pos.y, 1.f)) {
+            if (new_state.jumping) {
+              new_state.jumping = false;
+              play_sound(gs->perm, find_sound(gs->sfx, str8_lit("13_human_jump_land_2")), false);
+            } else if (pressed(jump)) {
+              new_state.jumping = true;
+              play_sound(gs->perm, find_sound(gs->sfx, str8_lit("12_human_jump_3")), false);
+              new_state.velocity.y = PLAYER_JUMP_SPEED;
+            }
           }
           new_state.velocity.y = new_state.velocity.y - GRAVITY * dt;
           new_state.pos.y = new_state.pos.y + new_state.velocity.y * dt;
@@ -977,7 +986,6 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
 
     // NOTE: Update Entity state
     *e = new_state;
-    e->old_dir = old_state.dir;
     done_updating[e-gs->entities] = true;
   }
 

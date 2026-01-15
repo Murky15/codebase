@@ -37,20 +37,21 @@ window:
         }
         0.75:
         {
+          selected
           getting_started
           text:
           {
-            expression: "file:\"W:/code/base/memory.c\".data"
+            selected
+            expression: "file:\"W:/code/roguelike/dungeon.c\".data"
             auto: 1
             query: input: ""
-            cursor_line: 64
+            cursor_line: 790
             cursor_column: 1
-            mark_line: 64
+            mark_line: 790
             mark_column: 1
           }
           text:
           {
-            selected
             expression: "file:\"W:/code/roguelike/roguelike.c\".data"
             project: "W:/misc/root.raddbg_project"
             query:
@@ -108,7 +109,6 @@ window:
     {
       0.50:
       {
-        selected
         watch: expression: "query:targets"
         watch:
         {
