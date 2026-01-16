@@ -84,7 +84,7 @@
 
 #define PLAYER_MOVE_SPEED 0.15f
 #define PLAYER_JUMP_SPEED 0.25f
-#define MONSTER_MOVE_SPEED PLAYER_MOVE_SPEED/1.2f
+#define MONSTER_MOVE_SPEED 0.10f
 #define GRAVITY 0.001f
 
 #define MAX_ENTITIES 128
@@ -660,9 +660,10 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     | ENTITY_FLAG_ANIMATE_SPRITES
     | ENTITY_FLAG_ANIMATE_ROTATIONS
     | ENTITY_FLAG_DRAWABLE
-    | ENTITY_FLAG_COLLISION
+    | ENTITY_FLAG_WALL_COLLISION
     | ENTITY_FLAG_DRAW_HEALTH
-    | ENTITY_FLAG_NOISY;
+    | ENTITY_FLAG_NOISY
+    | ENTITY_FLAG_VULNERABLE;
 
   player.pos = v3(0,1,0);
   while (d_index_tile_from_world(xz(player.pos))->flags == DUNGEON_TILE_EMPTY) {
@@ -752,8 +753,9 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       Entity enemy = {0};
       enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES
         | ENTITY_FLAG_ANIMATE_ROTATIONS
-        | ENTITY_FLAG_COLLISION;
-       // | ENTITY_FLAG_DRAWABLE;
+        | ENTITY_FLAG_WALL_COLLISION
+        | ENTITY_FLAG_DRAWABLE
+        | ENTITY_FLAG_HARMFUL;
       enemy.class = ENTITY_CLASS_MONSTER;
       enemy.pos = gs->entities[0].pos;
       enemy.seconds_to_flip = 0.12f;
@@ -765,6 +767,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       enemy.bbox.height = gs->dungeon->grid_dim/2.f;
       enemy.scale_mul = 1;
       enemy.rot_offset = v3(enemy.idle.coords[0].scale.width/2.f);
+      enemy.damage = 1.f;
       gs->entities[gs->num_entities++] = enemy;
 
       Entity sword = {0};
@@ -904,6 +907,9 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
                 if (rot_amt >= 1.f) {
                   new_state.slash_phase = ATTACK_PHASE_ACTION;
                   new_state.started_swing_at = clock;
+                  if (new_state.flags & ENTITY_FLAG_NOISY) {
+                     play_sound(gs->perm, find_sound(gs->sfx, str8_lit("07_human_atk_sword_1")), 1.f, false);
+                  }
                 }
               } break;
 
@@ -954,9 +960,6 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             new_state.start_point_rot = qmul(axis_angle(v3(.y=1), start_angle + M_PI32/2.f), gs->floor_rot);
             new_state.end_point_rot = qmul(axis_angle(v3(.y=1), end_angle + M_PI32/2.f), gs->floor_rot);
             new_state.started_swing_at = os_clock_seconds();
-            if (new_state.flags & ENTITY_FLAG_NOISY) {
-              play_sound(gs->perm, find_sound(gs->sfx, str8_lit("07_human_atk_sword_1")), 1.f, false);
-            }
           }
         }
       } break;
@@ -975,7 +978,18 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       }
     }
 
-    if (new_state.flags & ENTITY_FLAG_COLLISION) {
+    if (new_state.flags & ENTITY_FLAG_HARMFUL) {
+      for each_in_arrayc (contact, gs->entities, gs->num_entities) {
+        if (contact->flags & ENTITY_FLAG_VULNERABLE &&
+            d_rects_intersect_expanded(xz(new_state.pos), new_state.bbox, xz(contact->pos), contact->bbox, 0, 0)) {
+          os_heat_begin_critical_section();
+          contact->hp -= new_state.damage;
+          os_heat_end_critical_section();
+        }
+      }
+    }
+
+    if (new_state.flags & ENTITY_FLAG_WALL_COLLISION) {
       Vec2 grid_pos = d_world_to_grid(xz(new_state.pos));
       for (s64 y = -1; y <= 1; ++y) {
         for (s64 x = -1; x <= 1; ++x) { // TODO: Must be fixed for larger enemies
