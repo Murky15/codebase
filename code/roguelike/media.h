@@ -29,9 +29,12 @@ typedef struct Texture_Atlas {
   u64 num_sprites;
 } Texture_Atlas;
 
+// NOTE: Audio
+
 typedef struct Sound {
   struct Sound *next;
   u64 _id;
+  f32 volume;
   Wave_Data audio_data;
   String8 name;
   u64 local_cursor;
@@ -116,5 +119,13 @@ function void         r_update_transform(Mat4 m);
 function void         r_draw_quads(void);
 function void         r_present(b32 enable_vsync);
 function void         r_push_quad_(Push_Quad_Params *p);
+
+// NOTE: Sound API
+function Sound    sound_from_wave(String8 name, Wave_Data raw_sound_data);
+function Sound*   get_playlist_slot(Playlist pl, String8 sound);
+function Sound    find_sound(Playlist pl, String8 sound);
+function Playlist make_playlist_from_dir(Arena *arena, String8 absolute_path_to_audio);
+function void     play_sound(Arena *arena, Sound sound, f32 volume, b32 loop);
+function void     run_playlist(Arena *arena, Playlist pl, f32 volume, b32 loop, b32 shuffle);
 
 #endif // GRAPHICS_H

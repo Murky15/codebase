@@ -205,10 +205,6 @@ function Sprite        get_sprite(Texture_Atlas atlas, String8 key);
 function Atlas_Coords  make_atlas_coords_from_string(String8 coords);
 function Texture_Atlas load_textures(Arena *arena, String8 absolute_path_to_asset_dir, r_create_texture_type r_create_texture);
 function Texture_Atlas load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type r_create_texture);
-function Sound         sound_from_wave(String8 name, Wave_Data raw_sound_data);
-function Sound*        get_playlist_slot(Playlist pl, String8 sound);
-function Sound         find_sound(Playlist pl, String8 sound);
-function Playlist      make_playlist_from_dir(Arena *arena, String8 absolute_path_to_audio);
 
 function Entity_Ref make_ref(Entity *e);
 function Entity*    get_entity(Entity_Ref ref);
@@ -220,9 +216,6 @@ function Vec3 cam_raycast_to_floor(Camera cam, Mat4 vp, Vec2 screen_pos);
 
 function void draw_entity(Entity *e);
 function void draw_string(Texture_Atlas font_atlas, Vec2 pos, f32 scale, String8 string);
-
-function void play_sound(Arena *arena, Sound sound, b32 loop);
-function void run_playlist(Arena *arena, Playlist pl, b32 loop, b32 shuffle);
 
 #endif // !PLATFORM_LAYER
 #endif // ROGUELIKE_H

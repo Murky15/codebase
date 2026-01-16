@@ -31,7 +31,7 @@
   - [X] It looks like the game is most performant with spin count = 0 for barriers?
     Verify this. Also, what is a good spin count for Critical sections?
   - [X] Vector swizzle *macros*: xz(Vec3) -> Vec2
-  - [ ] Conversion routines between strings and wide strings
+  - [ ] Conversion routines between strings and wide strings (Windows platform layer)
 
   - [O] Instead of a simple AABB check for determining the visible range, I should
     instead use a point-in-polygon function to support angles rotated around y-axis.
@@ -41,7 +41,7 @@
     to prevent z-flimmering.
   - [O] Debug wireframe renderer for hitboxes
   - [X] HUD
-  - [ ] Audio
+  - [X] Audio
   - [ ] Lighting & Shadows
   - [X] Mouse Input
   - [X] Old input & new input
@@ -123,7 +123,7 @@ typedef struct Game_State {
   Dungeon *dungeon;
   Camera cam;
   u64 num_entities;
-  Entity entities[MAX_ENTITIES];
+  Entity *entities;
 } Game_State;
 
 // NOTE: Actual useful globals
@@ -502,7 +502,7 @@ draw_string (Texture_Atlas font_atlas, Vec2 pos, f32 scale, String8 string) {
 }
 
 function void
-play_sound (Arena *arena, Sound sound, b32 loop) {
+play_sound (Arena *arena, Sound sound, f32 volume, b32 loop) {
   Sound *sound_slot = gs->first_free_sound;
   if (sound_slot) {
     gs->first_free_sound = sound_slot->next;
@@ -512,6 +512,7 @@ play_sound (Arena *arena, Sound sound, b32 loop) {
   }
   *sound_slot = sound;
   sound_slot->loop = loop;
+  sound_slot->volume = clamp(volume, 0.f, 1.f);
 
   sll_queue_push(gs->sounds_to_play.first, gs->sounds_to_play.last, sound_slot);
   gs->sounds_to_play.count += 1;
@@ -519,7 +520,7 @@ play_sound (Arena *arena, Sound sound, b32 loop) {
 
 // TODO: Add transitions
 function void
-run_playlist (Arena *arena, Playlist pl, b32 loop, b32 shuffle) {
+run_playlist (Arena *arena, Playlist pl, f32 volume, b32 loop, b32 shuffle) {
   gs->active_playlist = pl;
   gs->active_playlist.loop = loop;
   gs->active_playlist.shuffle = shuffle;
@@ -527,7 +528,11 @@ run_playlist (Arena *arena, Playlist pl, b32 loop, b32 shuffle) {
   gs->active_playlist.sounds_played = 0;
   memory_zero(gs->active_playlist.played, sizeof(b32) * gs->active_playlist.count);
 
-  play_sound(arena, pl.sounds[gs->active_sound_idx], false);
+  for each_in_arrayc (s, gs->active_playlist.sounds, gs->active_playlist.count) {
+    s->volume = clamp(volume, 0.f, 1.f);
+  }
+
+  play_sound(arena, pl.sounds[gs->active_sound_idx], volume, false);
 }
 
 function s32
@@ -561,9 +566,8 @@ roguelike_audio_callback (f32 *sample_buffer, u32 samples_to_write) {
       assert (divisor != 0);
       sample_left  = sign_extend(sample_left,  bits_per_sample);
       sample_right = sign_extend(sample_right, bits_per_sample);
-      // TODO: relative audio can be achieved by multiplying this float value by a scalar [0,1]
-      mixed_sample_left  += ((f32)sample_left  / divisor);
-      mixed_sample_right += ((f32)sample_right / divisor);
+      mixed_sample_left  += ((f32)sample_left  / divisor) * sound->volume;
+      mixed_sample_right += ((f32)sample_right / divisor) * sound->volume;
 
       if (sound->local_cursor == buffer_size) {
         if (sound->loop) {
@@ -589,7 +593,7 @@ roguelike_audio_callback (f32 *sample_buffer, u32 samples_to_write) {
             gs->active_playlist.played[gs->active_sound_idx] = true;
             if (++gs->active_playlist.sounds_played == gs->active_playlist.count) {
               if (gs->active_playlist.loop) {
-                run_playlist(gs->perm, gs->active_playlist, true, gs->active_playlist.shuffle);
+                run_playlist(gs->perm, gs->active_playlist, sound->volume, true, gs->active_playlist.shuffle);
               } else {
                 gs->active_playlist = (Playlist){0};
                 gs->active_sound_idx = 0;
@@ -599,7 +603,8 @@ roguelike_audio_callback (f32 *sample_buffer, u32 samples_to_write) {
               u64 new_song_idx = gs->active_playlist.shuffle ? rand_next() % bounds : gs->active_sound_idx + 1;
               for (;gs->active_playlist.played[new_song_idx]; ++new_song_idx);
               gs->active_sound_idx = new_song_idx;
-              play_sound(gs->perm, gs->active_playlist.sounds[gs->active_sound_idx], false);
+              Sound next_sound = gs->active_playlist.sounds[gs->active_sound_idx];
+              play_sound(gs->perm, next_sound, next_sound.volume, false);
             }
           }
 
@@ -621,6 +626,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   os_set_thread_context(*tctx);
   Game_State *new_game_state = arena_pushn(init.perm, Game_State, 1);
   gs = new_game_state;
+  gs->entities = arena_pushn(init.perm, Entity, MAX_ENTITIES);
 
   String8 asset_path = str8_pushf(init.frame, "%.*sArt/Sprites", str8_expand(init.asset_dir));
   String8 font_path = str8_pushf(init.frame, "%.*sArt/Fonts/monogram-bitmap.png", str8_expand(init.asset_dir));
@@ -632,7 +638,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   String8 music_path = str8_pushf(init.frame, "%.*sMusic/Background", str8_expand(init.asset_dir));
   Playlist sound_effects = make_playlist_from_dir(init.perm, sfx_path);
   Playlist bg_music = make_playlist_from_dir(init.perm, music_path);
-  run_playlist(init.perm, bg_music, true, true);
+  run_playlist(init.perm, bg_music, 0.85f, true, true);
 
   Dungeon *dungeon = d_create(init.perm, sprites,
     .target_room_count = 500,
@@ -804,10 +810,10 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           if (almost_equal(new_state.pos.y, 1.f)) {
             if (new_state.jumping) {
               new_state.jumping = false;
-              play_sound(gs->perm, find_sound(gs->sfx, str8_lit("13_human_jump_land_2")), false);
+              play_sound(gs->perm, find_sound(gs->sfx, str8_lit("13_human_jump_land_2")), 1.f, false);
             } else if (pressed(jump)) {
               new_state.jumping = true;
-              play_sound(gs->perm, find_sound(gs->sfx, str8_lit("12_human_jump_3")), false);
+              play_sound(gs->perm, find_sound(gs->sfx, str8_lit("12_human_jump_3")), 1.f, false);
               new_state.velocity.y = PLAYER_JUMP_SPEED;
             }
           }
@@ -944,7 +950,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             new_state.end_point_rot = qmul(axis_angle(v3(.y=1), end_angle + M_PI32/2.f), gs->floor_rot);
             new_state.started_swing_at = os_clock_seconds();
 
-            play_sound(gs->perm, find_sound(gs->sfx, str8_lit("07_human_atk_sword_1")), false);
+            play_sound(gs->perm, find_sound(gs->sfx, str8_lit("07_human_atk_sword_1")), 1.f, false);
           }
         }
       } break;
