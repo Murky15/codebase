@@ -638,7 +638,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   String8 music_path = str8_pushf(init.frame, "%.*sMusic/Background", str8_expand(init.asset_dir));
   Playlist sound_effects = make_playlist_from_dir(init.perm, sfx_path);
   Playlist bg_music = make_playlist_from_dir(init.perm, music_path);
-  run_playlist(init.perm, bg_music, 0.85f, true, true);
+  run_playlist(init.perm, bg_music, 0.5f, true, true);
 
   Dungeon *dungeon = d_create(init.perm, sprites,
     .target_room_count = 500,
@@ -661,7 +661,8 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     | ENTITY_FLAG_ANIMATE_ROTATIONS
     | ENTITY_FLAG_DRAWABLE
     | ENTITY_FLAG_COLLISION
-    | ENTITY_FLAG_DRAW_HEALTH;
+    | ENTITY_FLAG_DRAW_HEALTH
+    | ENTITY_FLAG_NOISY;
 
   player.pos = v3(0,1,0);
   while (d_index_tile_from_world(xz(player.pos))->flags == DUNGEON_TILE_EMPTY) {
@@ -680,6 +681,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   player.num_heart_containers = 3;
   player.scale_mul = 1;
   player.rot_offset = v3(player.idle.coords[0].scale.x/2.f);
+  player.step_sound_interval = player.run.seconds_to_complete;
   gs->entities[gs->num_entities++] = player;
 
   f32 fov_h = M_PI32/4.f;
@@ -767,7 +769,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       gs->entities[gs->num_entities++] = enemy;
 
       Entity sword = {0};
-      sword.flags = ENTITY_FLAG_DRAWABLE | ENTITY_FLAG_HARMFUL;
+      sword.flags = ENTITY_FLAG_DRAWABLE | ENTITY_FLAG_HARMFUL | ENTITY_FLAG_NOISY;
       sword.class = ENTITY_CLASS_WEAPON;
       sword.pos = gs->entities[0].pos;
       sword.idle = get_sprite(gs->sprites, str8_lit("weapon_katana"));
@@ -810,11 +812,15 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           if (almost_equal(new_state.pos.y, 1.f)) {
             if (new_state.jumping) {
               new_state.jumping = false;
-              play_sound(gs->perm, find_sound(gs->sfx, str8_lit("13_human_jump_land_2")), 1.f, false);
+              if (new_state.flags & ENTITY_FLAG_NOISY) {
+                play_sound(gs->perm, find_sound(gs->sfx, str8_lit("13_human_jump_land_2")), 1.f, false);
+              }
             } else if (pressed(jump)) {
               new_state.jumping = true;
-              play_sound(gs->perm, find_sound(gs->sfx, str8_lit("12_human_jump_3")), 1.f, false);
               new_state.velocity.y = PLAYER_JUMP_SPEED;
+              if (new_state.flags & ENTITY_FLAG_NOISY) {
+                play_sound(gs->perm, find_sound(gs->sfx, str8_lit("12_human_jump_3")), 1.f, false);
+              }
             }
           }
           new_state.velocity.y = new_state.velocity.y - GRAVITY * dt;
@@ -885,7 +891,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           if (new_state.slash_phase) {
             f64 clock = os_clock_seconds();
             // TODO: Should this be in the draw entity function?
-            // and can we condense this?
+            // and can this be condensed/abstracted?
             switch (new_state.slash_phase) {
               case ATTACK_PHASE_ANTICIPATION: {
                 f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + new_state.seconds_for_anticipation);
@@ -949,11 +955,25 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             new_state.start_point_rot = qmul(axis_angle(v3(.y=1), start_angle + M_PI32/2.f), gs->floor_rot);
             new_state.end_point_rot = qmul(axis_angle(v3(.y=1), end_angle + M_PI32/2.f), gs->floor_rot);
             new_state.started_swing_at = os_clock_seconds();
-
-            play_sound(gs->perm, find_sound(gs->sfx, str8_lit("07_human_atk_sword_1")), 1.f, false);
+            if (new_state.flags & ENTITY_FLAG_NOISY) {
+              play_sound(gs->perm, find_sound(gs->sfx, str8_lit("07_human_atk_sword_1")), 1.f, false);
+            }
           }
         }
       } break;
+    }
+
+    if (new_state.flags & ENTITY_FLAG_NOISY) {
+      if (v2len(new_state.dir) > 0.f && !new_state.jumping) {
+        new_state.step_sound_progress += dt / 1000.f;
+        if (new_state.step_sound_progress >= new_state.step_sound_interval ||
+              almost_equal(v2len(old_state.dir), 0)) {
+          play_sound(gs->perm, find_sound(gs->sfx, str8_lit("16_human_walk_stone_2")), 1.f, false);
+          new_state.step_sound_progress = 0;
+        }
+      } else {
+        new_state.step_sound_progress = 0;
+      }
     }
 
     if (new_state.flags & ENTITY_FLAG_COLLISION) {

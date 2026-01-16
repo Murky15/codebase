@@ -55,6 +55,7 @@ enum {
   ENTITY_FLAG_DRAW_HEALTH = (1 << 5),
   ENTITY_FLAG_VULNERABLE = (1 << 6),
   ENTITY_FLAG_HARMFUL = (1 << 7),
+  ENTITY_FLAG_NOISY = (1 << 8)
 };
 
 typedef u32 Entity_Class;
@@ -170,6 +171,10 @@ struct Entity {
   Sprite run;
   f32 scale_mul;
   Vec3 rot_offset;
+
+  // NOTE: Audio
+  f32 step_sound_interval;
+  f32 step_sound_progress;
 
   // NOTE: References
   Entity_Ref parent;
