@@ -173,7 +173,6 @@ struct Entity {
   Vec3 rot_offset;
 
   // NOTE: Audio
-  f32 step_sound_interval;
   f32 step_sound_progress;
 
   // NOTE: References
