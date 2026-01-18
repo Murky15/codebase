@@ -1,3 +1,6 @@
 [submodule "code/geometry_compiler"]
 	path = code/geometry_compiler
 	url = https://git.mr4th.com/mr4th/geometry_compiler
+[submodule "code/soniboy/code/soniboy/extra_modules/Json"]
+	path = code/soniboy/code/soniboy/extra_modules/Json
+	url = https://github.com/rluba/jaison
