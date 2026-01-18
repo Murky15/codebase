@@ -42,6 +42,12 @@ core_function void os_mutex_claim(Thread_Mutex mutex);
 core_function void os_mutex_release(Thread_Mutex mutex);
 core_function void os_mutex_invalidate(Thread_Mutex mutex);
 
+// Can these be macros??
+core_function s64 os_interlocked_add(s64 volatile *addend, s64 value);
+core_function s64 os_interlocked_inc(s64 volatile *value);
+core_function s64 os_interlocked_exchange(s64 volatile *dest, s64 value, s64 comp);
+core_function s64 os_interlocked_add_f64(f64 volatile *addend, f64 value);
+
 core_function void os_set_thread_context(Thread_Context ctx);
 core_function Thread_Context* os_get_thread_context(void);
 #define runner_id() (os_get_thread_context()->heat.runner_id)

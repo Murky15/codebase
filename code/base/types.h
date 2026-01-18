@@ -141,6 +141,15 @@ typedef struct Quad3D {
 // NOTE: More swizzles
 #define xz(v) v2((v).x,(v).z)
 
+// NOTE: Type punning
+#if LANG_C
+union {
+  f64 d;
+  u64 i;
+} Double_u64_Pun;
+
+#endif
+
 //- @note: Vectors
 // TODO: Can we inline these?
 core_function b32  v2exact(Vec2 a, Vec2 b);
@@ -201,7 +210,7 @@ core_function Mat4 m4perspective(f32 fovy, f32 aspect, f32 znear, f32 zfar);
 core_function Mat4 m4orthographic(f32 width, f32 height, f32 znear, f32 zfar);
 core_function Mat4 m4lookat(Vec3 viewpoint, Vec3 focus, Vec3 reference_up);
 
-//- @note: Some float helpers
+//- @note: Float helpers
 core_function f64 fmod_cycling(f64 x, f64 y);
 core_function f64 lerp(f64 v0, f64 v1, f64 t);
 #define v2lerp(a,b,t) v2(lerp((a).x,(b).x,(t)),lerp((a).y,(b).y,(t)))

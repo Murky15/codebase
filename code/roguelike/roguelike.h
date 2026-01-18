@@ -51,10 +51,11 @@ enum {
   ENTITY_FLAG_ANIMATE_SPRITES = (1 << 1),
   ENTITY_FLAG_ANIMATE_ROTATIONS = (1 << 2),
   ENTITY_FLAG_DRAWABLE = (1 << 3),
-  ENTITY_FLAG_COLLISION = (1 << 4),
+  ENTITY_FLAG_WALL_COLLISION = (1 << 4),
   ENTITY_FLAG_DRAW_HEALTH = (1 << 5),
   ENTITY_FLAG_VULNERABLE = (1 << 6),
   ENTITY_FLAG_HARMFUL = (1 << 7),
+  ENTITY_FLAG_NOISY = (1 << 8)
 };
 
 typedef u32 Entity_Class;
@@ -132,20 +133,17 @@ struct Entity {
   Vec3 pos;
   Vec2 dir;
   Vec3 velocity;
-  Vec2 old_dir;
   Vec2 bbox;
   Quat rot;
+  b32 jumping;
 
   // NOTE: Stats
   f32 hp;
   f32 hp_max;
   u64 num_heart_containers;
   f32 mass;
-
   f32 damage;
   f32 knockback;
-  f32 durability;
-  f32 max_durability;
 
   // TODO: Some way to classify what kinds of entities can hold this weapon.
 
@@ -174,10 +172,11 @@ struct Entity {
   f32 scale_mul;
   Vec3 rot_offset;
 
-  // NOTE: Misc
-  Entity_Ref parent;
+  // NOTE: Audio
+  f32 step_sound_progress;
 
-  // NOTE: For Monsters
+  // NOTE: References
+  Entity_Ref parent;
   Entity_Ref target_hero;
 };
 
@@ -210,10 +209,6 @@ function Sprite        get_sprite(Texture_Atlas atlas, String8 key);
 function Atlas_Coords  make_atlas_coords_from_string(String8 coords);
 function Texture_Atlas load_textures(Arena *arena, String8 absolute_path_to_asset_dir, r_create_texture_type r_create_texture);
 function Texture_Atlas load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type r_create_texture);
-function Sound         sound_from_wave(String8 name, Wave_Data raw_sound_data);
-function Sound*        get_playlist_slot(Playlist pl, String8 sound);
-function Sound         find_sound(Playlist pl, String8 sound);
-function Playlist      make_playlist_from_dir(Arena *arena, String8 absolute_path_to_audio);
 
 function Entity_Ref make_ref(Entity *e);
 function Entity*    get_entity(Entity_Ref ref);
@@ -225,9 +220,6 @@ function Vec3 cam_raycast_to_floor(Camera cam, Mat4 vp, Vec2 screen_pos);
 
 function void draw_entity(Entity *e);
 function void draw_string(Texture_Atlas font_atlas, Vec2 pos, f32 scale, String8 string);
-
-function void play_sound(Arena *arena, Sound sound, b32 loop);
-function void run_playlist(Arena *arena, Playlist pl, b32 loop, b32 shuffle);
 
 #endif // !PLATFORM_LAYER
 #endif // ROGUELIKE_H

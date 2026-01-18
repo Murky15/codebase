@@ -31,7 +31,7 @@
   - [X] It looks like the game is most performant with spin count = 0 for barriers?
     Verify this. Also, what is a good spin count for Critical sections?
   - [X] Vector swizzle *macros*: xz(Vec3) -> Vec2
-  - [ ] Conversion routines between strings and wide strings
+  - [ ] Conversion routines between strings and wide strings (Windows platform layer)
 
   - [O] Instead of a simple AABB check for determining the visible range, I should
     instead use a point-in-polygon function to support angles rotated around y-axis.
@@ -41,7 +41,7 @@
     to prevent z-flimmering.
   - [O] Debug wireframe renderer for hitboxes
   - [X] HUD
-  - [ ] Audio
+  - [X] Audio
   - [ ] Lighting & Shadows
   - [X] Mouse Input
   - [X] Old input & new input
@@ -49,6 +49,8 @@
   - [ ] More robust physics system for movement.
     This would make properties like knockback way more interesting
   - [X] BASIC sword animation
+
+  - [ ] CACHE ALL SOUNDS WHEN WE FIND WHICH ONES ARE MOST FREQUENTLY USED!!!
 
   For bosses, instead of a health bar, we can still just use the hearts.
   We should display them at the top-middle portion of the screen but every time you hit the boss it doesn't
@@ -82,7 +84,7 @@
 
 #define PLAYER_MOVE_SPEED 0.15f
 #define PLAYER_JUMP_SPEED 0.25f
-#define MONSTER_MOVE_SPEED PLAYER_MOVE_SPEED/1.2f
+#define MONSTER_MOVE_SPEED 0.10f
 #define GRAVITY 0.001f
 
 #define MAX_ENTITIES 128
@@ -121,7 +123,7 @@ typedef struct Game_State {
   Dungeon *dungeon;
   Camera cam;
   u64 num_entities;
-  Entity entities[MAX_ENTITIES];
+  Entity *entities;
 } Game_State;
 
 // NOTE: Actual useful globals
@@ -500,7 +502,7 @@ draw_string (Texture_Atlas font_atlas, Vec2 pos, f32 scale, String8 string) {
 }
 
 function void
-play_sound (Arena *arena, Sound sound, b32 loop) {
+play_sound (Arena *arena, Sound sound, f32 volume, b32 loop) {
   Sound *sound_slot = gs->first_free_sound;
   if (sound_slot) {
     gs->first_free_sound = sound_slot->next;
@@ -510,6 +512,7 @@ play_sound (Arena *arena, Sound sound, b32 loop) {
   }
   *sound_slot = sound;
   sound_slot->loop = loop;
+  sound_slot->volume = clamp(volume, 0.f, 1.f);
 
   sll_queue_push(gs->sounds_to_play.first, gs->sounds_to_play.last, sound_slot);
   gs->sounds_to_play.count += 1;
@@ -517,7 +520,7 @@ play_sound (Arena *arena, Sound sound, b32 loop) {
 
 // TODO: Add transitions
 function void
-run_playlist (Arena *arena, Playlist pl, b32 loop, b32 shuffle) {
+run_playlist (Arena *arena, Playlist pl, f32 volume, b32 loop, b32 shuffle) {
   gs->active_playlist = pl;
   gs->active_playlist.loop = loop;
   gs->active_playlist.shuffle = shuffle;
@@ -525,7 +528,11 @@ run_playlist (Arena *arena, Playlist pl, b32 loop, b32 shuffle) {
   gs->active_playlist.sounds_played = 0;
   memory_zero(gs->active_playlist.played, sizeof(b32) * gs->active_playlist.count);
 
-  play_sound(arena, pl.sounds[gs->active_sound_idx], false);
+  for each_in_arrayc (s, gs->active_playlist.sounds, gs->active_playlist.count) {
+    s->volume = clamp(volume, 0.f, 1.f);
+  }
+
+  play_sound(arena, pl.sounds[gs->active_sound_idx], volume, false);
 }
 
 function s32
@@ -559,9 +566,8 @@ roguelike_audio_callback (f32 *sample_buffer, u32 samples_to_write) {
       assert (divisor != 0);
       sample_left  = sign_extend(sample_left,  bits_per_sample);
       sample_right = sign_extend(sample_right, bits_per_sample);
-      // TODO: relative audio can be achieved by multiplying this float value by a scalar [0,1]
-      mixed_sample_left  += ((f32)sample_left  / divisor);
-      mixed_sample_right += ((f32)sample_right / divisor);
+      mixed_sample_left  += ((f32)sample_left  / divisor) * sound->volume;
+      mixed_sample_right += ((f32)sample_right / divisor) * sound->volume;
 
       if (sound->local_cursor == buffer_size) {
         if (sound->loop) {
@@ -587,7 +593,7 @@ roguelike_audio_callback (f32 *sample_buffer, u32 samples_to_write) {
             gs->active_playlist.played[gs->active_sound_idx] = true;
             if (++gs->active_playlist.sounds_played == gs->active_playlist.count) {
               if (gs->active_playlist.loop) {
-                run_playlist(gs->perm, gs->active_playlist, true, gs->active_playlist.shuffle);
+                run_playlist(gs->perm, gs->active_playlist, sound->volume, true, gs->active_playlist.shuffle);
               } else {
                 gs->active_playlist = (Playlist){0};
                 gs->active_sound_idx = 0;
@@ -597,7 +603,8 @@ roguelike_audio_callback (f32 *sample_buffer, u32 samples_to_write) {
               u64 new_song_idx = gs->active_playlist.shuffle ? rand_next() % bounds : gs->active_sound_idx + 1;
               for (;gs->active_playlist.played[new_song_idx]; ++new_song_idx);
               gs->active_sound_idx = new_song_idx;
-              play_sound(gs->perm, gs->active_playlist.sounds[gs->active_sound_idx], false);
+              Sound next_sound = gs->active_playlist.sounds[gs->active_sound_idx];
+              play_sound(gs->perm, next_sound, next_sound.volume, false);
             }
           }
 
@@ -619,6 +626,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   os_set_thread_context(*tctx);
   Game_State *new_game_state = arena_pushn(init.perm, Game_State, 1);
   gs = new_game_state;
+  gs->entities = arena_pushn(init.perm, Entity, MAX_ENTITIES);
 
   String8 asset_path = str8_pushf(init.frame, "%.*sArt/Sprites", str8_expand(init.asset_dir));
   String8 font_path = str8_pushf(init.frame, "%.*sArt/Fonts/monogram-bitmap.png", str8_expand(init.asset_dir));
@@ -630,7 +638,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   String8 music_path = str8_pushf(init.frame, "%.*sMusic/Background", str8_expand(init.asset_dir));
   Playlist sound_effects = make_playlist_from_dir(init.perm, sfx_path);
   Playlist bg_music = make_playlist_from_dir(init.perm, music_path);
-  run_playlist(init.perm, bg_music, true, true);
+  run_playlist(init.perm, bg_music, 0.f, true, true);
 
   Dungeon *dungeon = d_create(init.perm, sprites,
     .target_room_count = 500,
@@ -652,8 +660,10 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
     | ENTITY_FLAG_ANIMATE_SPRITES
     | ENTITY_FLAG_ANIMATE_ROTATIONS
     | ENTITY_FLAG_DRAWABLE
-    | ENTITY_FLAG_COLLISION
-    | ENTITY_FLAG_DRAW_HEALTH;
+    | ENTITY_FLAG_WALL_COLLISION
+    | ENTITY_FLAG_DRAW_HEALTH
+    | ENTITY_FLAG_NOISY
+    | ENTITY_FLAG_VULNERABLE;
 
   player.pos = v3(0,1,0);
   while (d_index_tile_from_world(xz(player.pos))->flags == DUNGEON_TILE_EMPTY) {
@@ -665,7 +675,7 @@ roguelike_init (Thread_Context *tctx, Game_Init_Package init) { /* NOTE: Always 
   player.idle = get_sprite(sprites, str8_lit("knight_m_idle_anim"));
   player.idle.seconds_to_complete = 0.5f;
   player.run  = get_sprite(sprites, str8_lit("knight_m_run_anim"));
-  player.run.seconds_to_complete = 0.5f;
+  player.run.seconds_to_complete = 0.3f;
   player.bbox = v2(player.idle.coords[0].scale.x, 6.f);
   player.hp = 75.f;
   player.hp_max = 75.f;
@@ -743,8 +753,9 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       Entity enemy = {0};
       enemy.flags = ENTITY_FLAG_ANIMATE_SPRITES
         | ENTITY_FLAG_ANIMATE_ROTATIONS
-        | ENTITY_FLAG_COLLISION;
-       // | ENTITY_FLAG_DRAWABLE;
+        | ENTITY_FLAG_WALL_COLLISION
+        | ENTITY_FLAG_DRAWABLE
+        | ENTITY_FLAG_HARMFUL;
       enemy.class = ENTITY_CLASS_MONSTER;
       enemy.pos = gs->entities[0].pos;
       enemy.seconds_to_flip = 0.12f;
@@ -756,10 +767,11 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       enemy.bbox.height = gs->dungeon->grid_dim/2.f;
       enemy.scale_mul = 1;
       enemy.rot_offset = v3(enemy.idle.coords[0].scale.width/2.f);
+      enemy.damage = 1.f;
       gs->entities[gs->num_entities++] = enemy;
 
       Entity sword = {0};
-      sword.flags = ENTITY_FLAG_DRAWABLE | ENTITY_FLAG_HARMFUL;
+      sword.flags = ENTITY_FLAG_DRAWABLE | ENTITY_FLAG_HARMFUL | ENTITY_FLAG_NOISY;
       sword.class = ENTITY_CLASS_WEAPON;
       sword.pos = gs->entities[0].pos;
       sword.idle = get_sprite(gs->sprites, str8_lit("weapon_katana"));
@@ -799,8 +811,19 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
     switch (new_state.class) {
       case ENTITY_CLASS_HERO: {
         if (new_state.flags & ENTITY_FLAG_INPUT_SENSITIVE) {
-          if (pressed(jump)) {
-            new_state.velocity.y = PLAYER_JUMP_SPEED;
+          if (almost_equal(new_state.pos.y, 1.f)) {
+            if (new_state.jumping) {
+              new_state.jumping = false;
+              if (new_state.flags & ENTITY_FLAG_NOISY) {
+                play_sound(gs->perm, find_sound(gs->sfx, str8_lit("13_human_jump_land_2")), 1.f, false);
+              }
+            } else if (pressed(jump)) {
+              new_state.jumping = true;
+              new_state.velocity.y = PLAYER_JUMP_SPEED;
+              if (new_state.flags & ENTITY_FLAG_NOISY) {
+                play_sound(gs->perm, find_sound(gs->sfx, str8_lit("12_human_jump_3")), 1.f, false);
+              }
+            }
           }
           new_state.velocity.y = new_state.velocity.y - GRAVITY * dt;
           new_state.pos.y = new_state.pos.y + new_state.velocity.y * dt;
@@ -870,7 +893,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
           if (new_state.slash_phase) {
             f64 clock = os_clock_seconds();
             // TODO: Should this be in the draw entity function?
-            // and can we condense this?
+            // and can this be condensed/abstracted?
             switch (new_state.slash_phase) {
               case ATTACK_PHASE_ANTICIPATION: {
                 f64 rot_amt = cnorm(clock, new_state.started_swing_at, new_state.started_swing_at + new_state.seconds_for_anticipation);
@@ -884,6 +907,9 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
                 if (rot_amt >= 1.f) {
                   new_state.slash_phase = ATTACK_PHASE_ACTION;
                   new_state.started_swing_at = clock;
+                  if (new_state.flags & ENTITY_FLAG_NOISY) {
+                     play_sound(gs->perm, find_sound(gs->sfx, str8_lit("07_human_atk_sword_1")), 1.f, false);
+                  }
                 }
               } break;
 
@@ -924,27 +950,46 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
             new_state.slash_phase = ATTACK_PHASE_ANTICIPATION;
             Vec3 floor_pos = cam_raycast_to_floor(gs->cam, vp, new_input.cursor);
             Vec3 pos_dir = v3norm(v3sub(floor_pos, new_state.pos));
-            new_state.pos.y = pos_offset.y - bob;
+            new_state.pos.y -= bob;
             f32 point_angle = atan2(-pos_dir.z, pos_dir.x);
             f32 half_swing = new_state.swing_angle/2.f;
             f32 start_angle = point_angle - half_swing;
             f32 end_angle = point_angle + half_swing;
-            /*if (point_angle < 0.f) {
-              swap(start_angle, end_angle);
-            }*/
             new_state.start_pos_rot = axis_angle(v3(.y=1), start_angle);
             new_state.end_pos_rot = axis_angle(v3(.y=1), end_angle);
             new_state.start_point_rot = qmul(axis_angle(v3(.y=1), start_angle + M_PI32/2.f), gs->floor_rot);
             new_state.end_point_rot = qmul(axis_angle(v3(.y=1), end_angle + M_PI32/2.f), gs->floor_rot);
             new_state.started_swing_at = os_clock_seconds();
-
-            play_sound(gs->perm, find_sound(gs->sfx, str8_lit("07_human_atk_sword_1")), false);
           }
         }
       } break;
     }
 
-    if (new_state.flags & ENTITY_FLAG_COLLISION) {
+    if (new_state.flags & ENTITY_FLAG_NOISY) {
+      if (v2len(new_state.dir) > 0.f && !new_state.jumping) {
+        new_state.step_sound_progress += dt / 1000.f;
+        if (new_state.step_sound_progress >= new_state.run.seconds_to_complete ||
+              almost_equal(v2len(old_state.dir), 0)) {
+          play_sound(gs->perm, find_sound(gs->sfx, str8_lit("16_human_walk_stone_2")), 1.f, false);
+          new_state.step_sound_progress = 0;
+        }
+      } else {
+        new_state.step_sound_progress = 0;
+      }
+    }
+
+    if (new_state.flags & ENTITY_FLAG_HARMFUL) {
+      for each_in_arrayc (contact, gs->entities, gs->num_entities) {
+        if (contact->flags & ENTITY_FLAG_VULNERABLE &&
+            d_rects_intersect_expanded(xz(new_state.pos), new_state.bbox, xz(contact->pos), contact->bbox, 0, 0)) {
+          os_heat_begin_critical_section();
+          contact->hp -= new_state.damage;
+          os_heat_end_critical_section();
+        }
+      }
+    }
+
+    if (new_state.flags & ENTITY_FLAG_WALL_COLLISION) {
       Vec2 grid_pos = d_world_to_grid(xz(new_state.pos));
       for (s64 y = -1; y <= 1; ++y) {
         for (s64 x = -1; x <= 1; ++x) { // TODO: Must be fixed for larger enemies
@@ -980,7 +1025,6 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
 
     // NOTE: Update Entity state
     *e = new_state;
-    e->old_dir = old_state.dir;
     done_updating[e-gs->entities] = true;
   }
 
