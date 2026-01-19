@@ -2,6 +2,14 @@
 #import "File";
 #import "Json";
 
+#if OS == .WINDOWS {
+  TEST_ROM_PATH :: "W:/code/soniboy/test_roms/cpu_instrs.gb";
+  OPCODE_DESCRIPTOR_PATH :: "W:/code/soniboy/gb_opcodes.json";
+} else #if OS == .LINUX {
+  TEST_ROM_PATH :: "/home/gmb/Workspace/root/code/soniboy/test_roms/cpu_instrs.gb";
+  OPCODE_DESCRIPTOR_PATH :: "/home/gmb/Workspace/root/code/soniboy/gb_opcodes.json";
+}
+
 CPU_Flags :: enum_flags {
   ZERO :: 0x80;
   SUBTRACTION :: 0x40;
@@ -42,24 +50,41 @@ CPU :: struct {
   pc: u16;
 }
 
-Json_Operand :: struct {
+CPU_Operand :: struct {
   name: string;
   immediate: bool;
   bytes: int;
 }
 
-Json_Opcode_Data :: struct {
+CPU_Opcode_Data :: struct {
   mnemonic: string;
   bytes: int;
   cycles: [] int;
-  operands: [..] Json_CPU_Operand;
+  operands: [] CPU_Operand;
   immediate: bool;
-  flags: Json_Value;
+  flags: *JSON_Value;
 }
 
-Json_Opcode :: struct {
+CPU_Opcode_Table :: struct #type_info_no_size_complaint {
+  #insert #run () -> string {
+    #import "String";
+    builder: String_Builder;
+    for 0x0..0xFF {
+      format := FormatInt.{base=16, value=it, minimum_digits=2};
+      hex := sprint("%", format);
+      to_upper_in_place(hex);
+      print_to_builder(*builder, "_0x%: CPU_Opcode_Data; @JsonName(0x%)\n", hex, hex);
+    }
 
+    return builder_to_string(*builder);
+  }();
+  #overlay (_0x00) opcodes: [0x100] CPU_Opcode_Data;
 }
+
+CPU_Instruction_Set :: struct {
+  unprefixed: CPU_Opcode_Table;
+  cbprefixed: CPU_Opcode_Table;
+};
 
 Bit_Reader :: struct {
   buff: u64;
@@ -86,8 +111,11 @@ consume_bits :: (reader: *Bit_Reader, count: int) -> u64 {
 }
 
 main :: () {
-  test_rom, success := read_entire_file("W:/code/soniboy/test_roms/cpu_instrs.gb");
-  assert (success);
+  cpu_load_result, cpu_instrs := json_parse_file(OPCODE_DESCRIPTOR_PATH, CPU_Instruction_Set);
+  assert (cpu_load_result);
+
+  test_rom, rom_load_result := read_entire_file(TEST_ROM_PATH);
+  assert (rom_load_result);
 
   default_format_int := context.print_style.default_format_int;
   defer context.print_style.default_format_int = default_format_int;
@@ -95,15 +123,13 @@ main :: () {
   format_int.base = 16;
 
   // NOTE: Skip over boot ROM straight into cartridge data
-  test_rom.data += 0x0100;
+  rom_reader := Bit_Reader.{cursor = test_rom.data + 0x0100};
 
-  for * test_rom {
-    opcode_reader := Bit_Reader.{cursor = it};
-    /*
-    third  := consume_bits(*opcode_reader, 3);
-    second := consume_bits(*opcode_reader, 3);
-    first  := consume_bits(*opcode_reader, 2);
-    */
-    print("% ", it.*);
+  while rom_reader.cursor - test_rom.data < test_rom.count {
+    opcode := rom_reader.cursor.*;
+    op_data := cpu_instrs.unprefixed.opcodes[opcode];
+    third  := consume_bits(*rom_reader, 3);
+    second := consume_bits(*rom_reader, 3);
+    first  := consume_bits(*rom_reader, 2);
   }
 }
