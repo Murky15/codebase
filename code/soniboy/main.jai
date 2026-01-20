@@ -255,11 +255,11 @@ gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] 
   return unprefixed, cbprefixed;
 }
 
-gb_generate_instruction_vtable :: ($unprefixed: [] GB_Instruction, $cbprefixed: [] GB_Instruction) -> unprefixed: [] gb_instr_proc, prefixed: [] gb_instr_proc {
-  result_unprefixed := NewArray(unprefixed.count, gb_instr_proc);
-  result_cbprefixed := NewArray(cbprefixed.count, gb_instr_proc);
+gb_generate_instruction_vtable :: () -> unprefixed: [] gb_instr_proc, prefixed: [] gb_instr_proc {
+  result_unprefixed := NewArray(gb_unprefixed_instrs.count, gb_instr_proc);
+  result_cbprefixed := NewArray(gb_cbprefixed_instrs.count, gb_instr_proc);
   #insert -> string {
-    prefix_sets := [] GB_Instruction.[unprefixed, cbprefixed];
+    prefix_sets := [] GB_Instruction.[gb_unprefixed_instrs, gb_cbprefixed_instrs];
     builder: String_Builder;
     for prefix: 0..1 {
       for prefix_sets[prefix] {
@@ -323,7 +323,12 @@ gb_generate_instruction_vtable :: ($unprefixed: [] GB_Instruction, $cbprefixed: 
           case .ILLEGAL_FC; #through;
           case .ILLEGAL_FD; print_to_builder(*builder, "gb_instr_nop");
         }
-        print_to_builder(*builder, "(null, %[%]);\n", ifx prefix == 0 then "unprefixed" else "cbprefixed", it_index);
+        instr_set := prefix_sets[prefix];
+        op1 := instr_set[it_index].op1;
+        op2 := instr_set[it_index].op2;
+        op3 := instr_set[it_index].op3;
+        vec_or_u3 := instr_set[it_index].vec_or_u3;
+        print_to_builder(*builder, "(null, .%, .%, .%, %);\n", op1, op2, op3, vec_or_u3);
       }
     }
 
@@ -336,185 +341,185 @@ gb_generate_instruction_vtable :: ($unprefixed: [] GB_Instruction, $cbprefixed: 
 // TODO: Horrible use of compile time, these should only be generated once and stored somewhere.
 gb_instr_proc :: #type (cpu: *GB_CPU);
 gb_unprefixed_instrs, gb_cbprefixed_instrs :: #run gb_load_instruction_data();
-gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl :: #run gb_generate_instruction_vtable(gb_unprefixed_instrs, gb_cbprefixed_instrs);
+gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl :: #run,stallable gb_generate_instruction_vtable();
 
-gb_instr_adc :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
-
-}
-
-gb_instr_add :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_adc :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_and :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_add :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_bit :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_and :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_call :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_bit :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_ccf :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_call :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_cp :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_ccf :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_cpl :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_cp :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_daa :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_cpl :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_dec :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_daa :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_di :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_dec :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_ei :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_di :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_halt :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_ei :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_inc :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_halt :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_jp :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_inc :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_jr :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_jp :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_ld :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_jr :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_ldh :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_ld :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_nop :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_ldh :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_or :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_nop :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_pop :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_or :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_push :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_pop :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_res :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_push :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_ret :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_res :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_reti :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_ret :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rl :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_reti :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rla :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_rl :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rlc :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_rla :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rlca :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_rlc :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rr :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_rlca :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rra :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_rr :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rrc :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_rra :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rrca :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_rrc :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rst :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_rrca :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_sbc :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_rst :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_scf :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_sbc :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_set :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_scf :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_sla :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_set :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_sra :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_sla :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_srl :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_sra :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_stop :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_srl :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_sub :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_stop :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_swap :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_sub :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_xor :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_swap :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_prefix :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+gb_instr_xor :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_prefix :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
@@ -530,6 +535,9 @@ main :: () {
 
   gb_state: GB_State;
   gb_state.base_memory_location = cast(*u8) alloc(0xFFFF);
+  for gb_unprefixed_instr_vtbl {
+    print("%\n", it);
+  }
 
   /* TODO: This needs to be mapped into GB address space
   ROM_START :: 0x0100;
