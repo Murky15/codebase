@@ -129,6 +129,7 @@ GB_Operand :: enum {
   H;
   L;
 
+  AF;
   BC;
   DE;
   HL;
@@ -201,14 +202,14 @@ gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] 
     #overlay (unprefixed) set: [2] Json_Opcode_Table;
   };
 
-  load_result, instrs := json_parse_file(OPCODE_DESCRIPTOR_PATH, Json_Instruction_Set,, temp);
+  load_result, instrs := json_parse_file(OPCODE_DESCRIPTOR_PATH, Json_Instruction_Set);
   assert (load_result);
   unprefixed := NewArray(instrs.unprefixed.opcodes.count, GB_Instruction);
   cbprefixed := NewArray(instrs.cbprefixed.opcodes.count, GB_Instruction);
   instruction_sets := [] GB_Instruction.[unprefixed, cbprefixed];
   for set, set_index: instrs.set {
-    for opcode: set.opcodes {
-      new_instr := *instruction_sets[set_index][it_index];
+    for opcode, opcode_idx: set.opcodes {
+      new_instr := *instruction_sets[set_index][opcode_idx];
       new_instr.size = opcode.bytes;
       m_info := type_info(GB_Mnemonic);
       found_mnemonic := false;
@@ -239,7 +240,7 @@ gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] 
             new_instr.vec_or_u3 = val;
           } else {
             val, success, _ = string_to_int(operand.name);
-            if (success) {
+            if (success && operand.name.count == 1) {
               new_instr.op[operand_idx] = .u3;
               new_instr.vec_or_u3 = val;
             } else {
@@ -254,11 +255,269 @@ gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] 
   return unprefixed, cbprefixed;
 }
 
-/*
-  Here are my options for instructions:
-  A. Give all mnemonics a dedicated function with a uniform signature. Store in Vtable. Easy lookup, worst performance.
-  B. Create tailored mnemonic functions with auto-baked parameters. Must be hardcoded. Painful to write, best performance.
-*/
+gb_generate_instruction_vtable :: ($unprefixed: [] GB_Instruction, $cbprefixed: [] GB_Instruction) -> unprefixed: [] gb_instr_proc, prefixed: [] gb_instr_proc {
+  result_unprefixed := NewArray(unprefixed.count, gb_instr_proc);
+  result_cbprefixed := NewArray(cbprefixed.count, gb_instr_proc);
+  #insert -> string {
+    prefix_sets := [] GB_Instruction.[unprefixed, cbprefixed];
+    builder: String_Builder;
+    for prefix: 0..1 {
+      for prefix_sets[prefix] {
+        print_to_builder(*builder, "%[%] = #procedure_of_call ", ifx prefix == 0 then "result_unprefixed" else "result_cbprefixed", it_index);
+        if #complete it.mnemonic == {
+          case .ADC; print_to_builder(*builder, "gb_instr_adc");
+          case .ADD; print_to_builder(*builder, "gb_instr_add");
+          case .AND; print_to_builder(*builder, "gb_instr_and");
+          case .BIT; print_to_builder(*builder, "gb_instr_bit");
+          case .CALL; print_to_builder(*builder, "gb_instr_call");
+          case .CCF; print_to_builder(*builder, "gb_instr_ccf");
+          case .CP; print_to_builder(*builder, "gb_instr_cp");
+          case .CPL; print_to_builder(*builder, "gb_instr_cpl");
+          case .DAA; print_to_builder(*builder, "gb_instr_daa");
+          case .DEC; print_to_builder(*builder, "gb_instr_dec");
+          case .DI; print_to_builder(*builder, "gb_instr_di");
+          case .EI; print_to_builder(*builder, "gb_instr_ei");
+          case .HALT; print_to_builder(*builder, "gb_instr_halt");
+          case .INC; print_to_builder(*builder, "gb_instr_inc");
+          case .JP; print_to_builder(*builder, "gb_instr_jp");
+          case .JR; print_to_builder(*builder, "gb_instr_jr");
+          case .LD; print_to_builder(*builder, "gb_instr_ld");
+          case .LDH; print_to_builder(*builder, "gb_instr_ldh");
+          case .NOP; print_to_builder(*builder, "gb_instr_nop");
+          case .OR; print_to_builder(*builder, "gb_instr_or");
+          case .POP; print_to_builder(*builder, "gb_instr_pop");
+          case .PUSH; print_to_builder(*builder, "gb_instr_push");
+          case .RES; print_to_builder(*builder, "gb_instr_res");
+          case .RET; print_to_builder(*builder, "gb_instr_ret");
+          case .RETI; print_to_builder(*builder, "gb_instr_reti");
+          case .RL; print_to_builder(*builder, "gb_instr_rl");
+          case .RLA; print_to_builder(*builder, "gb_instr_rla");
+          case .RLC; print_to_builder(*builder, "gb_instr_rlc");
+          case .RLCA; print_to_builder(*builder, "gb_instr_rlca");
+          case .RR; print_to_builder(*builder, "gb_instr_rr");
+          case .RRA; print_to_builder(*builder, "gb_instr_rra");
+          case .RRC; print_to_builder(*builder, "gb_instr_rrc");
+          case .RRCA; print_to_builder(*builder, "gb_instr_rrca");
+          case .RST; print_to_builder(*builder, "gb_instr_rst");
+          case .SBC; print_to_builder(*builder, "gb_instr_sbc");
+          case .SCF; print_to_builder(*builder, "gb_instr_scf");
+          case .SET; print_to_builder(*builder, "gb_instr_set");
+          case .SLA; print_to_builder(*builder, "gb_instr_sla");
+          case .SRA; print_to_builder(*builder, "gb_instr_sra");
+          case .SRL; print_to_builder(*builder, "gb_instr_srl");
+          case .STOP; print_to_builder(*builder, "gb_instr_stop");
+          case .SUB; print_to_builder(*builder, "gb_instr_sub");
+          case .SWAP; print_to_builder(*builder, "gb_instr_swap");
+          case .XOR; print_to_builder(*builder, "gb_instr_xor");
+          case .PREFIX; print_to_builder(*builder, "gb_instr_prefix");
+
+          case .ILLEGAL_D3; #through;
+          case .ILLEGAL_DB; #through;
+          case .ILLEGAL_DD; #through;
+          case .ILLEGAL_E3; #through;
+          case .ILLEGAL_E4; #through;
+          case .ILLEGAL_EB; #through;
+          case .ILLEGAL_EC; #through;
+          case .ILLEGAL_ED; #through;
+          case .ILLEGAL_F4; #through;
+          case .ILLEGAL_FC; #through;
+          case .ILLEGAL_FD; print_to_builder(*builder, "gb_instr_nop");
+        }
+        print_to_builder(*builder, "(null, %[%]);\n", ifx prefix == 0 then "unprefixed" else "cbprefixed", it_index);
+      }
+    }
+
+    return builder_to_string(*builder);
+  }
+
+  return result_unprefixed, result_cbprefixed;
+}
+
+// TODO: Horrible use of compile time, these should only be generated once and stored somewhere.
+gb_instr_proc :: #type (cpu: *GB_CPU);
+gb_unprefixed_instrs, gb_cbprefixed_instrs :: #run gb_load_instruction_data();
+gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl :: #run gb_generate_instruction_vtable(gb_unprefixed_instrs, gb_cbprefixed_instrs);
+
+gb_instr_adc :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_add :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_and :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_bit :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_call :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_ccf :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_cp :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_cpl :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_daa :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_dec :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_di :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_ei :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_halt :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_inc :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_jp :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_jr :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_ld :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_ldh :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_nop :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_or :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_pop :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_push :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_res :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_ret :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_reti :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_rl :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_rla :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_rlc :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_rlca :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_rr :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_rra :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_rrc :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_rrca :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_rst :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_sbc :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_scf :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_set :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_sla :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_sra :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_srl :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_stop :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_sub :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_swap :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_xor :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
+gb_instr_prefix :: (cpu: *GB_CPU, $instr_data: GB_Instruction) {
+
+}
+
 
 main :: () {
   perm_arena: Flat_Pool;
@@ -271,8 +530,8 @@ main :: () {
 
   gb_state: GB_State;
   gb_state.base_memory_location = cast(*u8) alloc(0xFFFF);
-  gb_unprefixed_instrs, gb_cbprefixed_instrs := gb_load_instruction_data();
 
+  /* TODO: This needs to be mapped into GB address space
   ROM_START :: 0x0100;
   test_rom, rom_load_result := read_entire_file(TEST_ROM_PATH);
   assert (rom_load_result);
@@ -282,4 +541,5 @@ main :: () {
 
     //it_index += instr_data.bytes - 1;
   }
+  */
 }
