@@ -25,7 +25,7 @@ GB_CPU :: struct {
     AF: u16;
     struct {
       A: u8;
-      F: u8;
+      F: GB_CPU_Flags;
     }
   }
   union {
@@ -154,17 +154,19 @@ GB_Operand :: enum {
 GB_Instruction :: struct {
   mnemonic: GB_Mnemonic;
   size: int;
+  vec_or_u3: int;
   op1: GB_Operand;
   op2: GB_Operand;
   op3: GB_Operand;
-  vec_or_u3: int;
 
   #overlay (op1) op: [3] GB_Operand;
 }
 
+// NOTE: If we were going to make all of the operand comparisons at compile time anyway,
+// there was really no reason why we had to do all this extra work on the Json.
 gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] GB_Instruction {
   Json_Opcode_Table :: struct #type_info_no_size_complaint {
-    #insert #run () -> string {
+    #insert -> string {
       #import "String";
       builder: String_Builder;
       for 0x0..0xFF {
@@ -175,7 +177,7 @@ gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] 
       }
 
       return builder_to_string(*builder);
-    }();
+    }
     #overlay (_0x00) opcodes: [0x100] Json_Opcode_Data;
 
     Json_Opcode_Data :: struct {
@@ -341,13 +343,13 @@ gb_generate_instruction_vtable :: ($unprefixed: [] GB_Instruction, $cbprefixed: 
 // TODO: Horrible use of compile time, these should only be generated once and stored somewhere.
 gb_unprefixed_instrs, gb_cbprefixed_instrs :: #run gb_load_instruction_data();
 // NOTE: There may be a better way to do this, but so far this is the only setup where the compiler doesn't yell at me.
-gb_instr_proc :: #type (cpu: *GB_CPU);
+gb_instr_proc :: #type (gb: *GB_State);
 gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl :: #run,stallable gb_generate_instruction_vtable(gb_unprefixed_instrs, gb_cbprefixed_instrs);
 
-gb_instr_adc :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_adc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
   #assert op1 == .A;
-  carry := cast(u8) ((cpu.F & xx GB_CPU_Flags.CARRY) == xx GB_CPU_Flags.CARRY);
-  result := cpu.A + carry;
+  carry := ifx (cpu.F & .CARRY) == .CARRY then 1 else 0;
+  result: int = cpu.A + carry;
 
   #if op2 == {
     case .A; result += cpu.A;
@@ -357,185 +359,250 @@ gb_instr_adc :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Oper
     case .E; result += cpu.E;
     case .H; result += cpu.H;
     case .L; result += cpu.L;
-    case .HL;
-    case .n8;
+    case .HL; result += base_memory_location[cpu.HL];
+    case .n8; result += base_memory_location[PC+1];
     case; #assert false "Improper ADC implementation!";
   }
+
+  cpu.F |= ifx result == 0 then .ZERO;
+  cpu.F |= ifx result > 0xFF then .CARRY;
+  cpu.F |= ifx result > 0xF  then .HALF_CARRY;
+  cpu.F &= ~.SUBTRACTION;
+
+  cpu.A = xx result;
 }
 
-gb_instr_add :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
+gb_instr_add :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+  result: int;
+  #if op1 == .A {
+    result = cpu.A;
+    #if op2 == {
+      case .A; result += cpu.A;
+      case .B; result += cpu.B;
+      case .C; result += cpu.C;
+      case .D; result += cpu.D;
+      case .E; result += cpu.E;
+      case .H; result += cpu.H;
+      case .L; result += cpu.L;
+      case .HL; result += base_memory_location[cpu.HL];
+      case .n8; result += base_memory_location[PC+1];
+      case; #assert false "Improper ADD implementation!";
+    }
+    cpu.F |= ifx result == 0 then .ZERO;
+    cpu.F |= ifx result > 0xFF then .CARRY;
+    cpu.F |= ifx result > 0xF  then .HALF_CARRY;
+    cpu.A = xx result;
+  } else #if op1 == .HL {
+    result = cpu.HL;
+    #if op2 == {
+      case .HL; result += cpu.HL;
+      case .BC; result += cpu.BC;
+      case .DE; result += cpu.DE;
+      case .SP; result += cpu.SP;
+      case; #assert false "Improper ADD implementation!";
+    }
+    cpu.F |= ifx result > 0xFFFF then .CARRY;
+    cpu.F |= ifx result > 0xFFF  then .HALF_CARRY;
+    cpu.HL = xx result;
+  } else #if op1 == .SP {
+    #assert op2 == .e8 "Improper ADD implementation!";
+    result = cpu.SP + cast(int) base_memory_location[PC+1];
+    cpu.F |= ifx result > 0xFF then .CARRY;
+    cpu.F |= ifx result > 0xF  then .HALF_CARRY;
+    cpu.F &= ~.ZERO;
+    cpu.SP = xx result;
+  } else #assert false "Improper ADD implementation!";
+  cpu.F &= ~.SUBTRACTION;
 }
 
-gb_instr_and :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_and :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+  #assert op1 == .A;
+  result := cpu.A;
+  #if op2 == {
+    case .A; result &= cpu.A;
+    case .B; result &= cpu.B;
+    case .C; result &= cpu.C;
+    case .D; result &= cpu.D;
+    case .E; result &= cpu.E;
+    case .H; result &= cpu.H;
+    case .L; result &= cpu.L;
+    case .HL; result &= base_memory_location[cpu.HL];
+    case .n8; result &= base_memory_location[PC+1];
+    case; #assert false "Improper ADD implementation!";
+  }
 
+  cpu.F |= ifx result == 0 then .ZERO;
+  cpu.F |= .HALF_CARRY;
+  cpu.F &= ~.SUBTRACTION;
+  cpu.F &= ~.CARRY;
+  cpu.A = result;
 }
 
-gb_instr_bit :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_call :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_ccf :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_cp :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_cpl :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_daa :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_dec :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_di :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_ei :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_halt :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_inc :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_jp :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_jr :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_ld :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_ldh :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_nop :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_or :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
-}
-
-gb_instr_pop :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_bit :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_push :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_call :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_res :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_ccf :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_ret :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_cp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_reti :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_cpl :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rl :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_daa :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rla :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_dec :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rlc :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_di :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rlca :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_ei :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rr :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_halt :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rra :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_inc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rrc :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_jp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rrca :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_jr :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_rst :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_ld :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_sbc :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_ldh :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_scf :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_nop :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_set :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_or :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_sla :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_pop :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_sra :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_push :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_srl :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_res :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_stop :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_ret :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_sub :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_reti :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_swap :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_rl :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_xor :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_rla :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
-gb_instr_prefix :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+gb_instr_rlc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_rlca :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_rr :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_rra :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_rrc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_rrca :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_rst :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_sbc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_scf :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_set :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_sla :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_sra :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_srl :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_stop :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_sub :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_swap :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_xor :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+
+}
+
+gb_instr_prefix :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
 
 }
 
