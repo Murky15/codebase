@@ -13,7 +13,7 @@
   OPCODE_DESCRIPTOR_PATH :: "/home/gmb/Workspace/root/code/soniboy/gb_opcodes.json";
 }
 
-GB_CPU_Flags :: enum_flags {
+GB_CPU_Flags :: enum_flags u8 {
   ZERO :: 0x80;
   SUBTRACTION :: 0x40;
   HALF_CARRY :: 0x20;
@@ -54,7 +54,7 @@ GB_CPU :: struct {
 }
 
 GB_State :: struct {
-  cpu: GB_CPU;
+  using,only(PC) cpu: GB_CPU;
   base_memory_location: *u8;
 }
 
@@ -255,11 +255,11 @@ gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] 
   return unprefixed, cbprefixed;
 }
 
-gb_generate_instruction_vtable :: () -> unprefixed: [] gb_instr_proc, prefixed: [] gb_instr_proc {
-  result_unprefixed := NewArray(gb_unprefixed_instrs.count, gb_instr_proc);
-  result_cbprefixed := NewArray(gb_cbprefixed_instrs.count, gb_instr_proc);
+gb_generate_instruction_vtable :: ($unprefixed: [] GB_Instruction, $cbprefixed: [] GB_Instruction) -> unprefixed: [] gb_instr_proc, prefixed: [] gb_instr_proc {
+  result_unprefixed := NewArray(unprefixed.count, gb_instr_proc);
+  result_cbprefixed := NewArray(cbprefixed.count, gb_instr_proc);
   #insert -> string {
-    prefix_sets := [] GB_Instruction.[gb_unprefixed_instrs, gb_cbprefixed_instrs];
+    prefix_sets := [] GB_Instruction.[unprefixed, cbprefixed];
     builder: String_Builder;
     for prefix: 0..1 {
       for prefix_sets[prefix] {
@@ -339,12 +339,28 @@ gb_generate_instruction_vtable :: () -> unprefixed: [] gb_instr_proc, prefixed: 
 }
 
 // TODO: Horrible use of compile time, these should only be generated once and stored somewhere.
-gb_instr_proc :: #type (cpu: *GB_CPU);
 gb_unprefixed_instrs, gb_cbprefixed_instrs :: #run gb_load_instruction_data();
-gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl :: #run,stallable gb_generate_instruction_vtable();
+// NOTE: There may be a better way to do this, but so far this is the only setup where the compiler doesn't yell at me.
+gb_instr_proc :: #type (cpu: *GB_CPU);
+gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl :: #run,stallable gb_generate_instruction_vtable(gb_unprefixed_instrs, gb_cbprefixed_instrs);
 
 gb_instr_adc :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+  #assert op1 == .A;
+  carry := cast(u8) ((cpu.F & xx GB_CPU_Flags.CARRY) == xx GB_CPU_Flags.CARRY);
+  result := cpu.A + carry;
 
+  #if op2 == {
+    case .A; result += cpu.A;
+    case .B; result += cpu.B;
+    case .C; result += cpu.C;
+    case .D; result += cpu.D;
+    case .E; result += cpu.E;
+    case .H; result += cpu.H;
+    case .L; result += cpu.L;
+    case .HL;
+    case .n8;
+    case; #assert false "Improper ADC implementation!";
+  }
 }
 
 gb_instr_add :: (cpu: *GB_CPU, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
@@ -535,12 +551,8 @@ main :: () {
 
   gb_state: GB_State;
   gb_state.base_memory_location = cast(*u8) alloc(0xFFFF);
-  for gb_unprefixed_instr_vtbl {
-    print("%\n", it);
-  }
 
   /* TODO: This needs to be mapped into GB address space
-  ROM_START :: 0x0100;
   test_rom, rom_load_result := read_entire_file(TEST_ROM_PATH);
   assert (rom_load_result);
   advance(*test_rom, ROM_START);
@@ -550,4 +562,13 @@ main :: () {
     //it_index += instr_data.bytes - 1;
   }
   */
+  ROM_START :: 0x0100;
+  test_rom, rom_load_result := read_entire_file(TEST_ROM_PATH);
+  assert(rom_load_result);
+  memcpy(gb_state.base_memory_location, test_rom.data, test_rom.count);
+
+  run_emulator := true;
+  while run_emulator {
+
+  }
 }
