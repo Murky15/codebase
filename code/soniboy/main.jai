@@ -166,8 +166,6 @@ GB_Instruction :: struct {
   #overlay (op1) op: [3] GB_Operand;
 }
 
-// NOTE: If we were going to make all of the operand comparisons at compile time anyway,
-// there was really no reason why we had to do all this extra work on the Json.
 gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] GB_Instruction {
   Json_Opcode_Table :: struct #type_info_no_size_complaint {
     #insert -> string {
@@ -232,9 +230,9 @@ gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] 
       op_info := type_info(GB_Operand);
       for operand, operand_idx: opcode.operands {
         found_operand := false;
+        assert(operand.immediate, "Unhandled special operand: % with opcode: %\n", operand, opcode_idx);
         for op_info.names {
           if it == operand.name {
-            assert(operand.immediate, "Unhandled special operand: % with opcode: %\n", operand, opcode_idx);
             found_operand = true;
             new_instr.op[operand_idx] = cast(GB_Operand) op_info.values[it_index];
           }
