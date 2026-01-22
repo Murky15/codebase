@@ -134,6 +134,10 @@ GB_Operand :: enum {
   DE;
   HL;
 
+  HLI;
+  HLD;
+  HLIND;
+
   SP;
   PC;
 
@@ -192,6 +196,7 @@ gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] 
         name: string;
         immediate: bool;
         increment: bool;
+        decrement: bool;
         bytes: int;
       }
     }
@@ -229,6 +234,7 @@ gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] 
         found_operand := false;
         for op_info.names {
           if it == operand.name {
+            assert(operand.immediate, "Unhandled special operand: % with opcode: %\n", operand, opcode_idx);
             found_operand = true;
             new_instr.op[operand_idx] = cast(GB_Operand) op_info.values[it_index];
           }
@@ -347,8 +353,8 @@ gb_instr_proc :: #type (gb: *GB_State);
 gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl :: #run,stallable gb_generate_instruction_vtable(gb_unprefixed_instrs, gb_cbprefixed_instrs);
 
 gb_instr_adc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-  #assert op1 == .A;
-  carry := ifx (cpu.F & .CARRY) == .CARRY then 1 else 0;
+  #assert op1 == .A; "Improper ADC implementation!";
+  carry := ifx cast(bool, cpu.F & .CARRY) then 1 else 0;
   result: int = cpu.A + carry;
 
   #if op2 == {
@@ -364,10 +370,10 @@ gb_instr_adc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: 
     case; #assert false "Improper ADC implementation!";
   }
 
+  cpu.F = 0;
   cpu.F |= ifx result == 0 then .ZERO;
   cpu.F |= ifx result > 0xFF then .CARRY;
   cpu.F |= ifx result > 0xF  then .HALF_CARRY;
-  cpu.F &= ~.SUBTRACTION;
 
   cpu.A = xx result;
 }
@@ -388,6 +394,7 @@ gb_instr_add :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: 
       case .n8; result += base_memory_location[PC+1];
       case; #assert false "Improper ADD implementation!";
     }
+    cpu.F = 0;
     cpu.F |= ifx result == 0 then .ZERO;
     cpu.F |= ifx result > 0xFF then .CARRY;
     cpu.F |= ifx result > 0xF  then .HALF_CARRY;
@@ -401,22 +408,23 @@ gb_instr_add :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: 
       case .SP; result += cpu.SP;
       case; #assert false "Improper ADD implementation!";
     }
+    cpu.F &= ~.SUBTRACTION;
     cpu.F |= ifx result > 0xFFFF then .CARRY;
     cpu.F |= ifx result > 0xFFF  then .HALF_CARRY;
     cpu.HL = xx result;
   } else #if op1 == .SP {
     #assert op2 == .e8 "Improper ADD implementation!";
-    result = cpu.SP + cast(int) base_memory_location[PC+1];
+    s := cast(s8) base_memory_location[PC+1];
+    result = cpu.SP + cast(int) s;
+    cpu.F = 0;
     cpu.F |= ifx result > 0xFF then .CARRY;
     cpu.F |= ifx result > 0xF  then .HALF_CARRY;
-    cpu.F &= ~.ZERO;
     cpu.SP = xx result;
   } else #assert false "Improper ADD implementation!";
-  cpu.F &= ~.SUBTRACTION;
 }
 
 gb_instr_and :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-  #assert op1 == .A;
+  #assert op1 == .A; "Improper AND implementation!";
   result := cpu.A;
   #if op2 == {
     case .A; result &= cpu.A;
@@ -428,18 +436,34 @@ gb_instr_and :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: 
     case .L; result &= cpu.L;
     case .HL; result &= base_memory_location[cpu.HL];
     case .n8; result &= base_memory_location[PC+1];
-    case; #assert false "Improper ADD implementation!";
+    case; #assert false "Improper AND implementation!";
   }
 
+  cpu.F = 0;
   cpu.F |= ifx result == 0 then .ZERO;
   cpu.F |= .HALF_CARRY;
-  cpu.F &= ~.SUBTRACTION;
-  cpu.F &= ~.CARRY;
   cpu.A = result;
 }
 
 gb_instr_bit :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+  #assert op1 == .u3; "Improper BIT implementation!";
+  bit_set: bool;
+  #if op2 == {
+    case .A; bit_set = cast(bool, (cpu.A >> vec_or_u3) & 0x1);
+    case .B; bit_set = cast(bool, (cpu.B >> vec_or_u3) & 0x1);
+    case .C; bit_set = cast(bool, (cpu.C >> vec_or_u3) & 0x1);
+    case .D; bit_set = cast(bool, (cpu.D >> vec_or_u3) & 0x1);
+    case .E; bit_set = cast(bool, (cpu.E >> vec_or_u3) & 0x1);
+    case .H; bit_set = cast(bool, (cpu.H >> vec_or_u3) & 0x1);
+    case .L; bit_set = cast(bool, (cpu.L >> vec_or_u3) & 0x1);
+    case .HL; bit_set = cast(bool, (base_memory_location[cpu.HL] >> vec_or_u3) & 0x1);
+    case; #assert false "Improper BIT implementation!";
+  }
 
+  cpu.F &= ~.ZERO;
+  cpu.F &= ~.SUBTRACTION;
+  cpu.F |= ifx !bit_set then .ZERO;
+  cpu.F |= .HALF_CARRY;
 }
 
 gb_instr_call :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
@@ -447,23 +471,80 @@ gb_instr_call :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3:
 }
 
 gb_instr_ccf :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
+  cpu.F &= ~.SUBTRACTION;
+  cpu.F &= ~.HALF_CARRY;
+  cpu.F ^= .CARRY;
 }
 
 gb_instr_cp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+  #assert op1 == .A; "Improper CP implementation!";
+  result: int = cpu.A;
+  val: int;
 
+  #if op2 == {
+    case .A; val = cpu.A;
+    case .B; val = cpu.B;
+    case .C; val = cpu.C;
+    case .D; val = cpu.D;
+    case .E; val = cpu.E;
+    case .H; val = cpu.H;
+    case .L; val = cpu.L;
+    case .HL; val = base_memory_location[cpu.HL];
+    case .n8; val = base_memory_location[PC+1];
+    case; #assert false "Improper CP implementation!";
+  }
+  result -= val;
+
+  cpu.F = 0;
+  cpu.F |= ifx result == 0 then .ZERO;
+  cpu.F |= .SUBTRACTION;
+  cpu.F |= ifx val > cpu.A then .CARRY;
+  cpu.F |= ifx val & 0xF > cpu.A & 0xF then .HALF_CARRY;
 }
 
 gb_instr_cpl :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
-
+  cpu.A = ~cpu.A;
+  cpu.F |= .SUBTRACTION;
+  cpu.F |= .HALF_CARRY;
 }
 
 gb_instr_daa :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+  result: int;
+  if cpu.F & .SUBTRACTION {
+    adjustment: int;
+    adjustment += ifx cpu.F & .HALF_CARRY then 0x6;
+    adjustment += ifx cpu.F & .CARRY then 0x60;
+    result = cpu.A - adjustment;
+  } else {
+    adjustment: int;
+    adjustment += ifx cpu.F & .HALF_CARRY || cpu.A & 0xF > 0x9 then 0x6;
+    adjustment += ifx cpu.F & .CARRY || cpu.A > 0x99 {
+      cpu.F |= .CARRY;
+      0x60;
+    }
+    result = cpu.A + adjustment;
+  }
 
+  cpu.F &= ~.ZERO;
+  cpu.F &= ~.HALF_CARRY;
+  cpu.F |= ifx result == 0 then .ZERO;
+  cpu.A = xx result;
 }
 
 gb_instr_dec :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
+  /*result: int;
+  #if op1 == {
+    case .A; result = cpu.A - 1; cpu.A = xx result;
+    case .B; result = cpu.B - 1; cpu.B = xx result;
+    case .C; result = cpu.C - 1; cpu.C = xx result;
+    case .D; result = cpu.D - 1; cpu.D = xx result;
+    case .E; result = cpu.E - 1; cpu.E = xx result;
+    case .H; result = cpu.H - 1; cpu.H = xx result;
+    case .L; result = cpu.L - 1; cpu.L = xx result;
 
+
+    case; #assert false "Improper DEC implementation!";
+  }*/
 }
 
 gb_instr_di :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $op3: GB_Operand, $vec_or_u3: int) {
