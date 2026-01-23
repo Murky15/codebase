@@ -369,7 +369,7 @@ gb_generate_instruction_vtable :: ($unprefixed: [] GB_Instruction, $cbprefixed: 
   return result_unprefixed, result_cbprefixed;
 }
 
-gb_operand_is_8bit :: ($$op: GB_Operand) -> bool {
+gb_operand_is_8bit :: (op: GB_Operand) -> bool {
   return op < .AF;
 }
 
@@ -599,7 +599,7 @@ gb_instr_ei :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
   // NOTE: I think the best way to handle this would be to check for it in the main fetch/execute loop and
   // handle accordingly, probably with a loop counter.
   cpu.IME = true;
-  log("GB WARN: EI instruction is not correctly implemented!\n");
+  log("GB: EI instruction is not correctly implemented!\n", flags=.WARNING);
 }
 
 gb_instr_halt :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: int) {
@@ -642,16 +642,49 @@ gb_instr_inc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
 }
 
 gb_instr_jp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: int) {
-  address: u16;
-  #if op1 == .n16 || op2 == .n16 {
-    address = base_mem[PC+2] << 8 | base_mem[PC+1];
-  } else #if op1 == .HL {
-    address = cpu.HL;
+  address := #ifx op1 == .a16 || op2 == .a16 {
+    cast(u16, base_mem[PC+2] << 8 | base_mem[PC+1]);
+  } else {
+    cpu.HL;
   }
+
+  carry_set := cast(bool, cpu.F & .CARRY);
+  zero_set := cast(bool, cpu.F & .ZERO);
+  should_jump := true;
+  #if op1 == {
+    case .a16;
+    case .HL;
+
+    case .C;  if !carry_set then should_jump = false;
+    case .NC; if  carry_set then should_jump = false;
+    case .Z;  if !zero_set  then should_jump = false;
+    case .NZ; if  zero_set  then should_jump = false;
+    case; #assert false "Improper JP implementation";
+  }
+
+  if should_jump then PC = address;
 }
 
 gb_instr_jr :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: int) {
+  offset := cast(s8) base_mem[PC+1];
 
+  carry_set := cast(bool, cpu.F & .CARRY);
+  zero_set := cast(bool, cpu.F & .ZERO);
+  should_jump := true;
+  #if op1 == {
+    case .e8;
+
+    case .C;  if !carry_set then should_jump = false;
+    case .NC; if  carry_set then should_jump = false;
+    case .Z;  if !zero_set  then should_jump = false;
+    case .NZ; if  zero_set  then should_jump = false;
+    case; #assert false "Improper JR implementation";
+  }
+
+  if should_jump {
+    new_addr := cast(int, PC + 1) + offset;
+    PC = xx new_addr;
+  }
 }
 
 gb_instr_ld :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: int) {
@@ -803,6 +836,5 @@ main :: () {
 
   run_emulator := true;
   while run_emulator {
-
   }
 }
