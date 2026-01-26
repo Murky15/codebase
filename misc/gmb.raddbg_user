@@ -6,7 +6,7 @@ window:
   size: 2003.199951 1152.000000
   panels:
   {
-    0.656645:
+    0.681927:
     {
       0.80:
       {
@@ -35,49 +35,20 @@ window:
             memory: expression: ""
           }
         }
-        0.75:
+        0.75: getting_started text:
         {
           selected
-          getting_started
-          text:
+          expression: "file:\"W:/code/soniboy/main.jai\".data"
+          auto: 1
+          query:
           {
-            selected
-            expression: "file:\"W:/code/roguelike/dungeon.c\".data"
-            auto: 1
-            query: input: ""
-            cursor_line: 790
-            cursor_column: 1
-            mark_line: 790
-            mark_column: 1
+            input: ""
+            cmd: search
           }
-          text:
-          {
-            expression: "file:\"W:/code/roguelike/roguelike.c\".data"
-            project: "W:/misc/root.raddbg_project"
-            query:
-            {
-              input: ""
-              cmd: search
-            }
-            cursor_line: 551
-            cursor_column: 1
-            mark_line: 551
-            mark_column: 1
-          }
-          text:
-          {
-            expression: "file:\"W:/code/roguelike/platform_win32.cpp\".data"
-            project: "W:/misc/root.raddbg_project"
-            query:
-            {
-              input: ""
-              cmd: search
-            }
-            cursor_line: 539
-            cursor_column: 1
-            mark_line: 539
-            mark_column: 1
-          }
+          cursor_line: 876
+          cursor_column: 20
+          mark_line: 876
+          mark_column: 20
         }
       }
       0.20:
@@ -99,29 +70,31 @@ window:
         }
         0.40:
         {
-          watch: selected expression: "query:call_stack"
+          watch:
+          {
+            expression: "query:call_stack"
+            selected
+          }
           watch: expression: "query:modules"
           tabs_on_bottom
         }
       }
     }
-    0.343355:
+    0.318073:
     {
       0.50:
       {
+        selected
         watch: expression: "query:targets"
         watch:
         {
           selected
           expression: ""
-          watch: sound_effects
-          watch: bg_music
-          watch: sound
-          watch: sample_left
-          watch: sample_right
-          watch: mixed_sample_left
-          watch: mixed_sample_right
-          watch: "gs->sounds_to_play"
+          watch: instr
+          watch: gb_state
+          watch: src
+          watch: "gb.base_mem[gb.cpu.SP-1]"
+          watch: "gb.cpu"
         }
         watch: expression: "query:locals"
       }

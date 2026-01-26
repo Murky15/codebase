@@ -370,7 +370,7 @@ Shift-Ctrl-F8               go_to_previous_build_error_in_side_pane
 theme: handmade-hero
 
 [fonts]
-font:          JetBrainsMonoNL
+font:          JetBrainsMonoNL-Regular
 font_ui:       JetBrainsMonoNL-Italic
 font_ui_bold:  JetBrainsMonoNL-BoldItalic
 font_size:     14

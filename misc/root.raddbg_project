@@ -1,24 +1,14 @@
 // raddbg 0.9.25 project file
 
-recent_file: path: "../code/roguelike/dungeon.c"
-recent_file: path: "../code/roguelike/roguelike.c"
-recent_file: path: "../code/base/memory.c"
-recent_file: path: "../code/roguelike/platform_win32.cpp"
-recent_file: path: "../code/os/win32/entry.c"
-recent_file: path: "../code/file/wav.c"
-target:
-{
-  executable: "../build/roguelike_platform_win32.exe"
-  working_directory: "../build"
-  enabled: 1
-}
+recent_file: path: "../code/soniboy/main.jai"
 debug_info:
 {
-  path: "W:/build/roguelike_platform_win32.pdb"
-  timestamp: 66203876378787
+  path: "W:/code/soniboy/main.pdb"
+  timestamp: 66204913276095
 }
-debug_info:
+breakpoint:
 {
-  path: "W:/build/roguelike_new.pdb"
-  timestamp: 66203876414931
+  source_location: "../code/soniboy/main.jai:876:1"
+  hit_count: 1
+  condition: "gb.cpu.B == 0x13"
 }
