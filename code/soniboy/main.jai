@@ -203,7 +203,7 @@ gb_pun_u8_s8 :: (val: u8) -> s8 #expand {
 }
 
 gb_operand_is_r8 :: (op: GB_Operand) -> bool #expand {
-  return op <= .L;
+  return op >= .A && op <= .L;
 }
 
 gb_operand_is_r16 :: (op: GB_Operand) -> bool #expand {
