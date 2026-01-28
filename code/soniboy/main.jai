@@ -856,9 +856,7 @@ gb_instr_ldh :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   dest.* = src;
 }
 
-gb_instr_nop :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
-
-}
+gb_instr_nop :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {}
 
 gb_instr_or :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
   #assert op1 == .A;
@@ -1281,9 +1279,7 @@ gb_instr_xor :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.F |= ifx cpu.A == 0 then .ZERO;
 }
 
-gb_instr_prefix :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
-
-}
+gb_instr_prefix :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {}
 
 
 main :: () {
