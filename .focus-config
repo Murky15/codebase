@@ -23,6 +23,14 @@ key_binding: F1
 run_command: %RUN_WORKING_DIR%/roguelike_platform_win32.exe
 key_binding: F2
 
+[Build Soniboy]
+error_regex: ^(?P<file>.*):(?P<line>\d+),(?P<col>\d+): (?P<type>Error|Warning|Info|...):* (?P<msg>.*)|^(?P<msg1>.*error LNK.*)
+build_command: jai %BUILD_WORKING_DIR%/code/soniboy/first.jai
+key_binding: F3
+[Run Soniboy]
+run_command: %RUN_WORKING_DIR%/Soniboy
+key_binding: F4
+
 [allow]
 # Files and directories matching the wildcards in this section will be loaded, even if they are ignored in the previous section.
 # NOTE: known binary file extensions are ignored by default (*.exe, *.obj etc.). If this is not what you want, you can explicitly allow them here.

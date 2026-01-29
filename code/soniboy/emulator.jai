@@ -1,37 +1,3 @@
-#import "Basic";
-#import "File";
-#import "Json";
-#import "Flat_Pool";
-#import "Reflection";
-
-/*
-TODO:
-- first.jai
-*/
-
-// TODO: Until we make a proper first.jai
-#if OS == .WINDOWS {
-  TEST_ROM_PATH :: "W:/code/soniboy/test_roms/11-op a,(hl).gb";
-  OPCODE_DESCRIPTOR_PATH :: "W:/code/soniboy/gb_opcodes.json";
-} else #if OS == .LINUX {
-  TEST_ROM_PATH :: "/home/gmb/Workspace/root/code/soniboy/test_roms/01-special.gb";
-  OPCODE_DESCRIPTOR_PATH :: "/home/gmb/Workspace/root/code/soniboy/gb_opcodes.json";
-}
-
-/*  Tests Passed
-  -[X] 01-special
-  -[ ] 02-interrupts
-  -[X] 03-op sp,hl
-  -[X] 04-op r,imm
-  -[X] 05-op rp
-  -[X] 06-ld r,r
-  -[X] 07-jr,jp,call,ret,rst
-  -[X] 08-misc instrs
-  -[X] 09-op r,r
-  -[X] 10-bit ops
-  -[X] 11-op a,(hl)
-*/
-
 GB_CPU_Flags :: enum_flags u8 {
   ZERO :: 0x80;
   SUBTRACTION :: 0x40;
@@ -218,204 +184,6 @@ gb_operand_is_address_or_indirect :: (op: GB_Operand) -> bool #expand {
   return op >= .a8 && op <= .a16IND;
 }
 
-gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] GB_Instruction {
-  Json_Opcode_Table :: struct #type_info_no_size_complaint {
-    #insert -> string {
-      #import "String";
-      builder: String_Builder;
-      for 0x0..0xFF {
-        format := FormatInt.{base=16, value=it, minimum_digits=2};
-        hex := sprint("%", format);
-        to_upper_in_place(hex);
-        print_to_builder(*builder, "_0x%: Json_Opcode_Data; @JsonName(0x%)\n", hex, hex);
-      }
-
-      return builder_to_string(*builder);
-    }
-    #overlay (_0x00) opcodes: [0x100] Json_Opcode_Data;
-
-    Json_Opcode_Data :: struct {
-      mnemonic: string;
-      bytes: int;
-      cycles: [] int;
-      operands: [] Json_Operand;
-      immediate: bool;
-      flags: *JSON_Value;
-
-      Json_Operand :: struct {
-        name: string;
-        immediate: bool;
-        increment: bool;
-        decrement: bool;
-        bytes: int;
-      }
-    }
-  }
-
-  Json_Instruction_Set :: struct {
-    unprefixed: Json_Opcode_Table;
-    cbprefixed: Json_Opcode_Table;
-
-    #overlay (unprefixed) set: [2] Json_Opcode_Table;
-  };
-
-  load_result, instrs := json_parse_file(OPCODE_DESCRIPTOR_PATH, Json_Instruction_Set);
-  assert (load_result);
-  unprefixed := NewArray(instrs.unprefixed.opcodes.count, GB_Instruction);
-  cbprefixed := NewArray(instrs.cbprefixed.opcodes.count, GB_Instruction);
-  instruction_sets := [] GB_Instruction.[unprefixed, cbprefixed];
-  for set, set_index: instrs.set {
-    for opcode, opcode_idx: set.opcodes {
-      new_instr := *instruction_sets[set_index][opcode_idx];
-      new_instr.size = cast(u16) opcode.bytes;
-      m_info := type_info(GB_Mnemonic);
-      found_mnemonic := false;
-      for m_info.names {
-        if it == opcode.mnemonic {
-          found_mnemonic = true;
-          new_instr.mnemonic = cast(GB_Mnemonic) m_info.values[it_index];
-        }
-      }
-      if !found_mnemonic {
-        assert(false, "Unrecognized instruction mnemonic: %", opcode.mnemonic);
-      }
-      op_info := type_info(GB_Operand);
-
-      if opcode.operands.count > 2 {
-        assert(new_instr.mnemonic == .LD); // There should only be one...
-        new_instr.op1 = .HL;
-        new_instr.op2 = .SP_e8;
-        continue;
-      }
-
-      for * operand, operand_idx: opcode.operands {
-        found_operand := false;
-        special_operand := false;
-        if operand.increment {
-          operand.name = sprint("%%", operand.name, "I");
-          special_operand = true;
-        } else if operand.decrement {
-          operand.name = sprint("%%", operand.name, "D");
-          special_operand = true;
-        } else if !operand.immediate {
-          operand.name = sprint("%%", operand.name, "IND");
-          special_operand = true;
-        }
-        for op_info.names {
-          if it == operand.name {
-            found_operand = true;
-            new_instr.op[operand_idx] = cast(GB_Operand) op_info.values[it_index];
-          }
-        }
-        if !found_operand && special_operand then assert(false, "Unrecognized instruction operand: %", operand.name);
-        if !found_operand {
-          // NOTE: We are probably dealing with an RST vector (0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x30, and 0x38),
-          // or an unsigned 3-bit integer (u3).
-          val, success, _ := string_to_int(advance(operand.name, 1), 16);
-          if (success) {
-            assert(operand.immediate, "Unhandled special operand: % with opcode: %\n", operand.*, opcode_idx);
-            new_instr.op[operand_idx] = .VEC;
-            new_instr.vec_or_u3 = cast(u8) val;
-          } else {
-            val, success, _ = string_to_int(operand.name);
-            if (success && operand.name.count == 1) {
-              new_instr.op[operand_idx] = .u3;
-              new_instr.vec_or_u3 = cast(u8) val;
-            } else {
-              assert(false, "Unrecognized instruction operand: %", operand.name);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return unprefixed, cbprefixed;
-}
-
-gb_generate_instruction_vtable :: ($unprefixed: [] GB_Instruction, $cbprefixed: [] GB_Instruction) -> unprefixed: [] gb_instr_proc, prefixed: [] gb_instr_proc {
-  result_unprefixed := NewArray(unprefixed.count, gb_instr_proc);
-  result_cbprefixed := NewArray(cbprefixed.count, gb_instr_proc);
-  #insert -> string {
-    prefix_sets := [] GB_Instruction.[unprefixed, cbprefixed];
-    builder: String_Builder;
-    for prefix: 0..1 {
-      for prefix_sets[prefix] {
-        print_to_builder(*builder, "%[%] = #procedure_of_call ", ifx prefix == 0 then "result_unprefixed" else "result_cbprefixed", it_index);
-        if #complete it.mnemonic == {
-          case .ADC; print_to_builder(*builder, "gb_instr_adc");
-          case .ADD; print_to_builder(*builder, "gb_instr_add");
-          case .AND; print_to_builder(*builder, "gb_instr_and");
-          case .BIT; print_to_builder(*builder, "gb_instr_bit");
-          case .CALL; print_to_builder(*builder, "gb_instr_call");
-          case .CCF; print_to_builder(*builder, "gb_instr_ccf");
-          case .CP; print_to_builder(*builder, "gb_instr_cp");
-          case .CPL; print_to_builder(*builder, "gb_instr_cpl");
-          case .DAA; print_to_builder(*builder, "gb_instr_daa");
-          case .DEC; print_to_builder(*builder, "gb_instr_dec");
-          case .DI; print_to_builder(*builder, "gb_instr_di");
-          case .EI; print_to_builder(*builder, "gb_instr_ei");
-          case .HALT; print_to_builder(*builder, "gb_instr_halt");
-          case .INC; print_to_builder(*builder, "gb_instr_inc");
-          case .JP; print_to_builder(*builder, "gb_instr_jp");
-          case .JR; print_to_builder(*builder, "gb_instr_jr");
-          case .LD; print_to_builder(*builder, "gb_instr_ld");
-          case .LDH; print_to_builder(*builder, "gb_instr_ldh");
-          case .NOP; print_to_builder(*builder, "gb_instr_nop");
-          case .OR; print_to_builder(*builder, "gb_instr_or");
-          case .POP; print_to_builder(*builder, "gb_instr_pop");
-          case .PUSH; print_to_builder(*builder, "gb_instr_push");
-          case .RES; print_to_builder(*builder, "gb_instr_res");
-          case .RET; print_to_builder(*builder, "gb_instr_ret");
-          case .RETI; print_to_builder(*builder, "gb_instr_reti");
-          case .RL; print_to_builder(*builder, "gb_instr_rl");
-          case .RLA; print_to_builder(*builder, "gb_instr_rla");
-          case .RLC; print_to_builder(*builder, "gb_instr_rlc");
-          case .RLCA; print_to_builder(*builder, "gb_instr_rlca");
-          case .RR; print_to_builder(*builder, "gb_instr_rr");
-          case .RRA; print_to_builder(*builder, "gb_instr_rra");
-          case .RRC; print_to_builder(*builder, "gb_instr_rrc");
-          case .RRCA; print_to_builder(*builder, "gb_instr_rrca");
-          case .RST; print_to_builder(*builder, "gb_instr_rst");
-          case .SBC; print_to_builder(*builder, "gb_instr_sbc");
-          case .SCF; print_to_builder(*builder, "gb_instr_scf");
-          case .SET; print_to_builder(*builder, "gb_instr_set");
-          case .SLA; print_to_builder(*builder, "gb_instr_sla");
-          case .SRA; print_to_builder(*builder, "gb_instr_sra");
-          case .SRL; print_to_builder(*builder, "gb_instr_srl");
-          case .STOP; print_to_builder(*builder, "gb_instr_stop");
-          case .SUB; print_to_builder(*builder, "gb_instr_sub");
-          case .SWAP; print_to_builder(*builder, "gb_instr_swap");
-          case .XOR; print_to_builder(*builder, "gb_instr_xor");
-          case .PREFIX; print_to_builder(*builder, "gb_instr_prefix");
-
-          case .ILLEGAL_D3; #through;
-          case .ILLEGAL_DB; #through;
-          case .ILLEGAL_DD; #through;
-          case .ILLEGAL_E3; #through;
-          case .ILLEGAL_E4; #through;
-          case .ILLEGAL_EB; #through;
-          case .ILLEGAL_EC; #through;
-          case .ILLEGAL_ED; #through;
-          case .ILLEGAL_F4; #through;
-          case .ILLEGAL_FC; #through;
-          case .ILLEGAL_FD; print_to_builder(*builder, "gb_instr_nop");
-        }
-        instr_set := prefix_sets[prefix];
-        op1 := instr_set[it_index].op1;
-        op2 := instr_set[it_index].op2;
-        vec_or_u3 := instr_set[it_index].vec_or_u3;
-        print_to_builder(*builder, "(null, .%, .%, %);\n", op1, op2, vec_or_u3);
-      }
-    }
-
-    return builder_to_string(*builder);
-  }
-
-  return result_unprefixed, result_cbprefixed;
-}
-
-// NOTE: There may be a better way to do this, but so far this is the only setup where the compiler doesn't yell at me.
 gb_instr_proc :: #type (gb: *GB_State);
 
 gb_instr_adc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
@@ -1281,71 +1049,34 @@ gb_instr_xor :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
 
 gb_instr_prefix :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {}
 
+gb_step :: (using gb_state: *GB_State, gb_unprefixed_instrs: [] GB_Instruction, gb_cbprefixed_instrs: [] GB_Instruction, gb_unprefixed_instr_vtbl: [] gb_instr_proc, gb_cbprefixed_instr_vtbl: [] gb_instr_proc) {
 
-main :: () {
-  perm_arena: Flat_Pool;
-  context.allocator.proc = flat_pool_allocator_proc;
-  context.allocator.data = *perm_arena;
-  default_format_int := context.print_style.default_format_int;
-  defer context.print_style.default_format_int = default_format_int;
-  format_int := *context.print_style.default_format_int;
-  format_int.base = 16;
-  format_int.minimum_digits = 2;
+  GB_DOCTOR_LOG :: false;
+  #if GB_DOCTOR_LOG {
+    log("A:% F:% B:% C:% D:% E:% H:% L:% SP:% PC:% PCMEM:%,%,%,%",
+      cpu.A, cast(u8) cpu.F, cpu.B, cpu.C, cpu.D, cpu.E, cpu.H, cpu.L,
+      FormatInt.{value=cpu.SP, minimum_digits=4, base=16}, FormatInt.{value=cpu.PC, minimum_digits=4, base=16},
+      base_mem[cpu.PC], base_mem[cpu.PC+1], base_mem[cpu.PC+2], base_mem[cpu.PC+3]);
+  }
 
-  // TODO: Horrible use of compile time, these should only be generated once and stored somewhere.
-  gb_unprefixed_instrs, gb_cbprefixed_instrs :: #run gb_load_instruction_data();
-  gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl := gb_generate_instruction_vtable(gb_unprefixed_instrs, gb_cbprefixed_instrs);
-  gb_state: GB_State;
-  gb_state.base_mem = cast(*u8) alloc(0xFFFF);
-  assert (gb_state.base_mem != null);
+  opcode := base_mem[cpu.PC];
+  cpu.PC += 1;
 
-  test_rom, rom_load_result := read_entire_file(TEST_ROM_PATH);
-  assert(rom_load_result);
-  memcpy(gb_state.base_mem, test_rom.data, test_rom.count);
-  gb_state.base_mem[0xFF44] = 0x90;
-  gb_state.cpu.A = 0x01;
-  gb_state.cpu.F = 0xB0;
-  gb_state.cpu.B = 0x00;
-  gb_state.cpu.C = 0x13;
-  gb_state.cpu.D = 0x00;
-  gb_state.cpu.E = 0xD8;
-  gb_state.cpu.H = 0x01;
-  gb_state.cpu.L = 0x4D;
-  gb_state.cpu.SP = 0xFFFE;
-  gb_state.cpu.PC = 0x0100;
+  instr := gb_unprefixed_instrs[opcode];
+  //if instr.mnemonic == .STOP then return;
+  gb_instr := gb_unprefixed_instr_vtbl[opcode];
 
-  while true {
-    reset_temporary_storage();
-
-    using gb_state;
-
-    GB_DOCTOR_LOG :: false;
-    #if GB_DOCTOR_LOG {
-      log("A:% F:% B:% C:% D:% E:% H:% L:% SP:% PC:% PCMEM:%,%,%,%",
-        cpu.A, cast(u8) cpu.F, cpu.B, cpu.C, cpu.D, cpu.E, cpu.H, cpu.L,
-        FormatInt.{value=cpu.SP, minimum_digits=4, base=16}, FormatInt.{value=cpu.PC, minimum_digits=4, base=16},
-        base_mem[cpu.PC], base_mem[cpu.PC+1], base_mem[cpu.PC+2], base_mem[cpu.PC+3]);
-    }
-
-    opcode := base_mem[cpu.PC];
+  if instr.mnemonic == .PREFIX {
+    opcode = base_mem[cpu.PC];
     cpu.PC += 1;
+    instr = gb_cbprefixed_instrs[opcode];
+    gb_instr = gb_cbprefixed_instr_vtbl[opcode];
+  }
 
-    instr := gb_unprefixed_instrs[opcode];
-    if instr.mnemonic == .STOP then break;
-    gb_instr := gb_unprefixed_instr_vtbl[opcode];
-
-    if instr.mnemonic == .PREFIX {
-      opcode = base_mem[cpu.PC];
-      cpu.PC += 1;
-      instr = gb_cbprefixed_instrs[opcode];
-      gb_instr = gb_cbprefixed_instr_vtbl[opcode];
-    }
-
-    gb_instr(*gb_state);
-    if base_mem[0xFF02] == 0x81 {
-      out_char := base_mem[0xFF01];
-      #if !GB_DOCTOR_LOG then print("%", to_string(*out_char,1));
-      base_mem[0xFF02] = 0x00;
-    }
+  gb_instr(gb_state);
+  if base_mem[0xFF02] == 0x81 {
+    out_char := base_mem[0xFF01];
+    #if !GB_DOCTOR_LOG then print("%", to_string(*out_char,1));
+    base_mem[0xFF02] = 0x00;
   }
 }
