@@ -50,6 +50,9 @@ GB_CPU :: struct {
 GB_State :: struct {
   cpu: GB_CPU;
   base_mem: *u8;
+
+  gb_unprefixed_instrs, gb_cbprefixed_instrs: [] GB_Instruction;
+  gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl: [] gb_instr_proc;
 }
 
 GB_Instruction :: struct {
@@ -1057,10 +1060,40 @@ gb_instr_xor :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
 
 gb_instr_prefix :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {}
 
-gb_step :: (using gb_state: *GB_State,
-            gb_unprefixed_instrs: [] GB_Instruction, gb_cbprefixed_instrs: [] GB_Instruction,
-            gb_unprefixed_instr_vtbl: [] gb_instr_proc, gb_cbprefixed_instr_vtbl: [] gb_instr_proc) {
+gb_init :: () -> GB_State {
+  gb_state: GB_State;
 
+  // TODO: These should only be generated once and stored somewhere.
+  gb_unprefixed_instrs, gb_cbprefixed_instrs := gb_load_instruction_data();
+  gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl := gb_generate_instruction_vtable();
+  gb_state.gb_unprefixed_instrs = gb_unprefixed_instrs;
+  gb_state.gb_cbprefixed_instrs = gb_cbprefixed_instrs;
+  gb_state.gb_unprefixed_instr_vtbl = gb_unprefixed_instr_vtbl;
+  gb_state.gb_cbprefixed_instr_vtbl = gb_cbprefixed_instr_vtbl;
+
+  gb_state.base_mem = cast(*u8) alloc(0xFFFF);
+  assert (gb_state.base_mem != null);
+
+  test_rom, rom_load_result := read_entire_file(TEST_ROM_PATH,, temp);
+  assert(rom_load_result);
+  memcpy(gb_state.base_mem, test_rom.data, test_rom.count);
+
+  gb_state.base_mem[0xFF44] = 0x90;
+  gb_state.cpu.A = 0x01;
+  gb_state.cpu.F = 0xB0;
+  gb_state.cpu.B = 0x00;
+  gb_state.cpu.C = 0x13;
+  gb_state.cpu.D = 0x00;
+  gb_state.cpu.E = 0xD8;
+  gb_state.cpu.H = 0x01;
+  gb_state.cpu.L = 0x4D;
+  gb_state.cpu.SP = 0xFFFE;
+  gb_state.cpu.PC = 0x0100;
+
+  return gb_state;
+}
+
+gb_step :: (using gb_state: *GB_State) {
   #if GB_DOCTOR_LOG {
     log("A:% F:% B:% C:% D:% E:% H:% L:% SP:% PC:% PCMEM:%,%,%,%",
       cpu.A, cast(u8) cpu.F, cpu.B, cpu.C, cpu.D, cpu.E, cpu.H, cpu.L,
@@ -1082,7 +1115,7 @@ gb_step :: (using gb_state: *GB_State,
   }
   gb_instr(gb_state);
 
-  
+
 
   if base_mem[0xFF02] == 0x81 {
     out_char := base_mem[0xFF01];

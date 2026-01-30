@@ -283,11 +283,12 @@ gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] 
 
     #overlay (unprefixed) set: [2] Json_Opcode_Table;
   };
+  unprefixed := NewArray(256, GB_Instruction);
+  cbprefixed := NewArray(256, GB_Instruction);
+  push_allocator(temp);
 
   load_result, instrs := json_parse_file(OPCODE_DESCRIPTOR_PATH, Json_Instruction_Set);
   assert (load_result);
-  unprefixed := NewArray(instrs.unprefixed.opcodes.count, GB_Instruction);
-  cbprefixed := NewArray(instrs.cbprefixed.opcodes.count, GB_Instruction);
   instruction_sets := [] GB_Instruction.[unprefixed, cbprefixed];
   for set, set_index: instrs.set {
     for opcode, opcode_idx: set.opcodes {

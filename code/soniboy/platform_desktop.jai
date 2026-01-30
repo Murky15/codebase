@@ -21,10 +21,9 @@ Bitmap :: struct {
   platform_data: *void;
 }
 
-desktop_create_framebuffer :: (width: int, height: int) -> Bitmap {
+desktop_create_framebuffer :: (window: Desktop.Window_Type, width: int, height: int) -> Bitmap {
   result: Bitmap;
   #if OS == .WINDOWS {
-    #import "Windows";
     dib_info := New(BITMAPINFO);
     dib_info.bmiHeader.biSize = size_of(BITMAPINFOHEADER);
     dib_info.bmiHeader.biWidth = xx width;
@@ -33,6 +32,8 @@ desktop_create_framebuffer :: (width: int, height: int) -> Bitmap {
     dib_info.bmiHeader.biBitCount = 32;
     dib_info.bmiHeader.biCompression = BI_RGB;
     result.platform_data = dib_info;
+  } else #if OS == .LINUX {
+    ximage := New(XImage);
   }
   result.width = width;
   result.height = height;
@@ -77,6 +78,7 @@ GB_RESOLUTION_H :: 144;
 GB_RESOLUTION_WINDOW_SCALE :: 4;
 
 main :: () {
+  // TODO: Where is the best place to put this?
   perm_arena: Flat_Pool;
   context.allocator.proc = flat_pool_allocator_proc;
   context.allocator.data = *perm_arena;
@@ -84,31 +86,11 @@ main :: () {
   format_int.base = 16;
   format_int.minimum_digits = 2;
 
-  // TODO: Horrible use of compile time, these should only be generated once and stored somewhere.
-  gb_unprefixed_instrs, gb_cbprefixed_instrs := gb_load_instruction_data();
-  gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl := gb_generate_instruction_vtable();
-  gb_state: GB_State;
-  gb_state.base_mem = cast(*u8) alloc(0xFFFF);
-  assert (gb_state.base_mem != null);
-
-  test_rom, rom_load_result := read_entire_file(TEST_ROM_PATH);
-  assert(rom_load_result);
-  memcpy(gb_state.base_mem, test_rom.data, test_rom.count);
-  gb_state.base_mem[0xFF44] = 0x90;
-  gb_state.cpu.A = 0x01;
-  gb_state.cpu.F = 0xB0;
-  gb_state.cpu.B = 0x00;
-  gb_state.cpu.C = 0x13;
-  gb_state.cpu.D = 0x00;
-  gb_state.cpu.E = 0xD8;
-  gb_state.cpu.H = 0x01;
-  gb_state.cpu.L = 0x4D;
-  gb_state.cpu.SP = 0xFFFE;
-  gb_state.cpu.PC = 0x0100;
-
   main_window := Desktop.create_window(GB_RESOLUTION_W * GB_RESOLUTION_WINDOW_SCALE, GB_RESOLUTION_H * GB_RESOLUTION_WINDOW_SCALE, "Soniboy");
   _, _, window_width, window_height := Desktop.get_dimensions(main_window, true);
-  frame_buffer := desktop_create_framebuffer(GB_RESOLUTION_W, GB_RESOLUTION_H);
+  frame_buffer := desktop_create_framebuffer(main_window, GB_RESOLUTION_W, GB_RESOLUTION_H);
+
+  gb_state := gb_init();
 
   should_run := true;
   while should_run {
@@ -119,7 +101,7 @@ main :: () {
       if it.type == .QUIT then should_run = false;
     }
 
-    gb_step(*gb_state, gb_unprefixed_instrs, gb_cbprefixed_instrs, gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl);
+    gb_step(*gb_state);
 
     x_grad: u8;
     y_grad: u8;
@@ -142,3 +124,8 @@ main :: () {
 #import "Flat_Pool";
 Desktop :: #import "Window_Creation";
 Input   :: #import "Input";
+
+#if OS == .WINDOWS
+  #import "Windows";
+else #if OS == .LINUX
+  #import "X11";
