@@ -358,9 +358,9 @@ gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] 
   return unprefixed, cbprefixed;
 }
 
-gb_generate_instruction_vtable :: ($unprefixed: [] GB_Instruction, $cbprefixed: [] GB_Instruction) -> unprefixed: [] gb_instr_proc, prefixed: [] gb_instr_proc {
-  result_unprefixed := NewArray(unprefixed.count, gb_instr_proc);
-  result_cbprefixed := NewArray(cbprefixed.count, gb_instr_proc);
+gb_generate_instruction_vtable :: () -> unprefixed: [] gb_instr_proc, prefixed: [] gb_instr_proc {
+  result_unprefixed := NewArray(256, gb_instr_proc);
+  result_cbprefixed := NewArray(256, gb_instr_proc);
   result_unprefixed[0] = #procedure_of_call gb_instr_nop(null, .NONE, .NONE, 0);
   result_unprefixed[1] = #procedure_of_call gb_instr_ld(null, .BC, .n16, 0);
   result_unprefixed[2] = #procedure_of_call gb_instr_ld(null, .BCIND, .A, 0);

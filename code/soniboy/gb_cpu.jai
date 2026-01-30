@@ -1,8 +1,16 @@
 GB_CPU_Flags :: enum_flags u8 {
-  ZERO :: 0x80;
+  ZERO        :: 0x80;
   SUBTRACTION :: 0x40;
-  HALF_CARRY :: 0x20;
-  CARRY :: 0x10;
+  HALF_CARRY  :: 0x20;
+  CARRY       :: 0x10;
+}
+
+GB_Interrupt :: enum_flags u8 {
+  VBLANK :: 0x01;
+  LCD    :: 0x02;
+  TIMER  :: 0x04;
+  SERIAL :: 0x08;
+  JOYPAD :: 0x10;
 }
 
 GB_CPU :: struct {
@@ -1049,9 +1057,10 @@ gb_instr_xor :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
 
 gb_instr_prefix :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {}
 
-gb_step :: (using gb_state: *GB_State, gb_unprefixed_instrs: [] GB_Instruction, gb_cbprefixed_instrs: [] GB_Instruction, gb_unprefixed_instr_vtbl: [] gb_instr_proc, gb_cbprefixed_instr_vtbl: [] gb_instr_proc) {
+gb_step :: (using gb_state: *GB_State,
+            gb_unprefixed_instrs: [] GB_Instruction, gb_cbprefixed_instrs: [] GB_Instruction,
+            gb_unprefixed_instr_vtbl: [] gb_instr_proc, gb_cbprefixed_instr_vtbl: [] gb_instr_proc) {
 
-  GB_DOCTOR_LOG :: false;
   #if GB_DOCTOR_LOG {
     log("A:% F:% B:% C:% D:% E:% H:% L:% SP:% PC:% PCMEM:%,%,%,%",
       cpu.A, cast(u8) cpu.F, cpu.B, cpu.C, cpu.D, cpu.E, cpu.H, cpu.L,
@@ -1063,7 +1072,6 @@ gb_step :: (using gb_state: *GB_State, gb_unprefixed_instrs: [] GB_Instruction, 
   cpu.PC += 1;
 
   instr := gb_unprefixed_instrs[opcode];
-  //if instr.mnemonic == .STOP then return;
   gb_instr := gb_unprefixed_instr_vtbl[opcode];
 
   if instr.mnemonic == .PREFIX {
@@ -1072,8 +1080,10 @@ gb_step :: (using gb_state: *GB_State, gb_unprefixed_instrs: [] GB_Instruction, 
     instr = gb_cbprefixed_instrs[opcode];
     gb_instr = gb_cbprefixed_instr_vtbl[opcode];
   }
-
   gb_instr(gb_state);
+
+  
+
   if base_mem[0xFF02] == 0x81 {
     out_char := base_mem[0xFF01];
     #if !GB_DOCTOR_LOG then print("%", to_string(*out_char,1));

@@ -13,10 +13,68 @@
 */
 
 #load "gb_instr_meta.jai";
-#load "emulator.jai";
+#load "gb_cpu.jai";
+
+Bitmap :: struct {
+  width, height: int;
+  pixels: *u32;
+  platform_data: *void;
+}
+
+desktop_create_framebuffer :: (width: int, height: int) -> Bitmap {
+  result: Bitmap;
+  #if OS == .WINDOWS {
+    #import "Windows";
+    dib_info := New(BITMAPINFO);
+    dib_info.bmiHeader.biSize = size_of(BITMAPINFOHEADER);
+    dib_info.bmiHeader.biWidth = xx width;
+    dib_info.bmiHeader.biHeight = xx height;
+    dib_info.bmiHeader.biPlanes = 1;
+    dib_info.bmiHeader.biBitCount = 32;
+    dib_info.bmiHeader.biCompression = BI_RGB;
+    result.platform_data = dib_info;
+  }
+  result.width = width;
+  result.height = height;
+  result.pixels = alloc(width * height * size_of(u32));
+
+  return result;
+}
+
+desktop_blt_buffer :: (window: Desktop.Window_Type, bitmap: Bitmap, window_width: int, window_height: int) {
+  #if OS == .WINDOWS {
+    dib_info := cast(*BITMAPINFO) bitmap.platform_data;
+    client_dc := GetDC(window);
+    gdi :: #library,system "Gdi32";
+    StretchDIBits :: (
+      hdc: HDC,
+      xDest: s32, yDest: s32,
+      DestWidth: s32, DestHeight: s32,
+      xSrc: s32, ySrc: s32,
+      SrcWidth: s32, SrcHeight: s32,
+      lpBits: *void, lpbmi: *BITMAPINFO,
+      iUsage: u32, rop: ROP) -> s32 #foreign gdi;
+
+    StretchDIBits(
+      client_dc,
+      0, 0,
+      xx window_width,
+      xx window_height,
+      0, 0,
+      xx bitmap.width,
+      xx bitmap.height,
+      bitmap.pixels,
+      dib_info,
+      DIB_RGB_COLORS,
+      .SRCCOPY
+    );
+    ReleaseDC(window, client_dc);
+  }
+}
 
 GB_RESOLUTION_W :: 160;
 GB_RESOLUTION_H :: 144;
+GB_RESOLUTION_WINDOW_SCALE :: 4;
 
 main :: () {
   perm_arena: Flat_Pool;
@@ -27,8 +85,8 @@ main :: () {
   format_int.minimum_digits = 2;
 
   // TODO: Horrible use of compile time, these should only be generated once and stored somewhere.
-  gb_unprefixed_instrs, gb_cbprefixed_instrs :: #run gb_load_instruction_data();
-  gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl := gb_generate_instruction_vtable(gb_unprefixed_instrs, gb_cbprefixed_instrs);
+  gb_unprefixed_instrs, gb_cbprefixed_instrs := gb_load_instruction_data();
+  gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl := gb_generate_instruction_vtable();
   gb_state: GB_State;
   gb_state.base_mem = cast(*u8) alloc(0xFFFF);
   assert (gb_state.base_mem != null);
@@ -48,7 +106,9 @@ main :: () {
   gb_state.cpu.SP = 0xFFFE;
   gb_state.cpu.PC = 0x0100;
 
-  main_window := Desktop.create_window(GB_RESOLUTION_W * 4, GB_RESOLUTION_H * 4, "Soniboy");
+  main_window := Desktop.create_window(GB_RESOLUTION_W * GB_RESOLUTION_WINDOW_SCALE, GB_RESOLUTION_H * GB_RESOLUTION_WINDOW_SCALE, "Soniboy");
+  _, _, window_width, window_height := Desktop.get_dimensions(main_window, true);
+  frame_buffer := desktop_create_framebuffer(GB_RESOLUTION_W, GB_RESOLUTION_H);
 
   should_run := true;
   while should_run {
@@ -60,6 +120,19 @@ main :: () {
     }
 
     gb_step(*gb_state, gb_unprefixed_instrs, gb_cbprefixed_instrs, gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl);
+
+    x_grad: u8;
+    y_grad: u8;
+    for y: 0..frame_buffer.height-1 {
+      x_grad = 0;
+      for x: 0..frame_buffer.width-1 {
+        // 0xAARRGGBB
+        frame_buffer.pixels[y * frame_buffer.width + x] = (cast(u32, y_grad) << 16) | (cast(u32, x_grad) << 8);
+        x_grad += 1;
+      }
+      y_grad += 1;
+    }
+    desktop_blt_buffer(main_window, frame_buffer, window_width, window_height);
   }
 }
 
