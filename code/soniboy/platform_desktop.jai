@@ -21,8 +21,18 @@ Bitmap :: struct {
   platform_data: *void;
 }
 
+#if OS == .LINUX {
+  X11_Blt_State :: struct {
+    fb: [2] XImage;
+    gc: GC;
+  }
+}
+
 desktop_create_framebuffer :: (window: Desktop.Window_Type, width: int, height: int) -> Bitmap {
   result: Bitmap;
+  result.width = width;
+  result.height = height;
+  result.pixels = alloc(width * height * size_of(u32));
   #if OS == .WINDOWS {
     dib_info := New(BITMAPINFO);
     dib_info.bmiHeader.biSize = size_of(BITMAPINFOHEADER);
@@ -33,11 +43,36 @@ desktop_create_framebuffer :: (window: Desktop.Window_Type, width: int, height: 
     dib_info.bmiHeader.biCompression = BI_RGB;
     result.platform_data = dib_info;
   } else #if OS == .LINUX {
-    ximage := New(XImage);
+    LSBFirst :: 0;
+    blt_state := New(X11_Blt_State);
+    blt_state.fb[0].width  = xx width;
+    blt_state.fb[0].height = xx height;
+    blt_state.fb[0].format = ZPixmap;
+    blt_state.fb[0].data = xx result.pixels;
+    blt_state.fb[0].byte_order = LSBFirst;
+    blt_state.fb[0].bitmap_unit = 32;
+    blt_state.fb[0].bitmap_bit_order = LSBFirst;
+    blt_state.fb[0].bitmap_pad = 32;
+    blt_state.fb[0].depth = 24;
+    blt_state.fb[0].bytes_per_line = xx(4 * width);
+    blt_state.fb[0].bits_per_pixel = 32;
+    blt_state.fb[0].red_mask   = 0x00FF0000;
+    blt_state.fb[0].green_mask = 0x0000FF00;
+    blt_state.fb[0].blue_mask  = 0x000000FF;
+
+    blt_state.fb[1] = blt_state.fb[0];
+    blt_state.fb[1].width  = xx(width  * GB_RESOLUTION_WINDOW_SCALE);
+    blt_state.fb[1].height = xx(height * GB_RESOLUTION_WINDOW_SCALE);
+    blt_state.fb[1].data = alloc(blt_state.fb[1].width * blt_state.fb[1].height * size_of(u32));
+    blt_state.fb[1].bytes_per_line = xx(4 * blt_state.fb[1].width);
+
+    assert(xx XInitImage(*blt_state.fb[0]), "X11: Unable to allocate framebuffer!");
+    assert(xx XInitImage(*blt_state.fb[1]), "X11: Unable to allocate framebuffer!");
+
+    blt_state.gc = XCreateGC(x_global_display, window, 0, null);
+    assert(xx blt_state.gc, "X11: Unable to create graphics context!");
+    result.platform_data = blt_state;
   }
-  result.width = width;
-  result.height = height;
-  result.pixels = alloc(width * height * size_of(u32));
 
   return result;
 }
@@ -46,6 +81,7 @@ desktop_blt_buffer :: (window: Desktop.Window_Type, bitmap: Bitmap, window_width
   #if OS == .WINDOWS {
     dib_info := cast(*BITMAPINFO) bitmap.platform_data;
     client_dc := GetDC(window);
+    defer ReleaseDC(window, client_dc);
     gdi :: #library,system "Gdi32";
     StretchDIBits :: (
       hdc: HDC,
@@ -69,13 +105,22 @@ desktop_blt_buffer :: (window: Desktop.Window_Type, bitmap: Bitmap, window_width
       DIB_RGB_COLORS,
       .SRCCOPY
     );
-    ReleaseDC(window, client_dc);
+  } else #if OS == .LINUX {
+    blt_state := cast(*X11_Blt_State) bitmap.platform_data;
+    src := cast(*u32) blt_state.fb[0].data;
+    dest := cast(*u32) blt_state.fb[1].data;
+    for y: 0..window_height {
+      for x: 0..window_width {
+        dest[y * window_width + x] = src[(y / GB_RESOLUTION_WINDOW_SCALE) * bitmap.width + (x / GB_RESOLUTION_WINDOW_SCALE)];
+      }
+    }
+    XPutImage(x_global_display, window, blt_state.gc, *blt_state.fb[1], 0, 0, 0, 0, xx window_width, xx window_height);
   }
 }
 
 GB_RESOLUTION_W :: 160;
 GB_RESOLUTION_H :: 144;
-GB_RESOLUTION_WINDOW_SCALE :: 4;
+GB_RESOLUTION_WINDOW_SCALE :: 6;
 
 main :: () {
   // TODO: Where is the best place to put this?
