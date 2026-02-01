@@ -12,6 +12,10 @@
   -[X] 11-op a,(hl)
 */
 
+/*
+  TODO: How do we want to handle window resizes?
+*/
+
 #load "gb_instr_meta.jai";
 #load "gb_cpu.jai";
 
@@ -141,25 +145,28 @@ main :: () {
   while should_run {
     reset_temporary_storage();
 
-    Input.update_window_events();
-    for Input.events_this_frame {
-      if it.type == .QUIT then should_run = false;
+    #if 0 {
+      Input.update_window_events();
+      for Input.events_this_frame {
+        if it.type == .QUIT then should_run = false;
+      }
+
+
+      x_grad: u8;
+      y_grad: u8;
+      for y: 0..frame_buffer.height-1 {
+        x_grad = 0;
+        for x: 0..frame_buffer.width-1 {
+          // 0xAARRGGBB
+          frame_buffer.pixels[y * frame_buffer.width + x] = (cast(u32, y_grad) << 16) | (cast(u32, x_grad) << 8);
+          x_grad += 1;
+        }
+        y_grad += 1;
+      }
+      desktop_blt_buffer(main_window, frame_buffer, window_width, window_height);
     }
 
     gb_step(*gb_state);
-
-    x_grad: u8;
-    y_grad: u8;
-    for y: 0..frame_buffer.height-1 {
-      x_grad = 0;
-      for x: 0..frame_buffer.width-1 {
-        // 0xAARRGGBB
-        frame_buffer.pixels[y * frame_buffer.width + x] = (cast(u32, y_grad) << 16) | (cast(u32, x_grad) << 8);
-        x_grad += 1;
-      }
-      y_grad += 1;
-    }
-    desktop_blt_buffer(main_window, frame_buffer, window_width, window_height);
   }
 }
 

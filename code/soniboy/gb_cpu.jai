@@ -13,6 +13,8 @@ GB_Interrupt :: enum_flags u8 {
   JOYPAD :: 0x10;
 }
 
+gb_interrupt_source_lookup :: u8.[0x40, 0x48, 0x50, 0x58, 0x60];
+
 GB_CPU :: struct {
   union {
     AF: u16;
@@ -50,6 +52,7 @@ GB_CPU :: struct {
 GB_State :: struct {
   cpu: GB_CPU;
   base_mem: *u8;
+  ime_needs_update: bool;
 
   gb_unprefixed_instrs, gb_cbprefixed_instrs: [] GB_Instruction;
   gb_unprefixed_instr_vtbl, gb_cbprefixed_instr_vtbl: [] gb_instr_proc;
@@ -441,16 +444,11 @@ gb_instr_di :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
 }
 
 gb_instr_ei :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
-  // TODO: How do I delay this to the instruction following the one *after* this?
-  // TODO: Also we can make custom loggers in this language with an actual prefix
-  // NOTE: I think the best way to handle this would be to check for it in the main fetch/execute loop and
-  // handle accordingly, probably with a loop counter.
-  cpu.IME = true;
-  //log("GB: EI instruction is not correctly implemented!\n", flags=.WARNING);
+  ime_needs_update = true;
 }
 
 gb_instr_halt :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
-
+  assert(false);
 }
 
 gb_instr_inc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
@@ -707,6 +705,12 @@ gb_instr_push :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_
     case .HL; {
       high.* = cpu.H;
       low.* = cpu.L;
+    }
+
+    // NOTE: For internal emulator use
+    case .PC; {
+      high.* = xx (cpu.PC >> 8);
+      low.* = xx (cpu.PC & 0xFF);
     }
 
     case; #assert false "Improper PUSH implementation!";
@@ -1071,7 +1075,7 @@ gb_init :: () -> GB_State {
   gb_state.gb_unprefixed_instr_vtbl = gb_unprefixed_instr_vtbl;
   gb_state.gb_cbprefixed_instr_vtbl = gb_cbprefixed_instr_vtbl;
 
-  gb_state.base_mem = cast(*u8) alloc(0xFFFF);
+  gb_state.base_mem = cast(*u8) alloc(0x10000);
   assert (gb_state.base_mem != null);
 
   test_rom, rom_load_result := read_entire_file(TEST_ROM_PATH,, temp);
@@ -1090,17 +1094,17 @@ gb_init :: () -> GB_State {
   gb_state.cpu.SP = 0xFFFE;
   gb_state.cpu.PC = 0x0100;
 
+  #if GB_DOCTOR_LOG {
+    log("A:% F:% B:% C:% D:% E:% H:% L:% SP:% PC:% PCMEM:%,%,%,%",
+      gb_state.cpu.A, cast(u8) gb_state.cpu.F, gb_state.cpu.B, gb_state.cpu.C, gb_state.cpu.D, gb_state.cpu.E, gb_state.cpu.H, gb_state.cpu.L,
+      FormatInt.{value=gb_state.cpu.SP, minimum_digits=4, base=16}, FormatInt.{value=gb_state.cpu.PC, minimum_digits=4, base=16},
+      gb_state.base_mem[gb_state.cpu.PC], gb_state.base_mem[gb_state.cpu.PC+1], gb_state.base_mem[gb_state.cpu.PC+2], gb_state.base_mem[gb_state.cpu.PC+3]);
+  }
+
   return gb_state;
 }
 
 gb_step :: (using gb_state: *GB_State) {
-  #if GB_DOCTOR_LOG {
-    log("A:% F:% B:% C:% D:% E:% H:% L:% SP:% PC:% PCMEM:%,%,%,%",
-      cpu.A, cast(u8) cpu.F, cpu.B, cpu.C, cpu.D, cpu.E, cpu.H, cpu.L,
-      FormatInt.{value=cpu.SP, minimum_digits=4, base=16}, FormatInt.{value=cpu.PC, minimum_digits=4, base=16},
-      base_mem[cpu.PC], base_mem[cpu.PC+1], base_mem[cpu.PC+2], base_mem[cpu.PC+3]);
-  }
-
   opcode := base_mem[cpu.PC];
   cpu.PC += 1;
 
@@ -1115,7 +1119,31 @@ gb_step :: (using gb_state: *GB_State) {
   }
   gb_instr(gb_state);
 
+  #if GB_DOCTOR_LOG {
+    log("A:% F:% B:% C:% D:% E:% H:% L:% SP:% PC:% PCMEM:%,%,%,%",
+      cpu.A, cast(u8) cpu.F, cpu.B, cpu.C, cpu.D, cpu.E, cpu.H, cpu.L,
+      FormatInt.{value=cpu.SP, minimum_digits=4, base=16}, FormatInt.{value=cpu.PC, minimum_digits=4, base=16},
+      base_mem[cpu.PC], base_mem[cpu.PC+1], base_mem[cpu.PC+2], base_mem[cpu.PC+3]);
+  }
 
+  if instr.mnemonic != .EI && ime_needs_update {
+    ime_needs_update = false;
+    cpu.IME = true;
+  }
+
+  if cpu.IME {
+    pending_interrupts := base_mem[0xFF0F];
+    enabled_interrupts := base_mem[0xFFFF];
+    interrupts := type_info(GB_Interrupt);
+    for < interrupts.values {
+      if (pending_interrupts & enabled_interrupts) & cast(u8) it {
+        base_mem[0xFF0F] &= ~cast(u8) it;
+        cpu.IME = false;
+        gb_instr_push(gb_state, .PC, .NONE, 0);
+        cpu.PC = gb_interrupt_source_lookup[it_index];
+      }
+    }
+  }
 
   if base_mem[0xFF02] == 0x81 {
     out_char := base_mem[0xFF01];
