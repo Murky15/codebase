@@ -1,8 +1,8 @@
 GB_CPU_Flags :: enum_flags u8 {
-  ZERO        :: 0x80;
-  SUBTRACTION :: 0x40;
-  HALF_CARRY  :: 0x20;
   CARRY       :: 0x10;
+  HALF_CARRY  :: 0x20;
+  SUBTRACTION :: 0x40;
+  ZERO        :: 0x80;
 }
 
 GB_Interrupt :: enum_flags u8 {
@@ -172,7 +172,10 @@ GB_Operand :: enum {
   NC;
 }
 
-gb_pun_u8_s8 :: (val: u8) -> s8 #expand {
+GB_DMG_DIV_INC_RATE :: 16384;
+gb_timer_control_lookup :: int.[4096, 262144, 65536, 16384];
+
+gb_pun_u8_s8 :: inline (val: u8) -> s8 {
   punner: union {
     u: u8;
     s: s8;
@@ -182,19 +185,19 @@ gb_pun_u8_s8 :: (val: u8) -> s8 #expand {
   return punner.s;
 }
 
-gb_operand_is_r8 :: (op: GB_Operand) -> bool #expand {
+gb_operand_is_r8 :: inline (op: GB_Operand) -> bool {
   return op >= .A && op <= .L;
 }
 
-gb_operand_is_r16 :: (op: GB_Operand) -> bool #expand {
+gb_operand_is_r16 :: inline (op: GB_Operand) -> bool {
   return op >= .AF && op <= .PC;
 }
 
-gb_operand_is_num :: (op: GB_Operand) -> bool #expand {
+gb_operand_is_num :: inline (op: GB_Operand) -> bool {
   return op >= .n8 && op <= .e8;
 }
 
-gb_operand_is_address_or_indirect :: (op: GB_Operand) -> bool #expand {
+gb_operand_is_address_or_indirect :: inline (op: GB_Operand) -> bool {
   return op >= .a8 && op <= .a16IND;
 }
 
@@ -1064,6 +1067,17 @@ gb_instr_xor :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
 
 gb_instr_prefix :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {}
 
+gb_request_interrupt :: (using gb: *GB_State, interrupt: GB_Interrupt) {
+  base_mem[0xFF0F] |= xx interrupt;
+}
+
+gb_log_state :: (using gb: *GB_State) {
+  log("A:% F:% B:% C:% D:% E:% H:% L:% SP:% PC:% PCMEM:%,%,%,%",
+    cpu.A, cast(u8) cpu.F, cpu.B, cpu.C, cpu.D, cpu.E, cpu.H, cpu.L,
+    FormatInt.{value=cpu.SP, minimum_digits=4, base=16}, FormatInt.{value=cpu.PC, minimum_digits=4, base=16},
+    base_mem[cpu.PC], base_mem[cpu.PC+1], base_mem[cpu.PC+2], base_mem[cpu.PC+3]);
+}
+
 gb_init :: () -> GB_State {
   gb_state: GB_State;
 
@@ -1083,6 +1097,7 @@ gb_init :: () -> GB_State {
   memcpy(gb_state.base_mem, test_rom.data, test_rom.count);
 
   gb_state.base_mem[0xFF44] = 0x90;
+  gb_state.base_mem[0xFF07] = 0xF8;
   gb_state.cpu.A = 0x01;
   gb_state.cpu.F = 0xB0;
   gb_state.cpu.B = 0x00;
@@ -1094,17 +1109,13 @@ gb_init :: () -> GB_State {
   gb_state.cpu.SP = 0xFFFE;
   gb_state.cpu.PC = 0x0100;
 
-  #if GB_DOCTOR_LOG {
-    log("A:% F:% B:% C:% D:% E:% H:% L:% SP:% PC:% PCMEM:%,%,%,%",
-      gb_state.cpu.A, cast(u8) gb_state.cpu.F, gb_state.cpu.B, gb_state.cpu.C, gb_state.cpu.D, gb_state.cpu.E, gb_state.cpu.H, gb_state.cpu.L,
-      FormatInt.{value=gb_state.cpu.SP, minimum_digits=4, base=16}, FormatInt.{value=gb_state.cpu.PC, minimum_digits=4, base=16},
-      gb_state.base_mem[gb_state.cpu.PC], gb_state.base_mem[gb_state.cpu.PC+1], gb_state.base_mem[gb_state.cpu.PC+2], gb_state.base_mem[gb_state.cpu.PC+3]);
-  }
+  #if GB_DOCTOR_LOG gb_log_state(*gb_state);
 
   return gb_state;
 }
 
 gb_step :: (using gb_state: *GB_State) {
+  // NOTE: Fetch & execute next instruction
   opcode := base_mem[cpu.PC];
   cpu.PC += 1;
 
@@ -1118,14 +1129,9 @@ gb_step :: (using gb_state: *GB_State) {
     gb_instr = gb_cbprefixed_instr_vtbl[opcode];
   }
   gb_instr(gb_state);
+  #if GB_DOCTOR_LOG gb_log_state(gb_state);
 
-  #if GB_DOCTOR_LOG {
-    log("A:% F:% B:% C:% D:% E:% H:% L:% SP:% PC:% PCMEM:%,%,%,%",
-      cpu.A, cast(u8) cpu.F, cpu.B, cpu.C, cpu.D, cpu.E, cpu.H, cpu.L,
-      FormatInt.{value=cpu.SP, minimum_digits=4, base=16}, FormatInt.{value=cpu.PC, minimum_digits=4, base=16},
-      base_mem[cpu.PC], base_mem[cpu.PC+1], base_mem[cpu.PC+2], base_mem[cpu.PC+3]);
-  }
-
+  // NOTE: Check for interrupts
   if instr.mnemonic != .EI && ime_needs_update {
     ime_needs_update = false;
     cpu.IME = true;
@@ -1145,6 +1151,7 @@ gb_step :: (using gb_state: *GB_State) {
     }
   }
 
+  // NOTE: Test ROM logging
   if base_mem[0xFF02] == 0x81 {
     out_char := base_mem[0xFF01];
     #if !GB_DOCTOR_LOG then print("%", to_string(*out_char,1));
