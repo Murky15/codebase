@@ -126,6 +126,10 @@ GB_RESOLUTION_W :: 160;
 GB_RESOLUTION_H :: 144;
 GB_RESOLUTION_WINDOW_SCALE :: 6;
 
+TARGET_FRAMES_PER_SECOND :: 60;
+TARGET_MS_PER_FRAME :: cast(float) 1/TARGET_FRAMES_PER_SECOND;
+CYCLES_PER_FRAME :: GB_DMG_MASTER_CLOCK_RATE / TARGET_FRAMES_PER_SECOND;
+
 main :: () {
   // TODO: Where is the best place to put this?
   perm_arena: Flat_Pool;
@@ -142,12 +146,18 @@ main :: () {
   gb_state := gb_init();
 
   should_run := true;
+  start := seconds_since_init();
   while should_run {
     reset_temporary_storage();
 
     Input.update_window_events();
     for Input.events_this_frame {
       if it.type == .QUIT then should_run = false;
+    }
+
+    cycles_this_frame := 0;
+    while cycles_this_frame <= CYCLES_PER_FRAME {
+      cycles_this_frame += gb_step(*gb_state);
     }
 
     x_grad: u8;
@@ -163,7 +173,11 @@ main :: () {
     }
     desktop_blt_buffer(main_window, frame_buffer, window_width, window_height);
 
-    gb_step(*gb_state);
+    end := seconds_since_init();
+    dt := (end - start) * 1000;
+    assert(dt < TARGET_MS_PER_FRAME);
+    sleep_milliseconds(cast(s32, TARGET_MS_PER_FRAME - dt));
+    start = end;
   }
 }
 

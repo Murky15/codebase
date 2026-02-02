@@ -61,9 +61,9 @@ GB_State :: struct {
 GB_Instruction :: struct {
   mnemonic: GB_Mnemonic;
   size: u16;
-  vec_or_u3: u8;
   op1: GB_Operand;
   op2: GB_Operand;
+  vec_or_u3: u8;
 
   #overlay (op1) op: [2] GB_Operand;
 }
@@ -172,7 +172,8 @@ GB_Operand :: enum {
   NC;
 }
 
-GB_DMG_DIV_INC_RATE :: 16384;
+GB_DMG_MASTER_CLOCK_RATE :: 4194304;
+GB_DMG_SYS_\  CLOCK_RATE :: GB_DMG_MASTER_CLOCK_RATE / 4;
 gb_timer_control_lookup :: int.[4096, 262144, 65536, 16384];
 
 gb_pun_u8_s8 :: inline (val: u8) -> s8 {
@@ -201,13 +202,14 @@ gb_operand_is_address_or_indirect :: inline (op: GB_Operand) -> bool {
   return op >= .a8 && op <= .a16IND;
 }
 
-gb_instr_proc :: #type (gb: *GB_State);
+gb_instr_proc :: #type (gb: *GB_State) -> t_states: int;
 
-gb_instr_adc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_adc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   #assert op1 == .A; "Improper ADC implementation!";
   carry := ifx cast(bool, cpu.F & .CARRY) then 1 else 0;
   result: u64 = cpu.A + cast(u64) carry;
   op: u8;
+  t_states := 4;
 
   #if op2 == {
     case .A; result += cpu.A; op = cpu.A;
@@ -217,8 +219,8 @@ gb_instr_adc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
     case .E; result += cpu.E; op = cpu.E;
     case .H; result += cpu.H; op = cpu.H;
     case .L; result += cpu.L; op = cpu.L;
-    case .HLIND; op = base_mem[cpu.HL]; result += op;
-    case .n8; op = base_mem[cpu.PC]; result += op; cpu.PC += 1;
+    case .HLIND; op = base_mem[cpu.HL]; result += op; t_states = 8;
+    case .n8; op = base_mem[cpu.PC]; result += op; cpu.PC += 1; t_states = 8;
     case; #assert false "Improper ADC implementation!";
   }
 
@@ -227,9 +229,11 @@ gb_instr_adc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.F |= ifx (cpu.A & 0xF) + (op & 0xF) + xx carry > 0xF then .HALF_CARRY;
   cpu.A = cast,trunc(u8) result;
   cpu.F |= ifx cpu.A == 0 then .ZERO;
+
+  return t_states;
 }
 
-gb_instr_add :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_add :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   #if op1 == .A {
     op: u8;
     result := cast(u64) cpu.A;
@@ -279,7 +283,7 @@ gb_instr_add :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   } else #assert false "Improper ADD implementation!";
 }
 
-gb_instr_and :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_and :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   #assert op1 == .A; "Improper AND implementation!";
   result := cpu.A;
   #if op2 == {
@@ -301,7 +305,7 @@ gb_instr_and :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.A = result;
 }
 
-gb_instr_bit :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_bit :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   #assert op1 == .u3; "Improper BIT implementation!";
   bit_set: bool;
   #if op2 == {
@@ -322,7 +326,7 @@ gb_instr_bit :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.F |= .HALF_CARRY;
 }
 
-gb_instr_call :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_call :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   carry_set := cast(bool, cpu.F & .CARRY);
   zero_set := cast(bool, cpu.F & .ZERO);
   should_call := true;
@@ -346,13 +350,13 @@ gb_instr_call :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_
   }
 }
 
-gb_instr_ccf :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_ccf :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   cpu.F &= ~.SUBTRACTION;
   cpu.F &= ~.HALF_CARRY;
   cpu.F ^= .CARRY;
 }
 
-gb_instr_cp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_cp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   #assert op1 == .A; "Improper CP implementation!";
   result: u64 = cpu.A;
   val: u64;
@@ -378,13 +382,13 @@ gb_instr_cp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
   cpu.F |= ifx val & 0xF > cpu.A & 0xF then .HALF_CARRY;
 }
 
-gb_instr_cpl :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_cpl :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   cpu.A = ~cpu.A;
   cpu.F |= .SUBTRACTION;
   cpu.F |= .HALF_CARRY;
 }
 
-gb_instr_daa :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_daa :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   result: u64;
   if cpu.F & .SUBTRACTION {
     adjustment: int;
@@ -407,7 +411,7 @@ gb_instr_daa :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.F |= ifx cpu.A == 0 then .ZERO;
 }
 
-gb_instr_dec :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_dec :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   result: u64;
   prev_value: u64;
   #if op1 == {
@@ -442,19 +446,19 @@ gb_instr_dec :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   }
 }
 
-gb_instr_di :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_di :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   cpu.IME = false;
 }
 
-gb_instr_ei :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_ei :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   ime_needs_update = true;
 }
 
-gb_instr_halt :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_halt :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   assert(false);
 }
 
-gb_instr_inc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_inc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   result: u64;
   prev_value: u64;
   #if op1 == {
@@ -489,7 +493,7 @@ gb_instr_inc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   }
 }
 
-gb_instr_jp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_jp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   address := #ifx op1 == .a16 || op2 == .a16 {
     cpu.PC += 2;
     (cast(u16, base_mem[cpu.PC-1]) << 8) | base_mem[cpu.PC-2];
@@ -514,7 +518,7 @@ gb_instr_jp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
   if should_jump then cpu.PC = address;
 }
 
-gb_instr_jr :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_jr :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   offset := gb_pun_u8_s8(base_mem[cpu.PC]);
   cpu.PC += 1;
 
@@ -537,7 +541,7 @@ gb_instr_jr :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
   }
 }
 
-gb_instr_ld :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_ld :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   src_type :: #ifx #run (gb_operand_is_r8(op1) || gb_operand_is_address_or_indirect(op1)) then u8 else u16;
   dest_type :: *src_type;
   dest: dest_type;
@@ -616,7 +620,7 @@ gb_instr_ld :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
   dest.* = src;
 }
 
-gb_instr_ldh :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_ldh :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   dest: *u8;
   src: u8;
   #if op1 == {
@@ -636,9 +640,9 @@ gb_instr_ldh :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   dest.* = src;
 }
 
-gb_instr_nop :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {}
+gb_instr_nop :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int { }
 
-gb_instr_or :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_or :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   #assert op1 == .A;
 
   result := cpu.A;
@@ -660,7 +664,7 @@ gb_instr_or :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
   cpu.A = result;
 }
 
-gb_instr_pop :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_pop :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   low := base_mem[cpu.SP];
   high := base_mem[cpu.SP + 1];
   cpu.SP += 2;
@@ -688,7 +692,7 @@ gb_instr_pop :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   }
 }
 
-gb_instr_push :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_push :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   low := *base_mem[cpu.SP-2];
   high := *base_mem[cpu.SP-1];
   cpu.SP -= 2;
@@ -720,7 +724,7 @@ gb_instr_push :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_
   }
 }
 
-gb_instr_res :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_res :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   #assert op1 == .u3 "Improper RES implementation!";
   #if op2 == {
     case .A; cpu.A &= ~cast(u8, 1 << vec_or_u3);
@@ -735,7 +739,7 @@ gb_instr_res :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   }
 }
 
-gb_instr_ret :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_ret :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   carry_set := cast(bool, cpu.F & .CARRY);
   zero_set := cast(bool, cpu.F & .ZERO);
   should_ret := true;
@@ -758,12 +762,12 @@ gb_instr_ret :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
 }
 
 // NOTE: This means IME is set *right after* this instruction
-gb_instr_reti :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_reti :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   gb_instr_ei(gb, .NONE, .NONE, 0);
   gb_instr_ret(gb, .NONE, .NONE, 0);
 }
 
-gb_instr_rl :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_rl :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   byte: *u8;
   #if op1 == {
     case .A; byte = *cpu.A;
@@ -786,12 +790,12 @@ gb_instr_rl :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
   cpu.F |= ifx byte.* == 0 then .ZERO;
 }
 
-gb_instr_rla :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_rla :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   gb_instr_rl(gb, .A, .NONE, 0);
   cpu.F &= ~.ZERO;
 }
 
-gb_instr_rlc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_rlc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   byte: *u8;
   #if op1 == {
     case .A; byte = *cpu.A;
@@ -812,12 +816,12 @@ gb_instr_rlc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.F |= ifx byte.* == 0 then .ZERO;
 }
 
-gb_instr_rlca :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_rlca :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   gb_instr_rlc(gb, .A, .NONE, 0);
   cpu.F &= ~.ZERO;
 }
 
-gb_instr_rr :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_rr :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   byte: *u8;
   #if op1 == {
     case .A; byte = *cpu.A;
@@ -841,12 +845,12 @@ gb_instr_rr :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
 
 }
 
-gb_instr_rra :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_rra :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   gb_instr_rr(gb, .A, .NONE, 0);
   cpu.F &= ~.ZERO;
 }
 
-gb_instr_rrc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_rrc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   byte: *u8;
   #if op1 == {
     case .A; byte = *cpu.A;
@@ -867,12 +871,12 @@ gb_instr_rrc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.F |= ifx byte.* == 0 then .ZERO;
 }
 
-gb_instr_rrca :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_rrca :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   gb_instr_rrc(gb, .A, .NONE, 0);
   cpu.F &= ~.ZERO;
 }
 
-gb_instr_rst :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_rst :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   next_instr := cpu.PC;
   base_mem[cpu.SP - 2] = cast(u8, next_instr & 0xFF);
   base_mem[cpu.SP - 1] = cast(u8, next_instr >> 8);
@@ -880,7 +884,7 @@ gb_instr_rst :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.PC = vec_or_u3;
 }
 
-gb_instr_sbc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_sbc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   #assert op1 == .A "Improper SBC implementation!";
   carry := cast(u8) ifx cpu.F & .CARRY then 1 else 0;
   result := cpu.A;
@@ -909,13 +913,13 @@ gb_instr_sbc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.A = result;
 }
 
-gb_instr_scf :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_scf :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   cpu.F &= ~.SUBTRACTION;
   cpu.F &= ~.HALF_CARRY;
   cpu.F |= .CARRY;
 }
 
-gb_instr_set :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_set :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   #assert op1 == .u3 "Improper SET implementation!";
   #if op2 == {
     case .A; cpu.A |= (1 << vec_or_u3);
@@ -930,7 +934,7 @@ gb_instr_set :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   }
 }
 
-gb_instr_sla :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_sla :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   byte: *u8;
   #if op1 == {
     case .A; byte = *cpu.A;
@@ -951,7 +955,7 @@ gb_instr_sla :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.F |= ifx new_carry then .CARRY;
 }
 
-gb_instr_sra :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_sra :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   byte: *s8;
   #if op1 == {
     case .A; byte = cast(*s8) *cpu.A;
@@ -972,7 +976,7 @@ gb_instr_sra :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.F |= ifx new_carry then .CARRY;
 }
 
-gb_instr_srl :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_srl :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   byte: *u8;
   #if op1 == {
     case .A; byte = *cpu.A;
@@ -993,11 +997,11 @@ gb_instr_srl :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.F |= ifx new_carry then .CARRY;
 }
 
-gb_instr_stop :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_stop :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   log("GB: Stop instruction received! Shutting down emulator...\n");
 }
 
-gb_instr_sub :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_sub :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   #assert op1 == .A "Improper SUB implementation!";
   result: u64 = cpu.A;
   r8: u64;
@@ -1025,7 +1029,7 @@ gb_instr_sub :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.A = cast,trunc(u8) result;
 }
 
-gb_instr_swap :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_swap :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   r8: *u8;
   #if op1 == {
     case .A; r8 = *cpu.A;
@@ -1044,7 +1048,7 @@ gb_instr_swap :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_
   cpu.F |= ifx r8.* == 0 then .ZERO;
 }
 
-gb_instr_xor :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {
+gb_instr_xor :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   #assert op1 == .A "Improper XOR implementation!";
   r8: u8;
   #if op2 == {
@@ -1065,7 +1069,7 @@ gb_instr_xor :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   cpu.F |= ifx cpu.A == 0 then .ZERO;
 }
 
-gb_instr_prefix :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) {}
+gb_instr_prefix :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int { }
 
 gb_request_interrupt :: (using gb: *GB_State, interrupt: GB_Interrupt) {
   base_mem[0xFF0F] |= xx interrupt;
@@ -1114,7 +1118,7 @@ gb_init :: () -> GB_State {
   return gb_state;
 }
 
-gb_step :: (using gb_state: *GB_State) {
+gb_step :: (using gb_state: *GB_State) -> t_states: int {
   // NOTE: Fetch & execute next instruction
   opcode := base_mem[cpu.PC];
   cpu.PC += 1;
@@ -1128,7 +1132,7 @@ gb_step :: (using gb_state: *GB_State) {
     instr = gb_cbprefixed_instrs[opcode];
     gb_instr = gb_cbprefixed_instr_vtbl[opcode];
   }
-  gb_instr(gb_state);
+  cycles_consumed := gb_instr(gb_state);
   #if GB_DOCTOR_LOG gb_log_state(gb_state);
 
   // NOTE: Check for interrupts
@@ -1157,4 +1161,6 @@ gb_step :: (using gb_state: *GB_State) {
     #if !GB_DOCTOR_LOG then print("%", to_string(*out_char,1));
     base_mem[0xFF02] = 0x00;
   }
+
+  return cycles_consumed;
 }
