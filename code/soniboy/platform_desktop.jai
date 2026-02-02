@@ -124,10 +124,10 @@ desktop_blt_buffer :: (window: Desktop.Window_Type, bitmap: Bitmap, window_width
 
 GB_RESOLUTION_W :: 160;
 GB_RESOLUTION_H :: 144;
-GB_RESOLUTION_WINDOW_SCALE :: 6;
+GB_RESOLUTION_WINDOW_SCALE :: 4;
 
 TARGET_FRAMES_PER_SECOND :: 60;
-TARGET_MS_PER_FRAME :: cast(float) 1/TARGET_FRAMES_PER_SECOND;
+TARGET_MS_PER_FRAME :: cast(float) 1000/TARGET_FRAMES_PER_SECOND;
 CYCLES_PER_FRAME :: GB_DMG_MASTER_CLOCK_RATE / TARGET_FRAMES_PER_SECOND;
 
 main :: () {
@@ -146,9 +146,9 @@ main :: () {
   gb_state := gb_init();
 
   should_run := true;
-  start := seconds_since_init();
   while should_run {
     reset_temporary_storage();
+    start := seconds_since_init();
 
     Input.update_window_events();
     for Input.events_this_frame {
@@ -156,7 +156,7 @@ main :: () {
     }
 
     cycles_this_frame := 0;
-    while cycles_this_frame <= CYCLES_PER_FRAME {
+    while cycles_this_frame < CYCLES_PER_FRAME {
       cycles_this_frame += gb_step(*gb_state);
     }
 
@@ -175,9 +175,8 @@ main :: () {
 
     end := seconds_since_init();
     dt := (end - start) * 1000;
-    assert(dt < TARGET_MS_PER_FRAME);
-    sleep_milliseconds(cast(s32, TARGET_MS_PER_FRAME - dt));
-    start = end;
+    if dt < TARGET_MS_PER_FRAME
+      sleep_milliseconds(cast(s32, TARGET_MS_PER_FRAME - dt));
   }
 }
 
