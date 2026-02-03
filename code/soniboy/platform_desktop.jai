@@ -99,8 +99,8 @@ desktop_blt_buffer :: (window: Desktop.Window_Type, bitmap: Bitmap, window_width
     blt_state := cast(*X11_Blt_State) bitmap.platform_data;
     src := cast(*u32) blt_state.fb[0].data;
     dest := cast(*u32) blt_state.fb[1].data;
-    for y: 0..window_height {
-      for x: 0..window_width {
+    for y: 0..window_height-1 {
+      for x: 0..window_width-1 {
         dest[y * window_width + x] = src[(y / GB_RESOLUTION_WINDOW_SCALE) * bitmap.width + (x / GB_RESOLUTION_WINDOW_SCALE)];
       }
     }
@@ -119,8 +119,8 @@ CYCLES_PER_FRAME :: GB_DMG_MASTER_CLOCK_RATE / TARGET_FRAMES_PER_SECOND;
 main :: () {
   // TODO: Where is the best place to put this?
   perm_arena: Flat_Pool;
-  context.allocator.proc = flat_pool_allocator_proc;
-  context.allocator.data = *perm_arena;
+  arena_allocator := Allocator.{proc=flat_pool_allocator_proc, data=*perm_arena};
+  context.allocator = arena_allocator;
   format_int := *context.print_style.default_format_int;
   format_int.base = 16;
   format_int.minimum_digits = 2;
@@ -145,7 +145,6 @@ main :: () {
     while cycles_this_frame < CYCLES_PER_FRAME {
       cycles_this_frame += gb_step(*gb_state);
     }
-
     x_grad: u8;
     y_grad: u8;
     for y: 0..frame_buffer.height-1 {
@@ -157,6 +156,7 @@ main :: () {
       }
       y_grad += 1;
     }
+
     desktop_blt_buffer(main_window, frame_buffer, window_width, window_height);
 
     end := seconds_since_init();

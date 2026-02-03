@@ -1,12 +1,12 @@
 /*  Tests Passed
   -[X] 01-special
   -[ ] 02-interrupts
-  -[ ] 03-op sp,hl
+  -[X] 03-op sp,hl
   -[X] 04-op r,imm
   -[X] 05-op rp
   -[X] 06-ld r,r
-  -[ ] 07-jr,jp,call,ret,rst
-  -[ ] 08-misc instrs
+  -[X] 07-jr,jp,call,ret,rst
+  -[X] 08-misc instrs
   -[X] 09-op r,r
   -[X] 10-bit ops
   -[X] 11-op a,(hl)
@@ -645,7 +645,7 @@ gb_instr_ld :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
     case .SP; {
       #assert op1 == .a16IND "Improper LD Implementation!";
       gb_write(gb, dest, cast(u8, cpu.SP & 0xFF));
-      gb_write(gb, dest, cast(u8, cpu.SP >> 8));
+      gb_write(gb, dest + 1, cast(u8, cpu.SP >> 8));
       return 0;
     }
 
@@ -1348,6 +1348,8 @@ gb_step :: (gb: *GB_State) -> t_states: int {
   }
   cycles_consumed := gb_instr(gb);
   if cycles_consumed == 0 then cycles_consumed = instr.t_states;
+  if cycles_consumed == 0
+    assert(false, "%", gb.*);
   #if GB_DOCTOR_LOG gb_log_state(gb);
 
   // NOTE: Check for interrupts

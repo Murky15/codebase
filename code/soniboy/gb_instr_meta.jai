@@ -294,7 +294,7 @@ gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] 
     for opcode, opcode_idx: set.opcodes {
       new_instr := *instruction_sets[set_index][opcode_idx];
       new_instr.size = cast(u16) opcode.bytes;
-      new_instr.t_states = ifx opcode.cycles.count > 1 -1 else opcode.cycles[0];
+      new_instr.t_states = ifx opcode.cycles.count > 1 then -1 else opcode.cycles[0];
       m_info := type_info(GB_Mnemonic);
       found_mnemonic := false;
       for m_info.names {
