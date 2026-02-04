@@ -1,6 +1,6 @@
 /*  Tests Passed
   -[X] 01-special
-  -[ ] 02-interrupts
+  -[X] 02-interrupts
   -[X] 03-op sp,hl
   -[X] 04-op r,imm
   -[X] 05-op rp
@@ -67,8 +67,11 @@ GB_State :: struct {
   cpu: GB_CPU;
   base_mem: *u8;
   ime_needs_update: bool;
+  low_power_mode: bool;
+  halt_stunt_bug: bool;
 
-  div_accum: int;
+  div\ _accum: int;
+  timer_accum: int;
 
   unprefixed_instrs,     cbprefixed_instrs: [] GB_Instruction;
   unprefixed_instr_vtbl, cbprefixed_instr_vtbl: [] gb_instr_proc;
@@ -505,7 +508,12 @@ gb_instr_ei :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
 }
 
 gb_instr_halt :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
-  //assert(false);
+  if cpu.IME {
+    low_power_mode = true;
+  } else {
+    interrupts_pending := gb_read(gb, 0xFF0F) & gb_read(gb, 0xFFFF);
+    if interrupts_pending then halt_stunt_bug = true; else low_power_mode = true;
+  }
 
   return 0;
 }
@@ -1288,6 +1296,8 @@ gb_read :: (gb: *GB_State, addr: u16) -> u8 {
 }
 
 gb_write :: (gb: *GB_State, addr: u16, value: u8) {
+  if addr == 0xFF04 then value = 0;
+  if addr == 0xFF07 then gb.timer_accum = 0;
   gb.base_mem[addr] = value;
 }
 
@@ -1336,30 +1346,33 @@ gb_init :: () -> GB_State {
 
 gb_step :: (gb: *GB_State) -> t_states: int {
   // NOTE: Fetch & execute next instruction
-  opcode := gb_read(gb, gb.cpu.PC);
-  gb.cpu.PC += 1;
-  instr := gb.unprefixed_instrs[opcode];
-  gb_instr := gb.unprefixed_instr_vtbl[opcode];
-  if instr.mnemonic == .PREFIX {
-    opcode = gb_read(gb, gb.cpu.PC);
-    gb.cpu.PC += 1;
-    instr = gb.cbprefixed_instrs[opcode];
-    gb_instr = gb.cbprefixed_instr_vtbl[opcode];
+  instr: GB_Instruction;
+  cycles_consumed := 1; // TODO: Verify this
+  if !gb.low_power_mode {
+    opcode := gb_read(gb, gb.cpu.PC);
+    if !gb.halt_stunt_bug then gb.cpu.PC += 1;
+    gb.halt_stunt_bug = false;
+    instr = gb.unprefixed_instrs[opcode];
+    gb_instr := gb.unprefixed_instr_vtbl[opcode];
+    if instr.mnemonic == .PREFIX {
+      opcode = gb_read(gb, gb.cpu.PC);
+      gb.cpu.PC += 1;
+      instr = gb.cbprefixed_instrs[opcode];
+      gb_instr = gb.cbprefixed_instr_vtbl[opcode];
+    }
+    cycles_consumed = gb_instr(gb);
+    if cycles_consumed == 0 then cycles_consumed = instr.t_states;
+    #if GB_DOCTOR_LOG gb_log_state(gb);
   }
-  cycles_consumed := gb_instr(gb);
-  if cycles_consumed == 0 then cycles_consumed = instr.t_states;
-  if cycles_consumed == 0
-    assert(false, "%", gb.*);
-  #if GB_DOCTOR_LOG gb_log_state(gb);
 
   // NOTE: Check for interrupts
   if instr.mnemonic != .EI && gb.ime_needs_update {
     gb.ime_needs_update = false;
     gb.cpu.IME = true;
   }
+  pending_interrupts := gb_read(gb, 0xFF0F);
+  enabled_interrupts := gb_read(gb, 0xFFFF);
   if gb.cpu.IME {
-    pending_interrupts := gb_read(gb, 0xFF0F);
-    enabled_interrupts := gb_read(gb, 0xFFFF);
     interrupts := type_info(GB_Interrupt);
     for < interrupts.values {
       if (pending_interrupts & enabled_interrupts) & cast(u8) it {
@@ -1369,8 +1382,11 @@ gb_step :: (gb: *GB_State) -> t_states: int {
         gb.cpu.IME = false;
         gb_instr_push(gb, .PC, .NONE, 0);
         gb.cpu.PC = gb_interrupt_source_lookup[it_index];
+        gb.low_power_mode = false;
       }
     }
+  } else if gb.low_power_mode && (pending_interrupts & enabled_interrupts) {
+    gb.low_power_mode = false;
   }
 
   // NOTE: Update timers
@@ -1381,6 +1397,22 @@ gb_step :: (gb: *GB_State) -> t_states: int {
   }
 
   timer_control := gb_read(gb, 0xFF07);
+  timer_enable := timer_control & 0x04;
+  if timer_enable {
+    clock_select := timer_control & 0x03;
+    clock_cycles_per_inc := GB_CLOCK_CYCLES_PER_TIMER_INC[clock_select];
+    gb.timer_accum += cycles_consumed;
+    if gb.timer_accum >= clock_cycles_per_inc {
+      gb.timer_accum = 0;
+      tima := gb.base_mem[0xFF05];
+      if tima == 0xFF {
+        gb.base_mem[0xFF05] = gb.base_mem[0xFF06];
+        gb_request_interrupt(gb, .TIMER);
+      } else {
+        gb.base_mem[0xFF05] += 1;
+      }
+    }
+  }
 
   // NOTE: Test ROM logging
   if gb.base_mem[0xFF02] == 0x81 {
