@@ -125,7 +125,7 @@ main :: () {
   format_int.base = 16;
   format_int.minimum_digits = 2;
 
-  main_window := Desktop.create_window(GB_RESOLUTION_W * GB_RESOLUTION_WINDOW_SCALE, GB_RESOLUTION_H * GB_RESOLUTION_WINDOW_SCALE, "Soniboy");
+  main_window := Desktop.create_window(GB_RESOLUTION_W * GB_RESOLUTION_WINDOW_SCALE, GB_RESOLUTION_H * GB_RESOLUTION_WINDOW_SCALE, "Gameboy");
   _, _, window_width, window_height := Desktop.get_dimensions(main_window, true);
   frame_buffer := desktop_create_framebuffer(main_window, GB_RESOLUTION_W, GB_RESOLUTION_H);
 

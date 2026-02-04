@@ -2,5 +2,5 @@
 	path = code/geometry_compiler
 	url = https://git.mr4th.com/mr4th/geometry_compiler
 [submodule "code/soniboy/extra_modules/Json"]
-	path = code/soniboy/extra_modules/Json
+	path = code/gameboy/extra_modules/Json
 	url = https://github.com/rluba/jaison

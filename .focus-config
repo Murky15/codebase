@@ -23,12 +23,12 @@ key_binding: F1
 run_command: %RUN_WORKING_DIR%/roguelike_platform_win32.exe
 key_binding: F2
 
-[Build Soniboy]
+[Build Gameboy]
 error_regex: ^(?P<file>.*):(?P<line>\d+),(?P<col>\d+): (?P<type>Error|Warning|Info|...):* (?P<msg>.*)|^(?P<msg1>.*error LNK.*)
-build_command: jai %BUILD_WORKING_DIR%/code/soniboy/first.jai
+build_command: jai %BUILD_WORKING_DIR%/code/gameboy/first.jai
 key_binding: F3
-[Run Soniboy]
-run_command: %RUN_WORKING_DIR%/Soniboy
+[Run Gameboy]
+run_command: %RUN_WORKING_DIR%/gameboy
 key_binding: F4
 
 [allow]

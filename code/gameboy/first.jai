@@ -1,7 +1,7 @@
 build :: () {
   w := compiler_create_workspace();
   options := get_build_options();
-  options.output_executable_name = "Soniboy";
+  options.output_executable_name = "gameboy";
   options.output_path = join(#filepath, "../../build");
 
   extra_modules := join(#filepath, "extra_modules");
