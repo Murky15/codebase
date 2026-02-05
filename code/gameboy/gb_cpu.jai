@@ -137,6 +137,12 @@ GB_Memory_Bank_Controller :: enum {
   MBC2;
 }
 
+GB_Cartridge_Bank_Info :: struct {
+  mbc_type: GB_Memory_Bank_Controller;
+  rom_size: int;
+  ram_size: int;
+}
+
 GB_CPU :: struct {
   union {
     AF: u16;
@@ -1313,15 +1319,34 @@ gb_log_state :: (using gb: *GB_State) {
     base_mem[cpu.PC], base_mem[cpu.PC+1], base_mem[cpu.PC+2], base_mem[cpu.PC+3]);
 }
 
-gb_parse_cartidge_header :: (cartridge: string) -> string, int, GB_Memory_Bank_Controller {
+gb_parse_cartridge_header :: (cartridge: string) -> string, GB_Cartridge_Bank_Info {
   assert(cartridge.count > 0);
-  title := to_string(cartridge.data + 0x0134, 16);
-  cartridge_type := cartridge.data[0x0147];
-  assert(cartridge_type <= xx GB_Memory_Bank_Controller.MBC2, "GB cartridge parse error! This memory bank controller is unsupported.");
-  rom_size := cast(int) cartridge.data[0x0148];
-  rom_size = 32 * 1024 * (1 << rom_size);
+  GB_RAM_BANK_SIZES :: int.[0, 0, 8*1024, 32*1024, 128*1024, 64*1024];
 
-  return title, rom_size, xx cartridge_type;
+  result: GB_Cartridge_Bank_Info;
+  title_view: [] u8;
+  title_view.data = cartridge.data + 0x0134;
+  title_view.count = 16;
+  title := to_string(title_view);
+  cartridge_type := cartridge.data[0x0147];
+  mbc: GB_Memory_Bank_Controller;
+  if cartridge_type == {
+    case 0x00; mbc = .ROM_ONLY;
+
+    case 0x01; #through;
+    case 0x02; #through;
+    case 0x03; mbc = .MBC1;
+
+    case 0x05; #through;
+    case 0x06; mbc = .MBC2;
+  }
+  rom_size := 32 * 1024 * (1 << cartridge.data[0x0148]);
+  ram_size := GB_RAM_BANK_SIZES[cartridge.data[0x0149]];
+
+  result.mbc_type = mbc;
+  result.rom_size = rom_size;
+  result.ram_size = ram_size;
+  return title, result;
 }
 
 gb_init :: () -> GB_State {
@@ -1340,7 +1365,11 @@ gb_init :: () -> GB_State {
 
   test_rom, rom_load_result := read_entire_file(TEST_ROM_PATH,, temp);
   assert(rom_load_result);
-  memcpy(gb_state.base_mem, test_rom.data, test_rom.count);
+
+  title, bank_info := gb_parse_cartridge_header(test_rom);
+  log("Loaded ROM: %, with size: %, MBC: %, and SRAM: %", title, bank_info.rom_size, bank_info.mbc_type, bank_info.ram_size);
+
+  //memcpy(gb_state.base_mem, test_rom.data, test_rom.count);
 
   gb_state.base_mem[0xFF44] = 0x90;
   gb_state.base_mem[0xFF07] = 0xF8;
