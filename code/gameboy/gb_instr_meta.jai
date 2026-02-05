@@ -1,4 +1,6 @@
 gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] GB_Instruction {
+  #import "Json";
+
   Json_Opcode_Table :: struct #type_info_no_size_complaint {
     _0x00: Json_Opcode_Data; @JsonName(0x00)
     _0x01: Json_Opcode_Data; @JsonName(0x01)

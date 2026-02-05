@@ -27,67 +27,6 @@ GB_Interrupt :: enum_flags u8 {
   JOYPAD :: 0x10;
 }
 
-gb_interrupt_source_lookup :: u8.[0x40, 0x48, 0x50, 0x58, 0x60];
-
-GB_CPU :: struct {
-  union {
-    AF: u16;
-    struct {
-      F: GB_CPU_Flags;
-      A: u8;
-    }
-  }
-  union {
-    BC: u16;
-    struct {
-      C: u8;
-      B: u8;
-    }
-  }
-  union {
-    DE: u16;
-    struct {
-      E: u8;
-      D: u8;
-    }
-  }
-  union {
-    HL: u16;
-    struct {
-      L: u8;
-      H: u8;
-    }
-  }
-  SP: u16;
-  PC: u16;
-  IME: bool;
-}
-
-GB_State :: struct {
-  cpu: GB_CPU;
-  base_mem: *u8;
-  ime_needs_update: bool;
-  low_power_mode: bool;
-  halt_stunt_bug: bool;
-
-  div\ _accum: int;
-  timer_accum: int;
-
-  unprefixed_instrs,     cbprefixed_instrs: [] GB_Instruction;
-  unprefixed_instr_vtbl, cbprefixed_instr_vtbl: [] gb_instr_proc;
-}
-
-GB_Instruction :: struct {
-  mnemonic: GB_Mnemonic;
-  size: u16;
-  t_states: int;
-  op1: GB_Operand;
-  op2: GB_Operand;
-  vec_or_u3: u8;
-
-  #overlay (op1) op: [2] GB_Operand;
-}
-
 GB_Mnemonic :: enum {
   ADC;
   ADD;
@@ -192,6 +131,71 @@ GB_Operand :: enum {
   NC;
 }
 
+GB_Memory_Bank_Controller :: enum {
+  ROM_ONLY;
+  MBC1;
+  MBC2;
+}
+
+GB_CPU :: struct {
+  union {
+    AF: u16;
+    struct {
+      F: GB_CPU_Flags;
+      A: u8;
+    }
+  }
+  union {
+    BC: u16;
+    struct {
+      C: u8;
+      B: u8;
+    }
+  }
+  union {
+    DE: u16;
+    struct {
+      E: u8;
+      D: u8;
+    }
+  }
+  union {
+    HL: u16;
+    struct {
+      L: u8;
+      H: u8;
+    }
+  }
+  SP: u16;
+  PC: u16;
+  IME: bool;
+}
+
+GB_State :: struct {
+  cpu: GB_CPU;
+  base_mem: *u8;
+  ime_needs_update: bool;
+  low_power_mode: bool;
+  halt_stunt_bug: bool;
+
+  div\ _accum: int;
+  timer_accum: int;
+
+  unprefixed_instrs,     cbprefixed_instrs: [] GB_Instruction;
+  unprefixed_instr_vtbl, cbprefixed_instr_vtbl: [] gb_instr_proc;
+}
+
+GB_Instruction :: struct {
+  mnemonic: GB_Mnemonic;
+  size: u16;
+  t_states: int;
+  op1: GB_Operand;
+  op2: GB_Operand;
+  vec_or_u3: u8;
+
+  #overlay (op1) op: [2] GB_Operand;
+}
+
 GB_DMG_MASTER_CLOCK_RATE :: 4194304;
 GB_DMG_DIV\  _CLOCK_RATE :: 16384;
 GB_CLOCK_CYCLES_PER_DIV\ _INC :: GB_DMG_MASTER_CLOCK_RATE / GB_DMG_DIV_CLOCK_RATE;
@@ -199,6 +203,7 @@ GB_CLOCK_CYCLES_PER_TIMER_INC :: int.[GB_DMG_MASTER_CLOCK_RATE/4096,
                                       GB_DMG_MASTER_CLOCK_RATE/262144,
                                       GB_DMG_MASTER_CLOCK_RATE/65536,
                                       GB_DMG_MASTER_CLOCK_RATE/16384];
+GB_INTERRUPT_SOURCE_LOOKUP :: u8.[0x40, 0x48, 0x50, 0x58, 0x60];
 
 gb_pun_byte :: inline ($Src: Type, $Ret: Type, val: Src) -> Ret {
   punner: union {
@@ -1308,6 +1313,17 @@ gb_log_state :: (using gb: *GB_State) {
     base_mem[cpu.PC], base_mem[cpu.PC+1], base_mem[cpu.PC+2], base_mem[cpu.PC+3]);
 }
 
+gb_parse_cartidge_header :: (cartridge: string) -> string, int, GB_Memory_Bank_Controller {
+  assert(cartridge.count > 0);
+  title := to_string(cartridge.data + 0x0134, 16);
+  cartridge_type := cartridge.data[0x0147];
+  assert(cartridge_type <= xx GB_Memory_Bank_Controller.MBC2, "GB cartridge parse error! This memory bank controller is unsupported.");
+  rom_size := cast(int) cartridge.data[0x0148];
+  rom_size = 32 * 1024 * (1 << rom_size);
+
+  return title, rom_size, xx cartridge_type;
+}
+
 gb_init :: () -> GB_State {
   gb_state: GB_State;
 
@@ -1381,7 +1397,7 @@ gb_step :: (gb: *GB_State) -> t_states: int {
         gb_write(gb, 0xFF0F, updated_reg);
         gb.cpu.IME = false;
         gb_instr_push(gb, .PC, .NONE, 0);
-        gb.cpu.PC = gb_interrupt_source_lookup[it_index];
+        gb.cpu.PC = GB_INTERRUPT_SOURCE_LOOKUP[it_index];
         gb.low_power_mode = false;
       }
     }
@@ -1423,3 +1439,5 @@ gb_step :: (gb: *GB_State) -> t_states: int {
 
   return cycles_consumed;
 }
+
+#import "File";
