@@ -187,6 +187,10 @@ GB_State :: struct {
   div\ _accum: int;
   timer_accum: int;
 
+  cartridge: [] u8;
+  bank_info: GB_Cartridge_Bank_Info;
+  active_bank: u8;
+
   unprefixed_instrs,     cbprefixed_instrs: [] GB_Instruction;
   unprefixed_instr_vtbl, cbprefixed_instr_vtbl: [] gb_instr_proc;
 }
@@ -202,6 +206,7 @@ GB_Instruction :: struct {
   #overlay (op1) op: [2] GB_Operand;
 }
 
+GB_ROM_BANK_SIZE :: 16 * 1024;
 GB_DMG_MASTER_CLOCK_RATE :: 4194304;
 GB_DMG_DIV\  _CLOCK_RATE :: 16384;
 GB_CLOCK_CYCLES_PER_DIV\ _INC :: GB_DMG_MASTER_CLOCK_RATE / GB_DMG_DIV_CLOCK_RATE;
@@ -1210,7 +1215,6 @@ gb_instr_srl :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
 }
 
 gb_instr_stop :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
-  log("GB: Stop instruction received! Shutting down emulator...\n");
   return 0;
 }
 
@@ -1306,7 +1310,45 @@ gb_read :: (gb: *GB_State, addr: u16) -> u8 {
   return gb.base_mem[addr];
 }
 
+gb_read_pc :: (gb: *GB_State) -> u8 {
+  defer gb.cpu.PC += 1;
+  return gb_read(gb, gb.cpu.PC);
+}
+
 gb_write :: (gb: *GB_State, addr: u16, value: u8) {
+  if gb.bank_info.mbc_type == .MBC1 {
+    return_early := true;
+    rom_bank_ready := false;
+    if addr < 0x2000 { // NOTE: RAM Enable
+      log("Wrote: % to RAM Enable", value);
+      assert(false, "GB Error: This bank mode is not yet implemented!");
+    } else if addr >= 0x2000 && addr < 0x4000 { // NOTE: ROM Bank Number
+      if (value & 0x1F) == 0 then value = 1; // Yes this is intentional
+      num_banks_supported := cast(u64, gb.bank_info.rom_size / GB_ROM_BANK_SIZE);
+      bits_required := cast(u8) bit_scan_forward(num_banks_supported) - 1;
+      value &= cast(u8, num_banks_supported - 1);
+      gb.active_bank = value;
+      rom_bank_ready = bits_required <= 5; // Otherwise we need to wait and see what the upper bits are
+    } else if addr >= 0x4000 && addr < 0x6000 { // NOTE: RAM Bank Number / Upper ROM Bank Number
+      log("Wrote: % to RAM Bank Number / Upper ROM Bank Number", value);
+      assert(false, "GB Error: This bank mode is not yet implemented!");
+    } else if addr >= 0x6000 && addr < 0x8000 { // NOTE: Banking Mode Select
+      log("Wrote: % to Banking Mode Select", value);
+      assert(false, "GB Error: This bank mode is not yet implemented!");
+    } else {
+      return_early = false;
+    }
+
+    if rom_bank_ready {
+      if context.log_level >= .VERBOSE log("Accessing ROM bank: %", gb.active_bank);
+      rom_bank_location := GB_ROM_BANK_SIZE * gb.active_bank;
+      memcpy(gb.base_mem + 0x4000, *gb.cartridge[rom_bank_location], GB_ROM_BANK_SIZE);
+    }
+
+    if return_early then return;
+
+  } else assert(false, "GB Error: This MBC mode (%) is not yet implemented!", gb.bank_info.mbc_type);
+
   if addr == 0xFF04 then value = 0;
   if addr == 0xFF07 then gb.timer_accum = 0;
   gb.base_mem[addr] = value;
@@ -1363,14 +1405,14 @@ gb_init :: () -> GB_State {
   gb_state.base_mem = cast(*u8) alloc(0x10000);
   assert (gb_state.base_mem != null);
 
-  test_rom, rom_load_result := read_entire_file(TEST_ROM_PATH,, temp);
+  test_rom, rom_load_result := read_entire_file(TEST_ROM_PATH);
   assert(rom_load_result);
-
   title, bank_info := gb_parse_cartridge_header(test_rom);
   log("Loaded ROM: %, with size: %, MBC: %, and SRAM: %", title, bank_info.rom_size, bank_info.mbc_type, bank_info.ram_size);
+  memcpy(gb_state.base_mem, test_rom.data, 0x8000);
 
-  //memcpy(gb_state.base_mem, test_rom.data, test_rom.count);
-
+  gb_state.cartridge = cast([] u8) test_rom;
+  gb_state.bank_info = bank_info;
   gb_state.base_mem[0xFF44] = 0x90;
   gb_state.base_mem[0xFF07] = 0xF8;
   gb_state.cpu.A = 0x01;
@@ -1383,8 +1425,6 @@ gb_init :: () -> GB_State {
   gb_state.cpu.L = 0x4D;
   gb_state.cpu.SP = 0xFFFE;
   gb_state.cpu.PC = 0x0100;
-
-  #if GB_DOCTOR_LOG gb_log_state(*gb_state);
 
   return gb_state;
 }
@@ -1407,7 +1447,6 @@ gb_step :: (gb: *GB_State) -> t_states: int {
     }
     cycles_consumed = gb_instr(gb);
     if cycles_consumed == 0 then cycles_consumed = instr.t_states;
-    #if GB_DOCTOR_LOG gb_log_state(gb);
   }
 
   // NOTE: Check for interrupts
@@ -1462,7 +1501,7 @@ gb_step :: (gb: *GB_State) -> t_states: int {
   // NOTE: Test ROM logging
   if gb.base_mem[0xFF02] == 0x81 {
     out_char := gb.base_mem[0xFF01];
-    #if !GB_DOCTOR_LOG then print("%", to_string(*out_char,1));
+    print("%", to_string(*out_char,1));
     gb.base_mem[0xFF02] = 0x00;
   }
 
@@ -1470,3 +1509,4 @@ gb_step :: (gb: *GB_State) -> t_states: int {
 }
 
 #import "File";
+#import "Bit_Operations";
