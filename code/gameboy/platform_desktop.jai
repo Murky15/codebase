@@ -50,6 +50,7 @@ desktop_create_framebuffer :: (window: Desktop.Window_Type, width: int, height: 
     blt_state.fb[0].green_mask = 0x0000FF00;
     blt_state.fb[0].blue_mask  = 0x000000FF;
 
+    // NOTE: Is it better to create this on the fly?
     blt_state.fb[1] = blt_state.fb[0];
     blt_state.fb[1].width  = xx(width  * GB_RESOLUTION_WINDOW_SCALE);
     blt_state.fb[1].height = xx(height * GB_RESOLUTION_WINDOW_SCALE);
@@ -151,7 +152,7 @@ main :: () {
       x_grad = 0;
       for x: 0..frame_buffer.width-1 {
         // 0xAARRGGBB
-        frame_buffer.pixels[y * frame_buffer.width + x] = (cast(u32, y_grad) << 16) | (cast(u32, x_grad) << 8);
+        frame_buffer.pixels[y * frame_buffer.width + x] = (cast(u32, y_grad) << 16) | (cast(u32, x_grad));
         x_grad += 1;
       }
       y_grad += 1;

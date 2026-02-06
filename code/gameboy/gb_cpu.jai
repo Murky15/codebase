@@ -1,15 +1,5 @@
 /*  Tests Passed
-  -[X] 01-special
-  -[X] 02-interrupts
-  -[X] 03-op sp,hl
-  -[X] 04-op r,imm
-  -[X] 05-op rp
-  -[X] 06-ld r,r
-  -[X] 07-jr,jp,call,ret,rst
-  -[X] 08-misc instrs
-  -[X] 09-op r,r
-  -[X] 10-bit ops
-  -[X] 11-op a,(hl)
+  - [X] cpu_instrs
 */
 
 GB_CPU_Flags :: enum_flags u8 {
@@ -267,7 +257,7 @@ gb_instr_adc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
     case .H; result += cpu.H; op = cpu.H;
     case .L; result += cpu.L; op = cpu.L;
     case .HLIND; op = gb_read(gb, cpu.HL); result += op;
-    case .n8; op = gb_read(gb, cpu.PC); result += op; cpu.PC += 1;
+    case .n8; op = gb_read_pc(gb); result += op;
     case; #assert false "Improper ADC implementation!";
   }
 
@@ -293,7 +283,7 @@ gb_instr_add :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
       case .H; result += cpu.H; op = cpu.H;
       case .L; result += cpu.L; op = cpu.L;
       case .HLIND; op = gb_read(gb, cpu.HL); result += op;
-      case .n8; op = gb_read(gb, cpu.PC); result += op; cpu.PC += 1;
+      case .n8; op = gb_read_pc(gb); result += op;
       case; #assert false "Improper ADD implementation!";
     }
     cpu.F = 0;
@@ -319,8 +309,7 @@ gb_instr_add :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
     cpu.HL = xx,trunc result;
   } else #if op1 == .SP {
     #assert op2 == .e8 "Improper ADD implementation!";
-    s_u8 := gb_read(gb, cpu.PC);
-    cpu.PC += 1;
+    s_u8 := gb_read_pc(gb);
     s := gb_pun_u8_s8(s_u8);
     result := cast,trunc(s16) cpu.SP + s;
     cpu.F = 0;
@@ -344,7 +333,7 @@ gb_instr_and :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
     case .H; result &= cpu.H;
     case .L; result &= cpu.L;
     case .HLIND; result &= gb_read(gb, cpu.HL);
-    case .n8; result &= gb_read(gb, cpu.PC); cpu.PC += 1;
+    case .n8; result &= gb_read_pc(gb);
     case; #assert false "Improper AND implementation!";
   }
 
@@ -427,7 +416,7 @@ gb_instr_cp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
     case .H; val = cpu.H;
     case .L; val = cpu.L;
     case .HLIND; val = gb_read(gb, cpu.HL);
-    case .n8; val = gb_read(gb, cpu.PC); cpu.PC += 1;
+    case .n8; val = gb_read_pc(gb);;
     case; #assert false "Improper CP implementation!";
   }
   result -= val;
@@ -573,8 +562,9 @@ gb_instr_inc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
 
 gb_instr_jp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
   address := #ifx op1 == .a16 || op2 == .a16 {
-    cpu.PC += 2;
-    (cast(u16, gb_read(gb, cpu.PC-1)) << 8) | gb_read(gb, cpu.PC-2);
+    low := gb_read_pc(gb);
+    high := gb_read_pc(gb);
+    (cast(u16, high) << 8) | low;
   } else {
     cpu.HL;
   }
@@ -600,8 +590,7 @@ gb_instr_jp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
 }
 
 gb_instr_jr :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
-  offset := gb_pun_u8_s8(gb_read(gb, cpu.PC));
-  cpu.PC += 1;
+  offset := gb_pun_u8_s8(gb_read_pc(gb));
 
   carry_set := cast(bool, cpu.F & .CARRY);
   zero_set := cast(bool, cpu.F & .ZERO);
@@ -647,9 +636,8 @@ gb_instr_ld :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
     case .HLI; dest = cpu.HL; cpu.HL += 1;
     case .HLD; dest = cpu.HL; cpu.HL -= 1;
     case .a16IND; {
-      high := gb_read(gb, cpu.PC+1);
-      low := gb_read(gb, cpu.PC);
-      cpu.PC += 2;
+      low := gb_read_pc(gb);
+      high := gb_read_pc(gb);
       address := (cast(u16, high) << 8) | low;
       dest = address;
     }
@@ -673,12 +661,11 @@ gb_instr_ld :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
       return 0;
     }
 
-    case .n8; src = gb_read(gb, cpu.PC); cpu.PC += 1;
+    case .n8; src = gb_read_pc(gb);
     case .n16; {
-      high := gb_read(gb, cpu.PC+1);
-      low := gb_read(gb, cpu.PC);
+      low := gb_read_pc(gb);
+      high := gb_read_pc(gb);
       src = (cast(u16, high) << 8) | low;
-      cpu.PC += 2;
     }
 
     case .HLIND; src = gb_read(gb, cpu.HL);
@@ -687,15 +674,13 @@ gb_instr_ld :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
     case .BCIND; src = gb_read(gb, cpu.BC);
     case .DEIND; src = gb_read(gb, cpu.DE);
     case .a16IND; {
-      high := gb_read(gb, cpu.PC+1);
-      low := gb_read(gb, cpu.PC);
-      cpu.PC += 2;
+      low := gb_read_pc(gb);
+      high := gb_read_pc(gb);
       address := (cast(u16, high) << 8) | low;
       src = gb_read(gb, address);
     }
     case .SP_e8; {
-      s_u8 := gb_read(gb, cpu.PC);
-      cpu.PC += 1;
+      s_u8 := gb_read_pc(gb);
       s := gb_pun_u8_s8(s_u8);
       rel_addr := cast,trunc(s16) cpu.SP + s;
       src = xx,no_check rel_addr;
@@ -723,14 +708,14 @@ gb_instr_ldh :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   #if op1 == {
     case .A; dest = *cpu.A;
     case .CIND; dest = 0xFF00 + cast(u16) cpu.C;
-    case .a8IND; dest = 0xFF00 + cast(u16) gb_read(gb, cpu.PC); cpu.PC += 1;
+    case .a8IND; dest = 0xFF00 + cast(u16) gb_read_pc(gb);
     case; #assert false "Improper LDH Implementation!";
   }
 
   #if op2 == {
     case .A; src = cpu.A;
     case .CIND; src = gb_read(gb, 0xFF00 + cast(u16) cpu.C);
-    case .a8IND; src = gb_read(gb, 0xFF00 + cast(u16) gb_read(gb, cpu.PC)); cpu.PC += 1;
+    case .a8IND; src = gb_read(gb, 0xFF00 + cast(u16) gb_read_pc(gb));
     case; #assert false "Improper LDH Implementation!";
   }
   #if op1 == .A {
@@ -756,7 +741,7 @@ gb_instr_or :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
     case .E; result |= cpu.E;
     case .H; result |= cpu.H;
     case .L; result |= cpu.L;
-    case .n8; result |= gb_read(gb, cpu.PC); cpu.PC += 1;
+    case .n8; result |= gb_read_pc(gb);
     case .HLIND; result |= gb_read(gb, cpu.HL);
     case; #assert false "Improper OR implementation!";
   }
@@ -1073,7 +1058,7 @@ gb_instr_sbc :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
     case .H; r8 = cpu.H;
     case .L; r8 = cpu.L;
     case .HLIND; r8 = gb_read(gb, cpu.HL);
-    case .n8; r8 = gb_read(gb, cpu.PC); cpu.PC += 1;
+    case .n8; r8 = gb_read_pc(gb);
     case; #assert false "Improper SBC implementation!";
   }
 
@@ -1232,7 +1217,7 @@ gb_instr_sub :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
     case .H; r8 = cpu.H;
     case .L; r8 = cpu.L;
     case .HLIND; r8 = gb_read(gb, cpu.HL);
-    case .n8; r8 = gb_read(gb, cpu.PC); cpu.PC += 1;
+    case .n8; r8 = gb_read_pc(gb);
     case; #assert false "Improper SUB implementation!";
   }
 
@@ -1289,7 +1274,7 @@ gb_instr_xor :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
     case .H; r8 = cpu.H;
     case .L; r8 = cpu.L;
     case .HLIND; r8 = gb_read(gb, cpu.HL);
-    case .n8; r8 = gb_read(gb, cpu.PC); cpu.PC += 1;
+    case .n8; r8 = gb_read_pc(gb);
     case; #assert false "Improper XOR implementation!";
   }
 
@@ -1326,7 +1311,7 @@ gb_write :: (gb: *GB_State, addr: u16, value: u8) {
       if (value & 0x1F) == 0 then value = 1; // Yes this is intentional
       num_banks_supported := cast(u64, gb.bank_info.rom_size / GB_ROM_BANK_SIZE);
       bits_required := cast(u8) bit_scan_forward(num_banks_supported) - 1;
-      value &= cast(u8, num_banks_supported - 1);
+      value &= cast(u8) min(num_banks_supported - 1, 0x1F);
       gb.active_bank = value;
       rom_bank_ready = bits_required <= 5; // Otherwise we need to wait and see what the upper bits are
     } else if addr >= 0x4000 && addr < 0x6000 { // NOTE: RAM Bank Number / Upper ROM Bank Number
@@ -1413,6 +1398,7 @@ gb_init :: () -> GB_State {
 
   gb_state.cartridge = cast([] u8) test_rom;
   gb_state.bank_info = bank_info;
+  gb_state.active_bank = 1;
   gb_state.base_mem[0xFF44] = 0x90;
   gb_state.base_mem[0xFF07] = 0xF8;
   gb_state.cpu.A = 0x01;
@@ -1434,14 +1420,13 @@ gb_step :: (gb: *GB_State) -> t_states: int {
   instr: GB_Instruction;
   cycles_consumed := 1; // TODO: Verify this
   if !gb.low_power_mode {
-    opcode := gb_read(gb, gb.cpu.PC);
-    if !gb.halt_stunt_bug then gb.cpu.PC += 1;
+    opcode := gb_read_pc(gb);
+    if gb.halt_stunt_bug then gb.cpu.PC -= 1;
     gb.halt_stunt_bug = false;
     instr = gb.unprefixed_instrs[opcode];
     gb_instr := gb.unprefixed_instr_vtbl[opcode];
     if instr.mnemonic == .PREFIX {
-      opcode = gb_read(gb, gb.cpu.PC);
-      gb.cpu.PC += 1;
+      opcode = gb_read_pc(gb);
       instr = gb.cbprefixed_instrs[opcode];
       gb_instr = gb.cbprefixed_instr_vtbl[opcode];
     }
