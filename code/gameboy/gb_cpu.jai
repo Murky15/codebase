@@ -1,5 +1,6 @@
 /*  Tests Passed
   - [X] cpu_instrs
+  - [ ] dmg_sound
 */
 
 GB_CPU_Flags :: enum_flags u8 {
@@ -15,110 +16,6 @@ GB_Interrupt :: enum_flags u8 {
   TIMER  :: 0x04;
   SERIAL :: 0x08;
   JOYPAD :: 0x10;
-}
-
-GB_Mnemonic :: enum {
-  ADC;
-  ADD;
-  AND;
-  BIT;
-  CALL;
-  CCF;
-  CP;
-  CPL;
-  DAA;
-  DEC;
-  DI;
-  EI;
-  HALT;
-  INC;
-  JP;
-  JR;
-  LD;
-  LDH;
-  NOP;
-  OR;
-  POP;
-  PUSH;
-  RES;
-  RET;
-  RETI;
-  RL;
-  RLA;
-  RLC;
-  RLCA;
-  RR;
-  RRA;
-  RRC;
-  RRCA;
-  RST;
-  SBC;
-  SCF;
-  SET;
-  SLA;
-  SRA;
-  SRL;
-  STOP;
-  SUB;
-  SWAP;
-  XOR;
-  PREFIX;
-
-  ILLEGAL_D3;
-  ILLEGAL_DB;
-  ILLEGAL_DD;
-  ILLEGAL_E3;
-  ILLEGAL_E4;
-  ILLEGAL_EB;
-  ILLEGAL_EC;
-  ILLEGAL_ED;
-  ILLEGAL_F4;
-  ILLEGAL_FC;
-  ILLEGAL_FD;
-}
-
-GB_Operand :: enum {
-  NONE;
-
-  A;
-  B;
-  C;
-  D;
-  E;
-  H;
-  L;
-
-  AF;
-  BC;
-  DE;
-  HL;
-
-  SP;
-  SPI;
-  SP_e8;
-  PC;
-
-  n8;
-  n16;
-  e8;
-
-  a8;
-  a16;
-  CIND;
-  BCIND;
-  DEIND;
-  HLIND;
-  HLI;
-  HLD;
-  a8IND;
-  a16IND;
-
-  u3;
-  VEC;
-
-  Z;
-  NZ;
-  NC;
 }
 
 GB_Memory_Bank_Controller :: enum {
@@ -1332,7 +1229,7 @@ gb_write :: (gb: *GB_State, addr: u16, value: u8) {
 
     if return_early then return;
 
-  } else assert(false, "GB Error: This MBC mode (%) is not yet implemented!", gb.bank_info.mbc_type);
+  } else if gb.bank_info.mbc_type != .ROM_ONLY then assert(false, "GB Error: This MBC mode (%) is not yet implemented!", gb.bank_info.mbc_type);
 
   if addr == 0xFF04 then value = 0;
   if addr == 0xFF07 then gb.timer_accum = 0;
@@ -1399,8 +1296,8 @@ gb_init :: () -> GB_State {
   gb_state.cartridge = cast([] u8) test_rom;
   gb_state.bank_info = bank_info;
   gb_state.active_bank = 1;
+
   gb_state.base_mem[0xFF44] = 0x90;
-  gb_state.base_mem[0xFF07] = 0xF8;
   gb_state.cpu.A = 0x01;
   gb_state.cpu.F = 0xB0;
   gb_state.cpu.B = 0x00;
@@ -1432,6 +1329,7 @@ gb_step :: (gb: *GB_State) -> t_states: int {
     }
     cycles_consumed = gb_instr(gb);
     if cycles_consumed == 0 then cycles_consumed = instr.t_states;
+    assert(cycles_consumed > 0);
   }
 
   // NOTE: Check for interrupts

@@ -1,5 +1,7 @@
 /*
-  TODO: How do we want to handle window resizes?
+  TODO:
+  -[ ] How do we want to handle window resizes?
+  -[ ] I Feel like a better rendering system would be to use OpenGL
 */
 
 #load "gb_instr_meta.jai";
@@ -172,7 +174,8 @@ main :: () {
 Desktop :: #import "Window_Creation";
 Input   :: #import "Input";
 
-#if OS == .WINDOWS
+#if OS == .WINDOWS {
   #import "Windows";
-else #if OS == .LINUX
+} else #if OS == .LINUX {
   #import "X11";
+}
