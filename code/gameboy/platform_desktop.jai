@@ -1,9 +1,3 @@
-/*
-  TODO:
-  -[ ] How do we want to handle window resizes?
-  -[ ] I Feel like a better rendering system would be to use OpenGL
-*/
-
 #load "gb_instr_meta.jai";
 #load "gb_cpu.jai";
 
