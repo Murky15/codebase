@@ -1,5 +1,6 @@
 /*  Tests Passed
   - [X] cpu_instrs
+  - [ ] instr_timing
   - [ ] dmg_sound
 */
 
@@ -68,6 +69,7 @@ GB_State :: struct {
   cpu: GB_CPU;
   base_mem: *u8;
   ime_needs_update: bool;
+
   low_power_mode: bool;
   halt_stunt_bug: bool;
 
@@ -107,7 +109,7 @@ gb_pun_byte :: inline ($Src: Type, $Ret: Type, val: Src) -> Ret {
   punner: union {
     u: u8;
     s: s8;
-  };
+  }
   #if Src == u8 {
     punner.u = val;
   } else #if Src == s8 {
@@ -1358,8 +1360,8 @@ gb_step :: (gb: *GB_State) -> t_states: int {
 
   // NOTE: Update timers
   gb.div_accum += cycles_consumed;
-  if gb.div_accum >= GB_CLOCK_CYCLES_PER_DIV_INC {
-    gb.div_accum = 0;
+  while gb.div_accum >= GB_CLOCK_CYCLES_PER_DIV_INC {
+    gb.div_accum -= GB_CLOCK_CYCLES_PER_DIV_INC;
     gb.base_mem[0xFF04] += 1;
   }
 
@@ -1369,8 +1371,8 @@ gb_step :: (gb: *GB_State) -> t_states: int {
     clock_select := timer_control & 0x03;
     clock_cycles_per_inc := GB_CLOCK_CYCLES_PER_TIMER_INC[clock_select];
     gb.timer_accum += cycles_consumed;
-    if gb.timer_accum >= clock_cycles_per_inc {
-      gb.timer_accum = 0;
+    while gb.timer_accum >= clock_cycles_per_inc {
+      gb.timer_accum -= clock_cycles_per_inc;
       tima := gb.base_mem[0xFF05];
       if tima == 0xFF {
         gb.base_mem[0xFF05] = gb.base_mem[0xFF06];
