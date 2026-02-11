@@ -1234,11 +1234,25 @@ gb_write :: (gb: *GB_State, addr: u16, value: u8) {
   if addr == 0xFF04 {
     tac := gb_read(gb, 0xFF07);
     bit := GB_TIMA_BITS_TO_WATCH[tac & 0x03];
-    if (gb.system_counter >> bit) & 0x01 {
-
-    }
+    timer_enable := tac & 0x04;
+    gb_timer_tick(gb, timer_enable && ((gb.system_counter >> bit) & 0x01));
     gb.system_counter = 0;
     return;
+  }
+
+  if addr == 0xFF05 {
+    gb.tima_needs_update = false;
+  }
+
+  if addr == 0xFF07 {
+    tac := gb_read(gb, 0xFF07);
+    old_bit := GB_TIMA_BITS_TO_WATCH[tac   & 0x03];
+    new_bit := GB_TIMA_BITS_TO_WATCH[value & 0x03];
+    old_enable := tac & 0x04;
+    old_input := old_enable && ((gb.system_counter >> old_bit) & 0x01);
+    new_enable := value & 0x04;
+    new_input := new_enable && ((gb.system_counter >> new_bit) & 0x01);
+    gb_timer_tick(gb, old_input && !new_input);
   }
 
   gb.base_mem[addr] = value;
@@ -1249,6 +1263,15 @@ gb_log_state :: (using gb: *GB_State) {
     cpu.A, cast(u8) cpu.F, cpu.B, cpu.C, cpu.D, cpu.E, cpu.H, cpu.L,
     FormatInt.{value=cpu.SP, minimum_digits=4, base=16}, FormatInt.{value=cpu.PC, minimum_digits=4, base=16},
     base_mem[cpu.PC], base_mem[cpu.PC+1], base_mem[cpu.PC+2], base_mem[cpu.PC+3]);
+}
+
+gb_timer_tick :: (gb: *GB_State, should_tick: bool) {
+  if !gb.tima_needs_update && should_tick {
+    gb.base_mem[0xFF05] += 1;
+    if gb_read(gb, 0xFF05) == 0 {
+      gb.tima_needs_update = true;
+    }
+  }
 }
 
 gb_parse_cartridge_header :: (cartridge: string) -> string, GB_Cartridge_Bank_Info {
@@ -1373,19 +1396,16 @@ gb_step :: (gb: *GB_State) -> t_states: int {
     gb.base_mem[0xFF04] = cast(u8, gb.system_counter >> 8);
 
     tac := gb_read(gb, 0xFF07);
+
+    clock_select := tac & 0x03;
+    bit := GB_TIMA_BITS_TO_WATCH[clock_select];
+    timer_enable := tac & 0x04;
+    gb_timer_tick(gb, timer_enable && ((old_system_counter >> bit) & 0x01) && (((gb.system_counter >> bit) & 0x01) == 0));
+
     if gb.tima_needs_update {
       gb.base_mem[0xFF05] = gb_read(gb, 0xFF06);
       gb_request_interrupt(gb, .TIMER);
       gb.tima_needs_update = false;
-    } else if tac & 0x04 {
-      clock_select := tac & 0x03;
-      bit := GB_TIMA_BITS_TO_WATCH[clock_select];
-      if ((old_system_counter >> bit) & 0x01) && (((gb.system_counter >> bit) & 0x01) == 0) {
-        gb.base_mem[0xFF05] += 1;
-        if gb_read(gb, 0xFF05) == 0 {
-          gb.tima_needs_update = true;
-        }
-      }
     }
   }
 
