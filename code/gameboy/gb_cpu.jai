@@ -68,13 +68,14 @@ GB_CPU :: struct {
 GB_State :: struct {
   cpu: GB_CPU;
   base_mem: *u8;
-  ime_needs_update: bool;
 
-  low_power_mode: bool;
-  halt_stunt_bug: bool;
+  clock_accumulator: int;
+  system_counter: u16;
 
-  div\ _accum: int;
-  timer_accum: int;
+  ime\_needs_update: bool;
+  tima_needs_update: bool;
+  low_power_mode:    bool;
+  halt_stunt_bug:    bool;
 
   cartridge: [] u8;
   bank_info: GB_Cartridge_Bank_Info;
@@ -95,14 +96,11 @@ GB_Instruction :: struct {
   #overlay (op1) op: [2] GB_Operand;
 }
 
+
+GB_CLOCKS_PER_M_CYCLE :: 4;
+GB_TIMA_BITS_TO_WATCH :: int.[7, 1, 3, 5];
 GB_ROM_BANK_SIZE :: 16 * 1024;
 GB_DMG_MASTER_CLOCK_RATE :: 4194304;
-GB_DMG_DIV\  _CLOCK_RATE :: 16384;
-GB_CLOCK_CYCLES_PER_DIV\ _INC :: GB_DMG_MASTER_CLOCK_RATE / GB_DMG_DIV_CLOCK_RATE;
-GB_CLOCK_CYCLES_PER_TIMER_INC :: int.[GB_DMG_MASTER_CLOCK_RATE/4096,
-                                      GB_DMG_MASTER_CLOCK_RATE/262144,
-                                      GB_DMG_MASTER_CLOCK_RATE/65536,
-                                      GB_DMG_MASTER_CLOCK_RATE/16384];
 GB_INTERRUPT_SOURCE_LOOKUP :: u8.[0x40, 0x48, 0x50, 0x58, 0x60];
 
 gb_pun_byte :: inline ($Src: Type, $Ret: Type, val: Src) -> Ret {
@@ -1233,8 +1231,16 @@ gb_write :: (gb: *GB_State, addr: u16, value: u8) {
 
   } else if gb.bank_info.mbc_type != .ROM_ONLY then assert(false, "GB Error: This MBC mode (%) is not yet implemented!", gb.bank_info.mbc_type);
 
-  if addr == 0xFF04 then value = 0;
-  if addr == 0xFF07 then gb.timer_accum = 0;
+  if addr == 0xFF04 {
+    tac := gb_read(gb, 0xFF07);
+    bit := GB_TIMA_BITS_TO_WATCH[tac & 0x03];
+    if (gb.system_counter >> bit) & 0x01 {
+
+    }
+    gb.system_counter = 0;
+    return;
+  }
+
   gb.base_mem[addr] = value;
 }
 
@@ -1359,26 +1365,26 @@ gb_step :: (gb: *GB_State) -> t_states: int {
   }
 
   // NOTE: Update timers
-  gb.div_accum += cycles_consumed;
-  while gb.div_accum >= GB_CLOCK_CYCLES_PER_DIV_INC {
-    gb.div_accum -= GB_CLOCK_CYCLES_PER_DIV_INC;
-    gb.base_mem[0xFF04] += 1;
-  }
+  gb.clock_accumulator += cycles_consumed;
+  while gb.clock_accumulator >= GB_CLOCKS_PER_M_CYCLE {
+    gb.clock_accumulator -= GB_CLOCKS_PER_M_CYCLE;
+    old_system_counter := gb.system_counter;
+    gb.system_counter += 1;
+    gb.base_mem[0xFF04] = cast(u8, gb.system_counter >> 8);
 
-  timer_control := gb_read(gb, 0xFF07);
-  timer_enable := timer_control & 0x04;
-  if timer_enable {
-    clock_select := timer_control & 0x03;
-    clock_cycles_per_inc := GB_CLOCK_CYCLES_PER_TIMER_INC[clock_select];
-    gb.timer_accum += cycles_consumed;
-    while gb.timer_accum >= clock_cycles_per_inc {
-      gb.timer_accum -= clock_cycles_per_inc;
-      tima := gb.base_mem[0xFF05];
-      if tima == 0xFF {
-        gb.base_mem[0xFF05] = gb.base_mem[0xFF06];
-        gb_request_interrupt(gb, .TIMER);
-      } else {
+    tac := gb_read(gb, 0xFF07);
+    if gb.tima_needs_update {
+      gb.base_mem[0xFF05] = gb_read(gb, 0xFF06);
+      gb_request_interrupt(gb, .TIMER);
+      gb.tima_needs_update = false;
+    } else if tac & 0x04 {
+      clock_select := tac & 0x03;
+      bit := GB_TIMA_BITS_TO_WATCH[clock_select];
+      if ((old_system_counter >> bit) & 0x01) && (((gb.system_counter >> bit) & 0x01) == 0) {
         gb.base_mem[0xFF05] += 1;
+        if gb_read(gb, 0xFF05) == 0 {
+          gb.tima_needs_update = true;
+        }
       }
     }
   }
