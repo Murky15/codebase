@@ -1,13 +1,18 @@
 #load "gb_instr_meta.jai";
 #load "gb_cpu.jai";
+#load "gb_gpu.jai";
 
 GB_RESOLUTION_W :: 160;
 GB_RESOLUTION_H :: 144;
 GB_RESOLUTION_WINDOW_SCALE :: 4;
 
-TARGET_FRAMES_PER_SECOND :: 60;
-TARGET_MS_PER_FRAME :: cast(float) 1000/TARGET_FRAMES_PER_SECOND;
-CYCLES_PER_FRAME :: GB_DMG_MASTER_CLOCK_RATE / TARGET_FRAMES_PER_SECOND;
+TARGET_FRAMES_PER_SECOND :: cast(float) GB_DMG_MASTER_CLOCK_RATE / GB_DOTS_PER_FRAME;
+TARGET_MS_PER_FRAME :: 1000/TARGET_FRAMES_PER_SECOND;
+
+Bitmap :: struct {
+  width, height: int;
+  pixels: *u32;
+}
 
 main :: () {
   // TODO: Where is the best place to put this?
@@ -23,9 +28,12 @@ main :: () {
   main_window := SDL_CreateWindow("Game Boy", GB_RESOLUTION_W * GB_RESOLUTION_WINDOW_SCALE, GB_RESOLUTION_H * GB_RESOLUTION_WINDOW_SCALE, 0);
   assert(main_window != null);
 
-  window_surface := SDL_GetWindowSurface(main_window);
-  framebuffer := SDL_CreateSurface(GB_RESOLUTION_W, GB_RESOLUTION_H, .XRGB8888);
+  framebuffer := Bitmap.{GB_RESOLUTION_W, GB_RESOLUTION_H,
+                  alloc(GB_RESOLUTION_W * GB_RESOLUTION_H * size_of(u32))};
   gb_state := gb_init();
+
+  window_surface := SDL_GetWindowSurface(main_window);
+  framebuffer_surface := SDL_CreateSurfaceFrom(GB_RESOLUTION_W, GB_RESOLUTION_H, .XRGB8888, framebuffer.pixels, GB_RESOLUTION_W * size_of(u32));
 
   should_run := true;
   while should_run {
@@ -39,30 +47,17 @@ main :: () {
       }
     }
 
-    cycles_this_frame := 0;
-    while cycles_this_frame < CYCLES_PER_FRAME {
-      cycles_this_frame += gb_step(*gb_state);
-    }
-
-    SDL_ClearSurface(framebuffer, 1, 1, 1, 1);
-    SDL_LockSurface(framebuffer);
     {
+      SDL_ClearSurface(framebuffer_surface, 1, 1, 1, 1);
       defer {
-        SDL_UnlockSurface(framebuffer);
-        SDL_BlitSurfaceScaled(framebuffer, null, window_surface, null, .SDL_SCALEMODE_NEAREST);
+        SDL_BlitSurfaceScaled(framebuffer_surface, null, window_surface, null, .SDL_SCALEMODE_NEAREST);
         SDL_UpdateWindowSurface(main_window);
       }
-      x_grad: u8;
-      y_grad: u8;
-      pixels := cast(*u32) framebuffer.pixels;
-      for y: 0..framebuffer.h-1 {
-        x_grad = 0;
-        for x: 0..framebuffer.w-1 {
-          // 0xXXRRGGBB
-          pixels[y * framebuffer.w + x] = (cast(u32, y_grad) << 16) | (cast(u32, x_grad));
-          x_grad += 1;
-        }
-        y_grad += 1;
+      cycles_this_frame := 0;
+      while cycles_this_frame < GB_DOTS_PER_FRAME {
+        cycles_taken := gb_step(*gb_state);
+        cycles_this_frame += cycles_taken;
+        gb_ppu_process_frame(*gb_state, cycles_taken, cycles_this_frame, framebuffer);
       }
     }
 

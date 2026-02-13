@@ -1,6 +1,12 @@
 /*  Tests Passed
   - [X] cpu_instrs
-  - [ ] instr_timing
+  - [X] instr_timing
+
+    NOTE: These tests verify very niche behavior that
+    is a pain to implement if we are not going for 100% accuracy.
+  - [ ] interrupt_time
+  - [ ] halt_bug
+
   - [ ] dmg_sound
 */
 
@@ -749,7 +755,7 @@ gb_instr_ret :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
     case; #assert false "Improper RET implementation";
   }
 
-  t_states := ifx op1 != .NONE 16;
+  t_states := ifx op1 == .NONE 16;
   if should_ret {
     low := gb_read(gb, cpu.SP);
     high := gb_read(gb, cpu.SP + 1);
@@ -1232,6 +1238,7 @@ gb_write :: (gb: *GB_State, addr: u16, value: u8) {
   } else if gb.bank_info.mbc_type != .ROM_ONLY then assert(false, "GB Error: This MBC mode (%) is not yet implemented!", gb.bank_info.mbc_type);
 
   if addr == 0xFF04 {
+    log("Wrote to DIV");
     tac := gb_read(gb, 0xFF07);
     bit := GB_TIMA_BITS_TO_WATCH[tac & 0x03];
     timer_enable := cast(bool, tac & 0x04);
@@ -1264,8 +1271,6 @@ gb_write :: (gb: *GB_State, addr: u16, value: u8) {
     value = 0xF8 | (value & 0x07);
   }
 
-  if addr == 0xFFFF gb_log_state(gb);
-
   gb.base_mem[addr] = value;
 }
 
@@ -1280,6 +1285,8 @@ gb_timer_tick :: (gb: *GB_State) {
   if !gb.tima_needs_update {
     gb.base_mem[0xFF05] += 1;
     if gb_read(gb, 0xFF05) == 0 {
+      //log("TIMA overflow!");
+      //print_stack_trace(context.stack_trace);
       gb.tima_needs_update = true;
       gb.tima_delay_counter = 4;
     }
