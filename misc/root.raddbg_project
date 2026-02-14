@@ -1,5 +1,6 @@
 // raddbg 0.9.25 project file
 
+recent_file: path: "../code/gameboy/platform_desktop.jai"
 recent_file: path: "../code/soniboy/main.jai"
 debug_info:
 {
@@ -9,6 +10,18 @@ debug_info:
 breakpoint:
 {
   source_location: "../code/soniboy/main.jai:876:1"
-  hit_count: 1
+  hit_count: 0
   condition: "gb.cpu.B == 0x13"
 }
+debug_info:
+{
+  path: "W:/build/gameboy.pdb"
+  timestamp: 66206463801782
+}
+breakpoint:
+{
+  source_location: "../code/gameboy/platform_desktop.jai:46:1"
+  hit_count: 1
+}
+type_view
+type_view

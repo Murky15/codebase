@@ -1,3 +1,108 @@
+
+GB_Mnemonic :: enum {
+  ADC;
+  ADD;
+  AND;
+  BIT;
+  CALL;
+  CCF;
+  CP;
+  CPL;
+  DAA;
+  DEC;
+  DI;
+  EI;
+  HALT;
+  INC;
+  JP;
+  JR;
+  LD;
+  LDH;
+  NOP;
+  OR;
+  POP;
+  PUSH;
+  RES;
+  RET;
+  RETI;
+  RL;
+  RLA;
+  RLC;
+  RLCA;
+  RR;
+  RRA;
+  RRC;
+  RRCA;
+  RST;
+  SBC;
+  SCF;
+  SET;
+  SLA;
+  SRA;
+  SRL;
+  STOP;
+  SUB;
+  SWAP;
+  XOR;
+  PREFIX;
+
+  ILLEGAL_D3;
+  ILLEGAL_DB;
+  ILLEGAL_DD;
+  ILLEGAL_E3;
+  ILLEGAL_E4;
+  ILLEGAL_EB;
+  ILLEGAL_EC;
+  ILLEGAL_ED;
+  ILLEGAL_F4;
+  ILLEGAL_FC;
+  ILLEGAL_FD;
+}
+
+GB_Operand :: enum {
+  NONE;
+
+  A;
+  B;
+  C;
+  D;
+  E;
+  H;
+  L;
+
+  AF;
+  BC;
+  DE;
+  HL;
+
+  SP;
+  SPI;
+  SP_e8;
+  PC;
+
+  n8;
+  n16;
+  e8;
+
+  a8;
+  a16;
+  CIND;
+  BCIND;
+  DEIND;
+  HLIND;
+  HLI;
+  HLD;
+  a8IND;
+  a16IND;
+
+  u3;
+  VEC;
+
+  Z;
+  NZ;
+  NC;
+}
+
 gb_load_instruction_data :: () -> unprefixed: [] GB_Instruction, cbprefixed: [] GB_Instruction {
   #import "Json";
 

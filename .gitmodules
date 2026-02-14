@@ -4,3 +4,6 @@
 [submodule "code/soniboy/extra_modules/Json"]
 	path = code/gameboy/extra_modules/Json
 	url = https://github.com/rluba/jaison
+[submodule "code/gameboy/extra_modules/sdl3"]
+	path = code/gameboy/extra_modules/sdl3
+	url = https://github.com/overlord-systems/jai-sdl3

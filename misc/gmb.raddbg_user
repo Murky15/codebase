@@ -3,10 +3,10 @@
 recent_project: path: "root.raddbg_project"
 window:
 {
-  size: 2003.199951 1152.000000
+  size: 1942 1152
   panels:
   {
-    0.681927:
+    0.519793:
     {
       0.80:
       {
@@ -38,17 +38,17 @@ window:
         0.75: getting_started text:
         {
           selected
-          expression: "file:\"W:/code/soniboy/main.jai\".data"
+          expression: "file:\"W:/code/gameboy/platform_desktop.jai\".data"
           auto: 1
           query:
           {
             input: ""
             cmd: search
           }
-          cursor_line: 876
-          cursor_column: 20
-          mark_line: 876
-          mark_column: 20
+          cursor_line: 47
+          cursor_column: 1
+          mark_line: 47
+          mark_column: 1
         }
       }
       0.20:
@@ -80,22 +80,13 @@ window:
         }
       }
     }
-    0.318073:
+    0.480207:
     {
       0.50:
       {
         selected
         watch: expression: "query:targets"
-        watch:
-        {
-          selected
-          expression: ""
-          watch: instr
-          watch: gb_state
-          watch: src
-          watch: "gb.base_mem[gb.cpu.SP-1]"
-          watch: "gb.cpu"
-        }
+        watch: selected expression: ""
         watch: expression: "query:locals"
       }
       0.50:
@@ -111,7 +102,7 @@ window:
     }
   }
   split_x
-  pos: 250 144
+  pos: -11 -6
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }
@@ -234,4 +225,9 @@ keybindings:
   { log_marker m ctrl shift alt }
   { toggle_dev_menu d ctrl shift alt }
 }
-current_path: "W:"
+current_path: "W:/code/gameboy"
+file_path_map:
+{
+  source: "W:/code/soniboy/main.jai"
+  dest: "W:/code/gameboy/platform_desktop.jai"
+}
