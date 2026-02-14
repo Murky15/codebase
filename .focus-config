@@ -15,12 +15,20 @@ build_working_dir: ../
 run_working_dir: ../build
 auto_jump_to_error: true
 
-[Build Roguelike]
-error_regex: ^(?P<file>.*)\((?P<line>\d+),?(?P<col>\d+)?\)[ ]?: (?P<type>fatal error|error|warning) (?P<msg>.*)$
-build_command: %BUILD_WORKING_DIR%/code/roguelike/build.bat
+# [Build Roguelike]
+# error_regex: ^(?P<file>.*)\((?P<line>\d+),?(?P<col>\d+)?\)[ ]?: (?P<type>fatal error|error|warning) (?P<msg>.*)$
+# build_command: %BUILD_WORKING_DIR%/code/roguelike/build.bat
+# key_binding: F1
+# [Run Roguelike]
+# run_command: %RUN_WORKING_DIR%/roguelike_platform_win32.exe
+# key_binding: F2
+
+[Build Bean Game]
+error_regex: ^(?P<file>.*):(?P<line>\d+),(?P<col>\d+): (?P<type>Error|Warning|Info|...):* (?P<msg>.*)|^(?P<msg1>.*error LNK.*)
+build_command: jai %BUILD_WORKING_DIR%/code/bean_game/first.jai
 key_binding: F1
-[Run Roguelike]
-run_command: %RUN_WORKING_DIR%/roguelike_platform_win32.exe
+[Run Bean Game]
+run_command: %RUN_WORKING_DIR%/BeanGame
 key_binding: F2
 
 [Build Gameboy]
