@@ -5,14 +5,14 @@ for her before she gets back.
 */
 
 AARect :: struct {
-  using v: Vector4;
+  using #as v: Vector4;
   #overlay (z) width: float;
   #overlay (w) height: float;
 }
 
 Entity :: struct {
   pos: Vector2;
-  bbox_dim: Vector2;
+  bbox_dim := #run xy(TILE_RESOLUTION);
   velocity: Vector2;
   jumping: bool;
 
@@ -24,15 +24,20 @@ Tile_Type :: enum {
   GROUND;
 }
 
+TILE_RESOLUTION :: 64;
 PLAYER_MOVE_SPEED :: 500.0;
-PLAYER_JUMP_VELOCITY :: 1400.0;
-GRAVITY :: -4000.0;
+PLAYER_JUMP_VELOCITY :: 1600.0;
+GRAVITY :: -4200.0;
 
 operator > :: (a: Vector2, b: Vector2) -> bool {
   return a.x > b.x && a.y > b.y;
 }
 
-rects_intersect :: (a: AARect, b: AARect) -> bool, AARect {
+floor :: (v: Vector2) -> Vector2 {
+  return {floor(v.x), floor(v.y)};
+}
+
+rects_intersect :: (a: Vector4, b: Vector4) -> bool, AARect {
   fulla := a.xy + a.zw;
   fullb := b.xy + b.zw;
   is_intersecting := (fulla > b.xy) && (fullb > a.xy);
@@ -46,6 +51,10 @@ rects_intersect :: (a: AARect, b: AARect) -> bool, AARect {
   return is_intersecting, overlap;
 }
 
+map_index :: (map: [] Tile_Type, ) {
+
+}
+
 main :: () {
   perm_arena: Flat_Pool;
   arena_allocator := Allocator.{proc=flat_pool_allocator_proc, data=*perm_arena};
@@ -57,9 +66,8 @@ main :: () {
 
   // NOTE: For now let's assume that the world is static
   // This is a very simple way to represent the world, and must be refined in the future.
-  tile_resolution :: 64;
-  playfield_width := window_width / tile_resolution;
-  playfield_height := window_height / tile_resolution;
+  playfield_width := window_width / TILE_RESOLUTION;
+  playfield_height := window_height / TILE_RESOLUTION;
   map_data := NewArray(playfield_width * playfield_height, Tile_Type);
   for y: 0..playfield_height-1 {
     for x: 0..playfield_width-1 {
@@ -76,6 +84,7 @@ main :: () {
   }
 
   player: Entity;
+  player.pos = xy(0, 150);
 
   should_run := true;
   input_move_left, input_move_right, input_jump: bool;
@@ -98,21 +107,41 @@ main :: () {
     dt := cast(float, end - start);
     start = end;
 
+    old_player := player;
+
     if input_jump && !player.jumping {
       player.jumping = true;
       player.velocity.y = PLAYER_JUMP_VELOCITY;
     }
+
     if player.jumping {
       player.velocity.y += GRAVITY * dt;
     }
-    player.pos.y = max(0.0, player.pos.y);
-    if player.pos.y == 0 then player.jumping = false;
 
     dir: float;
     if input_move_left  dir -= 1;
     if input_move_right dir += 1;
+
     player.pos.x += dir * PLAYER_MOVE_SPEED * dt;
     player.pos.y += player.velocity.y * dt;
+    player_pos_diff := player.pos - old_player.pos;
+
+    player_grid_pos := floor(player.pos / TILE_RESOLUTION);
+    for x: 0..1 {
+      test := player_grid_pos + xy(xx x, 0);
+      if test.y < 0 || test.y >= xx playfield_height  break;
+      if test.x < 0 || test.x >= xx playfield_width   continue;
+      potential_collision := map_data[xx test.y * playfield_width + xx test.x];
+      if potential_collision == .GROUND {
+        tile := AARect.{xy = test * TILE_RESOLUTION, zw = xy(TILE_RESOLUTION)};
+        colliding, overlap := rects_intersect(player.bbox, tile);
+        if colliding {
+          player.pos.y += overlap.height;
+          player.velocity.y = 0;
+          player.jumping = false;
+        }
+      }
+    }
 
     Simp.clear_render_target(1, 1, 1, 1);
     Simp.set_shader_for_color();
@@ -120,13 +149,13 @@ main :: () {
       for x: 0..playfield_width-1 {
         tile := map_data[y * playfield_width + x];
         if tile == .GROUND {
-          dsp_x := cast(float) x * tile_resolution;
-          dsp_y := cast(float) y * tile_resolution;
-          Simp.immediate_quad(dsp_x + 1, dsp_y, dsp_x + tile_resolution, dsp_y + tile_resolution, {0, 0, 0, 1});
+          dsp_x := cast(float) x * TILE_RESOLUTION;
+          dsp_y := cast(float) y * TILE_RESOLUTION;
+          Simp.immediate_quad(dsp_x + 1, dsp_y, dsp_x + TILE_RESOLUTION, dsp_y + TILE_RESOLUTION, {0, 0, 0, 1});
         }
       }
     }
-    Simp.immediate_quad(player.pos.x, player.pos.y, player.pos.x + tile_resolution, player.pos.y + tile_resolution, {.5, .5, .5, 1});
+    Simp.immediate_quad(player.pos.x, player.pos.y, player.pos.x + TILE_RESOLUTION, player.pos.y + TILE_RESOLUTION, {.5, .5, .5, 1});
     Simp.swap_buffers(main_window);
   }
 }
