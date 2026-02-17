@@ -86,7 +86,7 @@ main :: () {
 
   for y: 0..playfield_height-1 {
     for x: 0..playfield_width-1 {
-      if y == 2 && x < 6 {
+      if (y == 2 || y == 7) && x < 6 {
         map.tiles[y * playfield_width + x] = .GROUND;
       }
       if y == 2 && x > 13 {

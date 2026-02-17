@@ -109,23 +109,38 @@ GB_ROM_BANK_SIZE :: 16 * 1024;
 GB_DMG_MASTER_CLOCK_RATE :: 4194304;
 GB_INTERRUPT_SOURCE_LOOKUP :: u8.[0x40, 0x48, 0x50, 0x58, 0x60];
 
-gb_pun_byte :: inline ($Src: Type, $Ret: Type, val: Src) -> Ret {
-  punner: union {
-    u: u8;
-    s: s8;
-  }
-  #if Src == u8 {
-    punner.u = val;
-  } else #if Src == s8 {
-    punner.s = val;
+gb_puncast :: (val: $A) -> $B
+#modify {
+  t := cast(*Type_Info) A;
+  if t.type != .INTEGER then return false, "Puncast only works with integers!";
+  ti := cast(*Type_Info_Integer) t;
+  if ti.signed {
+    if ti.runtime_size == {
+      case 1; B = u8;
+      case 2; B = u16;
+      case 4; B = u32;
+      case 8; B = u64;
+    }
   } else {
-    #assert false "Only 1-byte values are applicable here!";
+    if ti.runtime_size == {
+      case 1; B = s8;
+      case 2; B = s16;
+      case 4; B = s32;
+      case 8; B = s64;
+    }
   }
 
-  return #ifx Ret == s8 punner.s else punner.u;
+  return true;
 }
-gb_pun_u8_s8 :: #bake_arguments gb_pun_byte(Src=u8, Ret=s8);
-gb_pun_s8_u8 :: #bake_arguments gb_pun_byte(Src=s8, Ret=u8);
+{
+  punner: union {
+    a: A;
+    b: B;
+  }
+  punner.a = val;
+
+  return punner.b;
+}
 
 gb_operand_is_r8 :: inline (op: GB_Operand) -> bool {
   return op >= .A && op <= .L;
@@ -213,7 +228,7 @@ gb_instr_add :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
   } else #if op1 == .SP {
     #assert op2 == .e8 "Improper ADD implementation!";
     s_u8 := gb_read_pc(gb);
-    s := gb_pun_u8_s8(s_u8);
+    s := gb_puncast(s_u8);
     result := cast,trunc(s16) cpu.SP + s;
     cpu.F = 0;
     cpu.F |= ifx (cpu.SP & 0xFF) + s_u8 > 0xFF then .CARRY;
@@ -493,7 +508,7 @@ gb_instr_jp :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
 }
 
 gb_instr_jr :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or_u3: u8) -> int {
-  offset := gb_pun_u8_s8(gb_read_pc(gb));
+  offset := gb_puncast(gb_read_pc(gb));
 
   carry_set := cast(bool, cpu.F & .CARRY);
   zero_set := cast(bool, cpu.F & .ZERO);
@@ -584,7 +599,7 @@ gb_instr_ld :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_or
     }
     case .SP_e8; {
       s_u8 := gb_read_pc(gb);
-      s := gb_pun_u8_s8(s_u8);
+      s := gb_puncast(s_u8);
       rel_addr := cast,trunc(s16) cpu.SP + s;
       src = xx,no_check rel_addr;
 
@@ -1059,10 +1074,10 @@ gb_instr_sra :: (using gb: *GB_State, $op1: GB_Operand, $op2: GB_Operand, $vec_o
     byte.* >>= 1;
     cpu.F |= ifx byte.* == 0 then .ZERO;
   } else {
-    dest := gb_pun_u8_s8(gb_read(gb, byte));
+    dest := gb_puncast(gb_read(gb, byte));
     new_carry := dest & 0x01;
     dest >>= 1;
-    gb_write(gb, byte, gb_pun_s8_u8(dest));
+    gb_write(gb, byte, gb_puncast(dest));
     cpu.F |= ifx dest == 0 then .ZERO;
   }
   cpu.F |= ifx new_carry then .CARRY;
