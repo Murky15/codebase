@@ -207,9 +207,12 @@ main :: () {
   input_move_left, input_move_right, input_jump: bool;
   start := seconds_since_init();
 
-  accel_force := Force.{magnitude = 220_000, duration_seconds = 0.1};
-  move_force := Force.{magnitude = 75_000};
+  // NOTE: Should we also have a special "pivot" force?
+  move_force := Force.{magnitude = 180_000};
   friction_force := move_force;
+  accel_force: Force;
+  accel_force.duration_seconds = 0.15;
+  accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / accel_force.duration_seconds)) + friction_force.magnitude;
 
   while should_run {
     reset_temporary_storage();
@@ -222,7 +225,10 @@ main :: () {
         if it.key_code == #char "A" then input_move_left  = xx it.key_pressed;
         if it.key_code == #char "D" then input_move_right = xx it.key_pressed;
         if it.key_code == .SPACEBAR then input_jump       = xx it.key_pressed;
-        if it.key_code == #char "R" && it.key_pressed then player.pos = xy(0, 250);
+        if it.key_code == #char "R" && it.key_pressed {
+          player.pos = xy(0, 250);
+          player.velocity = {};
+        }
       }
     }
 
@@ -257,20 +263,21 @@ main :: () {
       if accel_force.time_counter < accel_force.duration_seconds {
         accel += accel_force.magnitude * dir;
         accel_force.time_counter += dt;
-      } else {
+      } else if sign(dir) == sign(player.dir) {
         accel += move_force.magnitude * dir;
       }
-      if sign(player.velocity.x) != sign(player.dir) {
+      if sign(player.velocity.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
         player.dir = 0;
         player.velocity.x = 0;
-      } else {
-        accel += friction_force.magnitude * player.dir * -1;
       }
+      accel += friction_force.magnitude * -sign(player.velocity.x);
       accel /= player.mass;
-
       player.velocity.x += accel * dt;
+      player.velocity.x = sign(player.velocity.x) * min(abs(player.velocity.x), PLAYER_MOVE_SPEED);
+
       player.pos += player.velocity * dt;
       player_pos_diff := player.pos - old_player.pos;
+      log("%", player.velocity.x);
 
       player_grid_pos := floor(player.pos / TILE_RESOLUTION);
       if !player.jumping {
