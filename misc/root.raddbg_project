@@ -1,5 +1,7 @@
 // raddbg 0.9.25 project file
 
+recent_file: path: "../code/bean_game/main.jai"
+recent_file: path: "C:/Users/gmb/Workspace/Tools/jai/modules/Unicode.jai"
 recent_file: path: "../code/gameboy/platform_desktop.jai"
 recent_file: path: "../code/soniboy/main.jai"
 debug_info:
@@ -18,10 +20,16 @@ debug_info:
   path: "W:/build/gameboy.pdb"
   timestamp: 66206463801782
 }
-breakpoint:
+type_view
+type_view
+target:
 {
-  source_location: "../code/gameboy/platform_desktop.jai:46:1"
-  hit_count: 1
+  executable: "../build/BeanGame.exe"
+  working_directory: "../build/"
+  enabled: 1
 }
-type_view
-type_view
+debug_info:
+{
+  path: "W:/build/BeanGame.pdb"
+  timestamp: 66207204388752
+}

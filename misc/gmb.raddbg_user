@@ -6,11 +6,11 @@ window:
   size: 1942 1152
   panels:
   {
-    0.519793:
+    0.654301:
     {
-      0.80:
+      0.672714:
       {
-        0.25:
+        0.389445:
         {
           0.50: disasm:
           {
@@ -35,23 +35,23 @@ window:
             memory: expression: ""
           }
         }
-        0.75: getting_started text:
+        0.610555: getting_started text:
         {
           selected
-          expression: "file:\"W:/code/gameboy/platform_desktop.jai\".data"
+          expression: "file:\"W:/code/bean_game/main.jai\".data"
           auto: 1
           query:
           {
             input: ""
             cmd: search
           }
-          cursor_line: 47
-          cursor_column: 1
-          mark_line: 47
-          mark_column: 1
+          cursor_line: 517
+          cursor_column: 2
+          mark_line: 517
+          mark_column: 2
         }
       }
-      0.20:
+      0.327286:
       {
         0.60:
         {
@@ -80,13 +80,18 @@ window:
         }
       }
     }
-    0.480207:
+    0.345699:
     {
       0.50:
       {
         selected
         watch: expression: "query:targets"
-        watch: selected expression: ""
+        watch:
+        {
+          selected
+          expression: ""
+          watch: it
+        }
         watch: expression: "query:locals"
       }
       0.50:
@@ -102,7 +107,7 @@ window:
     }
   }
   split_x
-  pos: -11 -6
+  pos: 281 144
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }
@@ -225,7 +230,7 @@ keybindings:
   { log_marker m ctrl shift alt }
   { toggle_dev_menu d ctrl shift alt }
 }
-current_path: "W:/code/gameboy"
+current_path: "W:/build"
 file_path_map:
 {
   source: "W:/code/soniboy/main.jai"
