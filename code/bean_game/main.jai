@@ -69,12 +69,14 @@ Tile_Type :: enum {
 Tile :: struct {
   type: Tile_Type;
   tex: *Simp.Texture;
+  display_offset: Vector2;
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
 
   decorative: bool;
 
   bob_counter: float;
   bob_amplitude: float;
+  bob_frequency :: PI;
   collected: bool;
 }
 
@@ -90,7 +92,7 @@ Map :: struct {
   }
 
   Parallax_Effect :: struct {
-    using n: Linked_List_Header;
+    #as using n: Linked_List_Header;
 
     layer: int;
     pos: Vector2;
@@ -288,13 +290,13 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
   above_ground_tiles := Autotile.[atile("tile_grass"), atile("tile_top"), atile("tile_water")];
   below_ground_tiles := Autotile.[atile("tile", 50.0, true), atile("tile_diagonal", 50.0/3), atile("tile_stone", 50.0/3), atile("tile_brick", 50.0/3)];
   bounce_pad_texture := table_find_pointer(*textures, "tile_belt");
-  background_layer_1_textures := Autotile.[atile("tile_tree", 8.0), atile("tile_bushHalf", 8.0), atile("tile_bush", 8.0)];
+  background_layer_1_textures := Autotile.[];
   // TODO: A lot of textures have alternate counterparts (coins/gems spikes/cogs)
-  // Should we autotile these or keep them as seperate entities?
+  // Should we autotile these or keep them as separate entities?
   coin_textures := Autotile.[atile("tile_coin", 50), atile("tile_gem", 50)];
 
   // NOTE: Not associated with tiles
-  background_layer_2_textures := Autotile.[atile("background_treeLarge", 50.0), atile("background_tree", 50.0)];
+  background_layer_2_textures := Autotile.[atile("tile_tree", 8.0), atile("tile_bushHalf", 8.0), atile("tile_bush", 8.0), atile("background_treeLarge", 8.0), atile("background_tree", 8.0)];
   background_layer_3_textures := Autotile.[atile("background_cloudA", 50.0), atile("background_cloudB", 50.0)];
 
   for * map {
@@ -304,6 +306,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
       case .EMPTY; {
         if below != .GROUND then continue;
         it.tex = atile_choose(background_layer_1_textures);
+
       }
       case .GROUND; {
         it.tex = ifx above != .GROUND && above != .WATER {
@@ -314,7 +317,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
       }
       case .WATER; {
         it.tex = above_ground_tiles[2].tex;
-        it.bob_counter = random_get_within_range(0, 2 * PI);
+        it.bob_counter = random_get_within_range(0, (2 * PI) / it.bob_frequency);
         it.bob_amplitude = 5.0;
       }
       case .BOUNCE_PAD; {
@@ -323,16 +326,10 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
       }
       case .COIN; {
         it.tex = atile_choose(coin_textures);
-        it.bob_counter = random_get_within_range(0, 2 * PI);
+        it.bob_counter = random_get_within_range(0, (2 * PI) / it.bob_frequency);
         it.bob_amplitude = 3.0;
       }
     }
-  }
-  for 0..4 {
-    test := New(Map.Parallax_Effect);
-    test.layer = it;
-    sll_queue_push(*map.background, test);
-    map.background.count += 1;
   }
 
   return map;
@@ -371,9 +368,14 @@ cam_update_tracking :: (cam: *Camera, dt: float, attachment := 4.5) {
   cam.pos = lerp(cam.pos, target.pos - cam.offset, t);
 }
 
+base_asset_path :: "W:/assets/bean_game";
+
+load_fonts :: (font_height_px: int) -> *Simp.Dynamic_Font {
+  return Simp.get_font_at_size(base_asset_path, "font.ttf", font_height_px);
+}
+
 Texture_Atlas :: Table(string, Simp.Texture);
 load_assets :: (font_height_px: int) -> Texture_Atlas, *Simp.Dynamic_Font {
-  base_asset_path :: "W:/assets/bean_game";
   art_path :: "W:/assets/bean_game/sprites"; // TODO: Should be provided by metaprogram
   texture_files := file_list(art_path);
   atlas: Texture_Atlas;
@@ -386,7 +388,7 @@ load_assets :: (font_height_px: int) -> Texture_Atlas, *Simp.Dynamic_Font {
     table_add(*atlas, key, new_texture);
   }
 
-  return atlas, Simp.get_font_at_size(base_asset_path, "font.ttf", font_height_px);
+  return atlas, load_fonts(font_height_px);
 }
 
 sign :: inline (x: $T) -> T {
@@ -417,7 +419,7 @@ TILE_RESOLUTION :: TILE_NATIVE_RESOLUTION / 2;
 RESOLUTION_W :: 640;
 RESOLUTION_H :: 360;
 ASPECT_RATIO :: cast(float) RESOLUTION_W / RESOLUTION_H;
-FONT_HEIGHT_PX :: RESOLUTION_H / 12;
+FONT_HEIGHT_DIVISOR :: 24;
 
 PLAYER_MOVE_SPEED :: 350.0;
 PLAYER_JUMP_VELOCITY :: 1000.0;
@@ -452,6 +454,7 @@ for_expansion :: (list: Linked_List, body: Code, flags: For_Flags) #expand {
   node := list.first;
   `it_index := 0;
   while node != null {
+    assert(it_index < list.count);
     defer {
       node = xx node.next;
       it_index += 1;
@@ -464,7 +467,7 @@ for_expansion :: (list: Linked_List, body: Code, flags: For_Flags) #expand {
     #insert body;
   }
 }
-sll_queue_push :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
+sll_queue_push :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   #assert type_of(list.first) == *T;
   if first == null {
     first = n;
@@ -476,35 +479,35 @@ sll_queue_push :: (using list: *Linked_List, n: *$T/interface Linked_List_Header
     n.next = null;
   }
 }
-sll_queue_push_front :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
+sll_queue_push_front :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   #assert type_of(list.first) == *T;
   if first == null {
     first = n;
     last = n;
     n.next = null;
   } else {
-    n.next = first;
+    n.next = xx first;
     first = n;
   }
 }
-sll_queue_pop :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
+sll_queue_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   #assert type_of(list.first) == *T;
   if first == last {
     first = null;
     last = null;
   } else {
-    first = first.next;
+    first = xx first.next;
   }
 }
-sll_stack_push :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
+sll_stack_push :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   #assert type_of(list.first) == *T;
-  n.next = first;
+  n.next = xx first;
   first = n;
 }
-sll_stack_pop :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
+sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   #assert type_of(list.first) == *T;
   if first != null {
-    first = first.next;
+    first = xx first.next;
   }
 }
 
@@ -513,10 +516,12 @@ main :: () {
   level_arena_allocator := Allocator.{proc=Arena.flat_pool_allocator_proc, data=*level_arena_pool};
   bg_logger_init_and_equip();
 
-  main_window := WC.create_window(1280, 720, "Bean Game");
+  window_width  := 1280;
+  window_height := 720;
+  main_window := WC.create_window(window_width, window_height, "Bean Game");
   Simp.set_render_target(main_window);
 
-  texture_atlas, font := load_assets(FONT_HEIGHT_PX);
+  texture_atlas, font := load_assets(window_height / FONT_HEIGHT_DIVISOR);
   coin_texture := table_find_pointer(*texture_atlas, "tile_coin"); // Duplicate
   x_texture := table_find_pointer(*texture_atlas, "ui_numX");
   number_textures := *Simp.Texture.[table_find_pointer(*texture_atlas, "ui_num0"),
@@ -577,7 +582,12 @@ main :: () {
         }
       }
 
-      for Input.get_window_resizes() Simp.update_window(it.window);
+      for Input.get_window_resizes() {
+        Simp.update_window(it.window);
+        window_width = it.width;
+        window_height = it.height;
+        font = load_fonts(window_height / FONT_HEIGHT_DIVISOR);
+      }
 
       #if ENABLE_LEVEL_HOT_RELOAD {
         modtime, _, success := file_modtime_and_size(map.path);
@@ -693,6 +703,14 @@ main :: () {
         }
       }
 
+      for * map {
+        if it.collected then continue;
+        if it.type == .COIN || it.type == .WATER {
+          it.bob_counter += dt;
+          it.bob_counter = fmod_cycling(it.bob_counter, (2 * PI) / it.bob_frequency);
+        }
+      }
+
       cam_update_tracking(*map.cam, dt);
     }
 
@@ -700,17 +718,12 @@ main :: () {
       Simp.clear_render_target(1, 1, 1, 1);
       defer Simp.swap_buffers(main_window);
 
-      for * :visible_only map {
+      for :visible_only map {
         if it.tex == null then continue;
+        if it.collected then continue;
         set_texture(it.tex);
         dsp := it_index * TILE_RESOLUTION;
-        if it.type == .COIN || it.type == .WATER {
-          BOB_FREQUENCY :: PI;
-          if it.collected then continue;
-          it.bob_counter += dt;
-          it.bob_counter = fmod_cycling(it.bob_counter, (2 * PI) / BOB_FREQUENCY);
-          dsp.y += it.bob_amplitude * sin(PI * it.bob_counter);
-        }
+        dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
         p0, p1, p2, p3 := make_quad({xy = dsp - map.cam.pos, zw = xy(TILE_RESOLUTION)});
         Simp.immediate_quad(p0, p1, p2, p3);
       }
@@ -747,7 +760,7 @@ main :: () {
       for * logs_to_display {
         t := norm(it.time_of_log + it.decay, it.time_of_log, it.time_of_log + LOG_MESSAGE_FADE_DURATION);
         alpha := ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
-        Simp.draw_text(font, 50, 50 + it_index * FONT_HEIGHT_PX, it.message, {w = 1 - alpha});
+        Simp.draw_text(font, 50, 50 + it_index * (window_height/FONT_HEIGHT_DIVISOR), it.message, {w = 1 - alpha});
         it.decay += dt;
         if it.decay > LOG_MESSAGE_FADE_DURATION {
           free(it.message);
