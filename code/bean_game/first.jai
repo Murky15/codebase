@@ -3,6 +3,7 @@
   options := get_build_options();
   options.output_executable_name = "BeanGame";
   options.output_path = join(#filepath, "../../build");
+  options.text_output_flags = xx 0;
 
   set_optimization(*options, .VERY_DEBUG);
   set_build_options(options, w);

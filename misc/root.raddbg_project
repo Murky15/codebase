@@ -25,11 +25,16 @@ type_view
 target:
 {
   executable: "../build/BeanGame.exe"
-  working_directory: "../build/"
+  working_directory: "../build"
   enabled: 1
 }
 debug_info:
 {
   path: "W:/build/BeanGame.pdb"
-  timestamp: 66207204388752
+  timestamp: 66207263716570
+}
+breakpoint:
+{
+  source_location: "../code/bean_game/main.jai:399:1"
+  hit_count: 1
 }

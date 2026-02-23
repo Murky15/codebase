@@ -19,12 +19,12 @@ for her before she gets back.
 - [X] Autotiling
 - [ ] Parallax backgrounds
 - [ ] Multi-Core by default (maybe)
-- [ ] Hands and weapons
+- [ ] Hands
+- [ ] Cosmetics
 - [X] Debug messages and font display (Custom logger that writes messages to the screen!)
-- [ ] Occlusion culling
+- [X] Occlusion culling
+- [ ] Main menu
 */
-
-ENABLE_LEVEL_HOT_RELOAD :: true;
 
 AARect :: #type,isa Vector4;
 
@@ -60,6 +60,7 @@ Tile_Type :: enum {
   INVALID;
   EMPTY;
   GROUND;
+  WATER;
   PLAYER_SPAWN;
   BOUNCE_PAD;
   COIN;
@@ -70,7 +71,10 @@ Tile :: struct {
   tex: *Simp.Texture;
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
 
-  coin_bob_counter: float;
+  decorative: bool;
+
+  bob_counter: float;
+  bob_amplitude: float;
   collected: bool;
 }
 
@@ -85,6 +89,24 @@ Map :: struct {
     last_modification: Apollo_Time;
   }
 
+  Parallax_Effect :: struct {
+    using n: Linked_List_Header;
+
+    layer: int;
+    pos: Vector2;
+    size: Vector2;
+    tex: *Simp.Texture;
+
+    #overlay (pos) bbox: AARect;
+  }
+  // A dynamic array here will lead to memory
+  // fragmentation because we are using an arena,
+  // which is why I am inclined to use Linked Lists.
+  //background: [..] Parallax_Effect;
+  background: Linked_List(Parallax_Effect);
+
+  cam: Camera;
+
   tiles: [] Tile;
   width, height: int;
   player_spawn: Vector2;
@@ -93,19 +115,45 @@ Map :: struct {
 
 for_expansion :: (map: Map, body: Code, flags: For_Flags) #expand {
   #assert !(flags & .REVERSE);
-  if map.tiles.data != null {
-    for y: 0..map.height-1 {
-      for x: 0..map.width-1 {
-        index := y * map.width + x;
-        #if flags & .POINTER {
-          `it := *map.tiles[index];
-        } else {
-          `it := map.tiles[index];
-        }
-        `it_index := Vector2.{xx x, xx y};
-
-        #insert (break=break y) body;
+  if map.tiles.data == null then return;
+  for y: 0..map.height-1 {
+    for x: 0..map.width-1 {
+      index := y * map.width + x;
+      #if flags & .POINTER {
+        `it := *map.tiles[index];
+      } else {
+        `it := map.tiles[index];
       }
+      `it_index := Vector2.{xx x, xx y};
+
+      #insert (break=break y) body;
+    }
+  }
+}
+
+visible_only :: (map: Map, body: Code, flags: For_Flags) #expand {
+  #assert !(flags & .REVERSE);
+  if map.tiles.data == null return;
+  cam_min_bounds := map.cam.pos;
+  cam_max_bounds := cam_min_bounds + xy(RESOLUTION_W, RESOLUTION_H);
+  cam_min_bounds /= TILE_RESOLUTION;
+  cam_max_bounds /= TILE_RESOLUTION;
+  min_x := cast(int) cam_min_bounds.x;
+  min_y := cast(int) cam_min_bounds.y;
+  max_x := cast(int) cam_max_bounds.x;
+  max_y := cast(int) cam_max_bounds.y;
+  for y: min_y..max_y {
+    for x: min_x..max_x {
+      `it_index := Vector2.{xx x, xx y};
+      #if flags & .POINTER {
+        `it := map_index_pointer(map, it_index);
+        if it == null then continue;
+      } else {
+        `it := map_index(map, it_index);
+        if it.type == .INVALID then continue;
+      }
+
+      #insert (break=break y) body;
     }
   }
 }
@@ -200,6 +248,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
       case #char "g"; type = .GROUND;
       case #char "b"; type = .BOUNCE_PAD;
       case #char "c"; type = .COIN;
+      case #char "w"; type = .WATER;
       case #char "p"; {
         type = .PLAYER_SPAWN;
         map.player_spawn = it_index * TILE_RESOLUTION;
@@ -217,44 +266,73 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
   Autotile :: struct {
     tex: *Simp.Texture;
     probability: float;
+    default: bool;
   }
-  atile :: (tex_name: string, probability := 100.0) -> Autotile #expand {
-    return {table_find_pointer(*`textures, tex_name), probability};
+  atile :: (tex_name: string, probability := 100.0, default := false) -> Autotile #expand {
+    return {table_find_pointer(*`textures, tex_name), probability, default};
+  }
+  atile_choose :: (tiles: [] Autotile) -> *Simp.Texture {
+    default: *Autotile;
+    rand := cast(float) (random_get() % 100) + 1;
+    for tiles {
+      rand -= it.probability;
+      if rand < 0 {
+        return it.tex;
+      } else if it.default then default = *tiles[it_index];
+    }
+
+    return ifx default != null then default.tex else null;
   }
 
-  above_ground_tiles := Autotile.[atile("tile_grass"), atile("tile_top")];
-  below_ground_tiles := Autotile.[atile("tile", 50), atile("tile_diagonal", 50.0/3), atile("tile_stone", 50.0/3), atile("tile_brick", 50.0/3)];
+  // NOTE: Associated with tiles
+  above_ground_tiles := Autotile.[atile("tile_grass"), atile("tile_top"), atile("tile_water")];
+  below_ground_tiles := Autotile.[atile("tile", 50.0, true), atile("tile_diagonal", 50.0/3), atile("tile_stone", 50.0/3), atile("tile_brick", 50.0/3)];
   bounce_pad_texture := table_find_pointer(*textures, "tile_belt");
+  background_layer_1_textures := Autotile.[atile("tile_tree", 8.0), atile("tile_bushHalf", 8.0), atile("tile_bush", 8.0)];
   // TODO: A lot of textures have alternate counterparts (coins/gems spikes/cogs)
   // Should we autotile these or keep them as seperate entities?
-  coin_texture := table_find_pointer(*textures, "tile_coin");
+  coin_textures := Autotile.[atile("tile_coin", 50), atile("tile_gem", 50)];
+
+  // NOTE: Not associated with tiles
+  background_layer_2_textures := Autotile.[atile("background_treeLarge", 50.0), atile("background_tree", 50.0)];
+  background_layer_3_textures := Autotile.[atile("background_cloudA", 50.0), atile("background_cloudB", 50.0)];
+
   for * map {
+    above := map_index(map, it_index + {0, 1}).type;
+    below := map_index(map, it_index + {0,-1}).type;
     if it.type == {
+      case .EMPTY; {
+        if below != .GROUND then continue;
+        it.tex = atile_choose(background_layer_1_textures);
+      }
       case .GROUND; {
-        above := map_index(map, it_index + {0, 1}).type;
-        below := map_index(map, it_index + {0,-1}).type;
-        it.tex = ifx above != .GROUND {
+        it.tex = ifx above != .GROUND && above != .WATER {
           ifx below != .GROUND then above_ground_tiles[1].tex else above_ground_tiles[0].tex;
         } else {
-          rand := cast(float) (random_get() % 100) + 1;
-          tex: *Simp.Texture;
-          for tile: below_ground_tiles {
-            rand -= tile.probability;
-            if rand < 0 {
-              tex = tile.tex;
-              break;
-            }
-          }
-
-          ifx rand > 0 then below_ground_tiles[0].tex else tex;
+          atile_choose(below_ground_tiles);
         }
+      }
+      case .WATER; {
+        it.tex = above_ground_tiles[2].tex;
+        it.bob_counter = random_get_within_range(0, 2 * PI);
+        it.bob_amplitude = 5.0;
       }
       case .BOUNCE_PAD; {
         it.tex = bounce_pad_texture;
         it.bbox_dim = {TILE_RESOLUTION, TILE_RESOLUTION/3};
       }
-      case .COIN; it.tex = coin_texture;
+      case .COIN; {
+        it.tex = atile_choose(coin_textures);
+        it.bob_counter = random_get_within_range(0, 2 * PI);
+        it.bob_amplitude = 3.0;
+      }
     }
+  }
+  for 0..4 {
+    test := New(Map.Parallax_Effect);
+    test.layer = it;
+    sll_queue_push(*map.background, test);
+    map.background.count += 1;
   }
 
   return map;
@@ -333,6 +411,7 @@ get_digits_right_to_left_on_temp :: (x: int) -> [] int {
   return digits;
 }
 
+ENABLE_LEVEL_HOT_RELOAD :: true;
 TILE_NATIVE_RESOLUTION :: 64;
 TILE_RESOLUTION :: TILE_NATIVE_RESOLUTION / 2;
 RESOLUTION_W :: 640;
@@ -359,6 +438,76 @@ make_quad :: (rect: AARect) -> Vector2, Vector2, Vector2, Vector2 {
   return p0, p1, p2, p3;
 }
 
+Linked_List :: struct (T: Type) {
+  first, last: *T;
+  count: int;
+}
+
+Linked_List_Header :: struct {
+  next: *#this;
+}
+
+for_expansion :: (list: Linked_List, body: Code, flags: For_Flags) #expand {
+  #assert !(flags & .REVERSE);
+  node := list.first;
+  `it_index := 0;
+  while node != null {
+    defer {
+      node = xx node.next;
+      it_index += 1;
+    }
+    #if flags & .POINTER {
+      `it := node;
+    } else {
+      `it := node.*;
+    }
+    #insert body;
+  }
+}
+sll_queue_push :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
+  #assert type_of(list.first) == *T;
+  if first == null {
+    first = n;
+    last = n;
+    n.next = null;
+  } else {
+    last.next = xx n;
+    last = n;
+    n.next = null;
+  }
+}
+sll_queue_push_front :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
+  #assert type_of(list.first) == *T;
+  if first == null {
+    first = n;
+    last = n;
+    n.next = null;
+  } else {
+    n.next = first;
+    first = n;
+  }
+}
+sll_queue_pop :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
+  #assert type_of(list.first) == *T;
+  if first == last {
+    first = null;
+    last = null;
+  } else {
+    first = first.next;
+  }
+}
+sll_stack_push :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
+  #assert type_of(list.first) == *T;
+  n.next = first;
+  first = n;
+}
+sll_stack_pop :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
+  #assert type_of(list.first) == *T;
+  if first != null {
+    first = first.next;
+  }
+}
+
 main :: () {
   level_arena_pool: Arena.Flat_Pool;
   level_arena_allocator := Allocator.{proc=Arena.flat_pool_allocator_proc, data=*level_arena_pool};
@@ -371,21 +520,25 @@ main :: () {
   coin_texture := table_find_pointer(*texture_atlas, "tile_coin"); // Duplicate
   x_texture := table_find_pointer(*texture_atlas, "ui_numX");
   number_textures := *Simp.Texture.[table_find_pointer(*texture_atlas, "ui_num0"),
-                                   table_find_pointer(*texture_atlas, "ui_num1"),
-                                   table_find_pointer(*texture_atlas, "ui_num2"),
-                                   table_find_pointer(*texture_atlas, "ui_num3"),
-                                   table_find_pointer(*texture_atlas, "ui_num4"),
-                                   table_find_pointer(*texture_atlas, "ui_num5"),
-                                   table_find_pointer(*texture_atlas, "ui_num6"),
-                                   table_find_pointer(*texture_atlas, "ui_num7"),
-                                   table_find_pointer(*texture_atlas, "ui_num8"),
-                                   table_find_pointer(*texture_atlas, "ui_num9")];
+                                    table_find_pointer(*texture_atlas, "ui_num1"),
+                                    table_find_pointer(*texture_atlas, "ui_num2"),
+                                    table_find_pointer(*texture_atlas, "ui_num3"),
+                                    table_find_pointer(*texture_atlas, "ui_num4"),
+                                    table_find_pointer(*texture_atlas, "ui_num5"),
+                                    table_find_pointer(*texture_atlas, "ui_num6"),
+                                    table_find_pointer(*texture_atlas, "ui_num7"),
+                                    table_find_pointer(*texture_atlas, "ui_num8"),
+                                    table_find_pointer(*texture_atlas, "ui_num9")];
   should_run := true;
   input_move_left, input_move_right, input_jump: bool;
   start := seconds_since_init();
   // NOTE: For now let's assume that the world is static
   // This is a very simple way to represent the world, and must be refined in the future.
   map := map_load(texture_atlas, to_apollo(start),, level_arena_allocator);
+  node := map.background.first;
+  for map.background {
+    log("%: %", it_index, it);
+  }
 
   player: Entity;
   player.pos = map.player_spawn;
@@ -393,10 +546,9 @@ main :: () {
   player.texture = table_find_pointer(*texture_atlas, "character_roundRed");
   player.mass = 50;
 
-  cam: Camera;
-  cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
-  cam.offset -= player.bbox.zw / 2;
-  cam_set_target(*cam, *player);
+  map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
+  map.cam.offset -= player.bbox.zw / 2;
+  cam_set_target(*map.cam, *player);
 
   // NOTE: Should we also have a special "pivot" force?
   friction_coefficient :: 2.0;
@@ -436,6 +588,9 @@ main :: () {
           if new_map.tiles.data != null {
             Arena.reset(*level_arena_pool, overwrite_memory=true);
             map = map_load(texture_atlas, modtime,, level_arena_allocator);
+            map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
+            map.cam.offset -= player.bbox.zw / 2;
+            cam_set_target(*map.cam, *player);
           } else map.last_modification = modtime;
         }
       }
@@ -474,7 +629,9 @@ main :: () {
         // TODO: There is a bug here where if we release the move key (dir == 0) and then press it again
         // before we fully deccelerate we resume moving at a much lower speed. This feels very janky and
         // needs to be fixed.
-        accel.x += move_force.magnitude * dir;
+        if values_are_close(abs(player.velocity.x), PLAYER_MOVE_SPEED) {
+          accel.x += move_force.magnitude * dir;
+        }
       }
       if sign(player.velocity.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
         player.dir = 0;
@@ -500,6 +657,7 @@ main :: () {
         for x: 0..1 {
           test := player_grid_pos + xy(xx x, xx y);
           potential_collision := map_index_pointer(map, test);
+          if potential_collision == null then continue;
           tile := AARect.{xy = test * TILE_RESOLUTION, zw = potential_collision.bbox_dim};
           colliding, overlap := rects_intersect(player.bbox, tile);
           if !colliding continue;
@@ -535,32 +693,31 @@ main :: () {
         }
       }
 
-      cam_update_tracking(*cam, dt);
+      cam_update_tracking(*map.cam, dt);
     }
 
     {
       Simp.clear_render_target(1, 1, 1, 1);
       defer Simp.swap_buffers(main_window);
 
-      for * map {
+      for * :visible_only map {
         if it.tex == null then continue;
         set_texture(it.tex);
         dsp := it_index * TILE_RESOLUTION;
-        if it.type == .COIN {
-          BOB_AMPLITUDE :: 3.0;
+        if it.type == .COIN || it.type == .WATER {
           BOB_FREQUENCY :: PI;
           if it.collected then continue;
-          it.coin_bob_counter += dt;
-          it.coin_bob_counter = fmod_cycling(it.coin_bob_counter, (2 * PI) / BOB_FREQUENCY);
-          dsp.y += 3 * sin(PI * it.coin_bob_counter);
+          it.bob_counter += dt;
+          it.bob_counter = fmod_cycling(it.bob_counter, (2 * PI) / BOB_FREQUENCY);
+          dsp.y += it.bob_amplitude * sin(PI * it.bob_counter);
         }
-        p0, p1, p2, p3 := make_quad({xy = dsp - cam.pos, zw = xy(TILE_RESOLUTION)});
+        p0, p1, p2, p3 := make_quad({xy = dsp - map.cam.pos, zw = xy(TILE_RESOLUTION)});
         Simp.immediate_quad(p0, p1, p2, p3);
       }
 
       {
         set_texture(player.texture);
-        p0, p1, p2, p3 := make_quad({xy = player.pos - cam.pos, zw = player.bbox_dim});
+        p0, p1, p2, p3 := make_quad({xy = player.pos - map.cam.pos, zw = player.bbox_dim});
         Simp.immediate_quad(p0, p1, p2, p3);
       }
 
@@ -626,6 +783,7 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
 
 #import "Basic";
 #import "Math";
+#import "Sloppy_Math";
 #import "String";
 #import "File";
 #import "File_Utilities";
