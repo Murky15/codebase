@@ -69,7 +69,6 @@ Tile_Type :: enum {
 Tile :: struct {
   type: Tile_Type;
   tex: *Simp.Texture;
-  display_offset: Vector2;
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
 
   decorative: bool;
@@ -91,10 +90,11 @@ Map :: struct {
     last_modification: Apollo_Time;
   }
 
+  max_parallax_layers :: 3;
   Parallax_Effect :: struct {
     #as using n: Linked_List_Header;
 
-    layer: int;
+    layer: u64;
     pos: Vector2;
     size: Vector2;
     tex: *Simp.Texture;
@@ -269,35 +269,40 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
     tex: *Simp.Texture;
     probability: float;
     default: bool;
+    parallax_layer: u64;
   }
-  atile :: (tex_name: string, probability := 100.0, default := false) -> Autotile #expand {
-    return {table_find_pointer(*`textures, tex_name), probability, default};
+  atile :: (tex_name: string, probability := 100.0, default := false, layer := 1) -> Autotile #expand {
+    #assert layer <= Map.max_parallax_layers;
+    return {table_find_pointer(*`textures, tex_name), probability, default, layer};
   }
-  atile_choose :: (tiles: [] Autotile) -> *Simp.Texture {
+  atile_choose :: inline (tiles: [] Autotile) -> *Simp.Texture, u64 {
     default: *Autotile;
     rand := cast(float) (random_get() % 100) + 1;
     for tiles {
       rand -= it.probability;
-      if rand < 0 {
-        return it.tex;
+      if rand <= 0 {
+        return it.tex, it.parallax_layer;
       } else if it.default then default = *tiles[it_index];
     }
 
-    return ifx default != null then default.tex else null;
+    if default != null {
+      return default.tex, default.parallax_layer;
+    } else return null, 0;
   }
 
   // NOTE: Associated with tiles
   above_ground_tiles := Autotile.[atile("tile_grass"), atile("tile_top"), atile("tile_water")];
   below_ground_tiles := Autotile.[atile("tile", 50.0, true), atile("tile_diagonal", 50.0/3), atile("tile_stone", 50.0/3), atile("tile_brick", 50.0/3)];
   bounce_pad_texture := table_find_pointer(*textures, "tile_belt");
-  background_layer_1_textures := Autotile.[];
   // TODO: A lot of textures have alternate counterparts (coins/gems spikes/cogs)
   // Should we autotile these or keep them as separate entities?
   coin_textures := Autotile.[atile("tile_coin", 50), atile("tile_gem", 50)];
 
   // NOTE: Not associated with tiles
-  background_layer_2_textures := Autotile.[atile("tile_tree", 8.0), atile("tile_bushHalf", 8.0), atile("tile_bush", 8.0), atile("background_treeLarge", 8.0), atile("background_tree", 8.0)];
-  background_layer_3_textures := Autotile.[atile("background_cloudA", 50.0), atile("background_cloudB", 50.0)];
+  // NOTE: I'm temporarily removing `atile("background_treeLarge", 4.0, layer=2), atile("background_tree", 4.0, layer=2)` from the following list because I can't figure out
+  // how to make them look good with parallax scrolling
+  environment_textures := Autotile.[atile("tile_tree", 8.0, layer=1), atile("tile_bushHalf", 8.0, layer=1), atile("tile_bush", 8.0, layer=1)];
+  cloud_textures := Autotile.[atile("background_cloudA", 50.0, layer=3), atile("background_cloudB", 50.0, layer=3)];
 
   for * map {
     above := map_index(map, it_index + {0, 1}).type;
@@ -305,8 +310,19 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
     if it.type == {
       case .EMPTY; {
         if below != .GROUND then continue;
-        it.tex = atile_choose(background_layer_1_textures);
-
+        foliage_texture, parallax_layer := atile_choose(environment_textures);
+        if foliage_texture == null then continue;
+        // NOTE: Can be tweaked
+        x_offset := random_get_within_range(-TILE_RESOLUTION/2, TILE_RESOLUTION/2);
+        y_offset := random_get_within_range(-TILE_RESOLUTION/4, 0);
+        foliage := New(Map.Parallax_Effect);
+        foliage.layer = parallax_layer;
+        foliage.pos = (it_index * TILE_RESOLUTION) + xy(x_offset, y_offset);
+        scale := random_get_within_range(0.7,1.5);
+        foliage.size = xy(xx (foliage_texture.width  * scale /TILE_RESOLUTION_DIVISOR),
+                          xx (foliage_texture.height * scale /TILE_RESOLUTION_DIVISOR));
+        foliage.tex = foliage_texture;
+        sll_queue_push(*map.background, foliage);
       }
       case .GROUND; {
         it.tex = ifx above != .GROUND && above != .WATER {
@@ -330,6 +346,20 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
         it.bob_amplitude = 3.0;
       }
     }
+  }
+
+  num_clouds := 80;
+  for 1..num_clouds {
+    cloud_texture, layer := atile_choose(cloud_textures);
+    assert(cloud_texture != null);
+    cloud := New(Map.Parallax_Effect);
+    cloud.layer = layer;
+    x := random_get_within_range(0.0, (map.width-1.0) * TILE_RESOLUTION);
+    y := random_get_within_range(0.0, (map.height-1.0) * TILE_RESOLUTION);
+    cloud.pos = xy(x,y);
+    cloud.size = xy(xx cloud_texture.width , xx cloud_texture.height);
+    cloud.tex = cloud_texture;
+    sll_queue_push_front(*map.background, cloud);
   }
 
   return map;
@@ -415,10 +445,12 @@ get_digits_right_to_left_on_temp :: (x: int) -> [] int {
 
 ENABLE_LEVEL_HOT_RELOAD :: true;
 TILE_NATIVE_RESOLUTION :: 64;
-TILE_RESOLUTION :: TILE_NATIVE_RESOLUTION / 2;
+TILE_RESOLUTION_DIVISOR :: 2;
+TILE_RESOLUTION :: TILE_NATIVE_RESOLUTION / TILE_RESOLUTION_DIVISOR;
 RESOLUTION_W :: 640;
 RESOLUTION_H :: 360;
 ASPECT_RATIO :: cast(float) RESOLUTION_W / RESOLUTION_H;
+DT_MAX :: cast(float) 1/60;
 FONT_HEIGHT_DIVISOR :: 24;
 
 PLAYER_MOVE_SPEED :: 350.0;
@@ -454,7 +486,7 @@ for_expansion :: (list: Linked_List, body: Code, flags: For_Flags) #expand {
   node := list.first;
   `it_index := 0;
   while node != null {
-    assert(it_index < list.count);
+    assert(it_index < list.count, "The number of nodes in this list exceeds the list count!");
     defer {
       node = xx node.next;
       it_index += 1;
@@ -478,6 +510,7 @@ sll_queue_push :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
     last = n;
     n.next = null;
   }
+  list.count += 1;
 }
 sll_queue_push_front :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   #assert type_of(list.first) == *T;
@@ -489,6 +522,7 @@ sll_queue_push_front :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
     n.next = xx first;
     first = n;
   }
+  list.count += 1;
 }
 sll_queue_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   #assert type_of(list.first) == *T;
@@ -498,17 +532,20 @@ sll_queue_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   } else {
     first = xx first.next;
   }
+  list.count -= 1;
 }
 sll_stack_push :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   #assert type_of(list.first) == *T;
   n.next = xx first;
   first = n;
+  list.count += 1;
 }
 sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   #assert type_of(list.first) == *T;
   if first != null {
     first = xx first.next;
   }
+  list.count -= 1;
 }
 
 main :: () {
@@ -539,11 +576,9 @@ main :: () {
   start := seconds_since_init();
   // NOTE: For now let's assume that the world is static
   // This is a very simple way to represent the world, and must be refined in the future.
-  map := map_load(texture_atlas, to_apollo(start),, level_arena_allocator);
-  node := map.background.first;
-  for map.background {
-    log("%: %", it_index, it);
-  }
+  apollo_start := to_apollo(start);
+  map := map_load(texture_atlas, apollo_start,, level_arena_allocator);
+  random_seed(cast,force(Some_Big_Time_Value) apollo_start);
 
   player: Entity;
   player.pos = map.player_spawn;
@@ -608,6 +643,7 @@ main :: () {
 
     end := seconds_since_init();
     dt := cast(float, end - start);
+    dt = min(dt, DT_MAX);
     start = end;
 
     {
@@ -654,7 +690,6 @@ main :: () {
       player.velocity.x = sign(player.velocity.x) * min(abs(player.velocity.x), PLAYER_MOVE_SPEED);
       player.pos += player.velocity * dt;
 
-      player_pos_diff := player.pos - old_player.pos;
       player_grid_pos := floor(player.pos / TILE_RESOLUTION);
       if !player.jumping {
         bottom_left  := map_index(map, player_grid_pos + {y = -1}).type == .GROUND;
@@ -673,17 +708,21 @@ main :: () {
           if !colliding continue;
           if potential_collision.type == {
             case .GROUND; {
-              vertical_collision, _ := rects_intersect(old_player.bbox + {y=player_pos_diff.y}, tile);
-              if vertical_collision {
-                if player.velocity.y < 0 {
-                  player.pos.y += overlap.w;
-                  player.jumping = false;
-                } else {
-                  player.pos.y -= overlap.w;
-                }
-                player.velocity.y = 0;
-              } else {
-                player.pos.x += -sign(player_pos_diff.x) * overlap.z;
+              while true {
+                player_pos_diff := player.pos - old_player.pos;
+                vertical_collision, _ := rects_intersect(old_player.bbox + {y=player_pos_diff.y}, tile);
+                horizontal_collision, _ := rects_intersect(old_player.bbox + {x=player_pos_diff.x}, tile);
+                if vertical_collision {
+                  if player.velocity.y < 0 {
+                    player.pos.y += overlap.w;
+                    player.jumping = false;
+                  } else {
+                    player.pos.y -= overlap.w;
+                  }
+                  player.velocity.y = 0;
+                } else if horizontal_collision {
+                  player.pos.x += -sign(player_pos_diff.x) * overlap.z;
+                } else break;
               }
             }
 
@@ -717,6 +756,16 @@ main :: () {
     {
       Simp.clear_render_target(1, 1, 1, 1);
       defer Simp.swap_buffers(main_window);
+
+      for map.background {
+        layer_effect := ifx it.layer > 1 then xx it.layer else 1.0;
+        parallax_cam := map.cam.pos / layer_effect;
+        cam_view := AARect.{xy=parallax_cam, zw=xy(RESOLUTION_W, RESOLUTION_H)};
+        if !rects_intersect(cam_view, it.bbox) then continue;
+        set_texture(it.tex);
+        p0, p1, p2, p3 := make_quad({xy = it.pos - parallax_cam, zw = it.size});
+        Simp.immediate_quad(p0, p1, p2, p3);
+      }
 
       for :visible_only map {
         if it.tex == null then continue;
