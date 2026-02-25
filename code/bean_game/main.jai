@@ -15,9 +15,9 @@ for her before she gets back.
 - [X] Coins
 - [ ] Wall jumping / friction
 - [ ] Grappling hook
-- [ ] Flip animation like paper mario
+- [X] Player flip direction
 - [X] Autotiling
-- [ ] Parallax backgrounds
+- [X] Parallax backgrounds
 - [ ] Multi-Core by default (maybe)
 - [ ] Hands
 - [ ] Cosmetics
@@ -32,6 +32,7 @@ Entity :: struct {
   gen: u64;
 
   dir: float;
+  facing := 1.0;
   pos: Vector2;
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
   velocity: Vector2;
@@ -60,6 +61,7 @@ Tile_Type :: enum {
   INVALID;
   EMPTY;
   GROUND;
+  WALL;
   WATER;
   PLAYER_SPAWN;
   BOUNCE_PAD;
@@ -70,8 +72,7 @@ Tile :: struct {
   type: Tile_Type;
   tex: *Simp.Texture;
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
-
-  decorative: bool;
+  decorative_uv_rotation: u64;
 
   bob_counter: float;
   bob_amplitude: float;
@@ -204,7 +205,14 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
     map.last_modification = last_modification;
   }
 
-  rows := split(raw_map, #char "\n");
+  #if OS == .WINDOWS {
+    newline_size :: 2;
+    rows := split(raw_map, "\r\n");
+  } else {
+    newline_size :: 1;
+    rows := split(raw_map, #char "\n");
+  }
+
   for 0..rows_in_header-1 {
     meta_tag := rows[it];
     success, tag, value := split_from_left(meta_tag, #char ":");
@@ -224,8 +232,8 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
         memcpy(cast(*void)*map + it.offset_in_bytes, cast(*void)*integer_value, it.type.runtime_size);
       }
     }
-    raw_map.count -= meta_tag.count+1;
-    raw_map.data += meta_tag.count+1;
+    raw_map.count -= meta_tag.count+newline_size;
+    raw_map.data += meta_tag.count+newline_size;
   }
   rows.count -= rows_in_header;
   rows.data += rows_in_header;
@@ -243,7 +251,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
   map.tiles = NewArray(map.width * map.height, Tile);
   for * map {
     // Map data in memory is flipped vertically from file data
-    c := raw_map.data[((rows.count-1)- xx it_index.y) * (pitch+1) + xx it_index.x];
+    c := raw_map.data[((rows.count-1) - xx it_index.y) * (pitch+newline_size) + xx it_index.x];
     type := Tile_Type.EMPTY;
     if c == {
       case #char "#"; type = .EMPTY;
@@ -251,6 +259,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
       case #char "b"; type = .BOUNCE_PAD;
       case #char "c"; type = .COIN;
       case #char "w"; type = .WATER;
+      case #char "t"; type = .WALL;
       case #char "p"; {
         type = .PLAYER_SPAWN;
         map.player_spawn = it_index * TILE_RESOLUTION;
@@ -292,14 +301,15 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
 
   // NOTE: Associated with tiles
   above_ground_tiles := Autotile.[atile("tile_grass"), atile("tile_top"), atile("tile_water")];
-  below_ground_tiles := Autotile.[atile("tile", 50.0, true), atile("tile_diagonal", 50.0/3), atile("tile_stone", 50.0/3), atile("tile_brick", 50.0/3)];
+  below_ground_tiles := Autotile.[atile("tile", 50.0, true), atile("tile_diagonal", 16.0), atile("tile_stone", 16.0), atile("tile_border", 16.0)];
   bounce_pad_texture := table_find_pointer(*textures, "tile_belt");
+  tower_texture := table_find_pointer(*textures, "tile_brick");
   // TODO: A lot of textures have alternate counterparts (coins/gems spikes/cogs)
   // Should we autotile these or keep them as separate entities?
   coin_textures := Autotile.[atile("tile_coin", 50), atile("tile_gem", 50)];
 
   // NOTE: Not associated with tiles
-  // NOTE: I'm temporarily removing `atile("background_treeLarge", 4.0, layer=2), atile("background_tree", 4.0, layer=2)` from the following list because I can't figure out
+  // TODO: I'm temporarily removing `atile("background_treeLarge", 4.0, layer=2), atile("background_tree", 4.0, layer=2)` from the following list because I can't figure out
   // how to make them look good with parallax scrolling
   environment_textures := Autotile.[atile("tile_tree", 8.0, layer=1), atile("tile_bushHalf", 8.0, layer=1), atile("tile_bush", 8.0, layer=1)];
   cloud_textures := Autotile.[atile("background_cloudA", 50.0, layer=3), atile("background_cloudB", 50.0, layer=3)];
@@ -328,9 +338,11 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
         it.tex = ifx above != .GROUND && above != .WATER {
           ifx below != .GROUND then above_ground_tiles[1].tex else above_ground_tiles[0].tex;
         } else {
+          it.decorative_uv_rotation = random_get();
           atile_choose(below_ground_tiles);
         }
       }
+      case .WALL; it.tex = tower_texture;
       case .WATER; {
         it.tex = above_ground_tiles[2].tex;
         it.bob_counter = random_get_within_range(0, (2 * PI) / it.bob_frequency);
@@ -348,16 +360,16 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
     }
   }
 
-  num_clouds := 80;
+  num_clouds := 40;
   for 1..num_clouds {
     cloud_texture, layer := atile_choose(cloud_textures);
     assert(cloud_texture != null);
     cloud := New(Map.Parallax_Effect);
     cloud.layer = layer;
-    x := random_get_within_range(0.0, (map.width-1.0) * TILE_RESOLUTION);
-    y := random_get_within_range(0.0, (map.height-1.0) * TILE_RESOLUTION);
-    cloud.pos = xy(x,y);
     cloud.size = xy(xx cloud_texture.width , xx cloud_texture.height);
+    x := random_get_within_range(-cloud.size.x, (map.width-1.0) * TILE_RESOLUTION);
+    y := random_get_within_range(-cloud.size.y, (map.height-1.0) * TILE_RESOLUTION);
+    cloud.pos = xy(x,y);
     cloud.tex = cloud_texture;
     sll_queue_push_front(*map.background, cloud);
   }
@@ -443,6 +455,30 @@ get_digits_right_to_left_on_temp :: (x: int) -> [] int {
   return digits;
 }
 
+set_texture :: inline (tex: *Simp.Texture) {
+  Simp.set_shader_for_images(tex);
+  Simp.immediate_set_2d_projection(RESOLUTION_W, RESOLUTION_H);
+}
+
+make_quad :: inline (rect: AARect) -> Vector2, Vector2, Vector2, Vector2 {
+  p0 := rect.xy;
+  p1 := xy(rect.x + rect.z, rect.y);
+  p2 := rect.xy + rect.zw;
+  p3 := xy(rect.x, rect.y + rect.w);
+
+  return p0, p1, p2, p3;
+}
+
+make_uv_counter_rotation :: inline (quadrants_to_rotate: u64) -> Vector2, Vector2, Vector2, Vector2 {
+  quadrants_to_rotate %= 4;
+  if quadrants_to_rotate == {
+    case;   return {0,0}, {1,0}, {1,1}, {0,1};
+    case 1; return {0,1}, {0,0}, {1,0}, {1,1};
+    case 2; return {1,1}, {0,1}, {0,0}, {1,0};
+    case 3; return {1,0}, {1,1}, {0,1}, {0,0};
+  }
+}
+
 ENABLE_LEVEL_HOT_RELOAD :: true;
 TILE_NATIVE_RESOLUTION :: 64;
 TILE_RESOLUTION_DIVISOR :: 2;
@@ -458,21 +494,19 @@ PLAYER_JUMP_VELOCITY :: 1000.0;
 PLAYER_BOUNCE_PAD_JUMP_VELOCITY :: 1500.0;
 GRAVITY :: -3800.0;
 
-set_texture :: (tex: *Simp.Texture) {
-  Simp.set_shader_for_images(tex);
-  Simp.immediate_set_2d_projection(RESOLUTION_W, RESOLUTION_H);
+Linked_List :: struct (T: Type)
+#modify { // NOTE: Probably unnecessary, but I wanted the practice.
+  error := sprint("Linked_List_Header must be the first member of %!", T);
+  ti := cast(*Type_Info) T;
+  if ti.type != .STRUCT then return false, error;
+  tis := cast(*Type_Info_Struct) ti;
+  header := tis.members[0];
+  if header.type.type != .STRUCT then return false, error;
+  header_struct := cast(*Type_Info_Struct) header.type;
+  if header_struct.name != "Linked_List_Header" return false, error;
+  return true;
 }
-
-make_quad :: (rect: AARect) -> Vector2, Vector2, Vector2, Vector2 {
-  p0 := rect.xy;
-  p1 := xy(rect.x + rect.z, rect.y);
-  p2 := rect.xy + rect.zw;
-  p3 := xy(rect.x, rect.y + rect.w);
-
-  return p0, p1, p2, p3;
-}
-
-Linked_List :: struct (T: Type) {
+{
   first, last: *T;
   count: int;
 }
@@ -571,6 +605,10 @@ main :: () {
                                     table_find_pointer(*texture_atlas, "ui_num7"),
                                     table_find_pointer(*texture_atlas, "ui_num8"),
                                     table_find_pointer(*texture_atlas, "ui_num9")];
+  cosmetic_textures := *Simp.Texture.[table_find_pointer(*texture_atlas, "item_hat"),
+                                      table_find_pointer(*texture_atlas, "item_hatTop"),
+                                      table_find_pointer(*texture_atlas, "item_helmet"),
+                                      table_find_pointer(*texture_atlas, "item_helmetModern")];
   should_run := true;
   input_move_left, input_move_right, input_jump: bool;
   start := seconds_since_init();
@@ -662,9 +700,12 @@ main :: () {
       dir: float;
       if input_move_left  dir -= 1;
       if input_move_right dir += 1;
-      if old_player.dir == 0 && dir != 0 {
-        player.dir = dir;
-        accel_force.time_counter = 0;
+      if dir != 0 {
+        player.facing = dir;
+        if old_player.dir == 0 {
+          player.dir = dir;
+          accel_force.time_counter = 0;
+        }
       }
 
       accel: Vector2;
@@ -707,22 +748,21 @@ main :: () {
           colliding, overlap := rects_intersect(player.bbox, tile);
           if !colliding continue;
           if potential_collision.type == {
+            case .WALL; {
+
+            } #through;
             case .GROUND; {
-              while true {
-                player_pos_diff := player.pos - old_player.pos;
-                vertical_collision, _ := rects_intersect(old_player.bbox + {y=player_pos_diff.y}, tile);
-                horizontal_collision, _ := rects_intersect(old_player.bbox + {x=player_pos_diff.x}, tile);
-                if vertical_collision {
-                  if player.velocity.y < 0 {
-                    player.pos.y += overlap.w;
-                    player.jumping = false;
-                  } else {
-                    player.pos.y -= overlap.w;
-                  }
-                  player.velocity.y = 0;
-                } else if horizontal_collision {
-                  player.pos.x += -sign(player_pos_diff.x) * overlap.z;
-                } else break;
+              player_pos_diff := player.pos - old_player.pos;
+              if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, tile) {
+                if player.velocity.y < 0 {
+                  player.pos.y += overlap.w;
+                  player.jumping = false;
+                } else {
+                  player.pos.y -= overlap.w;
+                }
+                player.velocity.y = 0;
+              } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, tile) {
+                player.pos.x += -sign(player_pos_diff.x) * overlap.z;
               }
             }
 
@@ -774,13 +814,17 @@ main :: () {
         dsp := it_index * TILE_RESOLUTION;
         dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
         p0, p1, p2, p3 := make_quad({xy = dsp - map.cam.pos, zw = xy(TILE_RESOLUTION)});
-        Simp.immediate_quad(p0, p1, p2, p3);
+        uv0, uv1, uv2, uv3 := make_uv_counter_rotation(it.decorative_uv_rotation);
+        Simp.immediate_quad(p0, p1, p2, p3, {1,1,1,1}, uv0, uv1, uv2, uv3);
       }
 
       {
         set_texture(player.texture);
         p0, p1, p2, p3 := make_quad({xy = player.pos - map.cam.pos, zw = player.bbox_dim});
-        Simp.immediate_quad(p0, p1, p2, p3);
+        // TODO: Can we interpolate this to create a smooth "flipping" animation?
+        left := ifx player.facing > 0 then 0.0 else 1.0;
+        right := ifx player.facing > 0 then 1.0 else 0.0;
+        Simp.immediate_quad(p0, p1, p2, p3, uv0={left,0}, uv1={right,0}, uv2={right,1}, uv3={left,1});
       }
 
       {
@@ -811,10 +855,7 @@ main :: () {
         alpha := ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
         Simp.draw_text(font, 50, 50 + it_index * (window_height/FONT_HEIGHT_DIVISOR), it.message, {w = 1 - alpha});
         it.decay += dt;
-        if it.decay > LOG_MESSAGE_FADE_DURATION {
-          free(it.message);
-          remove it;
-        }
+        if it.decay > LOG_MESSAGE_FADE_DURATION remove it;
       }
     }
   }

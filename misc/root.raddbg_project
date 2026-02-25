@@ -1,5 +1,9 @@
 // raddbg 0.9.25 project file
 
+recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcstartup/src/startup/exe_common.inl"
+recent_file: path: "C:/Users/gmb/Workspace/Tools/jai/modules/Default_Allocator/module.jai"
+recent_file: path: "C:/Users/gmb/Workspace/Tools/jai/modules/Runtime_Support.jai"
+recent_file: path: "C:/Users/gmb/Workspace/Tools/jai/modules/Basic/module.jai"
 recent_file: path: "../code/bean_game/main.jai"
 recent_file: path: "C:/Users/gmb/Workspace/Tools/jai/modules/Unicode.jai"
 recent_file: path: "../code/gameboy/platform_desktop.jai"
@@ -31,10 +35,5 @@ target:
 debug_info:
 {
   path: "W:/build/BeanGame.pdb"
-  timestamp: 66207263716570
-}
-breakpoint:
-{
-  source_location: "../code/bean_game/main.jai:399:1"
-  hit_count: 1
+  timestamp: 66207441720003
 }

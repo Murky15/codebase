@@ -35,19 +35,19 @@ window:
             memory: expression: ""
           }
         }
-        0.610555: selected getting_started text:
+        0.610555: getting_started text:
         {
           selected
-          expression: "file:\"W:/code/bean_game/main.jai\".data"
+          expression: "file:\"D:/a/_work/1/s/src/vctools/crt/vcstartup/src/startup/exe_common.inl\".data"
           auto: 1
           query:
           {
             input: ""
             cmd: search
           }
-          cursor_line: 440
+          cursor_line: 1
           cursor_column: 1
-          mark_line: 440
+          mark_line: 1
           mark_column: 1
         }
       }
@@ -70,6 +70,7 @@ window:
         }
         0.40:
         {
+          selected
           watch:
           {
             expression: "query:call_stack"
