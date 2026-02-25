@@ -24,6 +24,7 @@ for her before she gets back.
 - [X] Debug messages and font display (Custom logger that writes messages to the screen!)
 - [X] Occlusion culling
 - [ ] Main menu
+- [ ] Include user data in logger to change message display duration
 */
 
 AARect :: #type,isa Vector4;
@@ -42,6 +43,9 @@ Entity :: struct {
   can_jump: bool;
 
   texture: *Simp.Texture;
+  flip_start: float;
+  flip_duration: float;
+  flip_counter: float;
 
   #overlay (pos) bbox: AARect;
 }
@@ -623,6 +627,7 @@ main :: () {
   player.jumping = true;
   player.texture = table_find_pointer(*texture_atlas, "character_roundRed");
   player.mass = 50;
+  player.flip_duration = 0.2;
 
   map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
   map.cam.offset -= player.bbox.zw / 2;
@@ -701,7 +706,12 @@ main :: () {
       if input_move_left  dir -= 1;
       if input_move_right dir += 1;
       if dir != 0 {
-        player.facing = dir;
+        if player.facing != dir {
+          player.facing = dir;
+          player.flip_start = xx seconds_since_init();
+          player.flip_counter = 0;
+          log("Flip!");
+        }
         if old_player.dir == 0 {
           player.dir = dir;
           accel_force.time_counter = 0;
@@ -819,12 +829,31 @@ main :: () {
       }
 
       {
-        set_texture(player.texture);
-        p0, p1, p2, p3 := make_quad({xy = player.pos - map.cam.pos, zw = player.bbox_dim});
+        using player;
+        set_texture(texture);
         // TODO: Can we interpolate this to create a smooth "flipping" animation?
+        /*
         left := ifx player.facing > 0 then 0.0 else 1.0;
         right := ifx player.facing > 0 then 1.0 else 0.0;
         Simp.immediate_quad(p0, p1, p2, p3, uv0={left,0}, uv1={right,0}, uv2={right,1}, uv3={left,1});
+        */
+
+        flip_counter += dt;
+        flip := clamp(norm(flip_start + flip_counter, flip_start, flip_start + flip_duration), 0, 1);
+        dsp_pos := pos - map.cam.pos;
+        dsp_dim := bbox_dim;
+        dsp_dim.x *= ifx flip < 0.5 lerp(1, 0, flip * 2) else lerp(0, 1, (flip - 0.5) * 2);
+        dsp_pos.x += (bbox_dim.x - dsp_dim.x) / 2;
+        p0, p1, p2, p3 := make_quad({xy = dsp_pos, zw = dsp_dim});
+        left := ifx player.facing < 0 then 0 else 1;
+        right := ifx player.facing < 0 then 1 else 0;
+        flip *= -player.facing;
+        uv0 := Vector2.{left + flip,0};
+        uv1 := Vector2.{right - flip,0};
+        uv2 := Vector2.{right - flip,1};
+        uv3 := Vector2.{left + flip,1};
+
+        Simp.immediate_quad(p0, p1, p2, p3, {1,1,1,1}, uv0, uv1, uv2, uv3);
       }
 
       {
