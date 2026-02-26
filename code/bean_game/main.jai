@@ -41,6 +41,9 @@ Entity :: struct {
 
   jumping: bool;
   can_jump: bool;
+  wall_sliding: bool;
+  wall_jumping: bool;
+  coyote_time := PLAYER_COYOTE_TIME_GRACE_PERIOD;
 
   texture: *Simp.Texture;
   flip_start: float;
@@ -201,7 +204,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
   map: Map;
   raw_map, load_success := read_entire_file(map_path,, temp);
   if !load_success {
-    log("Error reading level data!");
+    log_error("Error reading level data!");
     return {};
   }
   #if ENABLE_LEVEL_HOT_RELOAD {
@@ -221,7 +224,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
     meta_tag := rows[it];
     success, tag, value := split_from_left(meta_tag, #char ":");
     if !success {
-      log("Error parsing level header on row %.", it+1);
+      log_error("Error parsing level header on row %.", it+1);
       return {};
     }
     to_lower_in_place(tag);
@@ -245,7 +248,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
   pitch := rows[0].count;
   for rows {
     if it.count != pitch {
-      log("Error parsing level data on row %. Expected a line with % characters, recieved %.", it_index+rows_in_header+1, pitch, it.count);
+      log_error("Error parsing level data on row %. Expected a line with % characters, recieved %.", it_index+rows_in_header+1, pitch, it.count);
       return {};
     }
   }
@@ -269,7 +272,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
         map.player_spawn = it_index * TILE_RESOLUTION;
       }
       case; {
-        log("Error parsing level data on row %. Unrecognized map symbol: %", (rows.count+rows_in_header)-it_index.y, to_string(*c,1));
+        log_error("Error parsing level data on row %. Unrecognized map symbol: %", (rows.count+rows_in_header)-it_index.y, to_string(*c,1));
         return {};
       }
     }
@@ -496,6 +499,7 @@ FONT_HEIGHT_DIVISOR :: 24;
 PLAYER_MOVE_SPEED :: 350.0;
 PLAYER_JUMP_VELOCITY :: 1000.0;
 PLAYER_BOUNCE_PAD_JUMP_VELOCITY :: 1500.0;
+PLAYER_COYOTE_TIME_GRACE_PERIOD :: 0.1;
 GRAVITY :: -3800.0;
 
 Linked_List :: struct (T: Type)
@@ -505,9 +509,9 @@ Linked_List :: struct (T: Type)
   if ti.type != .STRUCT then return false, error;
   tis := cast(*Type_Info_Struct) ti;
   header := tis.members[0];
-  if header.type.type != .STRUCT then return false, error;
+  if header.type.type != .STRUCT || header.offset_in_bytes > 0 then return false, error;
   header_struct := cast(*Type_Info_Struct) header.type;
-  if header_struct.name != "Linked_List_Header" return false, error;
+  if header_struct.name != "Linked_List_Header" then return false, error;
   return true;
 }
 {
@@ -635,11 +639,12 @@ main :: () {
 
   // NOTE: Should we also have a special "pivot" force?
   friction_coefficient :: 2.0;
-  friction_force := Force.{magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
-  move_force := friction_force;
+  floor_friction_force := Force.{magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
+  wall_friction_force := Force.{magnitude = 130_000};
+  move_force := floor_friction_force;
   accel_force: Force;
   accel_force.duration_seconds = 0.18;
-  accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / accel_force.duration_seconds)) + friction_force.magnitude;
+  accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / accel_force.duration_seconds)) + floor_friction_force.magnitude;
 
   while should_run {
     reset_temporary_storage();
@@ -692,14 +697,23 @@ main :: () {
     {
       old_player := player;
 
+      coyote_jump := false;
+      if player.coyote_time < PLAYER_COYOTE_TIME_GRACE_PERIOD {
+        player.coyote_time += dt;
+        coyote_jump = true;
+      }
+
       if !player.jumping {
         if !input_jump {
           player.can_jump = true;
-        } else if player.can_jump {
-          player.jumping = true;
-          player.can_jump = false;
-          player.velocity.y = PLAYER_JUMP_VELOCITY;
         }
+      } else player.can_jump = false;
+
+      if (player.can_jump || coyote_jump) && input_jump {
+        player.jumping = true;
+        player.can_jump = false;
+        player.velocity.y = PLAYER_JUMP_VELOCITY;
+        player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
       }
 
       dir: float;
@@ -710,7 +724,6 @@ main :: () {
           player.facing = dir;
           player.flip_start = xx seconds_since_init();
           player.flip_counter = 0;
-          log("Flip!");
         }
         if old_player.dir == 0 {
           player.dir = dir;
@@ -718,24 +731,30 @@ main :: () {
         }
       }
 
+      if player.wall_sliding && input_jump {
+        player.wall_jumping = true;
+        player.velocity.x = -player.dir * 200;
+        player.velocity.y = PLAYER_JUMP_VELOCITY / 1.5;
+      }
+
       accel: Vector2;
-      if accel_force.time_counter < accel_force.duration_seconds {
-        accel.x += accel_force.magnitude * dir;
-        accel_force.time_counter += dt;
-      } else if sign(dir) == sign(player.dir) {
-        // TODO: There is a bug here where if we release the move key (dir == 0) and then press it again
-        // before we fully deccelerate we resume moving at a much lower speed. This feels very janky and
-        // needs to be fixed.
-        if values_are_close(abs(player.velocity.x), PLAYER_MOVE_SPEED) {
-          accel.x += move_force.magnitude * dir;
+      if !player.wall_jumping {
+        if accel_force.time_counter < accel_force.duration_seconds {
+          accel.x += accel_force.magnitude * dir;
+          accel_force.time_counter += dt;
+        } else if sign(dir) == sign(player.dir) {
+          if values_are_close(abs(player.velocity.x), PLAYER_MOVE_SPEED) {
+            accel.x += move_force.magnitude * dir;
+          }
         }
+        if sign(player.velocity.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
+          player.dir = 0;
+          player.velocity.x = 0;
+        }
+        accel.x += floor_friction_force.magnitude * -sign(player.velocity.x);
       }
-      if sign(player.velocity.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
-        player.dir = 0;
-        player.velocity.x = 0;
-      }
-      accel.x += friction_force.magnitude * -sign(player.velocity.x);
-      if player.jumping accel.y += GRAVITY * player.mass;
+      if player.jumping then accel.y += GRAVITY * player.mass;
+      if player.wall_sliding then accel.y += wall_friction_force.magnitude;
       accel /= player.mass;
       player.velocity += accel * dt;
       player.velocity.x = sign(player.velocity.x) * min(abs(player.velocity.x), PLAYER_MOVE_SPEED);
@@ -747,8 +766,11 @@ main :: () {
         bottom_right := map_index(map, player_grid_pos + {1, -1}).type  == .GROUND;
         floor_below := bottom_left || bottom_right;
         player.jumping = !floor_below;
+        if !floor_below && !input_jump then player.coyote_time = 0;
       }
 
+      wall_collision := false;
+      defer if !wall_collision then player.wall_sliding = false;
       for y: 0..1 {
         for x: 0..1 {
           test := player_grid_pos + xy(xx x, xx y);
@@ -759,7 +781,11 @@ main :: () {
           if !colliding continue;
           if potential_collision.type == {
             case .WALL; {
-
+              if dir != 0 && player.jumping && player.velocity.y < 0 {
+                player.wall_sliding = true;
+                player.wall_jumping = false;
+                wall_collision = true;
+              }
             } #through;
             case .GROUND; {
               player_pos_diff := player.pos - old_player.pos;
@@ -767,6 +793,7 @@ main :: () {
                 if player.velocity.y < 0 {
                   player.pos.y += overlap.w;
                   player.jumping = false;
+                  player.wall_jumping = false;
                 } else {
                   player.pos.y -= overlap.w;
                 }
@@ -831,27 +858,26 @@ main :: () {
       {
         using player;
         set_texture(texture);
-        // TODO: Can we interpolate this to create a smooth "flipping" animation?
-        /*
-        left := ifx player.facing > 0 then 0.0 else 1.0;
-        right := ifx player.facing > 0 then 1.0 else 0.0;
-        Simp.immediate_quad(p0, p1, p2, p3, uv0={left,0}, uv1={right,0}, uv2={right,1}, uv3={left,1});
-        */
 
         flip_counter += dt;
         flip := clamp(norm(flip_start + flip_counter, flip_start, flip_start + flip_duration), 0, 1);
         dsp_pos := pos - map.cam.pos;
         dsp_dim := bbox_dim;
-        dsp_dim.x *= ifx flip < 0.5 lerp(1, 0, flip * 2) else lerp(0, 1, (flip - 0.5) * 2);
+        dsp_dim.x *= abs(cos(PI * flip));
         dsp_pos.x += (bbox_dim.x - dsp_dim.x) / 2;
         p0, p1, p2, p3 := make_quad({xy = dsp_pos, zw = dsp_dim});
-        left := ifx player.facing < 0 then 0 else 1;
-        right := ifx player.facing < 0 then 1 else 0;
-        flip *= -player.facing;
-        uv0 := Vector2.{left + flip,0};
-        uv1 := Vector2.{right - flip,0};
-        uv2 := Vector2.{right - flip,1};
-        uv3 := Vector2.{left + flip,1};
+        left, right: float;
+        if player.facing > 0 {
+          left = ifx flip > 0.5 then 0.0 else 1.0;
+          right = ifx flip > 0.5 then 1.0 else 0.0;
+        } else {
+          left = ifx flip > 0.5 then 1.0 else 0.0;
+          right = ifx flip > 0.5 then 0.0 else 1.0;
+        }
+        uv0 := Vector2.{left,0};
+        uv1 := Vector2.{right,0};
+        uv2 := Vector2.{right,1};
+        uv3 := Vector2.{left,1};
 
         Simp.immediate_quad(p0, p1, p2, p3, {1,1,1,1}, uv0, uv1, uv2, uv3);
       }
@@ -880,21 +906,21 @@ main :: () {
 
       Simp.set_shader_for_color();
       for * logs_to_display {
-        t := norm(it.time_of_log + it.decay, it.time_of_log, it.time_of_log + LOG_MESSAGE_FADE_DURATION);
+        t := norm(it.time_of_log + it.decay, it.time_of_log, it.time_of_log + it.time_to_decay);
         alpha := ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
         Simp.draw_text(font, 50, 50 + it_index * (window_height/FONT_HEIGHT_DIVISOR), it.message, {w = 1 - alpha});
         it.decay += dt;
-        if it.decay > LOG_MESSAGE_FADE_DURATION remove it;
+        if it.decay > it.time_to_decay remove it;
       }
     }
   }
 }
 
-LOG_MESSAGE_FADE_DURATION :: 5;
 Log_Message :: struct {
   message: string;
   time_of_log: float;
   decay: float;
+  time_to_decay: float;
 }
 
 logs_to_display: [..] Log_Message;
@@ -907,10 +933,13 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
   write_string(message);
   if message[message.count-1] != #char "\n" then write_string("\n");
 
-  new_message: Log_Message;
-  new_message.message = copy_string(message,, logs_to_display.allocator);
-  new_message.time_of_log = xx seconds_since_init(); // current_time_monotonic?
-  array_insert_at(*logs_to_display, new_message, 0);
+  if !(info.common_flags & .TO_FILE_ONLY) {
+    new_message: Log_Message;
+    new_message.message = copy_string(message,, logs_to_display.allocator);
+    new_message.time_of_log = xx seconds_since_init(); // current_time_monotonic?
+    new_message.time_to_decay = ifx info.common_flags & .ERROR then 10.0 else 5.0;
+    array_insert_at(*logs_to_display, new_message, 0);
+  }
 }
 
 #import "Basic";
