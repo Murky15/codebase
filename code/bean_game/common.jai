@@ -9,8 +9,7 @@ Linked_List :: struct (T: Type)
   header_struct := cast(*Type_Info_Struct) header.type;
   if header_struct.name != "Linked_List_Header" then return false, error;
   return true;
-}
-{
+} {
   first, last: *T;
   count: int;
 }
@@ -38,7 +37,6 @@ for_expansion :: (list: Linked_List, body: Code, flags: For_Flags) #expand {
   }
 }
 sll_queue_push :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
-  #assert type_of(list.first) == *T;
   if first == null {
     first = n;
     last = n;
@@ -51,7 +49,6 @@ sll_queue_push :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   list.count += 1;
 }
 sll_queue_push_front :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
-  #assert type_of(list.first) == *T;
   if first == null {
     first = n;
     last = n;
@@ -63,7 +60,6 @@ sll_queue_push_front :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   list.count += 1;
 }
 sll_queue_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
-  #assert type_of(list.first) == *T;
   if first == last {
     first = null;
     last = null;
@@ -73,13 +69,11 @@ sll_queue_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   list.count -= 1;
 }
 sll_stack_push :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
-  #assert type_of(list.first) == *T;
   n.next = xx first;
   first = n;
   list.count += 1;
 }
 sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
-  #assert type_of(list.first) == *T;
   if first != null {
     first = xx first.next;
   }
@@ -87,10 +81,31 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
 }
 
 // NOTE: I'm trying this out because my mentor swears by coroutines, so let's see how much it actually cleans up my logic
+
 #if OS == .WINDOWS {
   #import "Windows";
   kernel32 :: #library,system "kernel32";
-  ConvertThreadToFiber :: (thread: *void) -> *void #foreign kernel32;
+  // NOTE: This parameter is pretty useless in Jai because we have no way to actually access this data.
+  ConvertThreadToFiber :: (lpParameter: *void) -> *void #foreign kernel32;
+}
+
+Coroutine_State :: struct {
+  platform_initialized: bool;
+}
+#add_context co_state: Coroutine_State;
+
+co_resume :: (coroutine: $T, create_new_if_already_started := false, args: ..Any)
+#modify {
+  ti := cast(*Type_Info) T;
+  return ti.type == .PROCEDURE, "Coroutine type must be a procedure!";
+} {
+
+}
+co_yield :: () {
+
+}
+co_terminate :: () {
+
 }
 
 sign :: inline (x: $T) -> T {
