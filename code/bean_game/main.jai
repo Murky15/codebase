@@ -190,12 +190,7 @@ main :: () {
   player.texture = table_find_pointer(*texture_atlas, "character_roundRed");
   player.mass = 50;
   player.flip_duration = 0.2;
-  player_update :: (s: string, i: int) {
-    print("%, %\n", s, i);
-    return;
-  }
-  pu := co_create(player_update);
-  co_resume(pu, "a", 64);
+ 
 
   map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
   map.cam.offset -= player.bbox.zw / 2;

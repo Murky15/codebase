@@ -88,14 +88,6 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   CreateFiber :: (dwStackSize: u64, lpStartAddress: (*void) #c_call, lpParameter: *void) -> *void #foreign kernel32;
   SwitchToFiber :: (lpFiber: *void) #foreign kernel32;
 
-  #scope_export
-
-  Coroutine_Status :: enum {
-    NULL;
-    ACTIVE;
-    SUSPENDED;
-  }
-
   Coroutine :: struct(T: Type)
   #modify {
     ti := cast(*Type_Info) T;
@@ -106,53 +98,87 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
     }
     return true;
   } {
+    status: Coroutine_Status;
+    proc: T;
+
+    // NOTE: Inconvinient but must be bundled so we can send this to bootstrap_fiber
     fiber: *void;
     ctx: *#Context;
     args: [] Any;
-    proc: T;
 
     bootstrap_fiber :: (lpParameter: *void) #c_call {
       co := cast(*Coroutine(T)) lpParameter;
+      defer SwitchToFiber(co.ctx.co_state.home);
       push_context co.ctx {
         tip :: cast(*Type_Info_Procedure) type_info(T);
+        assert(co.args.count == tip.argument_types.count, "Error: Attempting to call the coroutine: %, with an improper number of arguments.", co.T);
         for co.args {
           if it.type.type != tip.argument_types[it_index].type ||
              it.type.runtime_size != tip.argument_types[it_index].runtime_size {
-            assert(false, "Error: Attempting to call the coroutine % with an improper argument type %.", co.T, it.type);
+            assert(false, "Error: Attempting to call the coroutine: %, with an improper argument type: %.", co.T, it);
            }
         }
-        #insert -> string {
-          Compiler :: #import "Compiler";
 
+        // NOTE: Unpack arguments and call procedure
+        #insert -> string {
           builder: String_Builder;
           print_to_builder(*builder, "co.proc(");
           for tip.argument_types {
-            expected_type := Compiler.get_type(it);
+            expected_type := cast(*Type, *it).*;
             print_to_builder(*builder, "cast(*%, co.args[%].value_pointer).*", expected_type, it_index);
             if it_index < tip.argument_types.count-1 then print_to_builder(*builder, ", ");
           }
           print_to_builder(*builder, ");");
-
           return builder_to_string(*builder);
         }
+
+
       }
     }
   }
+  #scope_export
 
-  co_create :: (coroutine: $T) -> Coroutine(T) {
-    return {};
+  Coroutine_State :: struct {
+    home: *void;
+    active: *void;
+  }
+  #add_context co_state: *Coroutine_State;
+
+  co_create :: (coroutine: $T) -> *Coroutine(T) {
+    if context.co_state == null {
+      context.co_state = New(Coroutine_State);
+      context.co_state.home = ConvertThreadToFiber(null);
+    }
+
+    result := New(Coroutine(T));
+    result.fiber = CreateFiber(0, result.bootstrap_fiber, result);
+    result.proc = coroutine;
+
+    return result;
   }
 
-  co_resume :: (co: Coroutine, args: ..Any) {
-
+  co_resume :: (co: *Coroutine, args: ..Any) {
+    assert(context.co_state != null);
+    co.status = .ACTIVE;
+    context.co_state.active = co.fiber;
+    defer context.co_state.active = null;
+    co.ctx = *context;
+    co.args = args;
+    SwitchToFiber(co.fiber);
   }
 
   co_yield :: () {
-
+    assert(context.home != context.active);
+    SwitchToFiber(context.home);
   }
 
-  co_query_status :: () -> Coroutine_Status {
-    return .NULL;
+  Coroutine_Status :: enum {
+    NULL;
+    ACTIVE;
+    SUSPENDED;
+  }
+  co_query_status :: (co: *Coroutine) -> Coroutine_Status {
+    return co.status;
   }
 }
 
