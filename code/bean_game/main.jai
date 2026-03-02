@@ -41,6 +41,7 @@ Entity :: struct {
 
   jumping: bool;
   can_jump: bool;
+  floor_below: bool;
   wall_sliding: bool;
   wall_jumping: bool;
   coyote_time := PLAYER_COYOTE_TIME_GRACE_PERIOD;
@@ -176,7 +177,6 @@ main :: () {
                                       table_find_pointer(*texture_atlas, "item_helmet"),
                                       table_find_pointer(*texture_atlas, "item_helmetModern")];
   should_run := true;
-  input_move_left, input_move_right, input_jump: bool;
   start := seconds_since_init();
   // NOTE: For now let's assume that the world is static
   // This is a very simple way to represent the world, and must be refined in the future.
@@ -190,6 +190,10 @@ main :: () {
   player.texture = table_find_pointer(*texture_atlas, "character_roundRed");
   player.mass = 50;
   player.flip_duration = 0.2;
+  player_update :: () {
+
+  }
+  co_create(player_update);
 
   map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
   map.cam.offset -= player.bbox.zw / 2;
@@ -204,6 +208,7 @@ main :: () {
   accel_force.duration_seconds = 0.18;
   accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / accel_force.duration_seconds)) + floor_friction_force.magnitude;
 
+  input_move_left, input_move_right, input_jump: bool;
   while should_run {
     reset_temporary_storage();
     Input.update_window_events();
@@ -255,6 +260,22 @@ main :: () {
     {
       old_player := player;
 
+      dir: float;
+      if input_move_left  dir -= 1;
+      if input_move_right dir += 1;
+      if dir != 0 {
+        if player.facing != dir {
+          player.facing = dir;
+          player.flip_start = xx seconds_since_init();
+          player.flip_counter = 0;
+        }
+        if old_player.dir == 0 {
+          player.dir = dir;
+          accel_force.time_counter = 0;
+        }
+      }
+
+
       coyote_jump := false;
       if player.coyote_time < PLAYER_COYOTE_TIME_GRACE_PERIOD {
         player.coyote_time += dt;
@@ -272,21 +293,6 @@ main :: () {
         player.can_jump = false;
         player.velocity.y = PLAYER_JUMP_VELOCITY;
         player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
-      }
-
-      dir: float;
-      if input_move_left  dir -= 1;
-      if input_move_right dir += 1;
-      if dir != 0 {
-        if player.facing != dir {
-          player.facing = dir;
-          player.flip_start = xx seconds_since_init();
-          player.flip_counter = 0;
-        }
-        if old_player.dir == 0 {
-          player.dir = dir;
-          accel_force.time_counter = 0;
-        }
       }
 
       if player.wall_sliding && input_jump {
@@ -313,6 +319,9 @@ main :: () {
       }
       if player.jumping then accel.y += GRAVITY * player.mass;
       if player.wall_sliding then accel.y += wall_friction_force.magnitude;
+
+
+      // NOTE: Player integration
       accel /= player.mass;
       player.velocity += accel * dt;
       player.velocity.x = sign(player.velocity.x) * min(abs(player.velocity.x), PLAYER_MOVE_SPEED);

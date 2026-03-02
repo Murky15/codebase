@@ -80,32 +80,49 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   list.count -= 1;
 }
 
-// NOTE: I'm trying this out because my mentor swears by coroutines, so let's see how much it actually cleans up my logic
-
 #if OS == .WINDOWS {
   #import "Windows";
   kernel32 :: #library,system "kernel32";
-  // NOTE: This parameter is pretty useless in Jai because we have no way to actually access this data.
   ConvertThreadToFiber :: (lpParameter: *void) -> *void #foreign kernel32;
-}
+  CreateFiber :: (dwStackSize: u64, lpStartAddress: (*void) #c_call, lpParameter: *void) -> *void #foreign kernel32;
+  SwitchToFiber :: (lpFiber: *void) #foreign kernel32;
 
-Coroutine_State :: struct {
-  platform_initialized: bool;
-}
-#add_context co_state: Coroutine_State;
+  Coroutine_Status :: enum {
+    NULL;
+    ACTIVE;
+    SUSPENDED;
+  }
+  Coroutine :: struct {
+    fiber: *void;
+    proc: (*void);
+    argument_types: [] *Type_Info;
+  }
+  #add_context co_active: *Coroutine;
 
-co_resume :: (coroutine: $T, create_new_if_already_started := false, args: ..Any)
-#modify {
-  ti := cast(*Type_Info) T;
-  return ti.type == .PROCEDURE, "Coroutine type must be a procedure!";
-} {
+  co_create :: (coroutine: $T) -> Coroutine
+  #modify {
+    ti := cast(*Type_Info) T;
+    if ti.type != .PROCEDURE then return false, "Error creating coroutine: this parameter must be a procedure.";
+    tip := cast(*Type_Info_Procedure) ti;
+    if tip.return_types.count != 0 || tip.procedure_flags != 0 {
+      return false, "Error creating coroutine: this procedure is invalid!";
+    }
+    return true;
+  } {
+    return {};
+  }
 
-}
-co_yield :: () {
+  co_resume :: (co: Coroutine, args: ..Any) {
 
-}
-co_terminate :: () {
+  }
 
+  co_yield :: () {
+
+  }
+
+  co_query_status :: () -> Coroutine_Status {
+    return .NULL;
+  }
 }
 
 sign :: inline (x: $T) -> T {
