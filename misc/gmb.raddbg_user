@@ -38,16 +38,16 @@ window:
         0.610555: getting_started text:
         {
           selected
-          expression: "file:\"D:/a/_work/1/s/src/vctools/crt/vcstartup/src/startup/exe_common.inl\".data"
+          expression: "file:\"W:/code/bean_game/common.jai\".data"
           auto: 1
           query:
           {
             input: ""
             cmd: search
           }
-          cursor_line: 1
+          cursor_line: 98
           cursor_column: 1
-          mark_line: 1
+          mark_line: 98
           mark_column: 1
         }
       }
@@ -55,22 +55,18 @@ window:
       {
         0.60:
         {
-          watch:
-          {
-            expression: ""
-            selected
-          }
+          selected
+          watch: expression: ""
           watch: expression: "query:locals"
           watch: expression: "query:registers"
           watch: expression: "query:globals"
-          watch: expression: "query:thread_locals"
+          watch: selected expression: "query:thread_locals"
           watch: expression: "query:types"
           watch: expression: "query:procedures"
           tabs_on_bottom
         }
         0.40:
         {
-          selected
           watch:
           {
             expression: "query:call_stack"
@@ -88,12 +84,11 @@ window:
         watch: expression: "query:targets"
         watch:
         {
-          selected
           expression: ""
           watch: it
           watch: map
         }
-        watch: expression: "query:locals"
+        watch: selected expression: "query:locals"
       }
       0.50:
       {
@@ -108,7 +103,7 @@ window:
     }
   }
   split_x
-  pos: 281 144
+  pos: -11 -6
   monitor: "\\\\.\\DISPLAY1"
   maximized
 }

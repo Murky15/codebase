@@ -81,25 +81,22 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
 }
 
 #if OS == .WINDOWS {
+  #scope_file
   #import "Windows";
   kernel32 :: #library,system "kernel32";
   ConvertThreadToFiber :: (lpParameter: *void) -> *void #foreign kernel32;
   CreateFiber :: (dwStackSize: u64, lpStartAddress: (*void) #c_call, lpParameter: *void) -> *void #foreign kernel32;
   SwitchToFiber :: (lpFiber: *void) #foreign kernel32;
 
+  #scope_export
+
   Coroutine_Status :: enum {
     NULL;
     ACTIVE;
     SUSPENDED;
   }
-  Coroutine :: struct {
-    fiber: *void;
-    proc: (*void);
-    argument_types: [] *Type_Info;
-  }
-  #add_context co_active: *Coroutine;
 
-  co_create :: (coroutine: $T) -> Coroutine
+  Coroutine :: struct(T: Type)
   #modify {
     ti := cast(*Type_Info) T;
     if ti.type != .PROCEDURE then return false, "Error creating coroutine: this parameter must be a procedure.";
@@ -109,6 +106,40 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
     }
     return true;
   } {
+    fiber: *void;
+    ctx: *#Context;
+    args: [] Any;
+    proc: T;
+
+    bootstrap_fiber :: (lpParameter: *void) #c_call {
+      co := cast(*Coroutine(T)) lpParameter;
+      push_context co.ctx {
+        tip :: cast(*Type_Info_Procedure) type_info(T);
+        for co.args {
+          if it.type.type != tip.argument_types[it_index].type ||
+             it.type.runtime_size != tip.argument_types[it_index].runtime_size {
+            assert(false, "Error: Attempting to call the coroutine % with an improper argument type %.", co.T, it.type);
+           }
+        }
+        #insert -> string {
+          Compiler :: #import "Compiler";
+
+          builder: String_Builder;
+          print_to_builder(*builder, "co.proc(");
+          for tip.argument_types {
+            expected_type := Compiler.get_type(it);
+            print_to_builder(*builder, "cast(*%, co.args[%].value_pointer).*", expected_type, it_index);
+            if it_index < tip.argument_types.count-1 then print_to_builder(*builder, ", ");
+          }
+          print_to_builder(*builder, ");");
+
+          return builder_to_string(*builder);
+        }
+      }
+    }
+  }
+
+  co_create :: (coroutine: $T) -> Coroutine(T) {
     return {};
   }
 
