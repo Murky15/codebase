@@ -80,36 +80,6 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   list.count -= 1;
 }
 
-#if OS == .WINDOWS {
-  #scope_file
-  #import "Windows";
-  kernel32 :: #library,system "kernel32";
-  ConvertThreadToFiber :: (lpParameter: *void) -> *void #foreign kernel32;
-  CreateFiber :: (dwStackSize: u64, lpStartAddress: (*void) #c_call, lpParameter: *void) -> *void #foreign kernel32;
-  SwitchToFiber :: (lpFiber: *void) #foreign kernel32;
-  #scope_export
-
-  Coroutine :: struct {
-
-  }
-
-  co_create :: () {
-
-  }
-
-  co_resume :: () {
-
-  }
-
-  co_yield :: () {
-
-  }
-
-  co_status :: ()  {
-
-  }
-}
-
 sign :: inline (x: $T) -> T {
   if x == 0 return 0;
   return abs(x)/x;
