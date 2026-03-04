@@ -80,6 +80,119 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   list.count -= 1;
 }
 
+#if OS == .WINDOWS {
+  // TODO: Verify that the context works as intended inside a coroutine
+  kernel32 :: #library,system "kernel32";
+  ConvertThreadToFiber :: (lpParameter: *void) -> *void #foreign kernel32;
+  CreateFiber :: (dwStackSize: u64, lpStartAddress: (*void) -> () #c_call, lpParameter: *void) -> *void #foreign kernel32;
+  SwitchToFiber :: (lpFiber: *void) #foreign kernel32;
+
+  CO_RESUME :: #string DONE
+  co_resume :: (co: *Coroutine($T), %) -> % {
+    SwitchToFiber(co.fiber);
+
+  }
+  DONE
+
+
+  /*
+  co_create
+  co_resume(*Coroutine(T),inputs of T) -> returns of T
+  co_yield(returns of T) -> inputs of T
+  co_query_status
+  */
+  Coroutine_State :: struct {
+    home_fiber: *void;
+    active_fiber: *void;
+    input: [] Any;
+    output: [] Any;
+  }
+  #add_context co_state: *Coroutine_State;
+
+  Coroutine :: struct (T: Type) {
+    proc: T;
+
+    fiber: *void;
+    ctx: *#Context;
+
+    fiber_bootstrap :: (lpParameter: *void) #c_call {
+      co := cast(*Coroutine(T)) lpParameter;
+      push_context co.ctx {
+        // NOTE: Insert procedure call and populate output array
+        #insert -> string {
+          tip := cast(*Type_Info_Procedure) T;
+          assert(tip.type == .PROCEDURE);
+          builder: String_Builder;
+          for tip.return_types {
+            print_to_builder(*builder, "ret%", it_index);
+            if it_index < tip.return_types.count-1 then print_to_builder(*builder, ", ");
+          }
+          print_to_builder(*builder, " := ");
+          print_to_builder(*builder, "co.proc(");
+          for tip.argument_types {
+            t := cast(*Type, *it).*;
+            print_to_builder(*builder, "cast(*%, context.co_state.input[%].value_pointer).*", t, it_index);
+            if it_index < tip.argument_types.count-1 then print_to_builder(*builder, ", ");
+          }
+          print_to_builder(*builder, ");\n");
+          print_to_builder(*builder, "context.co_state.output = NewArray(%, Any,, temp);\n", tip.return_types.count);
+          for tip.return_types {
+            print_to_builder(*builder, "context.co_state.output[%1] = ret%1;\n", it_index);
+          }
+
+          return builder_to_string(*builder);
+        }
+      }
+    }
+  }
+
+  co_create :: (proc: $T) -> *Coroutine(T) {
+    #run {
+      Compiler :: #import "Compiler";
+      tip := cast(*Type_Info_Procedure) T;
+      assert(tip.type == .PROCEDURE);
+      builder: String_Builder;
+
+      print_to_builder(*builder, "co_resume :: (co: *Coroutine($T), ");
+      for tip.argument_types {
+        print_to_builder(*builder, "arg%: %", it_index, Compiler.get_type(it));
+        if it_index < tip.argument_types.count-1 then print_to_builder(*builder, ", ");
+      }
+      print_to_builder(*builder, ") -> ");
+      for tip.return_types {
+        print_to_builder(*builder, "%", Compiler.get_type(it));
+        if it_index < tip.return_types.count-1 then print_to_builder(*builder, ", ");
+      }
+      print_to_builder(*builder, " {\n");
+      print_to_builder(*builder, "context.co_state.input = NewArray(%, Any,, temp);\n", tip.argument_types.count);
+      for tip.argument_types {
+        print_to_builder(*builder, "context.co_state.input[%1] = arg%1;\n", it_index);
+      }
+      print_to_builder(*builder, "SwitchToFiber(co.fiber);\n");
+      for tip.return_types {
+        t := Compiler.get_type(it);
+        print_to_builder(*builder, "ret%1 := cast(*%2, context.co_state.output[%1].value_pointer).*;\n", it_index, t);
+      }
+      print_to_builder(*builder, "return ");
+      for tip.return_types {
+        print_to_builder(*builder, "ret%1", it_index);
+        if it_index < tip.argument_types.count-1 then print_to_builder(*builder, ", ");
+      }
+      print_to_builder(*builder, ";\n}\n");
+
+      Compiler.add_build_string(builder_to_string(*builder), -1);
+    }
+    if context.co_state == null {
+      context.co_state = New(Coroutine_State);
+      context.co_state.home_fiber = ConvertThreadToFiber(null);
+    }
+    co := New(Coroutine(T));
+    co.proc = proc;
+    co.fiber = CreateFiber(0, co.fiber_bootstrap, co);
+    return co;
+  }
+}
+
 sign :: inline (x: $T) -> T {
   if x == 0 return 0;
   return abs(x)/x;

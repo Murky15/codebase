@@ -197,6 +197,12 @@ main :: () {
   player.mass = 50;
   player.flip_duration = 0.2;
 
+  player_update_test :: (p: int, h: string) -> bool, Entity {
+    return false, {};
+  }
+  co := co_create(player_update_test);
+  co_resume(co, true, "Hello Krissy");
+
   map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
   map.cam.offset -= player.bbox.zw / 2;
   cam_set_target(*map.cam, *player);
@@ -277,83 +283,49 @@ wall_friction_force := Force.{magnitude = 130_000};
         }
       }
 
-      accel: Vector2;
-      if player.state == {
-        case .GROUND; {
-          if accel_force.time_counter < accel_force.duration_seconds {
-            accel.x += accel_force.magnitude * dir;
-            accel_force.time_counter += dt;
-          } else if sign(dir) == sign(player.dir) {
-            if values_are_close(abs(player.velocity.x), PLAYER_MOVE_SPEED) {
-              accel.x += move_force.magnitude * dir;
-            }
-          }
-          if sign(player.velocity.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
-            player.dir = 0;
-            player.velocity.x = 0;
-          }
-          accel.x += floor_friction_force.magnitude * -sign(player.velocity.x);
-
-          if input_jump {
-            player.state = .AIR;
-            player.velocity.y = PLAYER_JUMP_VELOCITY;
-          }
-        }
-        case .AIR; {
-          coyote_jump := false;
-          if player.coyote_time < PLAYER_COYOTE_TIME_GRACE_PERIOD {
-            player.coyote_time += dt;
-            coyote_jump = true;
-          }
-          accel.y += GRAVITY * player.mass;
-        }
+      coyote_jump := false;
+      if player.coyote_time < PLAYER_COYOTE_TIME_GRACE_PERIOD {
+        player.coyote_time += dt;
+        coyote_jump = true;
       }
 
-      /*
-        coyote_jump := false;
-        if player.coyote_time < PLAYER_COYOTE_TIME_GRACE_PERIOD {
-          player.coyote_time += dt;
-          coyote_jump = true;
+      if !player.jumping {
+        if !input_jump {
+          player.can_jump = true;
         }
+      } else player.can_jump = false;
 
-        if !player.jumping {
-          if !input_jump {
-            player.can_jump = true;
+      if (player.can_jump || coyote_jump) && input_jump {
+        player.jumping = true;
+        player.can_jump = false;
+        player.velocity.y = PLAYER_JUMP_VELOCITY;
+        player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
+      }
+
+      if player.wall_sliding && input_jump {
+        player.wall_jumping = true;
+        player.velocity.x = -player.dir * 200;
+        player.velocity.y = PLAYER_JUMP_VELOCITY / 1.5;
+      }
+
+      accel: Vector2;
+      if !player.wall_jumping {
+        if accel_force.time_counter < accel_force.duration_seconds {
+          accel.x += accel_force.magnitude * dir;
+          accel_force.time_counter += dt;
+        } else if sign(dir) == sign(player.dir) {
+          if values_are_close(abs(player.velocity.x), PLAYER_MOVE_SPEED) {
+            accel.x += move_force.magnitude * dir;
           }
-        } else player.can_jump = false;
-
-        if (player.can_jump || coyote_jump) && input_jump {
-          player.jumping = true;
-          player.can_jump = false;
-          player.velocity.y = PLAYER_JUMP_VELOCITY;
-          player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
         }
-
-        if player.wall_sliding && input_jump {
-          player.wall_jumping = true;
-          player.velocity.x = -player.dir * 200;
-          player.velocity.y = PLAYER_JUMP_VELOCITY / 1.5;
+        if sign(player.velocity.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
+          player.dir = 0;
+          player.velocity.x = 0;
         }
-
-        accel: Vector2;
-        if !player.wall_jumping {
-          if accel_force.time_counter < accel_force.duration_seconds {
-            accel.x += accel_force.magnitude * dir;
-            accel_force.time_counter += dt;
-          } else if sign(dir) == sign(player.dir) {
-            if values_are_close(abs(player.velocity.x), PLAYER_MOVE_SPEED) {
-              accel.x += move_force.magnitude * dir;
-            }
-          }
-          if sign(player.velocity.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
-            player.dir = 0;
-            player.velocity.x = 0;
-          }
-          accel.x += floor_friction_force.magnitude * -sign(player.velocity.x);
-        }
-        if player.jumping then accel.y += GRAVITY * player.mass;
-        if player.wall_sliding then accel.y += wall_friction_force.magnitude;
-      */
+        accel.x += floor_friction_force.magnitude * -sign(player.velocity.x);
+      }
+      if player.jumping then accel.y += GRAVITY * player.mass;
+      if player.wall_sliding then accel.y += wall_friction_force.magnitude;
 
       // NOTE: Player integration
       accel /= player.mass;
