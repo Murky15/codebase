@@ -87,13 +87,69 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   CreateFiber :: (dwStackSize: u64, lpStartAddress: (*void) -> () #c_call, lpParameter: *void) -> *void #foreign kernel32;
   SwitchToFiber :: (lpFiber: *void) #foreign kernel32;
 
-  CO_RESUME :: #string DONE
-  co_resume :: (co: *Coroutine($T), %) -> % {
-    SwitchToFiber(co.fiber);
-
-  }
+  CO_RESUME_GENERIC_SOURCE :: #string DONE
+assert(co.state != .DEAD);
+co.state = .ACTIVE;
+co.ctx = *context;
+context.co_state.active_fiber = co.fiber;
+SwitchToFiber(co.fiber);
+context.co_state.active_fiber = null;
+if co.state != .DEAD then co.state = .SUSPENDED;
   DONE
 
+  #scope_file
+  co_impl_generate_argument_header :: () #expand {
+    for `tip.argument_types {
+      print_to_builder(*`builder, "arg%: %", it_index, `Compiler.get_type(it));
+      if it_index < `tip.argument_types.count-1 then print_to_builder(*`builder, ", ");
+    }
+  }
+
+  co_impl_generate_return_header :: () #expand {
+    for `tip.return_types {
+      print_to_builder(*`builder, "ret%: %", it_index, `Compiler.get_type(it));
+      if it_index < `tip.return_types.count-1 then print_to_builder(*`builder, ", ");
+    }
+  }
+
+  co_impl_generate_input_array :: () #expand {
+    print_to_builder(*`builder, "context.co_state.input = NewArray(%, Any,, temp);\n", `tip.argument_types.count);
+    for `tip.argument_types {
+      print_to_builder(*`builder, "context.co_state.input[%1] = arg%1;\n", it_index);
+    }
+  }
+
+  co_impl_generate_output_array :: () #expand {
+    print_to_builder(*`builder, "context.co_state.output = NewArray(%, Any,, temp);\n", `tip.return_types.count);
+    for `tip.return_types {
+      print_to_builder(*`builder, "context.co_state.output[%1] = ret%1;\n", it_index);
+    }
+  }
+
+  co_impl_generate_output_collection :: () #expand {
+    for `tip.return_types {
+      t := `Compiler.get_type(it);
+      print_to_builder(*`builder, "ret%1 := cast(*%2, context.co_state.output[%1].value_pointer).*;\n", it_index, t);
+    }
+  }
+
+  co_impl_generate_input_collection :: () #expand {
+    for `tip.argument_types {
+      t := `Compiler.get_type(it);
+      print_to_builder(*`builder, "arg%1 := cast(*%2, context.co_state.input[%1].value_pointer).*;\n", it_index, t);
+    }
+  }
+
+  co_impl_generate_return_statement :: (prefix: string) #expand {
+    print_to_builder(*`builder, "return");
+    types := ifx prefix == "arg" then `tip.argument_types else `tip.return_types;
+    for types {
+      print_to_builder(*`builder, " %%", prefix, it_index);
+      if it_index < types.count-1 then print_to_builder(*`builder, ",");
+    }
+    print_to_builder(*`builder, ";\n}\n");
+  }
+  #scope_export
 
   /*
   co_create
@@ -101,6 +157,7 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   co_yield(returns of T) -> inputs of T
   co_query_status
   */
+
   Coroutine_State :: struct {
     home_fiber: *void;
     active_fiber: *void;
@@ -109,8 +166,15 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   }
   #add_context co_state: *Coroutine_State;
 
+  Coroutine_Status :: enum {
+    SUSPENDED;
+    ACTIVE;
+    DEAD;
+  }
+
   Coroutine :: struct (T: Type) {
     proc: T;
+    state := Coroutine_Status.SUSPENDED;
 
     fiber: *void;
     ctx: *#Context;
@@ -127,7 +191,7 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
             print_to_builder(*builder, "ret%", it_index);
             if it_index < tip.return_types.count-1 then print_to_builder(*builder, ", ");
           }
-          print_to_builder(*builder, " := ");
+          if tip.return_types.count > 0 then print_to_builder(*builder, " := ");
           print_to_builder(*builder, "co.proc(");
           for tip.argument_types {
             t := cast(*Type, *it).*;
@@ -135,10 +199,9 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
             if it_index < tip.argument_types.count-1 then print_to_builder(*builder, ", ");
           }
           print_to_builder(*builder, ");\n");
-          print_to_builder(*builder, "context.co_state.output = NewArray(%, Any,, temp);\n", tip.return_types.count);
-          for tip.return_types {
-            print_to_builder(*builder, "context.co_state.output[%1] = ret%1;\n", it_index);
-          }
+          co_impl_generate_output_array();
+          print_to_builder(*builder, "co.state = .DEAD;\n");
+          print_to_builder(*builder, "SwitchToFiber(context.co_state.home_fiber);\n");
 
           return builder_to_string(*builder);
         }
@@ -153,35 +216,43 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
       assert(tip.type == .PROCEDURE);
       builder: String_Builder;
 
-      print_to_builder(*builder, "co_resume :: (co: *Coroutine($T), ");
-      for tip.argument_types {
-        print_to_builder(*builder, "arg%: %", it_index, Compiler.get_type(it));
-        if it_index < tip.argument_types.count-1 then print_to_builder(*builder, ", ");
+      // NOTE: Generate co_resume
+      print_to_builder(*builder, "co_resume :: (co: *Coroutine($T)");
+      if tip.argument_types.count > 0 then print_to_builder(*builder, ", ");
+      co_impl_generate_argument_header();
+      print_to_builder(*builder, ")");
+      if tip.return_types.count > 0 {
+        print_to_builder(*builder, " -> ");
       }
-      print_to_builder(*builder, ") -> ");
-      for tip.return_types {
-        print_to_builder(*builder, "%", Compiler.get_type(it));
-        if it_index < tip.return_types.count-1 then print_to_builder(*builder, ", ");
-      }
+      co_impl_generate_return_header();
       print_to_builder(*builder, " {\n");
-      print_to_builder(*builder, "context.co_state.input = NewArray(%, Any,, temp);\n", tip.argument_types.count);
-      for tip.argument_types {
-        print_to_builder(*builder, "context.co_state.input[%1] = arg%1;\n", it_index);
-      }
-      print_to_builder(*builder, "SwitchToFiber(co.fiber);\n");
-      for tip.return_types {
-        t := Compiler.get_type(it);
-        print_to_builder(*builder, "ret%1 := cast(*%2, context.co_state.output[%1].value_pointer).*;\n", it_index, t);
-      }
-      print_to_builder(*builder, "return ");
-      for tip.return_types {
-        print_to_builder(*builder, "ret%1", it_index);
-        if it_index < tip.argument_types.count-1 then print_to_builder(*builder, ", ");
-      }
-      print_to_builder(*builder, ";\n}\n");
+      co_impl_generate_input_array();
+      print_to_builder(*builder, CO_RESUME_GENERIC_SOURCE);
+      co_impl_generate_output_collection();
+      co_impl_generate_return_statement("ret");
+      Compiler.add_build_string(builder_to_string(*builder), -1);
 
+      // NOTE: Generate co_yield
+      reset(*builder);
+      proc_sig := replace(tprint("%", T), "procedure", "");
+      print_to_builder(*builder, "co_yield :: (proc: %", proc_sig);
+      if tip.return_types.count > 0 then print_to_builder(*builder, ", ");
+      co_impl_generate_return_header();
+      print_to_builder(*builder, ")");
+      if tip.argument_types.count > 0 {
+        print_to_builder(*builder, " -> ");
+      }
+      co_impl_generate_argument_header();
+      print_to_builder(*builder, " {\n");
+      co_impl_generate_output_array();
+      // NOTE: This would mean that we are calling yield from the home fiber
+      print_to_builder(*builder, "assert(context.co_state.active_fiber != null);\n");
+      print_to_builder(*builder, "SwitchToFiber(context.co_state.home_fiber);\n");
+      co_impl_generate_input_collection();
+      co_impl_generate_return_statement("arg");
       Compiler.add_build_string(builder_to_string(*builder), -1);
     }
+
     if context.co_state == null {
       context.co_state = New(Coroutine_State);
       context.co_state.home_fiber = ConvertThreadToFiber(null);
@@ -190,6 +261,10 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
     co.proc = proc;
     co.fiber = CreateFiber(0, co.fiber_bootstrap, co);
     return co;
+  }
+
+  co_query_status :: (co: *Coroutine($T)) -> Coroutine_Status {
+    return co.status;
   }
 }
 

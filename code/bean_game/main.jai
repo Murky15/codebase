@@ -34,7 +34,7 @@ Entity_State :: enum {
   AIR;
 }
 
-Entity :: struct {
+Player :: struct {
   gen: u64;
 
   dir: float;
@@ -60,34 +60,42 @@ Entity :: struct {
   #overlay (pos) bbox: AARect;
 }
 
-Entity_Handle :: struct {
-  e: *Entity;
-  gen: u64;
+Input_Package :: struct {
+  dir: float;
+  jump: bool;
+}
+
+player_update :: (player: *Player, input: Input_Package, dt: float) {
+  while true {
+    player_state_ground();
+    player_state_air();
+  }
+}
+
+player_state_ground :: () {
+  while true {
+    player, input, dt := co_yield(player_update);
+  }
+}
+
+player_state_air :: () {
+  while true {
+    player, input, dt := co_yield(player_update);
+  }
 }
 
 Camera :: struct {
-  tracking: Entity_Handle;
+  tracking: *Player;
   pos: Vector2;
   offset: Vector2;
 }
 
-make_handle :: (e: *Entity) -> Entity_Handle {
-  return {e, e.gen};
-}
-
-get_entity :: (h: Entity_Handle) -> *Entity {
-  e: *Entity;
-  if h.gen == h.e.gen then e = h.e;
-  return e;
-}
-
-cam_set_target :: (cam: *Camera, e: *Entity) {
-  handle := make_handle(e);
-  cam.tracking = handle;
+cam_set_target :: (cam: *Camera, e: *Player) {
+  cam.tracking = e;
 }
 
 cam_update_tracking :: (cam: *Camera, dt: float, attachment := 4.5) {
-  target := get_entity(cam.tracking);
+  target := cam.tracking;
   t := clamp(attachment * dt, 0, 1);
   cam.pos = lerp(cam.pos, target.pos - cam.offset, t);
 }
@@ -190,18 +198,13 @@ main :: () {
   map := map_load(texture_atlas, apollo_start,, level_arena_allocator);
   random_seed(cast,force(Some_Big_Time_Value) apollo_start);
 
-  player: Entity;
+  player: Player;
   player.pos = map.player_spawn;
   player.jumping = true;
   player.texture = table_find_pointer(*texture_atlas, "character_roundRed");
   player.mass = 50;
   player.flip_duration = 0.2;
-
-  player_update_test :: (p: int, h: string) -> bool, Entity {
-    return false, {};
-  }
-  co := co_create(player_update_test);
-  co_resume(co, true, "Hello Krissy");
+  player_update_routine := co_create(player_update);
 
   map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
   map.cam.offset -= player.bbox.zw / 2;
@@ -282,6 +285,8 @@ wall_friction_force := Force.{magnitude = 130_000};
           accel_force.time_counter = 0;
         }
       }
+
+      co_resume(player_update_routine, *player, {}, dt);
 
       coyote_jump := false;
       if player.coyote_time < PLAYER_COYOTE_TIME_GRACE_PERIOD {
