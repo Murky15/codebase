@@ -978,6 +978,7 @@ roguelike_tick (Thread_Context *tctx, void *game_state, f32 dt, Game_Input_Packa
       }
     }
 
+    // NOTE: Should be flipped where vulnerable entities poll for harmful entities so we can avoid this critical section
     if (new_state.flags & ENTITY_FLAG_HARMFUL) {
       for each_in_arrayc (contact, gs->entities, gs->num_entities) {
         if (contact->flags & ENTITY_FLAG_VULNERABLE &&

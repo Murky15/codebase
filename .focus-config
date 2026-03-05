@@ -383,7 +383,7 @@ Shift-Ctrl-F8               go_to_previous_build_error_in_side_pane
 
 [[style]]
 
-theme: jblow-nostalgia
+theme: basic-light
 
 [fonts]
 font:          JetBrainsMonoNL-Regular
