@@ -217,7 +217,8 @@ if co.state != .DEAD then co.state = .SUSPENDED;
       builder: String_Builder;
 
       // NOTE: Generate co_resume
-      print_to_builder(*builder, "co_resume :: (co: *Coroutine($T)");
+      proc_sig := replace(tprint("%", T), "procedure ", "");
+      print_to_builder(*builder, "co_resume :: (co: *Coroutine(#type %)", proc_sig);
       if tip.argument_types.count > 0 then print_to_builder(*builder, ", ");
       co_impl_generate_argument_header();
       print_to_builder(*builder, ")");
@@ -234,7 +235,7 @@ if co.state != .DEAD then co.state = .SUSPENDED;
 
       // NOTE: Generate co_yield
       reset(*builder);
-      proc_sig := replace(tprint("%", T), "procedure", "");
+      proc_sig = replace(tprint("%", T), "procedure", "");
       print_to_builder(*builder, "co_yield :: (proc: %", proc_sig);
       if tip.return_types.count > 0 then print_to_builder(*builder, ", ");
       co_impl_generate_return_header();
@@ -245,7 +246,7 @@ if co.state != .DEAD then co.state = .SUSPENDED;
       co_impl_generate_argument_header();
       print_to_builder(*builder, " {\n");
       co_impl_generate_output_array();
-      // NOTE: This would mean that we are calling yield from the home fiber
+      // NOTE: This would mean that we are calling yield from the home fiber, which is illegal
       print_to_builder(*builder, "assert(context.co_state.active_fiber != null);\n");
       print_to_builder(*builder, "SwitchToFiber(context.co_state.home_fiber);\n");
       co_impl_generate_input_collection();
