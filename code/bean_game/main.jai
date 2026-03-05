@@ -25,26 +25,21 @@ for her before she gets back.
 - [X] Occlusion culling
 - [ ] Main menu
 - [X] Include user data in logger to change message display duration
+- [ ] Audio
 */
 
 AARect :: #type,isa Vector4;
 
-Entity_State :: enum {
-  GROUND;
-  AIR;
-}
-
 Player :: struct {
-  gen: u64;
-
   dir: float;
   facing := 1.0;
   pos: Vector2;
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
-  velocity: Vector2;
-  mass: float;
 
-  state: Entity_State;
+  accel_per_frame: Vector2;
+  mass: float;
+  velocity: Vector2;
+
   jumping: bool;
   can_jump: bool;
   floor_below: bool;
@@ -75,12 +70,55 @@ player_update :: (player: *Player, input: Input_Package, dt: float) {
 player_state_ground :: () {
   while true {
     player, input, dt := co_yield(player_update);
+
+    if !player.jumping {
+      if !input.jump {
+        player.can_jump = true;
+      }
+    } else player.can_jump = false;
+
+    if (player.can_jump || coyote_jump) && input.jump {
+      player.jumping = true;
+      player.can_jump = false;
+      player.velocity.y = PLAYER_JUMP_VELOCITY;
+      player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
+    }
+
+    if player.wall_sliding && input.jump {
+      player.wall_jumping = true;
+      player.velocity.x = -player.dir * 200;
+      player.velocity.y = PLAYER_JUMP_VELOCITY / 1.5;
+    }
+
+    if !player.wall_jumping {
+      if accel_force.time_counter < accel_force.duration_seconds {
+        player.accel_per_frame.x += accel_force.magnitude * input.dir;
+        accel_force.time_counter += dt;
+      } else if sign(input.dir) == sign(player.dir) {
+        if values_are_close(abs(player.velocity.x), PLAYER_MOVE_SPEED) {
+          player.accel_per_frame.x += move_force.magnitude * input.dir;
+        }
+      }
+      if sign(player.velocity.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
+        player.dir = 0;
+        player.velocity.x = 0;
+      }
+      player.accel_per_frame.x += floor_friction_force.magnitude * -sign(player.velocity.x);
+    }
+    if player.jumping then player.accel_per_frame.y += GRAVITY * player.mass;
+    if player.wall_sliding then player.accel_per_frame.y += wall_friction_force.magnitude;
   }
 }
 
 player_state_air :: () {
   while true {
     player, input, dt := co_yield(player_update);
+
+    coyote_jump := false;
+    if player.coyote_time < PLAYER_COYOTE_TIME_GRACE_PERIOD {
+      player.coyote_time += dt;
+      coyote_jump = true;
+    }
   }
 }
 
@@ -163,6 +201,11 @@ PLAYER_BOUNCE_PAD_JUMP_VELOCITY :: 1500.0;
 PLAYER_COYOTE_TIME_GRACE_PERIOD :: 0.1;
 GRAVITY :: -3800.0;
 
+floor_friction_force: Force;
+wall_friction_force: Force;
+move_force: Force;
+accel_force: Force;
+
 main :: () {
   level_arena_pool: Arena.Flat_Pool;
   level_arena_allocator := Allocator.{proc=Arena.flat_pool_allocator_proc, data=*level_arena_pool};
@@ -206,18 +249,16 @@ main :: () {
   player.flip_duration = 0.2;
   player_update_routine := co_create(player_update);
 
+  friction_coefficient :: 2.0;
+  floor_friction_force = {magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
+  wall_friction_force = {magnitude = 130_000};
+  move_force = floor_friction_force;
+  accel_force.duration_seconds = 0.18;
+  accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / accel_force.duration_seconds)) + floor_friction_force.magnitude;
+
   map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
   map.cam.offset -= player.bbox.zw / 2;
   cam_set_target(*map.cam, *player);
-
-  // NOTE: Should we also have a special "pivot" force?
-  friction_coefficient :: 2.0;
-  floor_friction_force := Force.{magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
-wall_friction_force := Force.{magnitude = 130_000};
-  move_force := floor_friction_force;
-  accel_force: Force;
-  accel_force.duration_seconds = 0.18;
-  accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / accel_force.duration_seconds)) + floor_friction_force.magnitude;
 
   input_move_left, input_move_right, input_jump: bool;
   while should_run {
@@ -286,57 +327,14 @@ wall_friction_force := Force.{magnitude = 130_000};
         }
       }
 
-      co_resume(player_update_routine, *player, {}, dt);
-
-      coyote_jump := false;
-      if player.coyote_time < PLAYER_COYOTE_TIME_GRACE_PERIOD {
-        player.coyote_time += dt;
-        coyote_jump = true;
-      }
-
-      if !player.jumping {
-        if !input_jump {
-          player.can_jump = true;
-        }
-      } else player.can_jump = false;
-
-      if (player.can_jump || coyote_jump) && input_jump {
-        player.jumping = true;
-        player.can_jump = false;
-        player.velocity.y = PLAYER_JUMP_VELOCITY;
-        player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
-      }
-
-      if player.wall_sliding && input_jump {
-        player.wall_jumping = true;
-        player.velocity.x = -player.dir * 200;
-        player.velocity.y = PLAYER_JUMP_VELOCITY / 1.5;
-      }
-
-      accel: Vector2;
-      if !player.wall_jumping {
-        if accel_force.time_counter < accel_force.duration_seconds {
-          accel.x += accel_force.magnitude * dir;
-          accel_force.time_counter += dt;
-        } else if sign(dir) == sign(player.dir) {
-          if values_are_close(abs(player.velocity.x), PLAYER_MOVE_SPEED) {
-            accel.x += move_force.magnitude * dir;
-          }
-        }
-        if sign(player.velocity.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
-          player.dir = 0;
-          player.velocity.x = 0;
-        }
-        accel.x += floor_friction_force.magnitude * -sign(player.velocity.x);
-      }
-      if player.jumping then accel.y += GRAVITY * player.mass;
-      if player.wall_sliding then accel.y += wall_friction_force.magnitude;
+      co_resume(player_update_routine, *player, {dir, input_jump}, dt);
 
       // NOTE: Player integration
-      accel /= player.mass;
+      accel := player.accel_per_frame / player.mass;
       player.velocity += accel * dt;
       player.velocity.x = sign(player.velocity.x) * min(abs(player.velocity.x), PLAYER_MOVE_SPEED);
       player.pos += player.velocity * dt;
+      player.accel_per_frame = {};
 
       player_grid_pos := floor(player.pos / TILE_RESOLUTION);
       if !player.jumping {
@@ -372,7 +370,6 @@ wall_friction_force := Force.{magnitude = 130_000};
                   player.pos.y += overlap.w;
                   player.jumping = false;
                   player.wall_jumping = false;
-                  player.state = .GROUND;
                 } else {
                   player.pos.y -= overlap.w;
                 }
