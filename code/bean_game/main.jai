@@ -18,7 +18,7 @@ for her before she gets back.
 - [X] Player flip direction
 - [X] Autotiling
 - [X] Parallax backgrounds
-- [ ] Coroutines
+- [X] Coroutines
 - [ ] Hands
 - [ ] Cosmetics
 - [X] Debug messages and font display (Custom logger that writes messages to the screen!)
@@ -37,6 +37,7 @@ Player :: struct {
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
 
   accel_per_frame: Vector2;
+  current_accel_force: Force;
   mass: float;
   velocity: Vector2;
 
@@ -110,6 +111,11 @@ player_state_air :: (old_player: *Player) {
       coyote_jump = true;
     }
 
+    if coyote_jump && input.jump {
+      player.velocity.y = PLAYER_JUMP_VELOCITY;
+      player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
+    }
+
     ground_collisions := get_collision(player, *map, .[.GROUND, .WALL]);
     for ground_collisions {
       player_pos_diff := player.pos - old_player.pos;
@@ -146,6 +152,18 @@ player_state_wall :: (old_player: *Player){
       if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
         player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
       }
+    }
+
+    if !input.jump {
+      player.can_jump = true;
+    }
+
+    if player.can_jump && input.jump {
+      player.velocity.y = PLAYER_JUMP_VELOCITY;
+      player.velocity.x = -player.dir * PLAYER_JUMP_VELOCITY;
+      player.dir = -player.dir;
+      player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
+      return;
     }
 
     player.accel_per_frame.y += GRAVITY * player.mass;
@@ -268,7 +286,9 @@ GRAVITY :: -3800.0;
 floor_friction_force: Force;
 wall_friction_force: Force;
 move_force: Force;
-accel_force: Force;
+ground_accel_force: Force;
+air_accel_force: Force;
+
 
 map: Map;
 
@@ -318,8 +338,10 @@ main :: () {
   floor_friction_force = {magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
   wall_friction_force = {magnitude = 130_000};
   move_force = floor_friction_force;
-  accel_force.duration_seconds = 0.18;
-  accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / accel_force.duration_seconds)) + floor_friction_force.magnitude;
+  ground_accel_force.duration_seconds = 0.18;
+  ground_accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / ground_accel_force.duration_seconds)) + floor_friction_force.magnitude;
+  air_accel_force.duration_seconds = 2.0;
+  air_accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / air_accel_force.duration_seconds)) + floor_friction_force.magnitude;
 
   map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
   map.cam.offset -= player.bbox.zw / 2;
@@ -386,7 +408,7 @@ main :: () {
         }
         if player.dir == 0 {
           player.dir = dir;
-          accel_force.time_counter = 0;
+          player.current_accel_force.time_counter = 0;
         }
       }
 
@@ -398,9 +420,9 @@ main :: () {
       player.accel_per_frame = {};
 
       input := Input_Package.{dir, input_jump};
-      if accel_force.time_counter < accel_force.duration_seconds {
-        player.accel_per_frame.x += accel_force.magnitude * input.dir;
-        accel_force.time_counter += dt;
+      if player.current_accel_force.time_counter < player.current_accel_force.duration_seconds {
+        player.accel_per_frame.x += player.current_accel_force.magnitude * input.dir;
+        player.current_accel_force.time_counter += dt;
       } else if sign(input.dir) == sign(player.dir) {
         if values_are_close(abs(player.velocity.x), PLAYER_MOVE_SPEED) {
           player.accel_per_frame.x += move_force.magnitude * input.dir;
