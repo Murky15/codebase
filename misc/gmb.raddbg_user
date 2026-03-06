@@ -38,16 +38,16 @@ window:
         0.610555: selected getting_started text:
         {
           selected
-          expression: "file:\"W:/code/bean_game/main.jai\".data"
+          expression: "file:\"W:/code/bean_game/.build/.added_strings_w3.jai\".data"
           auto: 1
           query:
           {
             input: ""
             cmd: search
           }
-          cursor_line: 128
+          cursor_line: 20
           cursor_column: 1
-          mark_line: 128
+          mark_line: 20
           mark_column: 1
         }
       }
@@ -103,7 +103,7 @@ window:
   }
   split_x
   pos: -11 -6
-  monitor: "\\\\.\\DISPLAY1"
+  monitor: "\\\\.\\DISPLAY6"
   maximized
 }
 keybindings:

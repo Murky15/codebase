@@ -37,7 +37,6 @@ Player :: struct {
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
 
   accel_per_frame: Vector2;
-  current_accel_force: Force;
   mass: float;
   velocity: Vector2;
 
@@ -45,9 +44,6 @@ Player :: struct {
   coyote_time := PLAYER_COYOTE_TIME_GRACE_PERIOD;
 
   texture: *Simp.Texture;
-  flip_start: float;
-  flip_duration: float;
-  flip_counter: float;
 
   #overlay (pos) bbox: AARect;
 }
@@ -55,6 +51,21 @@ Player :: struct {
 Input_Package :: struct {
   dir: float;
   jump: bool;
+}
+
+// TODO: Expand
+progress_animation :: (duration: float, dt: float) -> float {
+  started_at := cast(float) seconds_since_init();
+  animation_index := 0.0;
+  value := 0.0;
+  dt: float;
+  while animation_index < duration {
+    animation_index += dt;
+    value = cast(float) clamp(norm(started_at + animation_index, started_at, started_at + duration), 0, 1);
+    _, dt = co_yield(progress_animation, value);
+  }
+
+  return value;
 }
 
 player_update :: (player: *Player, input: Input_Package, dt: float) {
@@ -283,12 +294,11 @@ PLAYER_BOUNCE_PAD_JUMP_VELOCITY :: 1500.0;
 PLAYER_COYOTE_TIME_GRACE_PERIOD :: 0.1;
 GRAVITY :: -3800.0;
 
+friction_coefficient := 2.0;
 floor_friction_force: Force;
 wall_friction_force: Force;
 move_force: Force;
-ground_accel_force: Force;
-air_accel_force: Force;
-
+accel_force: Force;
 
 map: Map;
 
@@ -331,17 +341,8 @@ main :: () {
   player.pos = map.player_spawn;
   player.texture = table_find_pointer(*texture_atlas, "character_roundRed");
   player.mass = 50;
-  player.flip_duration = 0.2;
   player_update_routine := co_create(player_update);
-
-  friction_coefficient :: 2.0;
-  floor_friction_force = {magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
-  wall_friction_force = {magnitude = 130_000};
-  move_force = floor_friction_force;
-  ground_accel_force.duration_seconds = 0.18;
-  ground_accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / ground_accel_force.duration_seconds)) + floor_friction_force.magnitude;
-  air_accel_force.duration_seconds = 2.0;
-  air_accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / air_accel_force.duration_seconds)) + floor_friction_force.magnitude;
+  player_flip := co_create(progress_animation);
 
   map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
   map.cam.offset -= player.bbox.zw / 2;
@@ -403,12 +404,12 @@ main :: () {
       if dir != 0 {
         if player.facing != dir {
           player.facing = dir;
-          player.flip_start = xx seconds_since_init();
-          player.flip_counter = 0;
+          co_delete(player_flip);
+          player_flip = co_create(progress_animation);
         }
         if player.dir == 0 {
           player.dir = dir;
-          player.current_accel_force.time_counter = 0;
+          accel_force.time_counter = 0;
         }
       }
 
@@ -419,10 +420,16 @@ main :: () {
       player.pos += player.velocity * dt;
       player.accel_per_frame = {};
 
+      floor_friction_force = {magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
+      wall_friction_force = {magnitude = 130_000};
+      move_force = floor_friction_force;
+      accel_force.duration_seconds = 0.18;
+      accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / accel_force.duration_seconds)) + floor_friction_force.magnitude;
+
       input := Input_Package.{dir, input_jump};
-      if player.current_accel_force.time_counter < player.current_accel_force.duration_seconds {
-        player.accel_per_frame.x += player.current_accel_force.magnitude * input.dir;
-        player.current_accel_force.time_counter += dt;
+      if accel_force.time_counter < accel_force.duration_seconds {
+        player.accel_per_frame.x += accel_force.magnitude * input.dir;
+        accel_force.time_counter += dt;
       } else if sign(input.dir) == sign(player.dir) {
         if values_are_close(abs(player.velocity.x), PLAYER_MOVE_SPEED) {
           player.accel_per_frame.x += move_force.magnitude * input.dir;
@@ -488,9 +495,7 @@ main :: () {
       {
         using player;
         set_texture(texture);
-
-        flip_counter += dt;
-        flip := clamp(norm(flip_start + flip_counter, flip_start, flip_start + flip_duration), 0, 1);
+        flip := co_resume(player_flip, 0.2, dt);
         dsp_pos := pos - map.cam.pos;
         dsp_dim := bbox_dim;
         dsp_dim.x *= abs(cos(PI * flip));
@@ -498,11 +503,11 @@ main :: () {
         p0, p1, p2, p3 := make_quad({xy = dsp_pos, zw = dsp_dim});
         left, right: float;
         if player.facing > 0 {
-          left = ifx flip > 0.5 then 0.0 else 1.0;
-          right = ifx flip > 0.5 then 1.0 else 0.0;
+          left = cast(float, !(flip > 0.5));
+          right = cast(float, flip > 0.5);
         } else {
-          left = ifx flip > 0.5 then 1.0 else 0.0;
-          right = ifx flip > 0.5 then 0.0 else 1.0;
+          left = cast(float, flip > 0.5);
+          right = cast(float, !(flip > 0.5));
         }
         uv0 := Vector2.{left,0};
         uv1 := Vector2.{right,0};

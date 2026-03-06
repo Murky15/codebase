@@ -81,20 +81,40 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
 }
 
 #if OS == .WINDOWS {
-  // TODO: Verify that the context works as intended inside a coroutine
   kernel32 :: #library,system "kernel32";
   ConvertThreadToFiber :: (lpParameter: *void) -> *void #foreign kernel32;
   CreateFiber :: (dwStackSize: u64, lpStartAddress: (*void) -> () #c_call, lpParameter: *void) -> *void #foreign kernel32;
+  DeleteFiber :: (lpFiber: *void) #foreign kernel32;
   SwitchToFiber :: (lpFiber: *void) #foreign kernel32;
 
+  copy_any :: (x: Any) -> Any {
+    any: Any = ---;
+    any.type = x.type;
+    any.value_pointer = alloc(x.type.runtime_size);
+    memcpy(any.value_pointer, x.value_pointer, x.type.runtime_size);
+    return any;
+  }
+
+  FIBER_BOOTSTRAP_GENERIC_SOURCE :: #string DONE
+  for * co.final_output {
+    it.* = copy_any(context.co_state.output[it_index]);
+  }
+  co.state = .DEAD;
+  SwitchToFiber(context.co_state.home_fiber);
+  DONE
+
   CO_RESUME_GENERIC_SOURCE :: #string DONE
-assert(co.state != .DEAD);
-co.state = .ACTIVE;
-co.ctx = *context;
-context.co_state.active_fiber = co.fiber;
-SwitchToFiber(co.fiber);
-context.co_state.active_fiber = null;
-if co.state != .DEAD then co.state = .SUSPENDED;
+  if co.state == .DEAD {
+    context.co_state.output = array_copy(co.final_output,, temp);
+  } else {
+    co.state = .ACTIVE;
+    context.co_state.active_fiber = co.fiber;
+    SwitchToFiber(co.fiber);
+    context.co_state.active_fiber = null;
+    if co.state != .DEAD {
+      co.state = .SUSPENDED;
+    }
+  }
   DONE
 
   #scope_file
@@ -151,13 +171,6 @@ if co.state != .DEAD then co.state = .SUSPENDED;
   }
   #scope_export
 
-  /*
-  co_create
-  co_resume(*Coroutine(T),inputs of T) -> returns of T
-  co_yield(returns of T) -> inputs of T
-  co_query_status
-  */
-
   Coroutine_State :: struct {
     home_fiber: *void;
     active_fiber: *void;
@@ -175,6 +188,7 @@ if co.state != .DEAD then co.state = .SUSPENDED;
   Coroutine :: struct (T: Type) {
     proc: T;
     state := Coroutine_Status.SUSPENDED;
+    final_output: [#run -> int {return cast(*Type_Info_Procedure,T).return_types.count;}] Any;
 
     fiber: *void;
     ctx: *#Context;
@@ -200,8 +214,7 @@ if co.state != .DEAD then co.state = .SUSPENDED;
           }
           print_to_builder(*builder, ");\n");
           co_impl_generate_output_array();
-          print_to_builder(*builder, "co.state = .DEAD;\n");
-          print_to_builder(*builder, "SwitchToFiber(context.co_state.home_fiber);\n");
+          print_to_builder(*builder, FIBER_BOOTSTRAP_GENERIC_SOURCE);
 
           return builder_to_string(*builder);
         }
@@ -210,7 +223,7 @@ if co.state != .DEAD then co.state = .SUSPENDED;
   }
 
   co_create :: (proc: $T) -> *Coroutine(T) {
-    #run {
+    #run,stallable {
       Compiler :: #import "Compiler";
       tip := cast(*Type_Info_Procedure) T;
       assert(tip.type == .PROCEDURE);
@@ -231,11 +244,9 @@ if co.state != .DEAD then co.state = .SUSPENDED;
       print_to_builder(*builder, CO_RESUME_GENERIC_SOURCE);
       co_impl_generate_output_collection();
       co_impl_generate_return_statement("ret");
-      Compiler.add_build_string(builder_to_string(*builder), -1);
 
       // NOTE: Generate co_yield
-      reset(*builder);
-      proc_sig = replace(tprint("%", T), "procedure", "");
+      proc_sig = replace(tprint("%", T), "procedure ", "");
       print_to_builder(*builder, "co_yield :: (proc: %", proc_sig);
       if tip.return_types.count > 0 then print_to_builder(*builder, ", ");
       co_impl_generate_return_header();
@@ -251,6 +262,7 @@ if co.state != .DEAD then co.state = .SUSPENDED;
       print_to_builder(*builder, "SwitchToFiber(context.co_state.home_fiber);\n");
       co_impl_generate_input_collection();
       co_impl_generate_return_statement("arg");
+
       Compiler.add_build_string(builder_to_string(*builder), -1);
     }
 
@@ -260,12 +272,23 @@ if co.state != .DEAD then co.state = .SUSPENDED;
     }
     co := New(Coroutine(T));
     co.proc = proc;
+    co.ctx = *context;
     co.fiber = CreateFiber(0, co.fiber_bootstrap, co);
     return co;
   }
 
+  co_delete :: (co: *Coroutine($T)) {
+    if co == null then return;
+    assert(context.co_state.active_fiber != co.fiber);
+    DeleteFiber(co.fiber);
+    for co.final_output {
+      free(it.value_pointer);
+    }
+    free(co);
+  }
+
   co_query_status :: (co: *Coroutine($T)) -> Coroutine_Status {
-    return co.status;
+    return co.state;
   }
 }
 
