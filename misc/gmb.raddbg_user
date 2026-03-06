@@ -6,9 +6,9 @@ window:
   size: 1942 1152
   panels:
   {
-    0.654301:
+    0.565389:
     {
-      0.672714:
+      0.866141:
       {
         0.389445:
         {
@@ -45,13 +45,13 @@ window:
             input: ""
             cmd: search
           }
-          cursor_line: 336
+          cursor_line: 128
           cursor_column: 1
-          mark_line: 336
+          mark_line: 128
           mark_column: 1
         }
       }
-      0.327286:
+      0.133859:
       {
         0.60:
         {
@@ -76,7 +76,7 @@ window:
         }
       }
     }
-    0.345699:
+    0.434611:
     {
       0.50:
       {
@@ -103,7 +103,7 @@ window:
   }
   split_x
   pos: -11 -6
-  monitor: "\\\\.\\DISPLAY6"
+  monitor: "\\\\.\\DISPLAY1"
   maximized
 }
 keybindings:

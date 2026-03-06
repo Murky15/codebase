@@ -40,11 +40,7 @@ Player :: struct {
   mass: float;
   velocity: Vector2;
 
-  jumping: bool;
   can_jump: bool;
-  floor_below: bool;
-  wall_sliding: bool;
-  wall_jumping: bool;
   coyote_time := PLAYER_COYOTE_TIME_GRACE_PERIOD;
 
   texture: *Simp.Texture;
@@ -61,56 +57,50 @@ Input_Package :: struct {
 }
 
 player_update :: (player: *Player, input: Input_Package, dt: float) {
+  old_player: Player;
   while true {
-    player_state_ground();
-    player_state_air();
+    player_state_ground(*old_player);
+    player_state_air(*old_player);
   }
 }
 
-player_state_ground :: () {
+player_state_ground :: (old_player: *Player) {
   while true {
     player, input, dt := co_yield(player_update);
 
-    if !player.jumping {
-      if !input.jump {
-        player.can_jump = true;
-      }
-    } else player.can_jump = false;
+    player_grid_pos := floor(player.pos / TILE_RESOLUTION);
+    bottom_left  := map_index(map, player_grid_pos + {y = -1}).type == .GROUND;
+    bottom_right := map_index(map, player_grid_pos + {1, -1}).type  == .GROUND;
+    floor_below := bottom_left || bottom_right;
+    if !floor_below {
+      if !input.jump then player.coyote_time = 0;
+      return;
+    }
 
-    if (player.can_jump || coyote_jump) && input.jump {
-      player.jumping = true;
+    if !input.jump {
+      player.can_jump = true;
+    }
+
+    if player.can_jump && input.jump{
       player.can_jump = false;
       player.velocity.y = PLAYER_JUMP_VELOCITY;
       player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
+      return;
     }
 
-    if player.wall_sliding && input.jump {
-      player.wall_jumping = true;
-      player.velocity.x = -player.dir * 200;
-      player.velocity.y = PLAYER_JUMP_VELOCITY / 1.5;
+    ground_collisions := get_collision(player, *map, .GROUND);
+    for ground_collisions {
+      player_pos_diff := player.pos - old_player.pos;
+      if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
+        player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
+      }
     }
 
-    if !player.wall_jumping {
-      if accel_force.time_counter < accel_force.duration_seconds {
-        player.accel_per_frame.x += accel_force.magnitude * input.dir;
-        accel_force.time_counter += dt;
-      } else if sign(input.dir) == sign(player.dir) {
-        if values_are_close(abs(player.velocity.x), PLAYER_MOVE_SPEED) {
-          player.accel_per_frame.x += move_force.magnitude * input.dir;
-        }
-      }
-      if sign(player.velocity.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
-        player.dir = 0;
-        player.velocity.x = 0;
-      }
-      player.accel_per_frame.x += floor_friction_force.magnitude * -sign(player.velocity.x);
-    }
-    if player.jumping then player.accel_per_frame.y += GRAVITY * player.mass;
-    if player.wall_sliding then player.accel_per_frame.y += wall_friction_force.magnitude;
+    old_player.* = player.*;
   }
 }
 
-player_state_air :: () {
+player_state_air :: (old_player: *Player) {
   while true {
     player, input, dt := co_yield(player_update);
 
@@ -119,6 +109,49 @@ player_state_air :: () {
       player.coyote_time += dt;
       coyote_jump = true;
     }
+
+    ground_collisions := get_collision(player, *map, .[.GROUND, .WALL]);
+    for ground_collisions {
+      player_pos_diff := player.pos - old_player.pos;
+      if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, it.bbox) {
+        defer player.velocity.y = 0;
+        if player.velocity.y < 0 {
+          player.pos.y += it.overlap.w;
+          return;
+        } else {
+          player.pos.y -= it.overlap.w;
+        }
+      } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
+        player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
+        if it.tile.type == .WALL && player.velocity.y < 0 {
+          player_state_wall(old_player);
+        }
+      }
+    }
+
+    player.accel_per_frame.y += GRAVITY * player.mass;
+
+    old_player.* = player.*;
+  }
+}
+
+player_state_wall :: (old_player: *Player){
+  while true {
+    player, input, dt := co_yield(player_update);
+
+    wall_collisions := get_collision(player, *map, .WALL);
+    if wall_collisions.count == 0 || get_collision(player, *map, .GROUND) then return;
+    for wall_collisions {
+      player_pos_diff := player.pos - old_player.pos;
+      if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
+        player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
+      }
+    }
+
+    player.accel_per_frame.y += GRAVITY * player.mass;
+    player.accel_per_frame.y += wall_friction_force.magnitude;
+
+    old_player.* = player.*;
   }
 }
 
@@ -185,6 +218,37 @@ make_uv_counter_rotation :: inline (quadrants_to_rotate: u64) -> Vector2, Vector
   }
 }
 
+Collision :: struct {
+  bbox: AARect;
+  overlap: AARect;
+  tile: *Tile;
+}
+
+get_collision :: (player: *Player, map: *Map, tile_types: [] Tile_Type) -> [] Collision {
+  is_colliding := false;
+  collisions: [..] Collision;
+  collisions.allocator = temp;
+  player_grid_pos := floor(player.pos / TILE_RESOLUTION);
+  for y: 0..1 {
+    for x: 0..1 {
+      test := player_grid_pos + xy(xx x, xx y);
+      potential_collision := map_index_pointer(map, test);
+      if potential_collision == null || !array_find(tile_types, potential_collision.type) then continue;
+      tile := AARect.{xy = test * TILE_RESOLUTION, zw = potential_collision.bbox_dim};
+      colliding, overlap := rects_intersect(player.bbox, tile);
+      if colliding {
+        array_add(*collisions, {tile, overlap, potential_collision});
+      }
+    }
+  }
+
+  return collisions;
+}
+
+get_collision :: (player: *Player, map: *Map, tile_type: Tile_Type) -> [] Collision {
+  return get_collision(player, map, .[tile_type]);
+}
+
 ENABLE_LEVEL_HOT_RELOAD :: true;
 TILE_NATIVE_RESOLUTION :: 64;
 TILE_RESOLUTION_DIVISOR :: 2;
@@ -205,6 +269,8 @@ floor_friction_force: Force;
 wall_friction_force: Force;
 move_force: Force;
 accel_force: Force;
+
+map: Map;
 
 main :: () {
   level_arena_pool: Arena.Flat_Pool;
@@ -238,12 +304,11 @@ main :: () {
   // NOTE: For now let's assume that the world is static
   // This is a very simple way to represent the world, and must be refined in the future.
   apollo_start := to_apollo(start);
-  map := map_load(texture_atlas, apollo_start,, level_arena_allocator);
+  map = map_load(texture_atlas, apollo_start,, level_arena_allocator);
   random_seed(cast,force(Some_Big_Time_Value) apollo_start);
 
   player: Player;
   player.pos = map.player_spawn;
-  player.jumping = true;
   player.texture = table_find_pointer(*texture_atlas, "character_roundRed");
   player.mass = 50;
   player.flip_duration = 0.2;
@@ -310,8 +375,6 @@ main :: () {
     start = end;
 
     {
-      old_player := player;
-
       dir: float;
       if input_move_left  dir -= 1;
       if input_move_right dir += 1;
@@ -321,13 +384,11 @@ main :: () {
           player.flip_start = xx seconds_since_init();
           player.flip_counter = 0;
         }
-        if old_player.dir == 0 {
+        if player.dir == 0 {
           player.dir = dir;
           accel_force.time_counter = 0;
         }
       }
-
-      co_resume(player_update_routine, *player, {dir, input_jump}, dt);
 
       // NOTE: Player integration
       accel := player.accel_per_frame / player.mass;
@@ -336,62 +397,33 @@ main :: () {
       player.pos += player.velocity * dt;
       player.accel_per_frame = {};
 
-      player_grid_pos := floor(player.pos / TILE_RESOLUTION);
-      if !player.jumping {
-        bottom_left  := map_index(map, player_grid_pos + {y = -1}).type == .GROUND;
-        bottom_right := map_index(map, player_grid_pos + {1, -1}).type  == .GROUND;
-        floor_below := bottom_left || bottom_right;
-        player.jumping = !floor_below;
-        if !floor_below && !input_jump then player.coyote_time = 0;
+      input := Input_Package.{dir, input_jump};
+      if accel_force.time_counter < accel_force.duration_seconds {
+        player.accel_per_frame.x += accel_force.magnitude * input.dir;
+        accel_force.time_counter += dt;
+      } else if sign(input.dir) == sign(player.dir) {
+        if values_are_close(abs(player.velocity.x), PLAYER_MOVE_SPEED) {
+          player.accel_per_frame.x += move_force.magnitude * input.dir;
+        }
+      }
+      if sign(player.velocity.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
+        player.dir = 0;
+        player.velocity.x = 0;
+      }
+      player.accel_per_frame.x += floor_friction_force.magnitude * -sign(player.velocity.x);
+
+      co_resume(player_update_routine, *player, input, dt);
+
+      if get_collision(*player, *map, .BOUNCE_PAD) {
+        player.velocity.y = PLAYER_BOUNCE_PAD_JUMP_VELOCITY;
+        player.can_jump = false;
       }
 
-      wall_collision := false;
-      defer if !wall_collision then player.wall_sliding = false;
-      for y: 0..1 {
-        for x: 0..1 {
-          test := player_grid_pos + xy(xx x, xx y);
-          potential_collision := map_index_pointer(map, test);
-          if potential_collision == null then continue;
-          tile := AARect.{xy = test * TILE_RESOLUTION, zw = potential_collision.bbox_dim};
-          colliding, overlap := rects_intersect(player.bbox, tile);
-          if !colliding continue;
-          if potential_collision.type == {
-            case .WALL; {
-              if dir != 0 && player.jumping && player.velocity.y < 0 {
-                player.wall_sliding = true;
-                player.wall_jumping = false;
-                wall_collision = true;
-              }
-            } #through;
-            case .GROUND; {
-              player_pos_diff := player.pos - old_player.pos;
-              if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, tile) {
-                if player.velocity.y < 0 {
-                  player.pos.y += overlap.w;
-                  player.jumping = false;
-                  player.wall_jumping = false;
-                } else {
-                  player.pos.y -= overlap.w;
-                }
-                player.velocity.y = 0;
-              } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, tile) {
-                player.pos.x += -sign(player_pos_diff.x) * overlap.z;
-              }
-            }
-
-            case .BOUNCE_PAD; {
-              player.velocity.y = PLAYER_BOUNCE_PAD_JUMP_VELOCITY;
-              player.jumping = true;
-              player.can_jump = false;
-            }
-
-            case .COIN; {
-              if !potential_collision.collected {
-                potential_collision.collected = true;
-                map.coins_collected += 1;
-              }
-            }
-          }
+      coins := get_collision(*player, *map, .COIN);
+      for coins {
+        if !it.tile.collected {
+          it.tile.collected = true;
+          map.coins_collected += 1;
         }
       }
 
