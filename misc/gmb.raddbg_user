@@ -45,9 +45,9 @@ window:
             input: ""
             cmd: search
           }
-          cursor_line: 20
+          cursor_line: 31
           cursor_column: 1
-          mark_line: 20
+          mark_line: 31
           mark_column: 1
         }
       }
@@ -86,6 +86,7 @@ window:
           expression: ""
           watch: it
           watch: map
+          watch: context
         }
         watch: selected expression: "query:locals"
       }

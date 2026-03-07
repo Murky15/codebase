@@ -1,9 +1,3 @@
-/* NOTE -- About this project
-Today is valentine's day, and my girlfriend is on a class trip to Italy.
-She said she wanted a handmade gift, so I have one week to make this game
-for her before she gets back.
-*/
-
 /* TODO
 - [X] Levels stored as text files
 - [X] Custom for expansion for looping over map
@@ -13,7 +7,7 @@ for her before she gets back.
 - [X] Hot reloading levels
 - [X] Bounce pads
 - [X] Coins
-- [ ] Wall jumping / friction
+- [X] Wall jumping / friction
 - [ ] Grappling hook
 - [X] Player flip direction
 - [X] Autotiling
@@ -26,6 +20,7 @@ for her before she gets back.
 - [ ] Main menu
 - [X] Include user data in logger to change message display duration
 - [ ] Audio
+- [ ] Downloading level files from the web and checking for updates
 */
 
 AARect :: #type,isa Vector4;
@@ -46,6 +41,12 @@ Player :: struct {
   texture: *Simp.Texture;
 
   #overlay (pos) bbox: AARect;
+}
+
+Force :: struct {
+  magnitude: float;
+  duration_seconds: float;
+  time_counter: float;
 }
 
 Input_Package :: struct {
@@ -174,6 +175,8 @@ player_state_wall :: (old_player: *Player){
       player.velocity.x = -player.dir * PLAYER_JUMP_VELOCITY;
       player.dir = -player.dir;
       player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
+      player.can_jump = false;
+      move_force.time_counter = 0;
       return;
     }
 
@@ -294,12 +297,12 @@ PLAYER_BOUNCE_PAD_JUMP_VELOCITY :: 1500.0;
 PLAYER_COYOTE_TIME_GRACE_PERIOD :: 0.1;
 GRAVITY :: -3800.0;
 
-friction_coefficient := 2.0;
+// TODO: Make these not global anymore
+friction_coefficient :: 1.8;
 floor_friction_force: Force;
 wall_friction_force: Force;
 move_force: Force;
 accel_force: Force;
-
 map: Map;
 
 main :: () {
@@ -343,6 +346,14 @@ main :: () {
   player.mass = 50;
   player_update_routine := co_create(player_update);
   player_flip := co_create(progress_animation);
+
+  floor_friction_force = {magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
+  wall_friction_force = {magnitude = 130_000};
+  move_force = floor_friction_force;
+  move_force.duration_seconds = 0.3;
+  move_force.time_counter = move_force.duration_seconds;
+  accel_force.duration_seconds = 0.18;
+  accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / accel_force.duration_seconds)) + floor_friction_force.magnitude;
 
   map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
   map.cam.offset -= player.bbox.zw / 2;
@@ -417,16 +428,16 @@ main :: () {
       accel := player.accel_per_frame / player.mass;
       player.velocity += accel * dt;
       player.velocity.x = sign(player.velocity.x) * min(abs(player.velocity.x), PLAYER_MOVE_SPEED);
+      // TODO: Player Y velocity should also be clamped
       player.pos += player.velocity * dt;
       player.accel_per_frame = {};
 
-      floor_friction_force = {magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
-      wall_friction_force = {magnitude = 130_000};
-      move_force = floor_friction_force;
-      accel_force.duration_seconds = 0.18;
-      accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / accel_force.duration_seconds)) + floor_friction_force.magnitude;
-
       input := Input_Package.{dir, input_jump};
+
+      if move_force.time_counter < move_force.duration_seconds {
+        player.accel_per_frame.x += move_force.magnitude * player.dir;
+        move_force.time_counter += dt;
+      }
       if accel_force.time_counter < accel_force.duration_seconds {
         player.accel_per_frame.x += accel_force.magnitude * input.dir;
         accel_force.time_counter += dt;
@@ -501,14 +512,9 @@ main :: () {
         dsp_dim.x *= abs(cos(PI * flip));
         dsp_pos.x += (bbox_dim.x - dsp_dim.x) / 2;
         p0, p1, p2, p3 := make_quad({xy = dsp_pos, zw = dsp_dim});
-        left, right: float;
-        if player.facing > 0 {
-          left = cast(float, !(flip > 0.5));
-          right = cast(float, flip > 0.5);
-        } else {
-          left = cast(float, flip > 0.5);
-          right = cast(float, !(flip > 0.5));
-        }
+        left  := cast(float, !(flip > 0.5));
+        right := cast(float,   flip > 0.5);
+        if player.facing < 0 then left, right = right, left;
         uv0 := Vector2.{left,0};
         uv1 := Vector2.{right,0};
         uv2 := Vector2.{right,1};
@@ -592,3 +598,4 @@ WC    :: #import "Window_Creation";
 Arena :: #import "Flat_Pool";
 Input :: #import "Input";
 Simp  :: #import "Simp";
+Sound :: #import "Sound_Player";

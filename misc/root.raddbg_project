@@ -37,7 +37,7 @@ target:
 debug_info:
 {
   path: "W:/build/BeanGame.pdb"
-  timestamp: 66208604419677
+  timestamp: 66208608380081
 }
 breakpoint:
 {
@@ -46,6 +46,6 @@ breakpoint:
 }
 breakpoint:
 {
-  source_location: "../code/bean_game/main.jai:91:1"
-  hit_count: 0
+  source_location: "../code/bean_game/.build/.added_strings_w3.jai:8:1"
+  hit_count: 1
 }

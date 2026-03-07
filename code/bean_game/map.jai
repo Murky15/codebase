@@ -102,12 +102,6 @@ visible_only :: (map: Map, body: Code, flags: For_Flags) #expand {
   }
 }
 
-Force :: struct {
-  magnitude: float;
-  duration_seconds: float;
-  time_counter: float;
-}
-
 operator > :: (a: Vector2, b: Vector2) -> bool {
   return a.x > b.x && a.y > b.y;
 }
