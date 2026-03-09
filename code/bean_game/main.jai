@@ -38,9 +38,23 @@ Player :: struct {
   can_jump: bool;
   coyote_time := PLAYER_COYOTE_TIME_GRACE_PERIOD;
 
+  grappling_hook: Verlet_Rope;
+
   texture: *Simp.Texture;
 
   #overlay (pos) bbox: AARect;
+}
+
+Verlet_Rope :: struct (particle_density := 1, jakobsen_iterations := 50) {
+  Particle :: struct {
+    pos: Vector2;
+    old_pos: Vector2;
+
+    fixed: bool;
+  }
+
+  length: float;
+  particles: [..] Particle; // Should this be dynamic? Maybe we want to grow or shrink the rope mid swing.
 }
 
 Force :: struct {
@@ -59,7 +73,6 @@ progress_animation :: (duration: float, dt: float) -> float {
   started_at := cast(float) seconds_since_init();
   animation_index := 0.0;
   value := 0.0;
-  dt: float;
   while animation_index < duration {
     animation_index += dt;
     value = cast(float) clamp(norm(started_at + animation_index, started_at, started_at + duration), 0, 1);
@@ -67,6 +80,25 @@ progress_animation :: (duration: float, dt: float) -> float {
   }
 
   return value;
+}
+
+begin_swing :: (rope: *Verlet_Rope, length: float, anchor: Vector2) {
+  rope.length = length;
+
+  num_particles := rope.particle_density * length;
+  particle_dist := 1.0 / rope.particle_density;
+  for 0..num_particles-1 {
+    particle: Verlet_Rope.Particle;
+    if it == 0 then particle.fixed = true;
+    particle.pos = anchor + xy(it * particle_dist, 0);
+    particle.old_pos = particle.pos;
+    array_add(*rope.particles, particle);
+  }
+}
+
+end_swing :: (rope: *Verlet_Rope) {
+  array_reset(*rope.particles);
+  rope.length = 0;
 }
 
 player_update :: (player: *Player, input: Input_Package, dt: float) {
@@ -231,6 +263,11 @@ set_texture :: inline (tex: *Simp.Texture) {
   Simp.immediate_set_2d_projection(RESOLUTION_W, RESOLUTION_H);
 }
 
+set_color :: inline () {
+  Simp.set_shader_for_color();
+  Simp.immediate_set_2d_projection(RESOLUTION_W, RESOLUTION_H);
+}
+
 make_quad :: inline (rect: AARect) -> Vector2, Vector2, Vector2, Vector2 {
   p0 := rect.xy;
   p1 := xy(rect.x + rect.z, rect.y);
@@ -346,6 +383,8 @@ main :: () {
   player.mass = 50;
   player_update_routine := co_create(player_update);
   player_flip := co_create(progress_animation);
+
+  begin_swing(*player.grappling_hook, 10);
 
   floor_friction_force = {magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
   wall_friction_force = {magnitude = 130_000};
@@ -504,6 +543,18 @@ main :: () {
       }
 
       {
+        using player.grappling_hook;
+        set_color();
+        for particles {
+          if it_index == particles.count-1 then break;
+          next_particle := particles[it_index + 1];
+          segment := next_particle.pos - it.pos;
+          angle := atan2(segment.y, segment.x);
+          
+        }
+      }
+
+      {
         using player;
         set_texture(texture);
         flip := co_resume(player_flip, 0.2, dt);
@@ -541,27 +592,31 @@ main :: () {
           set_texture(number_textures[it]);
           dp0, dp1, dp2, dp3 := make_quad({xy = xy(scoreboard_x, SCOREBOARD_Y), zw = xy(SCOREBOARD_RESOLUTION)});
           Simp.immediate_quad(dp0, dp1, dp2, dp3);
-          scoreboard_x += TILE_RESOLUTION;
+          scoreboard_x += TILE_RESOLUTION / 1.8;
         }
       }
 
       Simp.set_shader_for_color();
-      for * logs_to_display {
-        t := norm(it.time_of_log + it.decay, it.time_of_log, it.time_of_log + it.time_to_decay);
+      for logs_to_display {
+        t := co_resume(it.fade, 0, dt);
         alpha := ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
         Simp.draw_text(font, 50, 50 + it_index * (window_height/FONT_HEIGHT_DIVISOR), it.message, {w = 1 - alpha});
-        it.decay += dt;
-        if it.decay > it.time_to_decay remove it;
+        if t >= 1.0 {
+          co_delete(it.fade);
+          remove it;
+        }
       }
+
+      width := Simp.prepare_text(font, tprint("FPS: %", FormatFloat.{value=1/dt, mode=.SHORTEST}));
+      Simp.generate_quads_for_prepared_text(font, window_width - width, window_height - (window_height/FONT_HEIGHT_DIVISOR), 0);
+      Simp.draw_generated_quads(font, {0,0,0,1});
     }
   }
 }
 
 Log_Message :: struct {
   message: string;
-  time_of_log: float;
-  decay: float;
-  time_to_decay: float;
+  fade: *Coroutine(type_of(progress_animation));
 }
 
 logs_to_display: [..] Log_Message;
@@ -577,8 +632,9 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
   if !(info.common_flags & .TO_FILE_ONLY) {
     new_message: Log_Message;
     new_message.message = copy_string(message,, logs_to_display.allocator);
-    new_message.time_of_log = xx seconds_since_init(); // current_time_monotonic?
-    new_message.time_to_decay = ifx info.common_flags & .ERROR then 10.0 else 5.0;
+    new_message.fade = co_create(progress_animation);
+    duration := ifx info.common_flags & .ERROR then 10.0 else 5.0;
+    co_resume(new_message.fade, duration, 0.0);
     array_insert_at(*logs_to_display, new_message, 0);
   }
 }
