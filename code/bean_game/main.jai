@@ -85,10 +85,10 @@ progress_animation :: (duration: float, dt: float) -> float {
 begin_swing :: (rope: *Verlet_Rope, length: float, anchor: Vector2) {
   rope.length = length;
 
-  num_particles := rope.particle_density * length;
+  num_particles := cast(int, rope.particle_density * length);
   particle_dist := 1.0 / rope.particle_density;
   for 0..num_particles-1 {
-    particle: Verlet_Rope.Particle;
+    particle: rope.Particle;
     if it == 0 then particle.fixed = true;
     particle.pos = anchor + xy(it * particle_dist, 0);
     particle.old_pos = particle.pos;
@@ -384,7 +384,7 @@ main :: () {
   player_update_routine := co_create(player_update);
   player_flip := co_create(progress_animation);
 
-  begin_swing(*player.grappling_hook, 10);
+  begin_swing(*player.grappling_hook, 10, player.pos);
 
   floor_friction_force = {magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
   wall_friction_force = {magnitude = 130_000};
@@ -550,7 +550,7 @@ main :: () {
           next_particle := particles[it_index + 1];
           segment := next_particle.pos - it.pos;
           angle := atan2(segment.y, segment.x);
-          
+
         }
       }
 
