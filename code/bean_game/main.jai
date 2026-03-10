@@ -38,14 +38,14 @@ Player :: struct {
   can_jump: bool;
   coyote_time := PLAYER_COYOTE_TIME_GRACE_PERIOD;
 
-  grappling_hook: Verlet_Rope;
+  grappling_hook: Verlet_Rope(particle_density = 0.25);
 
   texture: *Simp.Texture;
 
   #overlay (pos) bbox: AARect;
 }
 
-Verlet_Rope :: struct (particle_density := 1, jakobsen_iterations := 50) {
+Verlet_Rope :: struct (particle_density := 1.0, jakobsen_iterations := 50) {
   Particle :: struct {
     pos: Vector2;
     old_pos: Vector2;
@@ -549,7 +549,8 @@ main :: () {
           if it_index == particles.count-1 then break;
           next_particle := particles[it_index + 1];
           segment := next_particle.pos - it.pos;
-          angle := atan2(segment.y, segment.x);
+          perpendicular := xy(segment.y, -segment.x);
+          perpendicular = unit_vector(perpendicular);
 
         }
       }
