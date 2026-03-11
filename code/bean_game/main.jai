@@ -38,7 +38,7 @@ Player :: struct {
   can_jump: bool;
   coyote_time := PLAYER_COYOTE_TIME_GRACE_PERIOD;
 
-  grappling_hook: Verlet_Rope(particle_density = 0.25);
+  grappling_hook: Verlet_Rope(particle_density = 0.1);
 
   texture: *Simp.Texture;
 
@@ -83,14 +83,13 @@ progress_animation :: (duration: float, dt: float) -> float {
 }
 
 begin_swing :: (rope: *Verlet_Rope, length: float, anchor: Vector2) {
-  rope.length = length;
-
-  num_particles := cast(int, rope.particle_density * length);
+  num_particles := cast(int) ceil(rope.particle_density * length);
   particle_dist := 1.0 / rope.particle_density;
-  for 0..num_particles-1 {
+  rope.length = particle_dist * num_particles;
+  for i: 0..num_particles-1 {
     particle: rope.Particle;
-    if it == 0 then particle.fixed = true;
-    particle.pos = anchor + xy(it * particle_dist, 0);
+    if i == 0 then particle.fixed = true;
+    particle.pos = anchor + xy(i * particle_dist, 0);
     particle.old_pos = particle.pos;
     array_add(*rope.particles, particle);
   }
@@ -268,6 +267,31 @@ set_color :: inline () {
   Simp.immediate_set_2d_projection(RESOLUTION_W, RESOLUTION_H);
 }
 
+draw_circle :: (center: Vector2, r: float, N: s32, color: Vector4) {
+  if !N return;
+
+  set_color();
+
+  dtheta := TAU / N;
+  p0 := Vector3.{center.x, center.y, 0};
+
+  // @Speed: Factor apart the loop below to save the previous points.
+  for i: 0..N-1 {
+    theta0 := dtheta * i;
+    theta1 := dtheta * (i+1);
+
+    ct0 := cos(theta0);
+    st0 := sin(theta0);
+    ct1 := cos(theta1);
+    st1 := sin(theta1);
+
+    p1 := Vector3.{center.x + ct0 * r, center.y + st0 * r, 0};
+    p2 := Vector3.{center.x + ct1 * r, center.y + st1 * r, 0};
+
+    Simp.immediate_triangle(p0, p1, p2, color, color, color);
+  }
+}
+
 make_quad :: inline (rect: AARect) -> Vector2, Vector2, Vector2, Vector2 {
   p0 := rect.xy;
   p1 := xy(rect.x + rect.z, rect.y);
@@ -384,7 +408,7 @@ main :: () {
   player_update_routine := co_create(player_update);
   player_flip := co_create(progress_animation);
 
-  begin_swing(*player.grappling_hook, 10, player.pos);
+  begin_swing(*player.grappling_hook, 100, player.pos + xy(0, 50));
 
   floor_friction_force = {magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
   wall_friction_force = {magnitude = 130_000};
@@ -476,8 +500,7 @@ main :: () {
       if move_force.time_counter < move_force.duration_seconds {
         player.accel_per_frame.x += move_force.magnitude * player.dir;
         move_force.time_counter += dt;
-      }
-      if accel_force.time_counter < accel_force.duration_seconds {
+      } else if accel_force.time_counter < accel_force.duration_seconds {
         player.accel_per_frame.x += accel_force.magnitude * input.dir;
         accel_force.time_counter += dt;
       } else if sign(input.dir) == sign(player.dir) {
@@ -543,21 +566,26 @@ main :: () {
       }
 
       {
-        using player.grappling_hook;
-        set_color();
-        for particles {
-          if it_index == particles.count-1 then break;
-          next_particle := particles[it_index + 1];
-          segment := next_particle.pos - it.pos;
-          perpendicular := xy(segment.y, -segment.x);
-          perpendicular = unit_vector(perpendicular);
-
-        }
-      }
-
-      {
         using player;
-        set_texture(texture);
+
+        rope_width :: 5;
+        set_color();
+        for grappling_hook.particles {
+          p0 := it.pos - map.cam.pos;
+          if it_index < grappling_hook.particles.count-1 {
+            next_particle := grappling_hook.particles[it_index + 1];
+            segment := next_particle.pos - it.pos;
+            perpendicular := xy(-segment.y, segment.x);
+            perpendicular = unit_vector(perpendicular);
+            perpendicular *= rope_width;
+            p1 := next_particle.pos - map.cam.pos;
+            p2 := p1 + perpendicular;
+            p3 := p0 + perpendicular;
+            Simp.immediate_quad(p0, p1, p2, p3, {0, 0, 1, 1});
+          }
+          draw_circle(p0, 2, 100, {1, 0, 0, 1});
+        }
+
         flip := co_resume(player_flip, 0.2, dt);
         dsp_pos := pos - map.cam.pos;
         dsp_dim := bbox_dim;
@@ -572,6 +600,7 @@ main :: () {
         uv2 := Vector2.{right,1};
         uv3 := Vector2.{left,1};
 
+        set_texture(texture);
         Simp.immediate_quad(p0, p1, p2, p3, {1,1,1,1}, uv0, uv1, uv2, uv3);
       }
 
@@ -597,7 +626,7 @@ main :: () {
         }
       }
 
-      Simp.set_shader_for_color();
+      Simp.set_shader_for_text();
       for logs_to_display {
         t := co_resume(it.fade, 0, dt);
         alpha := ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;

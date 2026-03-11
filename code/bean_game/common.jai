@@ -193,36 +193,6 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
     fiber: *void;
     ctx: *#Context;
 
-    fiber_bootstrap :: (lpParameter: *void) #c_call {
-      co := cast(*Coroutine(T)) lpParameter;
-      push_context co.ctx {
-        // NOTE: Insert procedure call and populate output array
-        #insert -> string {
-          tip := cast(*Type_Info_Procedure) T;
-          assert(tip.type == .PROCEDURE);
-          builder: String_Builder;
-          for tip.return_types {
-            print_to_builder(*builder, "ret%", it_index);
-            if it_index < tip.return_types.count-1 then print_to_builder(*builder, ", ");
-          }
-          if tip.return_types.count > 0 then print_to_builder(*builder, " := ");
-          print_to_builder(*builder, "co.proc(");
-          for tip.argument_types {
-            t := cast(*Type, *it).*;
-            print_to_builder(*builder, "cast(*%, context.co_state.input[%].value_pointer).*", t, it_index);
-            if it_index < tip.argument_types.count-1 then print_to_builder(*builder, ", ");
-          }
-          print_to_builder(*builder, ");\n");
-          co_impl_generate_output_array();
-          print_to_builder(*builder, FIBER_BOOTSTRAP_GENERIC_SOURCE);
-
-          return builder_to_string(*builder);
-        }
-      }
-    }
-  }
-
-  co_create :: (proc: $T) -> *Coroutine(T) {
     #run,stallable {
       Compiler :: #import "Compiler";
       tip := cast(*Type_Info_Procedure) T;
@@ -266,6 +236,36 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
       Compiler.add_build_string(builder_to_string(*builder), -1);
     }
 
+    fiber_bootstrap :: (lpParameter: *void) #c_call {
+      co := cast(*Coroutine(T)) lpParameter;
+      push_context co.ctx {
+        // NOTE: Insert procedure call and populate output array
+        #insert -> string {
+          tip := cast(*Type_Info_Procedure) T;
+          assert(tip.type == .PROCEDURE);
+          builder: String_Builder;
+          for tip.return_types {
+            print_to_builder(*builder, "ret%", it_index);
+            if it_index < tip.return_types.count-1 then print_to_builder(*builder, ", ");
+          }
+          if tip.return_types.count > 0 then print_to_builder(*builder, " := ");
+          print_to_builder(*builder, "co.proc(");
+          for tip.argument_types {
+            t := cast(*Type, *it).*;
+            print_to_builder(*builder, "cast(*%, context.co_state.input[%].value_pointer).*", t, it_index);
+            if it_index < tip.argument_types.count-1 then print_to_builder(*builder, ", ");
+          }
+          print_to_builder(*builder, ");\n");
+          co_impl_generate_output_array();
+          print_to_builder(*builder, FIBER_BOOTSTRAP_GENERIC_SOURCE);
+
+          return builder_to_string(*builder);
+        }
+      }
+    }
+  }
+
+  co_create :: (proc: $T) -> *Coroutine(T) {
     if context.co_state == null {
       context.co_state = New(Coroutine_State);
       context.co_state.home_fiber = ConvertThreadToFiber(null);
@@ -295,6 +295,10 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
 sign :: inline (x: $T) -> T {
   if x == 0 return 0;
   return abs(x)/x;
+}
+
+round :: inline (x: float) -> float {
+  return ifx x - cast(int) x > 0.5 then ceil(x) else floor(x);
 }
 
 norm :: inline (x: float, min: float, max: float) -> float {
