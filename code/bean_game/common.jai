@@ -292,18 +292,10 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   }
 }
 
-sign :: inline (x: $T) -> T {
-  if x == 0 return 0;
-  return abs(x)/x;
-}
-
-round :: inline (x: float) -> float {
-  return ifx x - cast(int) x > 0.5 then ceil(x) else floor(x);
-}
-
-norm :: inline (x: float, min: float, max: float) -> float {
-  return (x-min)/(max-min);
-}
+round  :: x => ifx x - cast(int) x >= 0.5 then ceil(x) else floor(x);
+square :: x => x * x;
+sign   :: x => ifx x == 0 then 0 else ifx signbit(x) then -1 else 1;
+norm   :: (x, min, max) => (x-min)/(max-min);
 
 get_digits_right_to_left_on_temp :: (x: int) -> [] int {
   push_allocator(temp);

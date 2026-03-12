@@ -83,7 +83,7 @@ progress_animation :: (duration: float, dt: float) -> float {
 }
 
 begin_swing :: (rope: *Verlet_Rope, length: float, anchor: Vector2) {
-  num_particles := cast(int) ceil(rope.particle_density * length);
+  num_particles := cast(int) round(rope.particle_density * length);
   particle_dist := 1.0 / rope.particle_density;
   rope.length = particle_dist * num_particles;
   for i: 0..num_particles-1 {
@@ -342,6 +342,18 @@ get_collision :: (player: *Player, map: *Map, tile_type: Tile_Type) -> [] Collis
   return get_collision(player, map, .[tile_type]);
 }
 
+Tick_Data :: struct {
+  target_seconds_per_frame: float;
+}
+
+tick :: (thread: *Thread) -> int {
+  return 0;
+}
+
+render :: (thread: *Thread) -> int {
+  return 0;
+}
+
 ENABLE_LEVEL_HOT_RELOAD :: true;
 TILE_NATIVE_RESOLUTION :: 64;
 TILE_RESOLUTION_DIVISOR :: 2;
@@ -367,6 +379,11 @@ accel_force: Force;
 map: Map;
 
 main :: () {
+  #if OS == .WINDOWS {
+    #import "Windows";
+    timeBeginPeriod(1);
+  }
+
   level_arena_pool: Arena.Flat_Pool;
   level_arena_allocator := Allocator.{proc=Arena.flat_pool_allocator_proc, data=*level_arena_pool};
   bg_logger_init_and_equip();
@@ -422,6 +439,11 @@ main :: () {
   map.cam.offset -= player.bbox.zw / 2;
   cam_set_target(*map.cam, *player);
 
+  tick_thread, render_thread: Thread;
+  thread_init(*tick_thread, tick);
+  thread_init(*render_thread, render);
+
+  /*
   input_move_left, input_move_right, input_jump: bool;
   while should_run {
     reset_temporary_storage();
@@ -642,6 +664,7 @@ main :: () {
       Simp.draw_generated_quads(font, {0,0,0,1});
     }
   }
+  */
 }
 
 Log_Message :: struct {
@@ -654,6 +677,7 @@ bg_logger_init_and_equip :: () {
   context.logger = bg_logger;
 }
 
+// TODO: Must be made thread safe!
 bg_logger :: (message: string, data: *void, info: Log_Info) {
   if !message then return;
   write_string(message);
@@ -680,6 +704,7 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
 #import "File_Utilities";
 #import "Hash_Table";
 #import "Random";
+#import "Thread"(false);
 WC    :: #import "Window_Creation";
 Arena :: #import "Flat_Pool";
 Input :: #import "Input";
