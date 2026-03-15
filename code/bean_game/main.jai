@@ -112,6 +112,15 @@ player_state_ground :: (old_player: *Player) {
   while true {
     player, input, dt := co_yield(player_update);
 
+    ground_collisions := get_collision(player, *map, .GROUND);
+    for ground_collisions {
+      player_pos_diff := player.pos - old_player.pos;
+      if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
+        player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
+        log("%", player_pos_diff);
+      }
+    }
+
     player_grid_pos := floor(player.pos / TILE_RESOLUTION);
     bottom_left  := map_index(map, player_grid_pos + {y = -1}).type == .GROUND;
     bottom_right := map_index(map, player_grid_pos + {1, -1}).type  == .GROUND;
@@ -130,14 +139,6 @@ player_state_ground :: (old_player: *Player) {
       player.velocity.y = PLAYER_JUMP_VELOCITY;
       player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
       return;
-    }
-
-    ground_collisions := get_collision(player, *map, .GROUND);
-    for ground_collisions {
-      player_pos_diff := player.pos - old_player.pos;
-      if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
-        player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
-      }
     }
 
     old_player.* = player.*;
@@ -292,6 +293,13 @@ draw_circle :: (center: Vector2, r: float, N: s32, color: Vector4) {
   }
 }
 
+set_vsync :: (enable: bool) {
+  #import "GL";
+  #if OS == .WINDOWS {
+    wglSwapIntervalEXT(xx enable);
+  }
+}
+
 make_quad :: inline (rect: AARect) -> Vector2, Vector2, Vector2, Vector2 {
   p0 := rect.xy;
   p1 := xy(rect.x + rect.z, rect.y);
@@ -443,7 +451,8 @@ main :: () {
   thread_init(*tick_thread, tick);
   thread_init(*render_thread, render);
 
-  /*
+  set_vsync(true);
+
   input_move_left, input_move_right, input_jump: bool;
   while should_run {
     reset_temporary_storage();
@@ -490,7 +499,7 @@ main :: () {
 
     end := seconds_since_init();
     dt := cast(float, end - start);
-    dt = min(dt, DT_MAX);
+    //dt = min(dt, DT_MAX);
     start = end;
 
     {
@@ -659,12 +668,11 @@ main :: () {
         }
       }
 
-      width := Simp.prepare_text(font, tprint("FPS: %", FormatFloat.{value=1/dt, mode=.SHORTEST}));
-      Simp.generate_quads_for_prepared_text(font, window_width - width, window_height - (window_height/FONT_HEIGHT_DIVISOR), 0);
+      width := Simp.prepare_text(font, tprint("FPS: %", cast(int,1/dt)));
+      Simp.generate_quads_for_prepared_text(font, window_width - cast(int,width*1.2), window_height - (window_height/FONT_HEIGHT_DIVISOR), 0);
       Simp.draw_generated_quads(font, {0,0,0,1});
     }
   }
-  */
 }
 
 Log_Message :: struct {

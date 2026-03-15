@@ -109,6 +109,7 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   } else {
     co.state = .ACTIVE;
     context.co_state.active_fiber = co.fiber;
+    array_add(*context.co_state.fiber_call_stack, co.fiber);
     SwitchToFiber(co.fiber);
     context.co_state.active_fiber = null;
     if co.state != .DEAD {
@@ -174,6 +175,7 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   Coroutine_State :: struct {
     home_fiber: *void;
     active_fiber: *void;
+    fiber_call_stack: [..] *void;
     input: [] Any;
     output: [] Any;
   }
@@ -269,6 +271,7 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
     if context.co_state == null {
       context.co_state = New(Coroutine_State);
       context.co_state.home_fiber = ConvertThreadToFiber(null);
+      //array_add(*context.co_state.fiber_call_stack, context.co_state.home_fiber);
     }
     co := New(Coroutine(T));
     co.proc = proc;
