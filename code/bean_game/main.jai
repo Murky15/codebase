@@ -69,18 +69,24 @@ Input_Package :: struct {
 }
 
 // TODO: Expand
+Progress_Animation_Params :: struct {
+  duration: float;
+}
+Progress_Animation_Inputs :: struct {
+  dt: float;
+}
 progress_animation :: (param: *void) {
   duration := cast(*float, param).*;
   started_at := cast(float) seconds_since_init();
   animation_index := 0.0;
   value := 0.0;
   while animation_index < duration {
+    co_yield();
+    dt := cast(*float, co_input()).*;
+    out := cast(*float, co_output());
     animation_index += dt;
-    value = cast(float) clamp(norm(started_at + animation_index, started_at, started_at + duration), 0, 1);
-    _, dt = co_yield(progress_animation, value);
+    out.* = cast(float) clamp(norm(started_at + animation_index, started_at, started_at + duration), 0, 1);
   }
-
-  return value;
 }
 
 begin_swing :: (rope: *Verlet_Rope, length: float, anchor: Vector2) {
@@ -101,6 +107,11 @@ end_swing :: (rope: *Verlet_Rope) {
   rope.length = 0;
 }
 
+Player_Update_Inputs :: struct {
+  player: *Player;
+  input: Input_Package;
+  dt: float;
+}
 player_update :: (param: *void) {
   old_player: Player;
   while true {
@@ -111,9 +122,9 @@ player_update :: (param: *void) {
 
 player_state_ground :: (old_player: *Player) {
   while true {
-    player: *Player;
-    input: Input_Package;
-    dt := 0; /*co_yield(player_update);*/
+    co_yield();
+    co_in := cast(*Player_Update_Inputs, co_input()).*;
+    using co_in;
 
     ground_collisions := get_collision(player, *map, .GROUND);
     for ground_collisions {
@@ -150,9 +161,9 @@ player_state_ground :: (old_player: *Player) {
 
 player_state_air :: (old_player: *Player) {
   while true {
-    player: *Player;
-    input: Input_Package;
-    dt := 0; /*co_yield(player_update);*/
+    co_yield();
+    co_in := cast(*Player_Update_Inputs, co_input()).*;
+    using co_in;
 
     coyote_jump := false;
     if player.coyote_time < PLAYER_COYOTE_TIME_GRACE_PERIOD {
@@ -192,9 +203,9 @@ player_state_air :: (old_player: *Player) {
 
 player_state_wall :: (old_player: *Player){
   while true {
-    player: *Player;
-    input: Input_Package;
-    dt := 0; /* co_yield(player_update); */
+    co_yield();
+    co_in := cast(*Player_Update_Inputs, co_input()).*;
+    using co_in;
 
     wall_collisions := get_collision(player, *map, .WALL);
     if wall_collisions.count == 0 || get_collision(player, *map, .GROUND) then return;
@@ -433,12 +444,13 @@ main :: () {
   map = map_load(texture_atlas, apollo_start,, level_arena_allocator);
   random_seed(cast,force(Some_Big_Time_Value) apollo_start);
 
+  player_flip_param := Progress_Animation_Params.{0.2};
   player: Player;
   player.pos = map.player_spawn;
   player.texture = table_find_pointer(*texture_atlas, "character_roundRed");
   player.mass = 50;
-  player_update_routine := co_create(player_update, null);
-  player_flip := co_create(progress_animation, 0.2);
+  player_update_routine := co_create(player_update);
+  player_flip := co_create(progress_animation, *player_flip_param);
 
   begin_swing(*player.grappling_hook, 100, player.pos + xy(0, 50));
 
@@ -517,7 +529,7 @@ main :: () {
         if player.facing != dir {
           player.facing = dir;
           co_delete(*player_flip);
-          player_flip = co_create(progress_animation, 0.2);
+          player_flip = co_create(progress_animation, *player_flip_param);
         }
         if player.dir == 0 {
           player.dir = dir;
@@ -552,7 +564,7 @@ main :: () {
       }
       player.accel_per_frame.x += floor_friction_force.magnitude * -sign(player.velocity.x);
 
-      co_resume(*player_update_routine, .{*player, input, dt});
+      co_resume(*player_update_routine, *(Player_Update_Inputs.{*player, input, dt}));
 
       if get_collision(*player, *map, .BOUNCE_PAD) {
         player.velocity.y = PLAYER_BOUNCE_PAD_JUMP_VELOCITY;
@@ -624,7 +636,8 @@ main :: () {
           draw_circle(p0, 2, 100, {1, 0, 0, 1});
         }
 
-        flip := co_resume(player_flip, 0.2, dt);
+        flip: float;
+        co_resume(*player_flip, *(Progress_Animation_Inputs.{dt}), *flip);
         dsp_pos := pos - map.cam.pos;
         dsp_dim := bbox_dim;
         dsp_dim.x *= abs(cos(PI * flip));
@@ -666,11 +679,12 @@ main :: () {
 
       Simp.set_shader_for_text();
       for logs_to_display {
-        t := co_resume(it.fade, 0, dt);
+        t: float;
+        co_resume(*it.fade, *dt, *t);
         alpha := ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
         Simp.draw_text(font, 50, 50 + it_index * (window_height/FONT_HEIGHT_DIVISOR), it.message, {w = 1 - alpha});
         if t >= 1.0 {
-          co_delete(it.fade);
+          co_delete(*it.fade);
           remove it;
         }
       }
@@ -685,6 +699,7 @@ main :: () {
 Log_Message :: struct {
   message: string;
   fade: Coroutine;
+  duration: float;
 }
 
 logs_to_display: [..] Log_Message;
@@ -701,9 +716,9 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
   if !(info.common_flags & .TO_FILE_ONLY) {
     new_message: Log_Message;
     new_message.message = copy_string(message,, logs_to_display.allocator);
-    duration := ifx info.common_flags & .ERROR then 10.0 else 5.0;
-    new_message.fade = co_create(progress_animation, *duration);
+    new_message.duration = ifx info.common_flags & .ERROR then 10.0 else 5.0;
     array_insert_at(*logs_to_display, new_message, 0);
+    logs_to_display[0].fade = co_create(progress_animation, *logs_to_display[0].duration);
   }
 }
 

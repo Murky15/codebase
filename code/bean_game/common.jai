@@ -98,55 +98,60 @@ Coroutine :: struct {
   out: *void;
 }
 
-co_create :: (proc: Coroutine_Proc, param: Any) -> Coroutine {
+co_create :: (proc: Coroutine_Proc, param := null) -> Coroutine {
   if context.co_state == null {
     context.co_state = New(Coroutine_State);
     context.co_state.calling_fiber = ConvertThreadToFiber(null);
-    context.co_state.active_coroutine.fiber = context.co_state.calling_fiber;
   }
 
   result: Coroutine;
   result.status = .SUSPENDED;
   result.fiber = CreateFiber(0, fiber_bootstrap, *context);
   result.proc = proc;
-  result.param = param.value_pointer;
+  result.param = param;
 
   return result;
 }
 
-co_resume :: (co: *Coroutine, in := Any.{}, out := null) {
+co_resume :: (co: *Coroutine, in := null, out := null) {
   assert(context.co_state != null);
   if co.status == .DEAD then return;
   prev_caller := context.co_state.calling_fiber;
-  defer context.co_state.calling_fiber = prev_caller;
-  context.co_state.calling_fiber = context.co_state.active_coroutine.fiber;
+  prev_active := context.co_state.active_coroutine;
+  if prev_active == null {
+    context.co_state.calling_fiber = prev_caller;
+  } else {
+    context.co_state.calling_fiber = prev_active.fiber;
+  }
   context.co_state.active_coroutine = co;
   co.status = .ACTIVE;
-  co.in = in.value_pointer;
+  co.in = in;
   co.out = out;
   SwitchToFiber(co.fiber);
   if co.status == .DEAD {
     co_delete(co);
   } else co.status = .SUSPENDED;
+  context.co_state.calling_fiber = prev_caller;
+  context.co_state.active_coroutine = prev_active;
 }
 
 co_param :: inline () -> *void {
-  assert(context.co_state != null);
+  assert(context.co_state != null && context.co_state.active_coroutine);
   return context.co_state.active_coroutine.param;
 }
 
 co_input :: inline () -> *void {
-  assert(context.co_state != null);
+  assert(context.co_state != null && context.co_state.active_coroutine);
   return context.co_state.active_coroutine.in;
 }
 
 co_output :: inline () -> *void {
-  assert(context.co_state != null);
+  assert(context.co_state != null && context.co_state.active_coroutine);
   return context.co_state.active_coroutine.out;
 }
 
 co_yield :: () {
-  assert(context.co_state != null);
+  assert(context.co_state != null && context.co_state.active_coroutine);
   SwitchToFiber(context.co_state.calling_fiber);
 }
 
