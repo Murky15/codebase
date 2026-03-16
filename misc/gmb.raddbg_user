@@ -6,7 +6,7 @@ window:
   size: 1942 1152
   panels:
   {
-    0.565389:
+    0.705901:
     {
       0.866141:
       {
@@ -35,7 +35,7 @@ window:
             memory: expression: ""
           }
         }
-        0.610555: selected getting_started text:
+        0.610555: getting_started text:
         {
           selected
           expression: "file:\"W:/code/bean_game/.build/.added_strings_w3.jai\".data"
@@ -45,9 +45,9 @@ window:
             input: ""
             cmd: search
           }
-          cursor_line: 31
+          cursor_line: 6
           cursor_column: 1
-          mark_line: 31
+          mark_line: 6
           mark_column: 1
         }
       }
@@ -66,6 +66,7 @@ window:
         }
         0.40:
         {
+          selected
           watch:
           {
             expression: "query:call_stack"
@@ -76,7 +77,7 @@ window:
         }
       }
     }
-    0.434611:
+    0.294099:
     {
       0.50:
       {
@@ -104,7 +105,7 @@ window:
   }
   split_x
   pos: -11 -6
-  monitor: "\\\\.\\DISPLAY6"
+  monitor: "\\\\.\\DISPLAY1"
   maximized
 }
 keybindings:

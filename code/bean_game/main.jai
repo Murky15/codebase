@@ -69,7 +69,8 @@ Input_Package :: struct {
 }
 
 // TODO: Expand
-progress_animation :: (duration: float, dt: float) -> float {
+progress_animation :: (param: *void) {
+  duration := cast(*float, param).*;
   started_at := cast(float) seconds_since_init();
   animation_index := 0.0;
   value := 0.0;
@@ -100,7 +101,7 @@ end_swing :: (rope: *Verlet_Rope) {
   rope.length = 0;
 }
 
-player_update :: (player: *Player, input: Input_Package, dt: float) {
+player_update :: (param: *void) {
   old_player: Player;
   while true {
     player_state_ground(*old_player);
@@ -110,7 +111,9 @@ player_update :: (player: *Player, input: Input_Package, dt: float) {
 
 player_state_ground :: (old_player: *Player) {
   while true {
-    player, input, dt := co_yield(player_update);
+    player: *Player;
+    input: Input_Package;
+    dt := 0; /*co_yield(player_update);*/
 
     ground_collisions := get_collision(player, *map, .GROUND);
     for ground_collisions {
@@ -147,7 +150,9 @@ player_state_ground :: (old_player: *Player) {
 
 player_state_air :: (old_player: *Player) {
   while true {
-    player, input, dt := co_yield(player_update);
+    player: *Player;
+    input: Input_Package;
+    dt := 0; /*co_yield(player_update);*/
 
     coyote_jump := false;
     if player.coyote_time < PLAYER_COYOTE_TIME_GRACE_PERIOD {
@@ -187,7 +192,9 @@ player_state_air :: (old_player: *Player) {
 
 player_state_wall :: (old_player: *Player){
   while true {
-    player, input, dt := co_yield(player_update);
+    player: *Player;
+    input: Input_Package;
+    dt := 0; /* co_yield(player_update); */
 
     wall_collisions := get_collision(player, *map, .WALL);
     if wall_collisions.count == 0 || get_collision(player, *map, .GROUND) then return;
@@ -430,8 +437,8 @@ main :: () {
   player.pos = map.player_spawn;
   player.texture = table_find_pointer(*texture_atlas, "character_roundRed");
   player.mass = 50;
-  player_update_routine := co_create(player_update);
-  player_flip := co_create(progress_animation);
+  player_update_routine := co_create(player_update, null);
+  player_flip := co_create(progress_animation, 0.2);
 
   begin_swing(*player.grappling_hook, 100, player.pos + xy(0, 50));
 
@@ -509,8 +516,8 @@ main :: () {
       if dir != 0 {
         if player.facing != dir {
           player.facing = dir;
-          co_delete(player_flip);
-          player_flip = co_create(progress_animation);
+          co_delete(*player_flip);
+          player_flip = co_create(progress_animation, 0.2);
         }
         if player.dir == 0 {
           player.dir = dir;
@@ -545,7 +552,7 @@ main :: () {
       }
       player.accel_per_frame.x += floor_friction_force.magnitude * -sign(player.velocity.x);
 
-      co_resume(player_update_routine, *player, input, dt);
+      co_resume(*player_update_routine, .{*player, input, dt});
 
       if get_collision(*player, *map, .BOUNCE_PAD) {
         player.velocity.y = PLAYER_BOUNCE_PAD_JUMP_VELOCITY;
@@ -677,7 +684,7 @@ main :: () {
 
 Log_Message :: struct {
   message: string;
-  fade: *Coroutine(type_of(progress_animation));
+  fade: Coroutine;
 }
 
 logs_to_display: [..] Log_Message;
@@ -694,9 +701,8 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
   if !(info.common_flags & .TO_FILE_ONLY) {
     new_message: Log_Message;
     new_message.message = copy_string(message,, logs_to_display.allocator);
-    new_message.fade = co_create(progress_animation);
     duration := ifx info.common_flags & .ERROR then 10.0 else 5.0;
-    co_resume(new_message.fade, duration, 0.0);
+    new_message.fade = co_create(progress_animation, *duration);
     array_insert_at(*logs_to_display, new_message, 0);
   }
 }
