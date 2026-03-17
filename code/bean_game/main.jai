@@ -40,7 +40,7 @@ Player :: struct {
   grappling_hook: Verlet_Rope(particle_density = 0.1);
 
   texture: *Simp.Texture;
-  facing: float;
+  facing := 1.0;
   flip: float;
 
   #overlay (pos) bbox: AARect;
