@@ -40,6 +40,7 @@ window:
           getting_started
           text:
           {
+            selected
             expression: "file:\"W:/code/bean_game/main.jai\".data"
             auto: 1
             query:
@@ -47,20 +48,23 @@ window:
               input: ""
               cmd: search
             }
-            cursor_line: 683
+            cursor_line: 531
             cursor_column: 1
-            mark_line: 683
+            mark_line: 531
             mark_column: 1
           }
           text:
           {
-            selected
             expression: "file:\"W:/code/bean_game/common.jai\".data"
             project: "W:/misc/root.raddbg_project"
-            query: input: ""
-            cursor_line: 117
+            query:
+            {
+              input: ""
+              cmd: search
+            }
+            cursor_line: 157
             cursor_column: 1
-            mark_line: 117
+            mark_line: 157
             mark_column: 1
           }
         }

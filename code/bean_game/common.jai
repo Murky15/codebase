@@ -118,11 +118,11 @@ co_resume :: (co: *Coroutine, in := null, out := null) {
   if co.status == .DEAD then return;
   prev_caller := context.co_state.calling_fiber;
   prev_active := context.co_state.active_coroutine;
-  if prev_active == null {
+  defer {
     context.co_state.calling_fiber = prev_caller;
-  } else {
-    context.co_state.calling_fiber = prev_active.fiber;
+    context.co_state.active_coroutine = prev_active;
   }
+  context.co_state.calling_fiber = ifx prev_active == null prev_caller else prev_active.fiber;
   context.co_state.active_coroutine = co;
   co.status = .ACTIVE;
   co.in = in;
@@ -131,8 +131,6 @@ co_resume :: (co: *Coroutine, in := null, out := null) {
   if co.status == .DEAD {
     co_delete(co);
   } else co.status = .SUSPENDED;
-  context.co_state.calling_fiber = prev_caller;
-  context.co_state.active_coroutine = prev_active;
 }
 
 co_param :: inline () -> *void {
@@ -156,6 +154,7 @@ co_yield :: () {
 }
 
 co_delete :: (co: *Coroutine) {
+  if co.fiber == null then return;
   DeleteFiber(co.fiber);
   co.fiber = null;
 }
@@ -181,6 +180,7 @@ Coroutine_State :: struct {
       co := context.co_state.active_coroutine;
       co.proc(co.param);
       co.status = .DEAD;
+      SwitchToFiber(context.co_state.calling_fiber);
     }
   }
 }

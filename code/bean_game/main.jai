@@ -27,7 +27,6 @@ AARect :: #type,isa Vector4;
 
 Player :: struct {
   dir: float;
-  facing := 1.0;
   pos: Vector2;
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
 
@@ -41,6 +40,8 @@ Player :: struct {
   grappling_hook: Verlet_Rope(particle_density = 0.1);
 
   texture: *Simp.Texture;
+  facing: float;
+  flip: float;
 
   #overlay (pos) bbox: AARect;
 }
@@ -126,12 +127,16 @@ player_state_ground :: (old_player: *Player) {
     co_in := cast(*Player_Update_Inputs, co_input()).*;
     using co_in;
 
-    ground_collisions := get_collision(player, *map, .GROUND);
+    ground_collisions := get_collision(player, *map, .[.GROUND, .WALL]);
     for ground_collisions {
       player_pos_diff := player.pos - old_player.pos;
-      if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
+      if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, it.bbox) {
+        player.velocity.y = 0;
+        player.pos.y += it.overlap.w;
+      } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
         player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
-        log("%", player_pos_diff);
+        player.dir = 0;
+        player.velocity.x = 0;
       }
     }
 
@@ -141,6 +146,7 @@ player_state_ground :: (old_player: *Player) {
     floor_below := bottom_left || bottom_right;
     if !floor_below {
       if !input.jump then player.coyote_time = 0;
+      player.can_jump = false;
       return;
     }
 
@@ -189,6 +195,8 @@ player_state_air :: (old_player: *Player) {
         }
       } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
         player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
+        player.dir = 0;
+        player.velocity.x = 0;
         if it.tile.type == .WALL && player.velocity.y < 0 {
           player_state_wall(old_player);
         }
@@ -202,10 +210,13 @@ player_state_air :: (old_player: *Player) {
 }
 
 player_state_wall :: (old_player: *Player){
+  player_dir := 0.0;
   while true {
     co_yield();
     co_in := cast(*Player_Update_Inputs, co_input()).*;
     using co_in;
+
+    if player_dir == 0 then player_dir = player.dir;
 
     wall_collisions := get_collision(player, *map, .WALL);
     if wall_collisions.count == 0 || get_collision(player, *map, .GROUND) then return;
@@ -213,6 +224,8 @@ player_state_wall :: (old_player: *Player){
       player_pos_diff := player.pos - old_player.pos;
       if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
         player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
+        player.dir = 0;
+        player.velocity.x = 0;
       }
     }
 
@@ -222,8 +235,8 @@ player_state_wall :: (old_player: *Player){
 
     if player.can_jump && input.jump {
       player.velocity.y = PLAYER_JUMP_VELOCITY;
-      player.velocity.x = -player.dir * PLAYER_JUMP_VELOCITY;
-      player.dir = -player.dir;
+      player.velocity.x = -player_dir * PLAYER_JUMP_VELOCITY;
+      player.dir = -player_dir;
       player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
       player.can_jump = false;
       move_force.time_counter = 0;
@@ -348,8 +361,8 @@ get_collision :: (player: *Player, map: *Map, tile_types: [] Tile_Type) -> [] Co
   collisions: [..] Collision;
   collisions.allocator = temp;
   player_grid_pos := floor(player.pos / TILE_RESOLUTION);
-  for y: 0..1 {
-    for x: 0..1 {
+  for y: -1..1 {
+    for x: -1..1 {
       test := player_grid_pos + xy(xx x, xx y);
       potential_collision := map_index_pointer(map, test);
       if potential_collision == null || !array_find(tile_types, potential_collision.type) then continue;
@@ -636,8 +649,7 @@ main :: () {
           draw_circle(p0, 2, 100, {1, 0, 0, 1});
         }
 
-        flip: float;
-        co_resume(*player_flip, *(Progress_Animation_Inputs.{dt}), *flip);
+        co_resume(*player_flip, *(Progress_Animation_Inputs.{dt}), *player.flip);
         dsp_pos := pos - map.cam.pos;
         dsp_dim := bbox_dim;
         dsp_dim.x *= abs(cos(PI * flip));
@@ -685,6 +697,8 @@ main :: () {
         Simp.draw_text(font, 50, 50 + it_index * (window_height/FONT_HEIGHT_DIVISOR), it.message, {w = 1 - alpha});
         if t >= 1.0 {
           co_delete(*it.fade);
+          free(it.message);
+          free(it);
           remove it;
         }
       }
@@ -702,7 +716,7 @@ Log_Message :: struct {
   duration: float;
 }
 
-logs_to_display: [..] Log_Message;
+logs_to_display: [..] *Log_Message;
 bg_logger_init_and_equip :: () {
   context.logger = bg_logger;
 }
@@ -714,11 +728,11 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
   if message[message.count-1] != #char "\n" then write_string("\n");
 
   if !(info.common_flags & .TO_FILE_ONLY) {
-    new_message: Log_Message;
-    new_message.message = copy_string(message,, logs_to_display.allocator);
+    new_message := New(Log_Message);
+    new_message.message = copy_string(message);
     new_message.duration = ifx info.common_flags & .ERROR then 10.0 else 5.0;
+    new_message.fade = co_create(progress_animation, *new_message.duration);
     array_insert_at(*logs_to_display, new_message, 0);
-    logs_to_display[0].fade = co_create(progress_animation, *logs_to_display[0].duration);
   }
 }
 
