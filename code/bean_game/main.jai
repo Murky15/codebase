@@ -112,33 +112,21 @@ Player_Update_Inputs :: struct {
   player: *Player;
   input: Input_Package;
   dt: float;
+
+  collision_events: [] Tile_Type;
 }
 player_update :: (param: *void) {
-  old_player: Player;
   while true {
-    player_state_ground(*old_player);
-    player_state_air(*old_player);
+    player_state_ground();
+    player_state_air();
   }
 }
 
-player_state_ground :: (old_player: *Player) {
+player_state_ground :: () {
   while true {
-    co_yield();
+    defer co_yield();
     co_in := cast(*Player_Update_Inputs, co_input()).*;
     using co_in;
-
-    ground_collisions := get_collision(player, *map, .[.GROUND, .WALL]);
-    for ground_collisions {
-      player_pos_diff := player.pos - old_player.pos;
-      if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, it.bbox) {
-        player.velocity.y = 0;
-        player.pos.y += it.overlap.w;
-      } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
-        player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
-        player.dir = 0;
-        player.velocity.x = 0;
-      }
-    }
 
     player_grid_pos := floor(player.pos / TILE_RESOLUTION);
     bottom_left  := map_index(map, player_grid_pos + {y = -1}).type == .GROUND;
@@ -160,14 +148,12 @@ player_state_ground :: (old_player: *Player) {
       player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
       return;
     }
-
-    old_player.* = player.*;
   }
 }
 
-player_state_air :: (old_player: *Player) {
+player_state_air :: () {
   while true {
-    co_yield();
+    defer co_yield();
     co_in := cast(*Player_Update_Inputs, co_input()).*;
     using co_in;
 
@@ -182,52 +168,23 @@ player_state_air :: (old_player: *Player) {
       player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
     }
 
-    ground_collisions := get_collision(player, *map, .[.GROUND, .WALL]);
-    for ground_collisions {
-      player_pos_diff := player.pos - old_player.pos;
-      if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, it.bbox) {
-        defer player.velocity.y = 0;
-        if player.velocity.y < 0 {
-          player.pos.y += it.overlap.w;
-          return;
-        } else {
-          player.pos.y -= it.overlap.w;
-        }
-      } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
-        player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
-        player.dir = 0;
-        player.velocity.x = 0;
-        if it.tile.type == .WALL && player.velocity.y < 0 {
-          player_state_wall(old_player);
-        }
-      }
+    for collision_events {
+      if it == .GROUND then return;
+      if it == .WALL then player_state_wall();
     }
 
     player.accel_per_frame.y += GRAVITY * player.mass;
-
-    old_player.* = player.*;
   }
 }
 
-player_state_wall :: (old_player: *Player){
+player_state_wall :: (){
   player_dir := 0.0;
   while true {
-    co_yield();
+    defer co_yield();
     co_in := cast(*Player_Update_Inputs, co_input()).*;
     using co_in;
 
     if player_dir == 0 then player_dir = player.dir;
-
-    wall_collisions := get_collision(player, *map, .WALL);
-    if wall_collisions.count == 0 || get_collision(player, *map, .GROUND) then return;
-    for wall_collisions {
-      player_pos_diff := player.pos - old_player.pos;
-      if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
-        player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
-        player.dir = 0;
-        player.velocity.x = 0;
-      }
-    }
 
     if !input.jump {
       player.can_jump = true;
@@ -243,10 +200,16 @@ player_state_wall :: (old_player: *Player){
       return;
     }
 
+    wall_collision := false;
+    for collision_events {
+      if it == .WALL {
+        wall_collision = true;
+      } else if it == .GROUND then return;
+    }
+    if !wall_collision then return;
+
     player.accel_per_frame.y += GRAVITY * player.mass;
     player.accel_per_frame.y += wall_friction_force.magnitude;
-
-    old_player.* = player.*;
   }
 }
 
@@ -486,6 +449,7 @@ main :: () {
   set_vsync(true);
 
   input_move_left, input_move_right, input_jump: bool;
+  collision_events: [..] Tile_Type; // NOTE: Represents useful collision events for state changes
   while should_run {
     reset_temporary_storage();
     Input.update_window_events();
@@ -550,15 +514,10 @@ main :: () {
         }
       }
 
-      // NOTE: Player integration
-      accel := player.accel_per_frame / player.mass;
-      player.velocity += accel * dt;
-      player.velocity.x = sign(player.velocity.x) * min(abs(player.velocity.x), PLAYER_MOVE_SPEED);
-      // TODO: Player Y velocity should also be clamped
-      player.pos += player.velocity * dt;
-      player.accel_per_frame = {};
-
       input := Input_Package.{dir, input_jump};
+
+      old_player := player;
+      co_resume(*player_update_routine, Player_Update_Inputs.{*player, input, dt, collision_events});
 
       if move_force.time_counter < move_force.duration_seconds {
         player.accel_per_frame.x += move_force.magnitude * player.dir;
@@ -577,7 +536,34 @@ main :: () {
       }
       player.accel_per_frame.x += floor_friction_force.magnitude * -sign(player.velocity.x);
 
-      co_resume(*player_update_routine, Player_Update_Inputs.{*player, input, dt});
+      // NOTE: Player integration
+      accel := player.accel_per_frame / player.mass;
+      player.velocity += accel * dt;
+      player.velocity.x = sign(player.velocity.x) * min(abs(player.velocity.x), PLAYER_MOVE_SPEED);
+      // TODO: Player Y velocity should also be clamped
+      player.pos += player.velocity * dt;
+      player.accel_per_frame = {};
+
+      // NOTE: Collisions
+      array_reset(*collision_events);
+      obstacle_collisions := get_collision(*player, *map, .[.GROUND, .WALL]);
+      for obstacle_collisions {
+        player_pos_diff := player.pos - old_player.pos;
+        if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, it.bbox) {
+          if player.velocity.y < 0 {
+            player.pos.y += it.overlap.w;
+            array_add(*collision_events, .GROUND);
+          } else player.pos.y -= it.overlap.w;
+          player.velocity.y = 0;
+        } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
+          player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
+          player.dir = 0;
+          player.velocity.x = 0;
+          if it.tile.type == .WALL && player.velocity.y < 0 {
+            array_add(*collision_events, .WALL);
+          }
+        }
+      }
 
       if get_collision(*player, *map, .BOUNCE_PAD) {
         player.velocity.y = PLAYER_BOUNCE_PAD_JUMP_VELOCITY;
