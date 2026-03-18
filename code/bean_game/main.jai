@@ -21,6 +21,7 @@
 - [X] Include user data in logger to change message display duration
 - [ ] Audio
 - [ ] Downloading level files from the web and checking for updates
+- [ ] Physics objects should inherit a Verlet particle so we can have one physics update loop
 */
 
 AARect :: #type,isa Vector4;
@@ -124,13 +125,14 @@ player_update :: (param: *void) {
 
 player_state_ground :: () {
   while true {
-    defer co_yield();
     co_in := cast(*Player_Update_Inputs, co_input()).*;
     using co_in;
 
     player_grid_pos := floor(player.pos / TILE_RESOLUTION);
-    bottom_left  := map_index(map, player_grid_pos + {y = -1}).type == .GROUND;
-    bottom_right := map_index(map, player_grid_pos + {1, -1}).type  == .GROUND;
+    bottom_left_type := map_index(map, player_grid_pos + {y = -1}).type;
+    bottom_right_type := map_index(map, player_grid_pos + {1, -1}).type;
+    bottom_left := bottom_left_type  == .GROUND || bottom_left_type == .WALL;
+    bottom_right := bottom_right_type == .GROUND || bottom_right_type == .WALL;
     floor_below := bottom_left || bottom_right;
     if !floor_below {
       if !input.jump then player.coyote_time = 0;
@@ -148,12 +150,13 @@ player_state_ground :: () {
       player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
       return;
     }
+
+    co_yield();
   }
 }
 
 player_state_air :: () {
   while true {
-    defer co_yield();
     co_in := cast(*Player_Update_Inputs, co_input()).*;
     using co_in;
 
@@ -174,13 +177,14 @@ player_state_air :: () {
     }
 
     player.accel_per_frame.y += GRAVITY * player.mass;
+
+    co_yield();
   }
 }
 
 player_state_wall :: (){
   player_dir := 0.0;
   while true {
-    defer co_yield();
     co_in := cast(*Player_Update_Inputs, co_input()).*;
     using co_in;
 
@@ -210,6 +214,8 @@ player_state_wall :: (){
 
     player.accel_per_frame.y += GRAVITY * player.mass;
     player.accel_per_frame.y += wall_friction_force.magnitude;
+
+    co_yield();
   }
 }
 
@@ -716,7 +722,7 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
   if !(info.common_flags & .TO_FILE_ONLY) {
     new_message := New(Log_Message);
     new_message.message = copy_string(message);
-    new_message.duration = ifx info.common_flags & .ERROR then 10.0 else 5.0;
+    new_message.duration = ifx info.common_flags & .ERROR then 15.0 else 5.0;
     new_message.fade = co_create(progress_animation, new_message.duration);
     array_insert_at(*logs_to_display, new_message, 0);
   }
