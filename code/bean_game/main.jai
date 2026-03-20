@@ -26,6 +26,14 @@
 
 AARect :: #type,isa Vector4;
 
+Verlet_Body :: struct {
+  mass: float;
+
+  pos: Vector2;
+  vel: Vector2;
+  acc: Vector2;
+}
+
 Player :: struct {
   dir: float;
   pos: Vector2;
