@@ -9,6 +9,12 @@ Tile_Type :: enum {
   COIN;
 }
 
+Collision_Event :: enum {
+  NONE;
+  FLOOR;
+  WALL_SLIDE;
+}
+
 Tile :: struct {
   type: Tile_Type;
   tex: *Simp.Texture;
@@ -50,6 +56,7 @@ Map :: struct {
   background: Linked_List(Parallax_Effect);
 
   cam: Camera;
+  player: Player;
 
   tiles: [] Tile;
   width, height: int;
@@ -308,6 +315,10 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
     cloud.tex = cloud_texture;
     sll_queue_push_front(*map.background, cloud);
   }
+
+  map.player.pos = map.player_spawn;
+  map.player.texture = table_find_pointer(*textures, "character_roundRed");
+  map.player.mass = 50;
 
   return map;
 }

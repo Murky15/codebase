@@ -98,7 +98,7 @@ Coroutine :: struct {
   out: *void;
 }
 
-co_create :: (proc: Coroutine_Proc, param := Any.{}) -> Coroutine {
+co_create :: (proc: Coroutine_Proc, param := null) -> Coroutine {
   if context.co_state == null {
     context.co_state = New(Coroutine_State);
     context.co_state.calling_fiber = ConvertThreadToFiber(null);
@@ -108,12 +108,12 @@ co_create :: (proc: Coroutine_Proc, param := Any.{}) -> Coroutine {
   result.status = .SUSPENDED;
   result.fiber = CreateFiber(0, fiber_bootstrap, *context);
   result.proc = proc;
-  result.param = param.value_pointer;
+  result.param = param;
 
   return result;
 }
 
-co_resume :: (co: *Coroutine, in := Any.{}, out := null) {
+co_resume :: (co: *Coroutine, in := null, out := null) {
   assert(context.co_state != null);
   if co.status == .DEAD then return;
   prev_caller := context.co_state.calling_fiber;
@@ -125,7 +125,7 @@ co_resume :: (co: *Coroutine, in := Any.{}, out := null) {
   context.co_state.calling_fiber = ifx prev_active == null prev_caller else prev_active.fiber;
   context.co_state.active_coroutine = co;
   co.status = .ACTIVE;
-  co.in = in.value_pointer;
+  co.in = in;
   co.out = out;
   SwitchToFiber(co.fiber);
   if co.status == .DEAD {

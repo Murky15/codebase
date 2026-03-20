@@ -114,7 +114,7 @@ Player_Update_Inputs :: struct {
   input: Input_Package;
   dt: float;
 
-  collision_events: [] Tile_Type;
+  collision_events: [] Collision_Event;
 }
 player_update :: (param: *void) {
   while true {
@@ -172,8 +172,8 @@ player_state_air :: () {
     }
 
     for collision_events {
-      if it == .GROUND then return;
-      if it == .WALL then player_state_wall();
+      if it == .FLOOR then return;
+      if it == .WALL_SLIDE then player_state_wall();
     }
 
     player.accel_per_frame.y += GRAVITY * player.mass;
@@ -206,9 +206,9 @@ player_state_wall :: (){
 
     wall_collision := false;
     for collision_events {
-      if it == .WALL {
+      if it == .WALL_SLIDE {
         wall_collision = true;
-      } else if it == .GROUND then return;
+      } else if it == .FLOOR then return;
     }
     if !wall_collision then return;
 
@@ -423,18 +423,10 @@ main :: () {
   // NOTE: For now let's assume that the world is static
   // This is a very simple way to represent the world, and must be refined in the future.
   apollo_start := to_apollo(start);
-  map = map_load(texture_atlas, apollo_start,, level_arena_allocator);
   random_seed(cast,force(Some_Big_Time_Value) apollo_start);
+  map = map_load(texture_atlas, apollo_start,, level_arena_allocator);
 
-  player_flip_param := Progress_Animation_Params.{0.2};
-  player: Player;
-  player.pos = map.player_spawn;
-  player.texture = table_find_pointer(*texture_atlas, "character_roundRed");
-  player.mass = 50;
-  player_update_routine := co_create(player_update);
-  player_flip := co_create(progress_animation, player_flip_param);
-
-  begin_swing(*player.grappling_hook, 100, player.pos + xy(0, 50));
+  player := *map.player;
 
   floor_friction_force = {magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
   wall_friction_force = {magnitude = 130_000};
@@ -444,9 +436,13 @@ main :: () {
   accel_force.duration_seconds = 0.18;
   accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / accel_force.duration_seconds)) + floor_friction_force.magnitude;
 
+  player_flip_param := Progress_Animation_Params.{0.2};
+  player_update_routine := co_create(player_update);
+  player_flip := co_create(progress_animation, *player_flip_param);
+
   map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
   map.cam.offset -= player.bbox.zw / 2;
-  cam_set_target(*map.cam, *player);
+  cam_set_target(*map.cam, player);
 
   tick_thread, render_thread: Thread;
   thread_init(*tick_thread, tick);
@@ -454,8 +450,11 @@ main :: () {
 
   set_vsync(true);
 
+  begin_swing(*player.grappling_hook, 100, player.pos + xy(0, 50));
+
   input_move_left, input_move_right, input_jump: bool;
-  collision_events: [..] Tile_Type; // NOTE: Represents useful collision events for state changes
+  collision_event_memory: [9] Collision_Event;
+  collision_events := array_view(collision_event_memory, 0);
   while should_run {
     reset_temporary_storage();
     Input.update_window_events();
@@ -493,7 +492,8 @@ main :: () {
             map = map_load(texture_atlas, modtime,, level_arena_allocator);
             map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
             map.cam.offset -= player.bbox.zw / 2;
-            cam_set_target(*map.cam, *player);
+            player = *map.player;
+            cam_set_target(*map.cam, player);
           } else map.last_modification = modtime;
         }
       }
@@ -512,7 +512,7 @@ main :: () {
         if player.facing != dir {
           player.facing = dir;
           co_delete(*player_flip);
-          player_flip = co_create(progress_animation, player_flip_param);
+          player_flip = co_create(progress_animation, *player_flip_param);
         }
         if player.dir == 0 {
           player.dir = dir;
@@ -522,8 +522,8 @@ main :: () {
 
       input := Input_Package.{dir, input_jump};
 
-      old_player := player;
-      co_resume(*player_update_routine, Player_Update_Inputs.{*player, input, dt, collision_events});
+      old_player := player.*;
+      co_resume(*player_update_routine, *(Player_Update_Inputs.{player, input, dt, collision_events}));
 
       if move_force.time_counter < move_force.duration_seconds {
         player.accel_per_frame.x += move_force.magnitude * player.dir;
@@ -551,14 +551,15 @@ main :: () {
       player.accel_per_frame = {};
 
       // NOTE: Collisions
-      array_reset(*collision_events);
-      obstacle_collisions := get_collision(*player, *map, .[.GROUND, .WALL]);
-      for obstacle_collisions {
+      collision_events.count = 0;
+      obstacle_collisions := get_collision(player, *map, .[.GROUND, .WALL]);
+      for obstacle_collisions #no_abc {
         player_pos_diff := player.pos - old_player.pos;
         if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, it.bbox) {
           if player.velocity.y < 0 {
             player.pos.y += it.overlap.w;
-            array_add(*collision_events, .GROUND);
+            collision_events[collision_events.count] = .FLOOR;
+            collision_events.count += 1;
           } else player.pos.y -= it.overlap.w;
           player.velocity.y = 0;
         } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
@@ -566,17 +567,18 @@ main :: () {
           player.dir = 0;
           player.velocity.x = 0;
           if it.tile.type == .WALL && player.velocity.y < 0 {
-            array_add(*collision_events, .WALL);
+            collision_events[collision_events.count] = .WALL_SLIDE;
+            collision_events.count += 1;
           }
         }
       }
 
-      if get_collision(*player, *map, .BOUNCE_PAD) {
+      if get_collision(player, *map, .BOUNCE_PAD) {
         player.velocity.y = PLAYER_BOUNCE_PAD_JUMP_VELOCITY;
         player.can_jump = false;
       }
 
-      coins := get_collision(*player, *map, .COIN);
+      coins := get_collision(player, *map, .COIN);
       for coins {
         if !it.tile.collected {
           it.tile.collected = true;
@@ -641,7 +643,7 @@ main :: () {
           draw_circle(p0, 2, 100, {1, 0, 0, 1});
         }
 
-        co_resume(*player_flip, dt, *player.flip);
+        co_resume(*player_flip, *dt, *player.flip);
         dsp_pos := pos - map.cam.pos;
         dsp_dim := bbox_dim;
         dsp_dim.x *= abs(cos(PI * flip));
@@ -684,7 +686,7 @@ main :: () {
       Simp.set_shader_for_text();
       for logs_to_display {
         t: float;
-        co_resume(*it.fade, dt, *t);
+        co_resume(*it.fade, *dt, *t);
         alpha := ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
         Simp.draw_text(font, 50, 50 + it_index * (window_height/FONT_HEIGHT_DIVISOR), it.message, {w = 1 - alpha});
         if t >= 1.0 {
@@ -723,7 +725,7 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
     new_message := New(Log_Message);
     new_message.message = copy_string(message);
     new_message.duration = ifx info.common_flags & .ERROR then 15.0 else 5.0;
-    new_message.fade = co_create(progress_animation, new_message.duration);
+    new_message.fade = co_create(progress_animation, *new_message.duration);
     array_insert_at(*logs_to_display, new_message, 0);
   }
 }
