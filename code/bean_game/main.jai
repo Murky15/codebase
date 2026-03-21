@@ -43,7 +43,8 @@ apply_force :: inline (body: *Rigid_Body, mag: Vector2) {
 }
 
 apply_impulse :: inline (body: *Rigid_Body, mag: Vector2) {
-  body.vel += mag;
+  if mag.x != 0 body.vel.x = mag.x;
+  if mag.y != 0 body.vel.y = mag.y;
 }
 
 // NOTE: ASSUMING CONSTANT FORCES
@@ -220,11 +221,12 @@ player_state_wall :: (){
       player.velocity.y = PLAYER_JUMP_VELOCITY;
       player.velocity.x = -player_dir * PLAYER_JUMP_VELOCITY;
       */
-      apply_impulse(player, xy(-player_dir * PLAYER_MOVE_SPEED, PLAYER_JUMP_VELOCITY));
       player.dir = -player_dir;
+      apply_impulse(player, xy(player.dir * PLAYER_MOVE_SPEED, PLAYER_JUMP_VELOCITY));
       player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
       player.can_jump = false;
       player.wall_jump_immobility_counter = 0;
+      player.acceleration_counter = PLAYER_TIME_TO_ACCELERATE;
       return;
     }
 
@@ -460,7 +462,7 @@ main :: () {
   FLOOR_FRICTION_FORCE = xy(-1 * GRAVITY * player.mass * FRICTION_COEFFICIENT, 0);
   WALL_FRICTION_FORCE = xy(0, 130_000);
   MOVE_FORCE = FLOOR_FRICTION_FORCE;
-  ACCEL_FORCE = xy((player.mass * (PLAYER_MOVE_SPEED / PLAYER_TIME_TO_ACCELERATE)), 0) + FLOOR_FRICTION_FORCE;
+  ACCEL_FORCE = player.mass * xy(PLAYER_MOVE_SPEED / PLAYER_TIME_TO_ACCELERATE, 0) + FLOOR_FRICTION_FORCE;
 
   player_flip_param := Progress_Animation_Params.{0.2};
   player_update_routine := co_create(player_update);
@@ -565,12 +567,9 @@ main :: () {
           apply_force(player, MOVE_FORCE * input.dir);
         }
       }
-      if sign(player.vel.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
-        player.dir = 0;
-        player.vel.x = 0;
-      }
+
+      apply_force(player, FLOOR_FRICTION_FORCE * -player.dir);
       //player.accel_per_frame.x += FLOOR_FRICTION_FORCE.magnitude * -sign(player.velocity.x);
-      apply_force(player, FLOOR_FRICTION_FORCE * cast(float) -sign(player.vel.x));
 
       /*
       // NOTE: Player integration
@@ -582,7 +581,12 @@ main :: () {
       */
 
       integrate(player, dt);
+      if sign(player.vel.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
+        player.dir = 0;
+        player.vel.x = 0;
+      }
       player.vel.x = sign(player.vel.x) * min(abs(player.vel.x), PLAYER_MOVE_SPEED);
+      //log("%", player.vel.x);
 
       // NOTE: Collisions
       collision_events.count = 0;
