@@ -21,41 +21,57 @@
 - [X] Include user data in logger to change message display duration
 - [ ] Audio
 - [ ] Downloading level files from the web and checking for updates
-- [ ] Physics objects should inherit a Verlet particle so we can have one physics update loop
+- [ ] Physics system overhaul
+- [ ] WASM build - maybe the best way to do this is by creating a separate C platform layer to bootstrap the Jai code so we can use emscripten
 */
 
 AARect :: #type,isa Vector4;
 
-Verlet_Body :: struct {
+Rigid_Body :: struct {
   mass: float;
 
   pos: Vector2;
+  bbox_dim: Vector2;
   vel: Vector2;
   acc: Vector2;
-}
-
-Player :: struct {
-  dir: float;
-  pos: Vector2;
-  bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
-
-  accel_per_frame: Vector2;
-  mass: float;
-  velocity: Vector2;
-
-  can_jump: bool;
-  coyote_time := PLAYER_COYOTE_TIME_GRACE_PERIOD;
-
-  grappling_hook: Verlet_Rope(particle_density = 0.1);
-
-  texture: *Simp.Texture;
-  facing := 1.0;
-  flip: float;
 
   #overlay (pos) bbox: AARect;
 }
 
-Verlet_Rope :: struct (particle_density := 1.0, jakobsen_iterations := 50) {
+apply_force :: inline (body: *Rigid_Body, mag: Vector2) {
+  body.acc += mag;
+}
+
+apply_impulse :: inline (body: *Rigid_Body, mag: Vector2) {
+  body.vel += mag;
+}
+
+// NOTE: ASSUMING CONSTANT FORCES
+integrate :: (body: *Rigid_Body, dt: float) {
+  acc := body.acc / body.mass;
+  body.pos += body.vel*dt + 0.5*acc*square(dt);
+  body.vel += acc*dt;
+  body.acc = xy(0,0);
+}
+
+Player :: struct {
+  #as using body: Rigid_Body;
+  body.bbox_dim = Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
+
+  can_jump: bool;
+  coyote_counter := PLAYER_COYOTE_TIME_GRACE_PERIOD;
+  wall_jump_immobility_counter := PLAYER_TIME_IMMOBILE;
+  acceleration_counter := PLAYER_TIME_TO_ACCELERATE;
+
+  grappling_hook: Rope(0.1);
+
+  texture: *Simp.Texture;
+  dir: float;
+  flip: float;
+  facing := 1.0;
+}
+
+Rope :: struct (particle_density := 1.0, jakobsen_iterations := 50) {
   Particle :: struct {
     pos: Vector2;
     old_pos: Vector2;
@@ -65,12 +81,6 @@ Verlet_Rope :: struct (particle_density := 1.0, jakobsen_iterations := 50) {
 
   length: float;
   particles: [..] Particle; // Should this be dynamic? Maybe we want to grow or shrink the rope mid swing.
-}
-
-Force :: struct {
-  magnitude: float;
-  duration_seconds: float;
-  time_counter: float;
 }
 
 Input_Package :: struct {
@@ -91,15 +101,15 @@ progress_animation :: (param: *void) {
   animation_index := 0.0;
   value := 0.0;
   while animation_index < duration {
-    co_yield();
     dt := cast(*float, co_input()).*;
     out := cast(*float, co_output());
     animation_index += dt;
-    out.* = cast(float) clamp(norm(started_at + animation_index, started_at, started_at + duration), 0, 1);
+    out.* = cast(float) saturate(norm(started_at + animation_index, started_at, started_at + duration));
+    co_yield();
   }
 }
 
-begin_swing :: (rope: *Verlet_Rope, length: float, anchor: Vector2) {
+begin_swing :: (rope: *Rope, length: float, anchor: Vector2) {
   num_particles := cast(int) round(rope.particle_density * length);
   particle_dist := 1.0 / rope.particle_density;
   rope.length = particle_dist * num_particles;
@@ -112,7 +122,7 @@ begin_swing :: (rope: *Verlet_Rope, length: float, anchor: Vector2) {
   }
 }
 
-end_swing :: (rope: *Verlet_Rope) {
+end_swing :: (rope: *Rope) {
   array_reset(*rope.particles);
   rope.length = 0;
 }
@@ -143,7 +153,7 @@ player_state_ground :: () {
     bottom_right := bottom_right_type == .GROUND || bottom_right_type == .WALL;
     floor_below := bottom_left || bottom_right;
     if !floor_below {
-      if !input.jump then player.coyote_time = 0;
+      if !input.jump then player.coyote_counter = 0;
       player.can_jump = false;
       return;
     }
@@ -154,8 +164,9 @@ player_state_ground :: () {
 
     if player.can_jump && input.jump{
       player.can_jump = false;
-      player.velocity.y = PLAYER_JUMP_VELOCITY;
-      player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
+      //player.velocity.y = PLAYER_JUMP_VELOCITY;
+      apply_impulse(player, xy(0, PLAYER_JUMP_VELOCITY));
+      player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
       return;
     }
 
@@ -169,14 +180,15 @@ player_state_air :: () {
     using co_in;
 
     coyote_jump := false;
-    if player.coyote_time < PLAYER_COYOTE_TIME_GRACE_PERIOD {
-      player.coyote_time += dt;
+    if player.coyote_counter < PLAYER_COYOTE_TIME_GRACE_PERIOD {
+      player.coyote_counter += dt;
       coyote_jump = true;
     }
 
     if coyote_jump && input.jump {
-      player.velocity.y = PLAYER_JUMP_VELOCITY;
-      player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
+      //player.velocity.y = PLAYER_JUMP_VELOCITY;
+      apply_impulse(player, xy(0, PLAYER_JUMP_VELOCITY));
+      player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
     }
 
     for collision_events {
@@ -184,7 +196,8 @@ player_state_air :: () {
       if it == .WALL_SLIDE then player_state_wall();
     }
 
-    player.accel_per_frame.y += GRAVITY * player.mass;
+    //player.accel_per_frame.y += GRAVITY * player.mass;
+    apply_force(player, xy(0, GRAVITY*player.mass));
 
     co_yield();
   }
@@ -203,12 +216,15 @@ player_state_wall :: (){
     }
 
     if player.can_jump && input.jump {
+      /*
       player.velocity.y = PLAYER_JUMP_VELOCITY;
       player.velocity.x = -player_dir * PLAYER_JUMP_VELOCITY;
+      */
+      apply_impulse(player, xy(-player_dir * PLAYER_MOVE_SPEED, PLAYER_JUMP_VELOCITY));
       player.dir = -player_dir;
-      player.coyote_time = PLAYER_COYOTE_TIME_GRACE_PERIOD+1;
+      player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
       player.can_jump = false;
-      move_force.time_counter = 0;
+      player.wall_jump_immobility_counter = 0;
       return;
     }
 
@@ -220,8 +236,11 @@ player_state_wall :: (){
     }
     if !wall_collision then return;
 
+    /*
     player.accel_per_frame.y += GRAVITY * player.mass;
-    player.accel_per_frame.y += wall_friction_force.magnitude;
+    player.accel_per_frame.y += WALL_FRICTION_FORCE.magnitude;
+    */
+    apply_force(player, xy(0, GRAVITY*player.mass) + WALL_FRICTION_FORCE);
 
     co_yield();
   }
@@ -239,7 +258,7 @@ cam_set_target :: (cam: *Camera, e: *Player) {
 
 cam_update_tracking :: (cam: *Camera, dt: float, attachment := 4.5) {
   target := cam.tracking;
-  t := clamp(attachment * dt, 0, 1);
+  t := saturate(attachment * dt);
   cam.pos = lerp(cam.pos, target.pos - cam.offset, t);
 }
 
@@ -384,14 +403,15 @@ PLAYER_MOVE_SPEED :: 350.0;
 PLAYER_JUMP_VELOCITY :: 1000.0;
 PLAYER_BOUNCE_PAD_JUMP_VELOCITY :: 1500.0;
 PLAYER_COYOTE_TIME_GRACE_PERIOD :: 0.1;
+PLAYER_TIME_TO_ACCELERATE :: 0.18;
+PLAYER_TIME_IMMOBILE :: 0.3;
 GRAVITY :: -3800.0;
 
-// TODO: Make these not global anymore
-friction_coefficient :: 1.8;
-floor_friction_force: Force;
-wall_friction_force: Force;
-move_force: Force;
-accel_force: Force;
+FLOOR_FRICTION_FORCE: Vector2;
+WALL_FRICTION\_FORCE: Vector2;
+MOVE\_FORCE: Vector2;
+ACCEL_FORCE: Vector2;
+
 map: Map;
 
 main :: () {
@@ -436,13 +456,11 @@ main :: () {
 
   player := *map.player;
 
-  floor_friction_force = {magnitude = -1 * GRAVITY * player.mass * friction_coefficient};
-  wall_friction_force = {magnitude = 130_000};
-  move_force = floor_friction_force;
-  move_force.duration_seconds = 0.3;
-  move_force.time_counter = move_force.duration_seconds;
-  accel_force.duration_seconds = 0.18;
-  accel_force.magnitude = (player.mass * (PLAYER_MOVE_SPEED / accel_force.duration_seconds)) + floor_friction_force.magnitude;
+  FRICTION_COEFFICIENT :: 1.8;
+  FLOOR_FRICTION_FORCE = xy(-1 * GRAVITY * player.mass * FRICTION_COEFFICIENT, 0);
+  WALL_FRICTION_FORCE = xy(0, 130_000);
+  MOVE_FORCE = FLOOR_FRICTION_FORCE;
+  ACCEL_FORCE = xy((player.mass * (PLAYER_MOVE_SPEED / PLAYER_TIME_TO_ACCELERATE)), 0) + FLOOR_FRICTION_FORCE;
 
   player_flip_param := Progress_Animation_Params.{0.2};
   player_update_routine := co_create(player_update);
@@ -477,7 +495,7 @@ main :: () {
           if it.key_code == .SPACEBAR || it.key_code == .ARROW_UP || it.key_code == #char "W" then input_jump = xx it.key_pressed;
           if it.key_code == #char "R" && it.key_pressed {
             player.pos = map.player_spawn;
-            player.velocity = {};
+            player.vel = {};
           }
         }
       }
@@ -524,7 +542,7 @@ main :: () {
         }
         if player.dir == 0 {
           player.dir = dir;
-          accel_force.time_counter = 0;
+          player.acceleration_counter = 0;
         }
       }
 
@@ -533,56 +551,65 @@ main :: () {
       old_player := player.*;
       co_resume(*player_update_routine, *(Player_Update_Inputs.{player, input, dt, collision_events}));
 
-      if move_force.time_counter < move_force.duration_seconds {
-        player.accel_per_frame.x += move_force.magnitude * player.dir;
-        move_force.time_counter += dt;
-      } else if accel_force.time_counter < accel_force.duration_seconds {
-        player.accel_per_frame.x += accel_force.magnitude * input.dir;
-        accel_force.time_counter += dt;
+      if player.wall_jump_immobility_counter < PLAYER_TIME_IMMOBILE {
+        //player.accel_per_frame.x += MOVE_FORCE.magnitude * player.dir;
+        apply_force(player, MOVE_FORCE * player.dir);
+        player.wall_jump_immobility_counter += dt;
+      } else if player.acceleration_counter < PLAYER_TIME_TO_ACCELERATE {
+        //player.accel_per_frame.x += ACCEL_FORCE.magnitude * input.dir;
+        apply_force(player, ACCEL_FORCE * input.dir);
+        player.acceleration_counter += dt;
       } else if sign(input.dir) == sign(player.dir) {
-        if values_are_close(abs(player.velocity.x), PLAYER_MOVE_SPEED) {
-          player.accel_per_frame.x += move_force.magnitude * input.dir;
+        if values_are_close(abs(player.vel.x), PLAYER_MOVE_SPEED) {
+          //player.accel_per_frame.x += MOVE_FORCE.magnitude * input.dir;
+          apply_force(player, MOVE_FORCE * input.dir);
         }
       }
-      if sign(player.velocity.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
+      if sign(player.vel.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
         player.dir = 0;
-        player.velocity.x = 0;
+        player.vel.x = 0;
       }
-      player.accel_per_frame.x += floor_friction_force.magnitude * -sign(player.velocity.x);
+      //player.accel_per_frame.x += FLOOR_FRICTION_FORCE.magnitude * -sign(player.velocity.x);
+      apply_force(player, FLOOR_FRICTION_FORCE * cast(float) -sign(player.vel.x));
 
+      /*
       // NOTE: Player integration
       accel := player.accel_per_frame / player.mass;
       player.velocity += accel * dt;
-      player.velocity.x = sign(player.velocity.x) * min(abs(player.velocity.x), PLAYER_MOVE_SPEED);
       // TODO: Player Y velocity should also be clamped
       player.pos += player.velocity * dt;
       player.accel_per_frame = {};
+      */
+
+      integrate(player, dt);
+      player.vel.x = sign(player.vel.x) * min(abs(player.vel.x), PLAYER_MOVE_SPEED);
 
       // NOTE: Collisions
       collision_events.count = 0;
       obstacle_collisions := get_collision(player, *map, .[.GROUND, .WALL]);
-      for obstacle_collisions #no_abc {
+      for obstacle_collisions {
         player_pos_diff := player.pos - old_player.pos;
         if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, it.bbox) {
-          if player.velocity.y < 0 {
+          if player.vel.y < 0 {
             player.pos.y += it.overlap.w;
-            collision_events[collision_events.count] = .FLOOR;
             collision_events.count += 1;
+            collision_events[collision_events.count-1] = .FLOOR;
           } else player.pos.y -= it.overlap.w;
-          player.velocity.y = 0;
+          player.vel.y = 0;
         } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
           player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
           player.dir = 0;
-          player.velocity.x = 0;
-          if it.tile.type == .WALL && player.velocity.y < 0 {
-            collision_events[collision_events.count] = .WALL_SLIDE;
+          player.vel.x = 0;
+          if it.tile.type == .WALL && player.vel.y < 0 {
             collision_events.count += 1;
+            collision_events[collision_events.count-1] = .WALL_SLIDE;
           }
         }
       }
 
       if get_collision(player, *map, .BOUNCE_PAD) {
-        player.velocity.y = PLAYER_BOUNCE_PAD_JUMP_VELOCITY;
+        //player.vel.y = PLAYER_BOUNCE_PAD_JUMP_VELOCITY;
+        apply_impulse(player, xy(0, PLAYER_BOUNCE_PAD_JUMP_VELOCITY));
         player.can_jump = false;
       }
 

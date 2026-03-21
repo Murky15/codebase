@@ -188,7 +188,6 @@ Coroutine_State :: struct {
 #scope_export
 
 round  :: x => ifx x - cast(int) x >= 0.5 then ceil(x) else floor(x);
-square :: x => x * x;
 sign   :: x => ifx x == 0 then 0 else ifx signbit(x) then -1 else 1;
 norm   :: (x, min, max) => (x-min)/(max-min);
 
