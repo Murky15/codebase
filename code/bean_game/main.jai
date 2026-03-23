@@ -165,7 +165,6 @@ player_state_ground :: () {
 
     if player.can_jump && input.jump{
       player.can_jump = false;
-      //player.velocity.y = PLAYER_JUMP_VELOCITY;
       apply_impulse(player, xy(0, PLAYER_JUMP_VELOCITY));
       player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
       return;
@@ -187,7 +186,6 @@ player_state_air :: () {
     }
 
     if coyote_jump && input.jump {
-      //player.velocity.y = PLAYER_JUMP_VELOCITY;
       apply_impulse(player, xy(0, PLAYER_JUMP_VELOCITY));
       player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
     }
@@ -197,7 +195,6 @@ player_state_air :: () {
       if it == .WALL_SLIDE then player_state_wall();
     }
 
-    //player.accel_per_frame.y += GRAVITY * player.mass;
     apply_force(player, xy(0, GRAVITY*player.mass));
 
     co_yield();
@@ -554,31 +551,17 @@ main :: () {
       co_resume(*player_update_routine, *(Player_Update_Inputs.{player, input, dt, collision_events}));
 
       if player.wall_jump_immobility_counter < PLAYER_TIME_IMMOBILE {
-        //player.accel_per_frame.x += MOVE_FORCE.magnitude * player.dir;
         apply_force(player, MOVE_FORCE * player.dir);
         player.wall_jump_immobility_counter += dt;
       } else if player.acceleration_counter < PLAYER_TIME_TO_ACCELERATE {
-        //player.accel_per_frame.x += ACCEL_FORCE.magnitude * input.dir;
         apply_force(player, ACCEL_FORCE * input.dir);
         player.acceleration_counter += dt;
       } else if sign(input.dir) == sign(player.dir) {
         if values_are_close(abs(player.vel.x), PLAYER_MOVE_SPEED) {
-          //player.accel_per_frame.x += MOVE_FORCE.magnitude * input.dir;
           apply_force(player, MOVE_FORCE * input.dir);
         }
       }
-
       apply_force(player, FLOOR_FRICTION_FORCE * -player.dir);
-      //player.accel_per_frame.x += FLOOR_FRICTION_FORCE.magnitude * -sign(player.velocity.x);
-
-      /*
-      // NOTE: Player integration
-      accel := player.accel_per_frame / player.mass;
-      player.velocity += accel * dt;
-      // TODO: Player Y velocity should also be clamped
-      player.pos += player.velocity * dt;
-      player.accel_per_frame = {};
-      */
 
       integrate(player, dt);
       if sign(player.vel.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
@@ -586,7 +569,6 @@ main :: () {
         player.vel.x = 0;
       }
       player.vel.x = sign(player.vel.x) * min(abs(player.vel.x), PLAYER_MOVE_SPEED);
-      //log("%", player.vel.x);
 
       // NOTE: Collisions
       collision_events.count = 0;
@@ -612,7 +594,6 @@ main :: () {
       }
 
       if get_collision(player, *map, .BOUNCE_PAD) {
-        //player.vel.y = PLAYER_BOUNCE_PAD_JUMP_VELOCITY;
         apply_impulse(player, xy(0, PLAYER_BOUNCE_PAD_JUMP_VELOCITY));
         player.can_jump = false;
       }
