@@ -21,7 +21,7 @@
 - [X] Include user data in logger to change message display duration
 - [ ] Audio
 - [ ] Downloading level files from the web and checking for updates
-- [ ] Physics system overhaul
+- [X] Physics system overhaul
 - [ ] WASM build - maybe the best way to do this is by creating a separate C platform layer to bootstrap the Jai code so we can use emscripten
 */
 
@@ -66,7 +66,7 @@ Player :: struct {
 
   grappling_hook: Rope(0.1);
 
-  texture: *Simp.Texture;
+  texture: *SDL_Texture;
   dir: float;
   flip: float;
   facing := 1.0;
@@ -262,77 +262,50 @@ cam_update_tracking :: (cam: *Camera, dt: float, attachment := 4.5) {
 }
 
 base_asset_path :: "W:/assets/bean_game";
+Baked_Bitmap :: struct {
+  name: string;
+  width, height, channels: s32;
+  pixels: * u8;
+}
+#no_reset baked_sprites_raw: [] Baked_Bitmap;
+#run load_assets();
 
+/*
 load_fonts :: (font_height_px: int) -> *Simp.Dynamic_Font {
   return Simp.get_font_at_size(base_asset_path, "font.ttf", font_height_px);
 }
+*/
 
-Texture_Atlas :: Table(string, Simp.Texture);
-load_assets :: (font_height_px: int) -> Texture_Atlas, *Simp.Dynamic_Font {
-  art_path :: "W:/assets/bean_game/sprites"; // TODO: Should be provided by metaprogram
-  texture_files := file_list(art_path);
-  atlas: Texture_Atlas;
-  init(*atlas, texture_files.count);
-  for texture_files {
-    new_texture: Simp.Texture;
-    tex_load_result := Simp.texture_load_from_file(*new_texture, it);
-    assert(tex_load_result, "Error loading texture data!");
-    _, key, _ := path_decomp(it);
-    table_add(*atlas, key, new_texture);
+Texture_Atlas :: Table(string, *SDL_Texture);
+load_assets :: (/*font_height_px: int*/) -> Texture_Atlas {
+  if #compile_time {
+    #import "stb_image";
+    art_path :: "W:/assets/bean_game/sprites"; // TODO: Should be provided by metaprogram
+    texture_files := file_list(art_path);
+    baked_sprites_raw = NewArray(texture_files.count, Baked_Bitmap);
+    for texture_files {
+      _, key, _ := path_decomp(it);
+      bitmap: Baked_Bitmap;
+      bitmap.name = key;
+      bitmap.pixels = stbi_load(to_c_string(it), *bitmap.width, *bitmap.height, *bitmap.channels, 0);
+      baked_sprites_raw[it_index] = bitmap;
+    }
+  } else {
+    atlas: Texture_Atlas;
+    init(*atlas, texture_files.count);
+    for texture_files {
+      new_texture: Simp.Texture;
+      tex_load_result := Simp.texture_load_from_file(*new_texture, it);
+      assert(tex_load_result, "Error loading texture data!");
+      table_add(*atlas, key, new_texture);
+    }
   }
 
-  return atlas, load_fonts(font_height_px);
+  return atlas;
 }
 
-set_texture :: inline (tex: *Simp.Texture) {
-  Simp.set_shader_for_images(tex);
-  Simp.immediate_set_2d_projection(RESOLUTION_W, RESOLUTION_H);
-}
-
-set_color :: inline () {
-  Simp.set_shader_for_color();
-  Simp.immediate_set_2d_projection(RESOLUTION_W, RESOLUTION_H);
-}
-
-draw_circle :: (center: Vector2, r: float, N: s32, color: Vector4) {
-  if !N return;
-
-  set_color();
-
-  dtheta := TAU / N;
-  p0 := Vector3.{center.x, center.y, 0};
-
-  // @Speed: Factor apart the loop below to save the previous points.
-  for i: 0..N-1 {
-    theta0 := dtheta * i;
-    theta1 := dtheta * (i+1);
-
-    ct0 := cos(theta0);
-    st0 := sin(theta0);
-    ct1 := cos(theta1);
-    st1 := sin(theta1);
-
-    p1 := Vector3.{center.x + ct0 * r, center.y + st0 * r, 0};
-    p2 := Vector3.{center.x + ct1 * r, center.y + st1 * r, 0};
-
-    Simp.immediate_triangle(p0, p1, p2, color, color, color);
-  }
-}
-
-set_vsync :: (enable: bool) {
-  #import "GL";
-  #if OS == .WINDOWS {
-    wglSwapIntervalEXT(xx enable);
-  }
-}
-
-make_quad :: inline (rect: AARect) -> Vector2, Vector2, Vector2, Vector2 {
-  p0 := rect.xy;
-  p1 := xy(rect.x + rect.z, rect.y);
-  p2 := rect.xy + rect.zw;
-  p3 := xy(rect.x, rect.y + rect.w);
-
-  return p0, p1, p2, p3;
+make_quad :: inline (rect: AARect) -> SDL_FRect {
+  return SDL_FRect.{rect.x, rect.y, rect.z, rect.w};
 }
 
 make_uv_counter_rotation :: inline (quadrants_to_rotate: u64) -> Vector2, Vector2, Vector2, Vector2 {
@@ -376,18 +349,6 @@ get_collision :: (player: *Player, map: *Map, tile_type: Tile_Type) -> [] Collis
   return get_collision(player, map, .[tile_type]);
 }
 
-Tick_Data :: struct {
-  target_seconds_per_frame: float;
-}
-
-tick :: (thread: *Thread) -> int {
-  return 0;
-}
-
-render :: (thread: *Thread) -> int {
-  return 0;
-}
-
 ENABLE_LEVEL_HOT_RELOAD :: true;
 TILE_NATIVE_RESOLUTION :: 64;
 TILE_RESOLUTION_DIVISOR :: 2;
@@ -414,37 +375,35 @@ ACCEL_FORCE: Vector2;
 map: Map;
 
 main :: () {
-  #if OS == .WINDOWS {
-    #import "Windows";
-    timeBeginPeriod(1);
-  }
-
   level_arena_pool: Arena.Flat_Pool;
   level_arena_allocator := Allocator.{proc=Arena.flat_pool_allocator_proc, data=*level_arena_pool};
   bg_logger_init_and_equip();
 
+  SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+
   window_width  := 1280;
   window_height := 720;
-  main_window := WC.create_window(window_width, window_height, "Bean Game");
-  Simp.set_render_target(main_window);
+  window := SDL_CreateWindow("Bean Game", xx window_width, xx window_height, 0);
+  renderer := SDL_CreateRenderer(window, null);
 
-  texture_atlas, font := load_assets(window_height / FONT_HEIGHT_DIVISOR);
-  coin_texture := table_find_pointer(*texture_atlas, "tile_coin"); // Duplicate
-  x_texture := table_find_pointer(*texture_atlas, "ui_numX");
-  number_textures := *Simp.Texture.[table_find_pointer(*texture_atlas, "ui_num0"),
-                                    table_find_pointer(*texture_atlas, "ui_num1"),
-                                    table_find_pointer(*texture_atlas, "ui_num2"),
-                                    table_find_pointer(*texture_atlas, "ui_num3"),
-                                    table_find_pointer(*texture_atlas, "ui_num4"),
-                                    table_find_pointer(*texture_atlas, "ui_num5"),
-                                    table_find_pointer(*texture_atlas, "ui_num6"),
-                                    table_find_pointer(*texture_atlas, "ui_num7"),
-                                    table_find_pointer(*texture_atlas, "ui_num8"),
-                                    table_find_pointer(*texture_atlas, "ui_num9")];
-  cosmetic_textures := *Simp.Texture.[table_find_pointer(*texture_atlas, "item_hat"),
-                                      table_find_pointer(*texture_atlas, "item_hatTop"),
-                                      table_find_pointer(*texture_atlas, "item_helmet"),
-                                      table_find_pointer(*texture_atlas, "item_helmetModern")];
+  texture_atlas := load_assets();
+  coin_texture := (.*)table_find_pointer(*texture_atlas, "tile_coin"); // Duplicate
+  x_texture := (.*)table_find_pointer(*texture_atlas, "ui_numX");
+
+  number_textures := *SDL_Texture.[(.*)table_find_pointer(*texture_atlas, "ui_num0"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num1"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num2"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num3"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num4"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num5"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num6"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num7"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num8"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num9")];
+  cosmetic_textures := *SDL_Texture.[(.*)table_find_pointer(*texture_atlas, "item_hat"),
+                                      (.*)table_find_pointer(*texture_atlas, "item_hatTop"),
+                                      (.*)table_find_pointer(*texture_atlas, "item_helmet"),
+                                      (.*)table_find_pointer(*texture_atlas, "item_helmetModern")];
   should_run := true;
   start := seconds_since_init();
   // NOTE: For now let's assume that the world is static
@@ -469,12 +428,6 @@ main :: () {
   map.cam.offset -= player.bbox.zw / 2;
   cam_set_target(*map.cam, player);
 
-  tick_thread, render_thread: Thread;
-  thread_init(*tick_thread, tick);
-  thread_init(*render_thread, render);
-
-  set_vsync(true);
-
   begin_swing(*player.grappling_hook, 100, player.pos + xy(0, 50));
 
   input_move_left, input_move_right, input_jump: bool;
@@ -482,29 +435,36 @@ main :: () {
   collision_events := array_view(collision_event_memory, 0);
   while should_run {
     reset_temporary_storage();
-    Input.update_window_events();
 
     {
-      for Input.events_this_frame {
-        if it.type == .QUIT should_run = false;
+      e: SDL_Event;
+      while SDL_PollEvent(*e) {
+        if cast(SDL_EventType) e.type == {
+          case .SDL_EVENT_QUIT; should_run = false;
 
-        if it.type == .KEYBOARD {
-          if it.key_code == #char "A" || it.key_code == .ARROW_LEFT  then input_move_left  = xx it.key_pressed;
-          if it.key_code == #char "D" || it.key_code == .ARROW_RIGHT then input_move_right = xx it.key_pressed;
-          if it.key_code == .SPACEBAR || it.key_code == .ARROW_UP || it.key_code == #char "W" then input_jump = xx it.key_pressed;
-          if it.key_code == #char "R" && it.key_pressed {
-            player.pos = map.player_spawn;
-            player.vel = {};
+          case .SDL_EVENT_KEY_UP; #through;
+          case .SDL_EVENT_KEY_DOWN; {
+            key := e.key.key;
+            down := e.key.down;
+            if key == #char "A" || key == SDLK_LEFT  then input_move_left  = down;
+            if key == #char "D" || key == SDLK_RIGHT then input_move_right = down;
+            if key == SDLK_SPACE || key == SDLK_UP || key == #char "W" then input_jump = down;
+            if key == #char "R" && down {
+              player.pos = map.player_spawn;
+              player.vel = {};
+            }
           }
         }
       }
 
+      /*
       for Input.get_window_resizes() {
         Simp.update_window(it.window);
         window_width = it.width;
         window_height = it.height;
         font = load_fonts(window_height / FONT_HEIGHT_DIVISOR);
       }
+      */
 
       #if ENABLE_LEVEL_HOT_RELOAD {
         modtime, _, success := file_modtime_and_size(map.path);
@@ -618,35 +578,36 @@ main :: () {
     }
 
     {
-      Simp.clear_render_target(1, 1, 1, 1);
-      defer Simp.swap_buffers(main_window);
+      SDL_SetRenderDrawColor(renderer, 1, 1, 1, 1);
+      SDL_RenderClear(renderer);
+      defer SDL_RenderPresent(renderer);
 
       for map.background {
         layer_effect := ifx it.layer > 1 then xx it.layer else 1.0;
         parallax_cam := map.cam.pos / layer_effect;
         cam_view := AARect.{xy=parallax_cam, zw=xy(RESOLUTION_W, RESOLUTION_H)};
         if !rects_intersect(cam_view, it.bbox) then continue;
-        set_texture(it.tex);
-        p0, p1, p2, p3 := make_quad({xy = it.pos - parallax_cam, zw = it.size});
-        Simp.immediate_quad(p0, p1, p2, p3);
+        //set_texture(it.tex);
+        //Simp.immediate_quad(p0, p1, p2, p3);
+        SDL_RenderTexture(renderer, it.tex, null, *make_quad({xy = it.pos - parallax_cam, zw = it.size}));
       }
 
       for :visible_only map {
         if it.tex == null then continue;
         if it.collected then continue;
-        set_texture(it.tex);
         dsp := it_index * TILE_RESOLUTION;
         dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
-        p0, p1, p2, p3 := make_quad({xy = dsp - map.cam.pos, zw = xy(TILE_RESOLUTION)});
-        uv0, uv1, uv2, uv3 := make_uv_counter_rotation(it.decorative_uv_rotation);
-        Simp.immediate_quad(p0, p1, p2, p3, {1,1,1,1}, uv0, uv1, uv2, uv3);
+        SDL_RenderTexture(renderer, it.tex, null, *make_quad({xy = dsp - map.cam.pos, zw = xy(TILE_RESOLUTION)}));
+        //set_texture(it.tex);
+        //uv0, uv1, uv2, uv3 := make_uv_counter_rotation(it.decorative_uv_rotation);
+        //Simp.immediate_quad(p0, p1, p2, p3, {1,1,1,1}, uv0, uv1, uv2, uv3);
       }
 
+        /*
       {
         using player;
 
         rope_width :: 5;
-        set_color();
         for grappling_hook.particles {
           p0 := it.pos - map.cam.pos;
           if it_index < grappling_hook.particles.count-1 {
@@ -658,11 +619,14 @@ main :: () {
             p1 := next_particle.pos - map.cam.pos;
             p2 := p1 + perpendicular;
             p3 := p0 + perpendicular;
+            //set_color();
             Simp.immediate_quad(p0, p1, p2, p3, {0, 0, 1, 1});
           }
           draw_circle(p0, 2, 100, {1, 0, 0, 1});
         }
+        */
 
+        /*
         co_resume(*player_flip, *dt, *player.flip);
         dsp_pos := pos - map.cam.pos;
         dsp_dim := bbox_dim;
@@ -702,7 +666,9 @@ main :: () {
           scoreboard_x += TILE_RESOLUTION / 1.8;
         }
       }
+      */
 
+      /*
       Simp.set_shader_for_text();
       for logs_to_display {
         t: float;
@@ -720,6 +686,7 @@ main :: () {
       width := Simp.prepare_text(font, tprint("FPS: %", cast(int,1/dt)));
       Simp.generate_quads_for_prepared_text(font, window_width - cast(int,width*1.2), window_height - (window_height/FONT_HEIGHT_DIVISOR), 0);
       Simp.draw_generated_quads(font, {0,0,0,1});
+      */
     }
   }
 }
@@ -761,9 +728,12 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
 #import "File_Utilities";
 #import "Hash_Table";
 #import "Random";
-#import "Thread"(false);
-WC    :: #import "Window_Creation";
 Arena :: #import "Flat_Pool";
-Input :: #import "Input";
-Simp  :: #import "Simp";
-Sound :: #import "Sound_Player";
+
+#if OS == .WINDOWS {
+  #import,file "modules/sdl3/windows/windows.jai";
+} else #if OS == .LINUX {
+  #import,file "modules/sdl3/linux/linux.jai";
+} else #if OS == .MACOS {
+  #import,file "modules/sdl3/macos/macos.jai";
+}

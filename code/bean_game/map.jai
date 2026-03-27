@@ -17,7 +17,7 @@ Collision_Event :: enum {
 
 Tile :: struct {
   type: Tile_Type;
-  tex: *Simp.Texture;
+  tex: *SDL_Texture;
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
   decorative_uv_rotation: u64;
 
@@ -45,7 +45,7 @@ Map :: struct {
     layer: u64;
     pos: Vector2;
     size: Vector2;
-    tex: *Simp.Texture;
+    tex: *SDL_Texture;
 
     #overlay (pos) bbox: AARect;
   }
@@ -217,16 +217,16 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
 
   // NOTE: Texture pass
   Autotile :: struct {
-    tex: *Simp.Texture;
+    tex: *SDL_Texture;
     probability: float;
     default: bool;
     parallax_layer: u64;
   }
   atile :: (tex_name: string, probability := 100.0, default := false, layer := 1) -> Autotile #expand {
     #assert layer <= Map.max_parallax_layers;
-    return {table_find_pointer(*`textures, tex_name), probability, default, layer};
+    return {(.*)table_find_pointer(*`textures, tex_name), probability, default, layer};
   }
-  atile_choose :: inline (tiles: [] Autotile) -> *Simp.Texture, u64 {
+  atile_choose :: inline (tiles: [] Autotile) -> *SDL_Texture, u64 {
     default: *Autotile;
     rand := cast(float) (random_get() % 100) + 1;
     for tiles {
@@ -244,8 +244,8 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
   // NOTE: Associated with tiles
   above_ground_tiles := Autotile.[atile("tile_grass"), atile("tile_top"), atile("tile_water")];
   below_ground_tiles := Autotile.[atile("tile", 50.0, true), atile("tile_diagonal", 16.0), atile("tile_stone", 16.0), atile("tile_border", 16.0)];
-  bounce_pad_texture := table_find_pointer(*textures, "tile_belt");
-  tower_texture := table_find_pointer(*textures, "tile_brick");
+  bounce_pad_texture := (.*)table_find_pointer(*textures, "tile_belt");
+  tower_texture := (.*)table_find_pointer(*textures, "tile_brick");
   // TODO: A lot of textures have alternate counterparts (coins/gems spikes/cogs)
   // Should we autotile these or keep them as separate entities?
   coin_textures := Autotile.[atile("tile_coin", 50), atile("tile_gem", 50)];
@@ -271,8 +271,10 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
         foliage.layer = parallax_layer;
         foliage.pos = (it_index * TILE_RESOLUTION) + xy(x_offset, y_offset);
         scale := random_get_within_range(0.7,1.5);
-        foliage.size = xy(xx (foliage_texture.width  * scale /TILE_RESOLUTION_DIVISOR),
-                          xx (foliage_texture.height * scale /TILE_RESOLUTION_DIVISOR));
+        w, h: float;
+        SDL_GetTextureSize(foliage_texture, *w, *h);
+        foliage.size = xy(w  * scale /TILE_RESOLUTION_DIVISOR,
+                          h * scale /TILE_RESOLUTION_DIVISOR);
         foliage.tex = foliage_texture;
         sll_queue_push(*map.background, foliage);
       }
@@ -308,7 +310,9 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
     assert(cloud_texture != null);
     cloud := New(Map.Parallax_Effect);
     cloud.layer = layer;
-    cloud.size = xy(xx cloud_texture.width , xx cloud_texture.height);
+    w, h: float;
+    SDL_GetTextureSize(cloud_texture, *w, *h);
+    cloud.size = xy(w, h);
     x := random_get_within_range(-cloud.size.x, (map.width-1.0) * TILE_RESOLUTION);
     y := random_get_within_range(-cloud.size.y, (map.height-1.0) * TILE_RESOLUTION);
     cloud.pos = xy(x,y);
@@ -317,7 +321,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
   }
 
   map.player.pos = map.player_spawn;
-  map.player.texture = table_find_pointer(*textures, "character_roundRed");
+  map.player.texture = (.*)table_find_pointer(*textures, "character_roundRed");
   map.player.mass = 50;
 
   return map;
