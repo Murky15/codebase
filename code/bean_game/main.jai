@@ -214,10 +214,6 @@ player_state_wall :: (){
     }
 
     if player.can_jump && input.jump {
-      /*
-      player.velocity.y = PLAYER_JUMP_VELOCITY;
-      player.velocity.x = -player_dir * PLAYER_JUMP_VELOCITY;
-      */
       player.dir = -player_dir;
       apply_impulse(player, xy(player.dir * PLAYER_MOVE_SPEED, PLAYER_JUMP_VELOCITY));
       player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
@@ -235,10 +231,6 @@ player_state_wall :: (){
     }
     if !wall_collision then return;
 
-    /*
-    player.accel_per_frame.y += GRAVITY * player.mass;
-    player.accel_per_frame.y += WALL_FRICTION_FORCE.magnitude;
-    */
     apply_force(player, xy(0, GRAVITY*player.mass) + WALL_FRICTION_FORCE);
 
     co_yield();
@@ -265,47 +257,55 @@ base_asset_path :: "W:/assets/bean_game";
 Baked_Bitmap :: struct {
   name: string;
   width, height, channels: s32;
-  pixels: * u8;
+  pixels: [] u32;
 }
-#no_reset baked_sprites_raw: [] Baked_Bitmap;
-#run load_assets();
+baked_sprites_raw :: #run bake_assets();
 
-/*
-load_fonts :: (font_height_px: int) -> *Simp.Dynamic_Font {
-  return Simp.get_font_at_size(base_asset_path, "font.ttf", font_height_px);
+bake_assets :: () -> [] Baked_Bitmap #compile_time {
+  #import "stb_image";
+  art_path :: "W:/assets/bean_game/sprites"; // TODO: Should be provided by metaprogram
+  texture_files := file_list(art_path);
+  baked_sprites := NewArray(texture_files.count, Baked_Bitmap);
+  for texture_files {
+    _, key, _ := path_decomp(it);
+    bitmap: Baked_Bitmap;
+    bitmap.name = key;
+    pixels := stbi_load(to_c_string(it), *bitmap.width, *bitmap.height, *bitmap.channels, 0);
+    assert(bitmap.channels == 4);
+    bitmap_size := bitmap.width * bitmap.height * bitmap.channels;
+    bitmap.pixels = NewArray(bitmap.width * bitmap.height, u32);
+    memcpy(bitmap.pixels.data, pixels, bitmap_size);
+    baked_sprites[it_index] = bitmap;
+  }
+
+  return baked_sprites;
 }
-*/
 
 Texture_Atlas :: Table(string, *SDL_Texture);
-load_assets :: (/*font_height_px: int*/) -> Texture_Atlas {
-  if #compile_time {
-    #import "stb_image";
-    art_path :: "W:/assets/bean_game/sprites"; // TODO: Should be provided by metaprogram
-    texture_files := file_list(art_path);
-    baked_sprites_raw = NewArray(texture_files.count, Baked_Bitmap);
-    for texture_files {
-      _, key, _ := path_decomp(it);
-      bitmap: Baked_Bitmap;
-      bitmap.name = key;
-      bitmap.pixels = stbi_load(to_c_string(it), *bitmap.width, *bitmap.height, *bitmap.channels, 0);
-      baked_sprites_raw[it_index] = bitmap;
-    }
-  } else {
-    atlas: Texture_Atlas;
-    init(*atlas, texture_files.count);
-    for texture_files {
-      new_texture: Simp.Texture;
-      tex_load_result := Simp.texture_load_from_file(*new_texture, it);
-      assert(tex_load_result, "Error loading texture data!");
-      table_add(*atlas, key, new_texture);
-    }
+load_assets :: (renderer: *SDL_Renderer) -> Texture_Atlas {
+  atlas: Texture_Atlas;
+  init(*atlas, baked_sprites_raw.count);
+  for baked_sprites_raw {
+    surface := SDL_CreateSurfaceFrom(it.width, it.height, .ABGR8888, it.pixels.data, it.width * 4);
+    texture := SDL_CreateTextureFromSurface(renderer, surface);
+    assert(texture != null, "Error loading texture data!");
+    table_add(*atlas, it.name, texture);
   }
 
   return atlas;
 }
 
-make_quad :: inline (rect: AARect) -> SDL_FRect {
+make_frect :: inline (rect: AARect) -> SDL_FRect {
   return SDL_FRect.{rect.x, rect.y, rect.z, rect.w};
+}
+
+draw_quad :: (renderer: *SDL_Renderer, tex: *SDL_Texture, rect: AARect, flip_x := false, flip_y := false) {
+  quad := rect;
+  quad.y = RESOLUTION_H - (quad.y + quad.w);
+  flip: SDL_FlipMode;
+  if flip_x then flip |= .HORIZONTAL;
+  if flip_y then flip |= .VERTICAL;
+  SDL_RenderTextureRotated(renderer, tex, null, *make_frect(quad), 0, null, flip);
 }
 
 make_uv_counter_rotation :: inline (quadrants_to_rotate: u64) -> Vector2, Vector2, Vector2, Vector2 {
@@ -385,8 +385,10 @@ main :: () {
   window_height := 720;
   window := SDL_CreateWindow("Bean Game", xx window_width, xx window_height, 0);
   renderer := SDL_CreateRenderer(window, null);
+  SDL_SetRenderLogicalPresentation(renderer, RESOLUTION_W, RESOLUTION_H, .INTEGER_SCALE);
+  SDL_SetRenderVSync(renderer, 1);
 
-  texture_atlas := load_assets();
+  texture_atlas := load_assets(renderer);
   coin_texture := (.*)table_find_pointer(*texture_atlas, "tile_coin"); // Duplicate
   x_texture := (.*)table_find_pointer(*texture_atlas, "ui_numX");
 
@@ -446,10 +448,10 @@ main :: () {
           case .SDL_EVENT_KEY_DOWN; {
             key := e.key.key;
             down := e.key.down;
-            if key == #char "A" || key == SDLK_LEFT  then input_move_left  = down;
-            if key == #char "D" || key == SDLK_RIGHT then input_move_right = down;
-            if key == SDLK_SPACE || key == SDLK_UP || key == #char "W" then input_jump = down;
-            if key == #char "R" && down {
+            if key == #char "a" || key == SDLK_LEFT  then input_move_left  = down;
+            if key == #char "d" || key == SDLK_RIGHT then input_move_right = down;
+            if key == SDLK_SPACE || key == SDLK_UP || key == #char "w" then input_jump = down;
+            if key == #char "r" && down {
               player.pos = map.player_spawn;
               player.vel = {};
             }
@@ -578,7 +580,7 @@ main :: () {
     }
 
     {
-      SDL_SetRenderDrawColor(renderer, 1, 1, 1, 1);
+      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
       SDL_RenderClear(renderer);
       defer SDL_RenderPresent(renderer);
 
@@ -587,9 +589,7 @@ main :: () {
         parallax_cam := map.cam.pos / layer_effect;
         cam_view := AARect.{xy=parallax_cam, zw=xy(RESOLUTION_W, RESOLUTION_H)};
         if !rects_intersect(cam_view, it.bbox) then continue;
-        //set_texture(it.tex);
-        //Simp.immediate_quad(p0, p1, p2, p3);
-        SDL_RenderTexture(renderer, it.tex, null, *make_quad({xy = it.pos - parallax_cam, zw = it.size}));
+        draw_quad(renderer, it.tex, {xy = it.pos - parallax_cam, zw = it.size});
       }
 
       for :visible_only map {
@@ -597,16 +597,13 @@ main :: () {
         if it.collected then continue;
         dsp := it_index * TILE_RESOLUTION;
         dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
-        SDL_RenderTexture(renderer, it.tex, null, *make_quad({xy = dsp - map.cam.pos, zw = xy(TILE_RESOLUTION)}));
-        //set_texture(it.tex);
-        //uv0, uv1, uv2, uv3 := make_uv_counter_rotation(it.decorative_uv_rotation);
-        //Simp.immediate_quad(p0, p1, p2, p3, {1,1,1,1}, uv0, uv1, uv2, uv3);
+        draw_quad(renderer, it.tex, {xy = dsp - map.cam.pos, zw = xy(TILE_RESOLUTION)});
       }
 
-        /*
       {
         using player;
 
+        /*
         rope_width :: 5;
         for grappling_hook.particles {
           p0 := it.pos - map.cam.pos;
@@ -626,55 +623,38 @@ main :: () {
         }
         */
 
-        /*
         co_resume(*player_flip, *dt, *player.flip);
         dsp_pos := pos - map.cam.pos;
         dsp_dim := bbox_dim;
         dsp_dim.x *= abs(cos(PI * flip));
         dsp_pos.x += (bbox_dim.x - dsp_dim.x) / 2;
-        p0, p1, p2, p3 := make_quad({xy = dsp_pos, zw = dsp_dim});
-        left  := cast(float, !(flip > 0.5));
-        right := cast(float,   flip > 0.5);
-        if player.facing < 0 then left, right = right, left;
-        uv0 := Vector2.{left,0};
-        uv1 := Vector2.{right,0};
-        uv2 := Vector2.{right,1};
-        uv3 := Vector2.{left,1};
-
-        set_texture(texture);
-        Simp.immediate_quad(p0, p1, p2, p3, {1,1,1,1}, uv0, uv1, uv2, uv3);
+        toggle := facing > 0;
+        if flip > 0.5 then toggle = !toggle;
+        draw_quad(renderer, texture, {xy = dsp_pos, zw = dsp_dim}, flip_x = toggle);
       }
 
       {
         scoreboard_x := 0.0;
         SCOREBOARD_Y :: 315;
         SCOREBOARD_RESOLUTION :: TILE_RESOLUTION * 1.5;
-        set_texture(coin_texture);
-        cp0, cp1, cp2, cp3 := make_quad({xy = xy(scoreboard_x, SCOREBOARD_Y), zw = xy(SCOREBOARD_RESOLUTION)});
-        Simp.immediate_quad(cp0, cp1, cp2, cp3);
+        draw_quad(renderer, coin_texture, {xy = xy(scoreboard_x, SCOREBOARD_Y), zw = xy(SCOREBOARD_RESOLUTION)});
         scoreboard_x += TILE_RESOLUTION;
-        set_texture(x_texture);
-        xp0, xp1, xp2, xp3 := make_quad({xy = xy(scoreboard_x, SCOREBOARD_Y), zw = xy(SCOREBOARD_RESOLUTION)});
-        Simp.immediate_quad(xp0, xp1, xp2, xp3);
+        draw_quad(renderer, x_texture, {xy = xy(scoreboard_x, SCOREBOARD_Y), zw = xy(SCOREBOARD_RESOLUTION)});
         scoreboard_x += TILE_RESOLUTION;
 
         coin_digits := get_digits_right_to_left_on_temp(map.coins_collected);
         for < coin_digits {
-          set_texture(number_textures[it]);
-          dp0, dp1, dp2, dp3 := make_quad({xy = xy(scoreboard_x, SCOREBOARD_Y), zw = xy(SCOREBOARD_RESOLUTION)});
-          Simp.immediate_quad(dp0, dp1, dp2, dp3);
+          draw_quad(renderer, number_textures[it], {xy = xy(scoreboard_x, SCOREBOARD_Y), zw = xy(SCOREBOARD_RESOLUTION)});
           scoreboard_x += TILE_RESOLUTION / 1.8;
         }
       }
-      */
 
-      /*
-      Simp.set_shader_for_text();
       for logs_to_display {
         t: float;
         co_resume(*it.fade, *dt, *t);
         alpha := ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
-        Simp.draw_text(font, 50, 50 + it_index * (window_height/FONT_HEIGHT_DIVISOR), it.message, {w = 1 - alpha});
+        SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1 - alpha);
+        SDL_RenderDebugText(renderer, 20.0, RESOLUTION_H - 20.0, temp_c_string(it.message));
         if t >= 1.0 {
           co_delete(*it.fade);
           free(it.message);
@@ -683,10 +663,8 @@ main :: () {
         }
       }
 
-      width := Simp.prepare_text(font, tprint("FPS: %", cast(int,1/dt)));
-      Simp.generate_quads_for_prepared_text(font, window_width - cast(int,width*1.2), window_height - (window_height/FONT_HEIGHT_DIVISOR), 0);
-      Simp.draw_generated_quads(font, {0,0,0,1});
-      */
+      SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1);
+      SDL_RenderDebugTextFormat(renderer, RESOLUTION_W - 100, 20, "FPS: %", cast(int,1/dt));
     }
   }
 }
