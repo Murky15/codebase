@@ -30,14 +30,18 @@ key_binding: F1
 [Run Bean Game]
 run_command: %RUN_WORKING_DIR%/BeanGame
 key_binding: F2
-
-[Build Gameboy]
+[Build Bean Game WASM]
 error_regex: ^(?P<file>.*):(?P<line>\d+),(?P<col>\d+): (?P<type>Error|Warning|Info|...):* (?P<msg>.*)|^(?P<msg1>.*error LNK.*)
-build_command: jai %BUILD_WORKING_DIR%/code/gameboy/first.jai
+build_command: jai %BUILD_WORKING_DIR%/code/bean_game/first.jai - wasm
 key_binding: F3
-[Run Gameboy]
-run_command: %RUN_WORKING_DIR%/gameboy
-key_binding: F4
+
+# [Build Gameboy]
+# error_regex: ^(?P<file>.*):(?P<line>\d+),(?P<col>\d+): (?P<type>Error|Warning|Info|...):* (?P<msg>.*)|^(?P<msg1>.*error LNK.*)
+# build_command: jai %BUILD_WORKING_DIR%/code/gameboy/first.jai
+# key_binding: F3
+# [Run Gameboy]
+# run_command: %RUN_WORKING_DIR%/gameboy
+# key_binding: F4
 
 [allow]
 # Files and directories matching the wildcards in this section will be loaded, even if they are ignored in the previous section.

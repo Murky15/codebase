@@ -19,13 +19,15 @@ Tile :: struct {
   type: Tile_Type;
   tex: *SDL_Texture;
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
-  decorative_uv_rotation: u64;
+  decorative_rotation: float;
 
   bob_counter: float;
   bob_amplitude: float;
   bob_frequency :: PI;
   collected: bool;
 }
+
+TILE_TILT_AMPLITUDE :: 5;
 
 Map :: struct {
   version: int;
@@ -279,10 +281,11 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
         sll_queue_push(*map.background, foliage);
       }
       case .GROUND; {
+        it.decorative_rotation = random_get_within_range(-TILE_TILT_AMPLITUDE, TILE_TILT_AMPLITUDE);
         it.tex = ifx above != .GROUND && above != .WATER {
           ifx below != .GROUND then above_ground_tiles[1].tex else above_ground_tiles[0].tex;
         } else {
-          it.decorative_uv_rotation = random_get();
+          it.decorative_rotation += 90.0 * (random_get() % 4);
           atile_choose(below_ground_tiles);
         }
       }

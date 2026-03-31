@@ -1,15 +1,4 @@
-Linked_List :: struct (T: Type)
-#modify { // NOTE: Probably unnecessary, but I wanted the practice.
-  error := sprint("Linked_List_Header must be the first member of %!", T);
-  ti := cast(*Type_Info) T;
-  if ti.type != .STRUCT then return false, error;
-  tis := cast(*Type_Info_Struct) ti;
-  header := tis.members[0];
-  if header.type.type != .STRUCT || header.offset_in_bytes > 0 then return false, error;
-  header_struct := cast(*Type_Info_Struct) header.type;
-  if header_struct.name != "Linked_List_Header" then return false, error;
-  return true;
-} {
+Linked_List :: struct (T: Type) {
   first, last: *T;
   count: int;
 }
@@ -80,6 +69,7 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   list.count -= 1;
 }
 
+/* NOTE: Fun experiment but not very practical.
 Coroutine_Proc :: #type (*void);
 
 Coroutine_Status :: enum {
@@ -186,6 +176,7 @@ Coroutine_State :: struct {
 }
 
 #scope_export
+*/
 
 round  :: x => ifx x - cast(int) x >= 0.5 then ceil(x) else floor(x);
 sign   :: x => ifx x == 0 then 0 else ifx signbit(x) then -1 else 1;

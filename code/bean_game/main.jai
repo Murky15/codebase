@@ -22,7 +22,9 @@
 - [ ] Audio
 - [ ] Downloading level files from the web and checking for updates
 - [X] Physics system overhaul
-- [ ] WASM build - maybe the best way to do this is by creating a separate C platform layer to bootstrap the Jai code so we can use emscripten
+- [ ] WASM build with Emscripten + SDL3
+- [X] SDL transition
+- [X] Remove coroutines
 */
 
 AARect :: #type,isa Vector4;
@@ -55,9 +57,17 @@ integrate :: (body: *Rigid_Body, dt: float) {
   body.acc = xy(0,0);
 }
 
+Player_State :: enum {
+  GROUND;
+  AIR;
+  WALL;
+}
+
 Player :: struct {
   #as using body: Rigid_Body;
   body.bbox_dim = Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
+
+  state: Player_State;
 
   can_jump: bool;
   coyote_counter := PLAYER_COYOTE_TIME_GRACE_PERIOD;
@@ -68,6 +78,7 @@ Player :: struct {
 
   texture: *SDL_Texture;
   dir: float;
+  wall_dir: float;
   flip: float;
   facing := 1.0;
 }
@@ -89,25 +100,32 @@ Input_Package :: struct {
   jump: bool;
 }
 
-// TODO: Expand
-Progress_Animation_Params :: struct {
+Tween_Proc :: #type (state: *Tween_State, dt: float) -> float;
+Tween_State :: struct {
   duration: float;
+  started_at: float;
+  index: float;
+
+  proc: Tween_Proc;
 }
-Progress_Animation_Inputs :: struct {
-  dt: float;
+
+tween_init :: (duration: float, proc: Tween_Proc) -> Tween_State {
+  result: Tween_State;
+  result.duration = duration;
+  result.started_at = xx seconds_since_init();
+  result.proc = proc;
+
+  return result;
 }
-progress_animation :: (param: *void) {
-  duration := cast(*float, param).*;
-  started_at := cast(float) seconds_since_init();
-  animation_index := 0.0;
-  value := 0.0;
-  while animation_index < duration {
-    dt := cast(*float, co_input()).*;
-    out := cast(*float, co_output());
-    animation_index += dt;
-    out.* = cast(float) saturate(norm(started_at + animation_index, started_at, started_at + duration));
-    co_yield();
-  }
+
+tween_lerp :: (using state: *Tween_State, dt: float) -> float {
+  index += dt;
+  return saturate(norm(started_at + index, started_at, started_at + duration));
+}
+
+tween_ease :: (using state: *Tween_State, dt: float) -> float {
+  t := tween_lerp(state, dt);
+  return ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
 }
 
 begin_swing :: (rope: *Rope, length: float, anchor: Vector2) {
@@ -135,107 +153,6 @@ Player_Update_Inputs :: struct {
 
   collision_events: [] Collision_Event;
 }
-player_update :: (param: *void) {
-  while true {
-    player_state_ground();
-    player_state_air();
-  }
-}
-
-player_state_ground :: () {
-  while true {
-    co_in := cast(*Player_Update_Inputs, co_input()).*;
-    using co_in;
-
-    player_grid_pos := floor(player.pos / TILE_RESOLUTION);
-    bottom_left_type := map_index(map, player_grid_pos + {y = -1}).type;
-    bottom_right_type := map_index(map, player_grid_pos + {1, -1}).type;
-    bottom_left := bottom_left_type  == .GROUND || bottom_left_type == .WALL;
-    bottom_right := bottom_right_type == .GROUND || bottom_right_type == .WALL;
-    floor_below := bottom_left || bottom_right;
-    if !floor_below {
-      if !input.jump then player.coyote_counter = 0;
-      player.can_jump = false;
-      return;
-    }
-
-    if !input.jump {
-      player.can_jump = true;
-    }
-
-    if player.can_jump && input.jump{
-      player.can_jump = false;
-      apply_impulse(player, xy(0, PLAYER_JUMP_VELOCITY));
-      player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
-      return;
-    }
-
-    co_yield();
-  }
-}
-
-player_state_air :: () {
-  while true {
-    co_in := cast(*Player_Update_Inputs, co_input()).*;
-    using co_in;
-
-    coyote_jump := false;
-    if player.coyote_counter < PLAYER_COYOTE_TIME_GRACE_PERIOD {
-      player.coyote_counter += dt;
-      coyote_jump = true;
-    }
-
-    if coyote_jump && input.jump {
-      apply_impulse(player, xy(0, PLAYER_JUMP_VELOCITY));
-      player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
-    }
-
-    for collision_events {
-      if it == .FLOOR then return;
-      if it == .WALL_SLIDE then player_state_wall();
-    }
-
-    apply_force(player, xy(0, GRAVITY*player.mass));
-
-    co_yield();
-  }
-}
-
-player_state_wall :: (){
-  player_dir := 0.0;
-  while true {
-    co_in := cast(*Player_Update_Inputs, co_input()).*;
-    using co_in;
-
-    if player_dir == 0 then player_dir = player.dir;
-
-    if !input.jump {
-      player.can_jump = true;
-    }
-
-    if player.can_jump && input.jump {
-      player.dir = -player_dir;
-      apply_impulse(player, xy(player.dir * PLAYER_MOVE_SPEED, PLAYER_JUMP_VELOCITY));
-      player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
-      player.can_jump = false;
-      player.wall_jump_immobility_counter = 0;
-      player.acceleration_counter = PLAYER_TIME_TO_ACCELERATE;
-      return;
-    }
-
-    wall_collision := false;
-    for collision_events {
-      if it == .WALL_SLIDE {
-        wall_collision = true;
-      } else if it == .FLOOR then return;
-    }
-    if !wall_collision then return;
-
-    apply_force(player, xy(0, GRAVITY*player.mass) + WALL_FRICTION_FORCE);
-
-    co_yield();
-  }
-}
 
 Camera :: struct {
   tracking: *Player;
@@ -261,24 +178,28 @@ Baked_Bitmap :: struct {
 }
 baked_sprites_raw :: #run bake_assets();
 
-bake_assets :: () -> [] Baked_Bitmap #compile_time {
-  #import "stb_image";
-  art_path :: "W:/assets/bean_game/sprites"; // TODO: Should be provided by metaprogram
-  texture_files := file_list(art_path);
-  baked_sprites := NewArray(texture_files.count, Baked_Bitmap);
-  for texture_files {
-    _, key, _ := path_decomp(it);
-    bitmap: Baked_Bitmap;
-    bitmap.name = key;
-    pixels := stbi_load(to_c_string(it), *bitmap.width, *bitmap.height, *bitmap.channels, 0);
-    assert(bitmap.channels == 4);
-    bitmap_size := bitmap.width * bitmap.height * bitmap.channels;
-    bitmap.pixels = NewArray(bitmap.width * bitmap.height, u32);
-    memcpy(bitmap.pixels.data, pixels, bitmap_size);
-    baked_sprites[it_index] = bitmap;
-  }
+#if OS != .WASM {
+  bake_assets :: () -> [] Baked_Bitmap #compile_time {
+    #import "File";
+    #import "File_Utilities";
+    #import "stb_image";
+    art_path :: "W:/assets/bean_game/sprites"; // TODO: Should be provided by metaprogram
+    texture_files := file_list(art_path);
+    baked_sprites := NewArray(texture_files.count, Baked_Bitmap);
+    for texture_files {
+      _, key, _ := path_decomp(it);
+      bitmap: Baked_Bitmap;
+      bitmap.name = key;
+      pixels := stbi_load(to_c_string(it), *bitmap.width, *bitmap.height, *bitmap.channels, 0);
+      assert(bitmap.channels == 4);
+      bitmap_size := bitmap.width * bitmap.height * bitmap.channels;
+      bitmap.pixels = NewArray(bitmap.width * bitmap.height, u32);
+      memcpy(bitmap.pixels.data, pixels, bitmap_size);
+      baked_sprites[it_index] = bitmap;
+    }
 
-  return baked_sprites;
+    return baked_sprites;
+  }
 }
 
 Texture_Atlas :: Table(string, *SDL_Texture);
@@ -299,23 +220,13 @@ make_frect :: inline (rect: AARect) -> SDL_FRect {
   return SDL_FRect.{rect.x, rect.y, rect.z, rect.w};
 }
 
-draw_quad :: (renderer: *SDL_Renderer, tex: *SDL_Texture, rect: AARect, flip_x := false, flip_y := false) {
+draw_quad :: (renderer: *SDL_Renderer, tex: *SDL_Texture, rect: AARect, flip_x := false, flip_y := false, rotation_angle := 0.0) {
   quad := rect;
   quad.y = RESOLUTION_H - (quad.y + quad.w);
   flip: SDL_FlipMode;
   if flip_x then flip |= .HORIZONTAL;
   if flip_y then flip |= .VERTICAL;
-  SDL_RenderTextureRotated(renderer, tex, null, *make_frect(quad), 0, null, flip);
-}
-
-make_uv_counter_rotation :: inline (quadrants_to_rotate: u64) -> Vector2, Vector2, Vector2, Vector2 {
-  quadrants_to_rotate %= 4;
-  if quadrants_to_rotate == {
-    case;   return {0,0}, {1,0}, {1,1}, {0,1};
-    case 1; return {0,1}, {0,0}, {1,0}, {1,1};
-    case 2; return {1,1}, {0,1}, {0,0}, {1,0};
-    case 3; return {1,0}, {1,1}, {0,1}, {0,0};
-  }
+  SDL_RenderTextureRotated(renderer, tex, null, *make_frect(quad), rotation_angle, null, flip);
 }
 
 Collision :: struct {
@@ -375,8 +286,6 @@ ACCEL_FORCE: Vector2;
 map: Map;
 
 main :: () {
-  level_arena_pool: Arena.Flat_Pool;
-  level_arena_allocator := Allocator.{proc=Arena.flat_pool_allocator_proc, data=*level_arena_pool};
   bg_logger_init_and_equip();
 
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
@@ -412,7 +321,7 @@ main :: () {
   // This is a very simple way to represent the world, and must be refined in the future.
   apollo_start := to_apollo(start);
   random_seed(cast,force(Some_Big_Time_Value) apollo_start);
-  map = map_load(texture_atlas, apollo_start,, level_arena_allocator);
+  map = map_load(texture_atlas, apollo_start);
 
   player := *map.player;
 
@@ -422,9 +331,7 @@ main :: () {
   MOVE_FORCE = FLOOR_FRICTION_FORCE;
   ACCEL_FORCE = player.mass * xy(PLAYER_MOVE_SPEED / PLAYER_TIME_TO_ACCELERATE, 0) + FLOOR_FRICTION_FORCE;
 
-  player_flip_param := Progress_Animation_Params.{0.2};
-  player_update_routine := co_create(player_update);
-  player_flip := co_create(progress_animation, *player_flip_param);
+  player_flip := tween_init(0.2, tween_lerp);
 
   map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
   map.cam.offset -= player.bbox.zw / 2;
@@ -475,8 +382,9 @@ main :: () {
           log("Reloading level...");
           new_map := map_load(texture_atlas,, temp);
           if new_map.tiles.data != null {
-            Arena.reset(*level_arena_pool, overwrite_memory=true);
-            map = map_load(texture_atlas, modtime,, level_arena_allocator);
+            array_free(map.tiles);
+            // TODO: Also must free parallax effects
+            map = map_load(texture_atlas, modtime);
             map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
             map.cam.offset -= player.bbox.zw / 2;
             player = *map.player;
@@ -498,8 +406,7 @@ main :: () {
       if dir != 0 {
         if player.facing != dir {
           player.facing = dir;
-          co_delete(*player_flip);
-          player_flip = co_create(progress_animation, *player_flip_param);
+          player_flip = tween_init(0.2, tween_lerp);
         }
         if player.dir == 0 {
           player.dir = dir;
@@ -510,7 +417,84 @@ main :: () {
       input := Input_Package.{dir, input_jump};
 
       old_player := player.*;
-      co_resume(*player_update_routine, *(Player_Update_Inputs.{player, input, dt, collision_events}));
+      if player.state == {
+        case .GROUND; {
+          player_grid_pos := floor(player.pos / TILE_RESOLUTION);
+          bottom_left_type := map_index(map, player_grid_pos + {y = -1}).type;
+          bottom_right_type := map_index(map, player_grid_pos + {1, -1}).type;
+          bottom_left := bottom_left_type  == .GROUND || bottom_left_type == .WALL;
+          bottom_right := bottom_right_type == .GROUND || bottom_right_type == .WALL;
+          floor_below := bottom_left || bottom_right;
+          if !floor_below {
+            if !input.jump then player.coyote_counter = 0;
+            player.can_jump = false;
+            player.state = .AIR;
+          }
+
+          if !input.jump {
+            player.can_jump = true;
+          }
+
+          if player.can_jump && input.jump{
+            player.can_jump = false;
+            apply_impulse(player, xy(0, PLAYER_JUMP_VELOCITY));
+            player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
+            player.state = .AIR;
+          }
+        }
+
+        case .AIR; {
+          player.wall_dir = 0;
+
+          coyote_jump := false;
+          if player.coyote_counter < PLAYER_COYOTE_TIME_GRACE_PERIOD {
+            player.coyote_counter += dt;
+            coyote_jump = true;
+          }
+
+          if coyote_jump && input.jump {
+            apply_impulse(player, xy(0, PLAYER_JUMP_VELOCITY));
+            player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
+            player.can_jump = false;
+          }
+
+          for collision_events {
+            if it == .FLOOR then player.state = .GROUND;
+            if it == .WALL_SLIDE then player.state = .WALL;
+          }
+
+          apply_force(player, xy(0, GRAVITY*player.mass));
+        }
+
+        case .WALL; {
+          if player.wall_dir == 0 then player.wall_dir = player.dir;
+
+          if !input.jump {
+            player.can_jump = true;
+          }
+
+          if player.can_jump && input.jump {
+            player.dir = -player.wall_dir;
+            apply_impulse(player, xy(player.dir * PLAYER_MOVE_SPEED, PLAYER_JUMP_VELOCITY));
+            player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
+            player.can_jump = false;
+            player.wall_jump_immobility_counter = 0;
+            player.acceleration_counter = PLAYER_TIME_TO_ACCELERATE;
+            player.state = .AIR;
+          }
+
+          wall_collision := false;
+          for collision_events {
+            if it == .WALL_SLIDE {
+              wall_collision = true;
+            } else if it == .FLOOR then player.state = .AIR;
+          }
+          if !wall_collision then player.state = .AIR;
+          if player.state == .AIR then player.can_jump = false;
+
+          apply_force(player, xy(0, GRAVITY*player.mass) + WALL_FRICTION_FORCE);
+        }
+      }
 
       if player.wall_jump_immobility_counter < PLAYER_TIME_IMMOBILE {
         apply_force(player, MOVE_FORCE * player.dir);
@@ -597,7 +581,7 @@ main :: () {
         if it.collected then continue;
         dsp := it_index * TILE_RESOLUTION;
         dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
-        draw_quad(renderer, it.tex, {xy = dsp - map.cam.pos, zw = xy(TILE_RESOLUTION)});
+        draw_quad(renderer, it.tex, {xy = dsp - map.cam.pos, zw = xy(TILE_RESOLUTION)}, rotation_angle = it.decorative_rotation);
       }
 
       {
@@ -623,7 +607,7 @@ main :: () {
         }
         */
 
-        co_resume(*player_flip, *dt, *player.flip);
+        flip = player_flip.proc(*player_flip, dt);
         dsp_pos := pos - map.cam.pos;
         dsp_dim := bbox_dim;
         dsp_dim.x *= abs(cos(PI * flip));
@@ -650,15 +634,11 @@ main :: () {
       }
 
       for logs_to_display {
-        t: float;
-        co_resume(*it.fade, *dt, *t);
-        alpha := ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
+        alpha := it.fade.proc(*it.fade, dt);
         SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1 - alpha);
-        SDL_RenderDebugText(renderer, 20.0, RESOLUTION_H - 20.0, temp_c_string(it.message));
-        if t >= 1.0 {
-          co_delete(*it.fade);
+        SDL_RenderDebugText(renderer, 20.0, RESOLUTION_H - (20.0 + it_index * 10), temp_c_string(it.message));
+        if alpha <= 0.0 {
           free(it.message);
-          free(it);
           remove it;
         }
       }
@@ -671,26 +651,24 @@ main :: () {
 
 Log_Message :: struct {
   message: string;
-  fade: Coroutine;
-  duration: float;
+  fade: Tween_State;
 }
 
-logs_to_display: [..] *Log_Message;
+logs_to_display: [..] Log_Message;
 bg_logger_init_and_equip :: () {
   context.logger = bg_logger;
 }
 
-// TODO: Must be made thread safe!
 bg_logger :: (message: string, data: *void, info: Log_Info) {
   if !message then return;
-  write_string(message);
-  if message[message.count-1] != #char "\n" then write_string("\n");
+  //write_string(message);
+  //if message[message.count-1] != #char "\n" then write_string("\n");
 
   if !(info.common_flags & .TO_FILE_ONLY) {
-    new_message := New(Log_Message);
+    new_message: Log_Message;
     new_message.message = copy_string(message);
-    new_message.duration = ifx info.common_flags & .ERROR then 15.0 else 5.0;
-    new_message.fade = co_create(progress_animation, *new_message.duration);
+    duration := ifx info.common_flags & .ERROR then 15.0 else 5.0;
+    new_message.fade = tween_init(duration, tween_ease);
     array_insert_at(*logs_to_display, new_message, 0);
   }
 }
@@ -702,11 +680,8 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
 #import "Math";
 #import "Sloppy_Math";
 #import "String";
-#import "File";
-#import "File_Utilities";
 #import "Hash_Table";
 #import "Random";
-Arena :: #import "Flat_Pool";
 
 #if OS == .WINDOWS {
   #import,file "modules/sdl3/windows/windows.jai";
