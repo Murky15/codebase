@@ -46,33 +46,51 @@ message_loop :: (build_wasm: bool) {
         typechecked := cast(*Message_Typechecked) message;
 
         for typechecked.procedure_bodies {
-          proc_body := it.expression;
-          proc_name := proc_body.header.name;
-          if array_find(problematic_procedures, proc_name) then continue;
+          proc := it.expression;
+          header := proc.header;
+
+          uses_asm := false;
           for it.subexpressions {
-            if it.kind != .IF then continue;
-            potential_cpu_check := cast(*Code_If) it;
-            if (potential_cpu_check.if_flags & .IS_STATIC) && (potential_cpu_check.static_if_flags & .EVALUATED_AS_TRUE) {
-              found_inline_asm := false;
-              for potential_cpu_check.then_block.statements {
-                if it.kind == .ASM {
-                  found_inline_asm = true;
-                  array_add_if_unique(*problematic_procedures, proc_name);
+            if it.kind == .ASM then uses_asm = true;
+          }
+
+          if uses_asm {
+            compiler_report("Removing body of this procedure because it contains inline assembly!", make_location(proc), .WARNING);
+            new_block: [..] *Code_Node;
+            dummy_return := New(Code_Return);
+            arguments_unsorted: [..] Code_Argument;
+            arguments_sorted: [..] *Code_Node;
+            for header.returns {
+              literal := New(Code_Literal);
+              if it.type.type == {
+                case .INTEGER; {
+                  literal.value_type = .NUMBER;
+                  literal.value_flags = .IS_A_NUMBER;
+                }
+                case .BOOL; {
+                  literal.value_type = .BOOLEAN;
+                }
+                case .POINTER; {
+                  literal.value_type = .POINTER;
+                  literal.pointer_literal_info = New(Code_Pointer_Literal_Info);
+                  literal.pointer_literal_info.pointer_literal_type = .CONSTANT_VALUE;
+                }
+                case; {
+                  literal.value_type = .STRUCT;
+                  literal.struct_literal_info = New(Code_Struct_Literal_Info);
                 }
               }
 
-              if found_inline_asm {
-                report := tprint("This #if in procedure % will be deleted because it contains inline assembly.", proc_name);
-                compiler_report(report, make_location(potential_cpu_check), .WARNING);
-                if proc_name == ">>" {
-                  potential_cpu_check.then_block = potential_cpu_check.else_block;
-                } else {
-                  empty_block: [] *Code_Node;
-                  potential_cpu_check.then_block.statements = empty_block;
-                }
-                compiler_modify_procedure(message.workspace, proc_body);
-              }
+              argument := Code_Argument.{literal, null};
+              array_add(*arguments_unsorted, argument);
+              array_add(*arguments_sorted, literal);
             }
+            dummy_return.arguments_unsorted = arguments_unsorted;
+            dummy_return.arguments_sorted = arguments_sorted;
+            array_add(*new_block, dummy_return);
+            proc.block.statements = new_block;
+
+            compiler_modify_procedure(typechecked.workspace, proc);
           }
         }
       }
@@ -81,8 +99,6 @@ message_loop :: (build_wasm: bool) {
     }
   }
 }
-
-problematic_procedures: [..] string;
 
 #import "Basic";
 #import "Compiler";

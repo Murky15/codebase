@@ -387,7 +387,7 @@ Shift-Ctrl-F8               go_to_previous_build_error_in_side_pane
 
 [[style]]
 
-theme: steel-breeze
+theme: everforest-hard
 
 [fonts]
 font:          JetBrainsMonoNL-Regular
