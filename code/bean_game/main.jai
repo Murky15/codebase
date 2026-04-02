@@ -661,8 +661,8 @@ bg_logger_init_and_equip :: () {
 
 bg_logger :: (message: string, data: *void, info: Log_Info) {
   if !message then return;
-  //write_string(message);
-  //if message[message.count-1] != #char "\n" then write_string("\n");
+  write_string(message);
+  if message[message.count-1] != #char "\n" then write_string("\n");
 
   if !(info.common_flags & .TO_FILE_ONLY) {
     new_message: Log_Message;

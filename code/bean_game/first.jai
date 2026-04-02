@@ -13,6 +13,7 @@ OUTPUT_NAME :: "BeanGame";
     }
   }
 
+  assert(options.cpu_target == .X64, "Only X64 targets are currently supported!");
   if build_wasm {
     log("Building WASM target with Emscripten backend...");
     options.output_type = .OBJECT_FILE;
@@ -24,10 +25,9 @@ OUTPUT_NAME :: "BeanGame";
   options.output_path = join(#filepath, "../../build");
   set_optimization(*options, .VERY_DEBUG);
   set_build_options(options, w);
-
   compiler_begin_intercept(w);
   add_build_file(join(#filepath, "main.jai"), w);
-  message_loop(w, options.output_path, build_wasm);
+  message_loop(build_wasm);
   compiler_end_intercept(w);
   emcc_command: [..] string;
   //emcc_result := run_command();
@@ -36,7 +36,7 @@ OUTPUT_NAME :: "BeanGame";
   set_build_options_dc({do_output=false});
 }
 
-message_loop :: (w: Workspace, working_directory: string, build_wasm: bool) {
+message_loop :: (build_wasm: bool) {
   if !build_wasm then return;
 
   while true {
@@ -44,29 +44,36 @@ message_loop :: (w: Workspace, working_directory: string, build_wasm: bool) {
     if message.kind == {
       case .TYPECHECKED; {
         typechecked := cast(*Message_Typechecked) message;
-        if !build_wasm then continue;
-        for typed_body: typechecked.procedure_bodies {
-          for typed_body.subexpressions {
-            if it.kind == .IF {
-              if_node := cast(*Code_If) it;
-              if if_node.if_flags & .IS_STATIC {
-                log("%", if_node.condition.*);
+
+        for typechecked.procedure_bodies {
+          proc_body := it.expression;
+          proc_name := proc_body.header.name;
+          if array_find(problematic_procedures, proc_name) then continue;
+          for it.subexpressions {
+            if it.kind != .IF then continue;
+            potential_cpu_check := cast(*Code_If) it;
+            if (potential_cpu_check.if_flags & .IS_STATIC) && (potential_cpu_check.static_if_flags & .EVALUATED_AS_TRUE) {
+              found_inline_asm := false;
+              for potential_cpu_check.then_block.statements {
+                if it.kind == .ASM {
+                  found_inline_asm = true;
+                  array_add_if_unique(*problematic_procedures, proc_name);
+                }
+              }
+
+              if found_inline_asm {
+                report := tprint("This #if in procedure % will be deleted because it contains inline assembly.", proc_name);
+                compiler_report(report, make_location(potential_cpu_check), .WARNING);
+                if proc_name == ">>" {
+                  potential_cpu_check.then_block = potential_cpu_check.else_block;
+                } else {
+                  empty_block: [] *Code_Node;
+                  potential_cpu_check.then_block.statements = empty_block;
+                }
+                compiler_modify_procedure(message.workspace, proc_body);
               }
             }
           }
-
-          /*
-          if contains_inline_asm {
-            body := proc_body.expression;
-            header := body.header;
-            log("Removing body of procedure: % because it contains #asm", header.name, loc = make_location(body), flags = .WARNING);
-            empty_returns: [..] *Code_Declaration;
-            header.returns = empty_returns;
-            empty_statements: [..] *Code_Node;
-            body.block.statements = empty_statements;
-            compiler_modify_procedure(w, body);
-          }
-          */
         }
       }
 
@@ -74,6 +81,8 @@ message_loop :: (w: Workspace, working_directory: string, build_wasm: bool) {
     }
   }
 }
+
+problematic_procedures: [..] string;
 
 #import "Basic";
 #import "Compiler";
