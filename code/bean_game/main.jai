@@ -183,6 +183,9 @@ Baked_Bitmap :: struct {
 baked_sprites_raw, baked_map_raw :: #run bake_assets();
 
 bake_assets :: () -> [] Baked_Bitmap, string #compile_time {
+  #import "Flat_Pool";
+  pool: Flat_Pool;
+  push_allocator({flat_pool_allocator_proc, *pool});
   using file :: #import "File";
   using file_util :: #import "File_Utilities";
   using stb :: #import "stb_image";
