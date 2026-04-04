@@ -24,6 +24,7 @@
 - [X] Physics system overhaul
 - [ ] WASM build with Emscripten + SDL3
 - [X] SDL transition
+- [ ] using,map to clean up SDL3 imports
 - [X] Remove coroutines
 */
 
@@ -112,7 +113,7 @@ Tween_State :: struct {
 tween_init :: (duration: float, proc: Tween_Proc) -> Tween_State {
   result: Tween_State;
   result.duration = duration;
-  result.started_at = xx seconds_since_init();
+  result.started_at = SDL_GetTicks() / 1000.0;
   result.proc = proc;
 
   return result;
@@ -170,36 +171,42 @@ cam_update_tracking :: (cam: *Camera, dt: float, attachment := 4.5) {
   cam.pos = lerp(cam.pos, target.pos - cam.offset, t);
 }
 
+// TODO: These should all be provided by metaprogram
 base_asset_path :: "W:/assets/bean_game";
+art_path :: "W:/assets/bean_game/sprites";
+map_path :: "W:/code/bean_game/level.bgdat";
 Baked_Bitmap :: struct {
   name: string;
   width, height, channels: s32;
   pixels: [] u32;
 }
-baked_sprites_raw :: #run bake_assets();
+baked_sprites_raw, baked_map_raw :: #run bake_assets();
 
-#if OS != .WASM {
-  bake_assets :: () -> [] Baked_Bitmap #compile_time {
-    #import "File";
-    #import "File_Utilities";
-    #import "stb_image";
-    art_path :: "W:/assets/bean_game/sprites"; // TODO: Should be provided by metaprogram
-    texture_files := file_list(art_path);
-    baked_sprites := NewArray(texture_files.count, Baked_Bitmap);
-    for texture_files {
-      _, key, _ := path_decomp(it);
-      bitmap: Baked_Bitmap;
-      bitmap.name = key;
-      pixels := stbi_load(to_c_string(it), *bitmap.width, *bitmap.height, *bitmap.channels, 0);
-      assert(bitmap.channels == 4);
-      bitmap_size := bitmap.width * bitmap.height * bitmap.channels;
-      bitmap.pixels = NewArray(bitmap.width * bitmap.height, u32);
-      memcpy(bitmap.pixels.data, pixels, bitmap_size);
-      baked_sprites[it_index] = bitmap;
-    }
+bake_assets :: () -> [] Baked_Bitmap, string #compile_time {
+  using file :: #import "File";
+  using file_util :: #import "File_Utilities";
+  using stb :: #import "stb_image";
 
-    return baked_sprites;
+  texture_files := file_list(art_path);
+  baked_sprites := NewArray(texture_files.count, Baked_Bitmap);
+  for texture_files {
+    _, key, _ := path_decomp(it);
+    bitmap: Baked_Bitmap;
+    bitmap.name = key;
+    pixels := stbi_load(to_c_string(it), *bitmap.width, *bitmap.height, *bitmap.channels, 0);
+    assert(bitmap.channels == 4);
+    bitmap_size := bitmap.width * bitmap.height * bitmap.channels;
+    bitmap.pixels = NewArray(bitmap.width * bitmap.height, u32);
+    memcpy(bitmap.pixels.data, pixels, bitmap_size);
+    baked_sprites[it_index] = bitmap;
   }
+
+  raw_map, load_success := read_entire_file(map_path);
+  if !load_success {
+    log_error("Error reading level data!");
+  }
+
+  return baked_sprites, raw_map;
 }
 
 Texture_Atlas :: Table(string, *SDL_Texture);
@@ -288,7 +295,7 @@ input_move_left, input_move_right, input_jump: bool;
 collision_event_memory: [9] Collision_Event;
 collision_events: [] Collision_Event;
 should_run: bool;
-start: float64;
+start: u64;
 player_flip: Tween_State;
 renderer: *SDL_Renderer;
 coin_texture: *SDL_Texture;
@@ -355,9 +362,8 @@ main_loop :: (ctx: *void) #c_call {
       */
     }
 
-    end := seconds_since_init();
-    dt := cast(float, end - start);
-    //dt = min(dt, DT_MAX);
+    end := SDL_GetTicks();
+    dt := (end - start) / 1000.0;
     start = end;
 
     {
@@ -605,7 +611,7 @@ main_loop :: (ctx: *void) #c_call {
       }
 
       SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1);
-      SDL_RenderDebugTextFormat(renderer, RESOLUTION_W - 100, 20, "FPS: %", cast(int,1/dt));
+      SDL_RenderDebugTextFormat_CFormat(renderer, RESOLUTION_W - 100, 20, "FPS: %d", cast(int,1.0/dt));
     }
   }
 }
@@ -640,12 +646,11 @@ main :: () {
                                       (.*)table_find_pointer(*texture_atlas, "item_hatTop"),
                                       (.*)table_find_pointer(*texture_atlas, "item_helmet"),
                                       (.*)table_find_pointer(*texture_atlas, "item_helmetModern")];
-  start = seconds_since_init();
+  start = SDL_GetTicks();
   // NOTE: For now let's assume that the world is static
   // This is a very simple way to represent the world, and must be refined in the future.
-  apollo_start := to_apollo(start);
-  random_seed(cast,force(Some_Big_Time_Value) apollo_start);
-  map = map_load(texture_atlas, apollo_start);
+  random_seed(cast,trunc(u32) SDL_GetPerformanceCounter());
+  map = map_load(texture_atlas);
 
   player := *map.player;
 
@@ -685,8 +690,10 @@ bg_logger_init_and_equip :: () {
 
 bg_logger :: (message: string, data: *void, info: Log_Info) {
   if !message then return;
+  /*
   write_string(message);
   if message[message.count-1] != #char "\n" then write_string("\n");
+  */
 
   if !(info.common_flags & .TO_FILE_ONLY) {
     new_message: Log_Message;
@@ -705,7 +712,7 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
 #import "Sloppy_Math";
 #import "String";
 #import "Hash_Table";
-#import "Random";
+#import "PCG";
 
 #if OS == .WINDOWS {
   #import,file "modules/sdl3/windows/windows.jai";
@@ -715,5 +722,5 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
   #import,file "modules/sdl3/macos/macos.jai";
 }
 #if EMSCRIPTEN {
-  #import,file "emscripten.jai";
+  #import,file "modules/emscripten.jai";
 }

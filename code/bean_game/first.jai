@@ -19,6 +19,7 @@ OUTPUT_NAME :: "BeanGame";
     options.runtime_support_definitions = .ENTRY_POINT_AND_INIT;
     options.backtrace_on_crash = .OFF;
     options.llvm_options.output_bitcode = true;
+    remap_import(w, "", "Default_Allocator", "Emscripten_Allocator");
   }
   options.backend = .LLVM;
   options.text_output_flags = xx 0;
@@ -26,6 +27,7 @@ OUTPUT_NAME :: "BeanGame";
   options.output_path = join(#filepath, "../../build");
   set_optimization(*options, .VERY_DEBUG);
   set_build_options(options, w);
+
   compiler_begin_intercept(w);
   {
     add_build_string(tprint("EMSCRIPTEN :: %;", build_wasm), w);
@@ -58,6 +60,8 @@ message_loop :: (build_wasm: bool) {
             if it.kind == .ASM then uses_asm = true;
           }
 
+          // TODO: How can I protect `print_to_builder`?
+          // remap_import?
           if uses_asm {
             compiler_report("Removing body of this procedure because it contains inline assembly!", make_location(proc), .WARNING);
             new_block: [..] *Code_Node;

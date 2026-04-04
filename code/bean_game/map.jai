@@ -133,17 +133,31 @@ rects_intersect :: (a: Vector4, b: Vector4) -> bool, AARect {
   return is_intersecting, overlap;
 }
 
+// Copy so we don't use inline assembly
+my_split_from_left :: (s: string, byte: u8) -> (left: string, right: string) {
+  cursor := 0;
+  while 1 {
+      // If we hit the end, we didn't find it. Bail!
+      if cursor >= s.count  return s, "";   // >= in case of data corruption.
+      if s[cursor] == byte  break;
+
+      cursor += 1;
+  }
+
+  left := s;
+  left.count = cursor;
+
+  return left, advance(s, cursor);
+}
+
 map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) -> Map {
-  map_path :: "W:/code/bean_game/level.bgdat"; // TODO: Should be provided by metaprogram
+
   rows_in_header :: 4;
   tis_map :: cast(*Type_Info_Struct) type_info(Map);
 
+  raw_map := copy_string(baked_map_raw,, temp);
+
   map: Map;
-  raw_map, load_success := read_entire_file(map_path,, temp);
-  if !load_success {
-    log_error("Error reading level data!");
-    return {};
-  }
   #if ENABLE_LEVEL_HOT_RELOAD {
     map.path = map_path;
     map.last_modification = last_modification;
@@ -159,11 +173,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
 
   for 0..rows_in_header-1 {
     meta_tag := rows[it];
-    success, tag, value := split_from_left(meta_tag, #char ":");
-    if !success {
-      log_error("Error parsing level header on row %.", it+1);
-      return {};
-    }
+    tag, value := my_split_from_left(meta_tag, #char ":");
     to_lower_in_place(tag);
     value = eat_spaces(value);
     for tis_map.members {
