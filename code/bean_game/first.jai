@@ -13,10 +13,11 @@ OUTPUT_NAME :: "BeanGame";
     }
   }
 
-  assert(options.cpu_target == .X64, "Only X64 targets are currently supported!");
   if build_wasm {
     log("Building WASM target with Emscripten backend...");
     options.output_type = .OBJECT_FILE;
+    options.runtime_support_definitions = .ENTRY_POINT_AND_INIT;
+    options.backtrace_on_crash = .OFF;
     options.llvm_options.output_bitcode = true;
   }
   options.backend = .LLVM;
@@ -26,8 +27,11 @@ OUTPUT_NAME :: "BeanGame";
   set_optimization(*options, .VERY_DEBUG);
   set_build_options(options, w);
   compiler_begin_intercept(w);
-  add_build_file(join(#filepath, "main.jai"), w);
-  message_loop(build_wasm);
+  {
+    add_build_string(tprint("EMSCRIPTEN :: %;", build_wasm), w);
+    add_build_file(join(#filepath, "main.jai"), w);
+    message_loop(build_wasm);
+  }
   compiler_end_intercept(w);
   emcc_command: [..] string;
   //emcc_result := run_command();

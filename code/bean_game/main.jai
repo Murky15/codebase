@@ -284,66 +284,27 @@ MOVE\_FORCE: Vector2;
 ACCEL_FORCE: Vector2;
 
 map: Map;
+input_move_left, input_move_right, input_jump: bool;
+collision_event_memory: [9] Collision_Event;
+collision_events: [] Collision_Event;
+should_run: bool;
+start: float64;
+player_flip: Tween_State;
+renderer: *SDL_Renderer;
+coin_texture: *SDL_Texture;
+x_texture: *SDL_Texture;
+number_textures: [] *SDL_Texture;
+cosmetic_textures: [] *SDL_Texture;
 
-main :: () {
-  bg_logger_init_and_equip();
+main_loop :: (ctx: *void) #c_call {
+  #if EMSCRIPTEN {
+    if !should_run then emscripten_cancel_main_loop();
+  }
 
-  SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
-
-  window_width  := 1280;
-  window_height := 720;
-  window := SDL_CreateWindow("Bean Game", xx window_width, xx window_height, 0);
-  renderer := SDL_CreateRenderer(window, null);
-  SDL_SetRenderLogicalPresentation(renderer, RESOLUTION_W, RESOLUTION_H, .INTEGER_SCALE);
-  SDL_SetRenderVSync(renderer, 1);
-
-  texture_atlas := load_assets(renderer);
-  coin_texture := (.*)table_find_pointer(*texture_atlas, "tile_coin"); // Duplicate
-  x_texture := (.*)table_find_pointer(*texture_atlas, "ui_numX");
-
-  number_textures := *SDL_Texture.[(.*)table_find_pointer(*texture_atlas, "ui_num0"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num1"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num2"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num3"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num4"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num5"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num6"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num7"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num8"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num9")];
-  cosmetic_textures := *SDL_Texture.[(.*)table_find_pointer(*texture_atlas, "item_hat"),
-                                      (.*)table_find_pointer(*texture_atlas, "item_hatTop"),
-                                      (.*)table_find_pointer(*texture_atlas, "item_helmet"),
-                                      (.*)table_find_pointer(*texture_atlas, "item_helmetModern")];
-  should_run := true;
-  start := seconds_since_init();
-  // NOTE: For now let's assume that the world is static
-  // This is a very simple way to represent the world, and must be refined in the future.
-  apollo_start := to_apollo(start);
-  random_seed(cast,force(Some_Big_Time_Value) apollo_start);
-  map = map_load(texture_atlas, apollo_start);
-
-  player := *map.player;
-
-  FRICTION_COEFFICIENT :: 1.8;
-  FLOOR_FRICTION_FORCE = xy(-1 * GRAVITY * player.mass * FRICTION_COEFFICIENT, 0);
-  WALL_FRICTION_FORCE = xy(0, 130_000);
-  MOVE_FORCE = FLOOR_FRICTION_FORCE;
-  ACCEL_FORCE = player.mass * xy(PLAYER_MOVE_SPEED / PLAYER_TIME_TO_ACCELERATE, 0) + FLOOR_FRICTION_FORCE;
-
-  player_flip := tween_init(0.2, tween_lerp);
-
-  map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
-  map.cam.offset -= player.bbox.zw / 2;
-  cam_set_target(*map.cam, player);
-
-  begin_swing(*player.grappling_hook, 100, player.pos + xy(0, 50));
-
-  input_move_left, input_move_right, input_jump: bool;
-  collision_event_memory: [9] Collision_Event;
-  collision_events := array_view(collision_event_memory, 0);
-  while should_run {
+  push_context cast(*#Context) ctx {
     reset_temporary_storage();
+
+    player := *map.player;
 
     {
       e: SDL_Event;
@@ -373,7 +334,6 @@ main :: () {
         window_height = it.height;
         font = load_fonts(window_height / FONT_HEIGHT_DIVISOR);
       }
-      */
 
       #if ENABLE_LEVEL_HOT_RELOAD {
         modtime, _, success := file_modtime_and_size(map.path);
@@ -392,6 +352,7 @@ main :: () {
           } else map.last_modification = modtime;
         }
       }
+      */
     }
 
     end := seconds_since_init();
@@ -649,6 +610,69 @@ main :: () {
   }
 }
 
+main :: () {
+  bg_logger_init_and_equip();
+
+  SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+
+  window_width  := 1280;
+  window_height := 720;
+  window := SDL_CreateWindow("Bean Game", xx window_width, xx window_height, 0);
+  renderer = SDL_CreateRenderer(window, null);
+  SDL_SetRenderLogicalPresentation(renderer, RESOLUTION_W, RESOLUTION_H, .INTEGER_SCALE);
+  SDL_SetRenderVSync(renderer, 1);
+
+  texture_atlas := load_assets(renderer);
+  coin_texture = (.*)table_find_pointer(*texture_atlas, "tile_coin"); // Duplicate
+  x_texture = (.*)table_find_pointer(*texture_atlas, "ui_numX");
+
+  number_textures = *SDL_Texture.[(.*)table_find_pointer(*texture_atlas, "ui_num0"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num1"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num2"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num3"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num4"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num5"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num6"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num7"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num8"),
+                                    (.*)table_find_pointer(*texture_atlas, "ui_num9")];
+  cosmetic_textures = *SDL_Texture.[(.*)table_find_pointer(*texture_atlas, "item_hat"),
+                                      (.*)table_find_pointer(*texture_atlas, "item_hatTop"),
+                                      (.*)table_find_pointer(*texture_atlas, "item_helmet"),
+                                      (.*)table_find_pointer(*texture_atlas, "item_helmetModern")];
+  start = seconds_since_init();
+  // NOTE: For now let's assume that the world is static
+  // This is a very simple way to represent the world, and must be refined in the future.
+  apollo_start := to_apollo(start);
+  random_seed(cast,force(Some_Big_Time_Value) apollo_start);
+  map = map_load(texture_atlas, apollo_start);
+
+  player := *map.player;
+
+  FRICTION_COEFFICIENT :: 1.8;
+  FLOOR_FRICTION_FORCE = xy(-1 * GRAVITY * player.mass * FRICTION_COEFFICIENT, 0);
+  WALL_FRICTION_FORCE = xy(0, 130_000);
+  MOVE_FORCE = FLOOR_FRICTION_FORCE;
+  ACCEL_FORCE = player.mass * xy(PLAYER_MOVE_SPEED / PLAYER_TIME_TO_ACCELERATE, 0) + FLOOR_FRICTION_FORCE;
+
+  player_flip = tween_init(0.2, tween_lerp);
+
+  map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
+  map.cam.offset -= player.bbox.zw / 2;
+  cam_set_target(*map.cam, player);
+
+  begin_swing(*player.grappling_hook, 100, player.pos + xy(0, 50));
+
+  collision_events = collision_event_memory;
+  should_run = true;
+
+  #if EMSCRIPTEN {
+    emscripten_set_main_loop_arg(main_loop, *context, 0, true);
+  } else {
+    while should_run main_loop(*context);
+  }
+}
+
 Log_Message :: struct {
   message: string;
   fade: Tween_State;
@@ -689,4 +713,7 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
   #import,file "modules/sdl3/linux/linux.jai";
 } else #if OS == .MACOS {
   #import,file "modules/sdl3/macos/macos.jai";
+}
+#if EMSCRIPTEN {
+  #import,file "emscripten.jai";
 }
