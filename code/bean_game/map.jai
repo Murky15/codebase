@@ -155,7 +155,9 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
   rows_in_header :: 4;
   tis_map :: cast(*Type_Info_Struct) type_info(Map);
 
-  raw_map := copy_string(baked_map_raw,, temp);
+  raw_map_cstr_len: u64;
+  raw_map_cstr := SDL_LoadFile(map_path, *raw_map_cstr_len);
+  raw_map := to_string(raw_map_cstr, xx raw_map_cstr_len);
 
   map: Map;
   #if ENABLE_LEVEL_HOT_RELOAD {

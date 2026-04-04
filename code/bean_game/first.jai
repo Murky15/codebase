@@ -13,8 +13,21 @@ OUTPUT_NAME :: "BeanGame";
     }
   }
 
+  // TODO: This process will need to be expanded obviously.
+  art_path, map_path: string;
+  ifx OS == {
+    case .WINDOWS; {
+      art_path = "W:/assets/bean_game/sprites";
+      map_path = "W:/code/bean_game/level.bgdat";
+    }
+  }
+
   if build_wasm {
     log("Building WASM target with Emscripten backend...");
+
+    art_path = "sprites";
+    map_path = "level.bgdat";
+
     options.output_type = .OBJECT_FILE;
     options.runtime_support_definitions = .ENTRY_POINT_AND_INIT;
     options.backtrace_on_crash = .OFF;
@@ -31,6 +44,7 @@ OUTPUT_NAME :: "BeanGame";
   compiler_begin_intercept(w);
   {
     add_build_string(tprint("EMSCRIPTEN :: %;", build_wasm), w);
+    add_build_string(tprint("art_path :: \"%\";\nmap_path :: \"%\";", art_path, map_path), w);
     add_build_file(join(#filepath, "main.jai"), w);
     message_loop(build_wasm);
   }

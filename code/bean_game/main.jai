@@ -171,53 +171,42 @@ cam_update_tracking :: (cam: *Camera, dt: float, attachment := 4.5) {
   cam.pos = lerp(cam.pos, target.pos - cam.offset, t);
 }
 
-// TODO: These should all be provided by metaprogram
-base_asset_path :: "W:/assets/bean_game";
-art_path :: "W:/assets/bean_game/sprites";
-map_path :: "W:/code/bean_game/level.bgdat";
-Baked_Bitmap :: struct {
-  name: string;
-  width, height, channels: s32;
-  pixels: [] u32;
-}
-baked_sprites_raw, baked_map_raw :: #run bake_assets();
-
-bake_assets :: () -> [] Baked_Bitmap, string #compile_time {
-  #import "Flat_Pool";
-  pool: Flat_Pool;
-  push_allocator({flat_pool_allocator_proc, *pool});
-  using file :: #import "File";
-  using file_util :: #import "File_Utilities";
-  using stb :: #import "stb_image";
-
-  texture_files := file_list(art_path);
-  baked_sprites := NewArray(texture_files.count, Baked_Bitmap);
-  for texture_files {
-    _, key, _ := path_decomp(it);
-    bitmap: Baked_Bitmap;
-    bitmap.name = key;
-    pixels := stbi_load(to_c_string(it), *bitmap.width, *bitmap.height, *bitmap.channels, 0);
-    assert(bitmap.channels == 4);
-    bitmap_size := bitmap.width * bitmap.height * bitmap.channels;
-    bitmap.pixels = NewArray(bitmap.width * bitmap.height, u32);
-    memcpy(bitmap.pixels.data, pixels, bitmap_size);
-    baked_sprites[it_index] = bitmap;
-  }
-
-  raw_map, load_success := read_entire_file(map_path);
-  if !load_success {
-    log_error("Error reading level data!");
-  }
-
-  return baked_sprites, raw_map;
-}
-
 Texture_Atlas :: Table(string, *SDL_Texture);
 load_assets :: (renderer: *SDL_Renderer) -> Texture_Atlas {
+  Bitmap :: struct {
+    name: string;
+    width, height, channels: s32;
+    pixels: *u8;
+  }
+  tex_visitor :: (userdata: *void, dirname: *u8, fname: *u8) -> SDL_EnumerationResult #c_call {
+    push_context {
+      bitmaps := cast(*[..] Bitmap) userdata;
+      name := to_string(fname);
+      full_path := join(to_string(dirname), name);
+      bitmap: Bitmap;
+      bitmap.name = copy_string(path_strip_extension(name));
+      #if EMSCRIPTEN {
+        bitmap.pixels = emscripten_get_preloaded_image_data(temp_c_string(full_path), *bitmap.width, *bitmap.height);
+        bitmap.channels = 4; // Hope this is correct...
+      } else {
+        using STB :: #import "stb_image";
+        bitmap.pixels = stbi_load(temp_c_string(full_path), *bitmap.width, *bitmap.height, *bitmap.channels, 0);
+      }
+      if bitmap.pixels == null || bitmap.channels != 4 then return .SDL_ENUM_FAILURE;
+      array_add(bitmaps, bitmap);
+
+      return .SDL_ENUM_CONTINUE;
+    }
+  }
+  bitmaps: [..] Bitmap;
+  bitmaps.allocator = temp;
+  texture_read_success := SDL_EnumerateDirectory(art_path, tex_visitor, *bitmaps);
+  assert(texture_read_success, "Error loading textures!");
+
   atlas: Texture_Atlas;
-  init(*atlas, baked_sprites_raw.count);
-  for baked_sprites_raw {
-    surface := SDL_CreateSurfaceFrom(it.width, it.height, .ABGR8888, it.pixels.data, it.width * 4);
+  init(*atlas, bitmaps.count);
+  for bitmaps {
+    surface := SDL_CreateSurfaceFrom(it.width, it.height, .ABGR8888, it.pixels, it.width * 4);
     texture := SDL_CreateTextureFromSurface(renderer, surface);
     assert(texture != null, "Error loading texture data!");
     table_add(*atlas, it.name, texture);
@@ -693,10 +682,10 @@ bg_logger_init_and_equip :: () {
 
 bg_logger :: (message: string, data: *void, info: Log_Info) {
   if !message then return;
-  /*
+
   write_string(message);
   if message[message.count-1] != #char "\n" then write_string("\n");
-  */
+
 
   if !(info.common_flags & .TO_FILE_ONLY) {
     new_message: Log_Message;
