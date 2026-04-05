@@ -296,11 +296,15 @@ number_textures: [] *SDL_Texture;
 cosmetic_textures: [] *SDL_Texture;
 
 main_loop :: (ctx: *void) #c_call {
-  #if EMSCRIPTEN {
-    if !should_run then emscripten_cancel_main_loop();
-  }
-
   push_context cast(*#Context) ctx {
+    if !should_run {
+      #if EMSCRIPTEN {
+        emscripten_cancel_main_loop();
+      } else {
+        exit(0);
+      }
+    }
+
     reset_temporary_storage();
 
     player := *map.player;
@@ -321,6 +325,7 @@ main_loop :: (ctx: *void) #c_call {
             if key == #char "r" && down {
               player.pos = map.player_spawn;
               player.vel = {};
+              log("Resetting player");
             }
           }
         }
@@ -666,7 +671,7 @@ main :: () {
   #if EMSCRIPTEN {
     emscripten_set_main_loop_arg(main_loop, *context, 0, true);
   } else {
-    while should_run main_loop(*context);
+    while (true) main_loop(*context);
   }
 }
 
