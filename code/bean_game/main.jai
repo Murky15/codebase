@@ -22,7 +22,7 @@
 - [ ] Audio
 - [ ] Downloading level files from the web and checking for updates
 - [X] Physics system overhaul
-- [ ] WASM build with Emscripten + SDL3
+- [X] WASM build with Emscripten + SDL3
 - [X] SDL transition
 - [ ] using,map to clean up SDL3 imports
 - [X] Remove coroutines
@@ -608,7 +608,7 @@ main_loop :: (ctx: *void) #c_call {
       }
 
       SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1);
-      SDL_RenderDebugTextFormat_CFormat(renderer, RESOLUTION_W - 100, 20, "FPS: %d", cast(int,1.0/dt));
+      SDL_RenderDebugTextFormat(renderer, RESOLUTION_W - 100, 20, "FPS: %", cast(int,1.0/dt));
     }
   }
 }
@@ -690,7 +690,6 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
 
   write_string(message);
   if message[message.count-1] != #char "\n" then write_string("\n");
-
 
   if !(info.common_flags & .TO_FILE_ONLY) {
     new_message: Log_Message;

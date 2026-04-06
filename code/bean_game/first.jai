@@ -22,11 +22,14 @@ OUTPUT_NAME :: "BeanGame";
     }
   }
 
+  exposed_art_path := art_path;
+  exposed_map_path := map_path;
+
   if build_wasm {
     log("Building WASM target with Emscripten backend...");
 
-    art_path = "sprites";
-    map_path = "level.bgdat";
+    exposed_art_path = "sprites";
+    exposed_map_path = "level.bgdat";
 
     options.output_type = .OBJECT_FILE;
     options.runtime_support_definitions = .ENTRY_POINT_AND_INIT;
@@ -44,7 +47,7 @@ OUTPUT_NAME :: "BeanGame";
   compiler_begin_intercept(w);
   {
     add_build_string(tprint("EMSCRIPTEN :: %;", build_wasm), w);
-    add_build_string(tprint("art_path :: \"%\";\nmap_path :: \"%\";", art_path, map_path), w);
+    add_build_string(tprint("art_path :: \"%\";\nmap_path :: \"%\";", exposed_art_path, exposed_map_path), w);
     add_build_file(join(#filepath, "main.jai"), w);
     message_loop(build_wasm);
   }
@@ -54,9 +57,19 @@ OUTPUT_NAME :: "BeanGame";
   //emcc -sMEMORY64=1 -sUSE_SDL=3 --use-preload-plugins --preload-file ..\assets\bean_game\sprites@sprites --preload-file ..\code\bean_game\level.bgdat@level.bgdat BeanGame.bc -o test.html
 
   if build_wasm {
-    bc_name := tprint("%.bc", OUTPUT_NAME);
-    output_name := "test.html";
-    cmd("emcc", "-sMEMORY64=1", "-sUSE_SDL=3", "--use-preload-plugins", "--preload-file", "../assets/bean_game/sprites@sprites", "--preload-file", "../code/bean_game/level.bgdat@level.bgdat", bc_name, "-o", output_name);
+    emscripten: [..] string;
+    array_add(*emscripten, "emcc.bat");
+    array_add(*emscripten, "-sMEMORY64=1");
+    array_add(*emscripten, "-sUSE_SDL=3");
+    array_add(*emscripten, "--use-preload-plugins");
+    array_add(*emscripten, "--preload-file");
+    array_add(*emscripten, tprint("%@sprites", art_path));
+    array_add(*emscripten, "--preload-file");
+    array_add(*emscripten, tprint("%@level.bgdat", map_path));
+    array_add(*emscripten, tprint("%/%.bc", options.output_path, OUTPUT_NAME));
+    array_add(*emscripten, "-o");
+    array_add(*emscripten, tprint("%/%.html", options.output_path, OUTPUT_NAME));
+    cmd(..emscripten);
   }
 
   set_build_options_dc({do_output=false});
