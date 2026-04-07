@@ -309,7 +309,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
       }
       case .BOUNCE_PAD; {
         it.tex = bounce_pad_texture;
-        it.bbox_dim = {TILE_RESOLUTION, TILE_RESOLUTION/3};
+        it.bbox_dim = {TILE_RESOLUTION, 1.0 /*TILE_RESOLUTION/3*/};
       }
       case .COIN; {
         it.tex = atile_choose(coin_textures);

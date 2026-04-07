@@ -27,9 +27,10 @@
 - [ ] using,map to clean up SDL3 imports
 - [X] Remove coroutines
 - [ ] Maybe coroutines could be useful actually
-- [ ] Fixed Arena implementation
+- [X] Fixed Arena implementation
 - [ ] To communicate player health instead of hearts we could switch player sprite from green -> yellow -> red -> dead
 - [ ] Bordered rects could be drawn with SDL_Rect whatever in a for loop increasing the offset and decreasing the dim each time
+- [X] Bounce pad bug where the player collides for multiple frames
 */
 
 AARect :: #type,isa Vector4;
@@ -75,6 +76,7 @@ Player :: struct {
   state: Player_State;
 
   can_jump: bool;
+  used_bounce_pad: bool;
   coyote_counter := PLAYER_COYOTE_TIME_GRACE_PERIOD;
   wall_jump_immobility_counter := PLAYER_TIME_IMMOBILE;
   acceleration_counter := PLAYER_TIME_TO_ACCELERATE;
@@ -305,7 +307,7 @@ FONT_HEIGHT_DIVISOR :: 24;
 
 PLAYER_MOVE_SPEED :: 350.0;
 PLAYER_JUMP_VELOCITY :: 1000.0;
-PLAYER_BOUNCE_PAD_JUMP_VELOCITY :: 1500.0;
+PLAYER_BOUNCE_PAD_JUMP_VELOCITY :: 1200.0;
 PLAYER_COYOTE_TIME_GRACE_PERIOD :: 0.1;
 PLAYER_TIME_TO_ACCELERATE :: 0.18;
 PLAYER_TIME_IMMOBILE :: 0.3;
@@ -414,7 +416,6 @@ main_loop :: (ctx: *void) #c_call {
 
       input := Input_Package.{dir, input_jump};
 
-      old_player := player.*;
       if player.state == {
         case .GROUND; {
           player_grid_pos := floor(player.pos / TILE_RESOLUTION);
@@ -507,6 +508,7 @@ main_loop :: (ctx: *void) #c_call {
       }
       apply_force(player, FLOOR_FRICTION_FORCE * -player.dir);
 
+      old_player := player.*;
       integrate(player, dt);
       if sign(player.vel.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
         player.dir = 0;
@@ -516,31 +518,39 @@ main_loop :: (ctx: *void) #c_call {
 
       // NOTE: Collisions
       collision_events.count = 0;
-      obstacle_collisions := get_collision(player, *map, .[.GROUND, .WALL]);
-      for obstacle_collisions {
-        player_pos_diff := player.pos - old_player.pos;
-        if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, it.bbox) {
-          if player.vel.y < 0 {
-            player.pos.y += it.overlap.w;
-            collision_events.count += 1;
-            collision_events[collision_events.count-1] = .FLOOR;
-          } else player.pos.y -= it.overlap.w;
-          player.vel.y = 0;
-        } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
-          player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
-          player.dir = 0;
-          player.vel.x = 0;
-          if it.tile.type == .WALL && player.vel.y < 0 {
-            collision_events.count += 1;
-            collision_events[collision_events.count-1] = .WALL_SLIDE;
+      while true {
+        obstacle_collisions := get_collision(player, *map, .[.GROUND, .WALL]);
+        if obstacle_collisions.count == 0 then break;
+        for obstacle_collisions {
+          player_pos_diff := player.pos - old_player.pos;
+          if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, it.bbox) {
+            if player.vel.y < 0 {
+              player.pos.y += it.overlap.w;
+              collision_events.count += 1;
+              collision_events[collision_events.count-1] = .FLOOR;
+            } else player.pos.y -= it.overlap.w;
+            player.vel.y = 0;
+          } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
+            player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
+            player.dir = 0;
+            player.vel.x = 0;
+            if it.tile.type == .WALL && player.vel.y < 0 {
+              collision_events.count += 1;
+              collision_events[collision_events.count-1] = .WALL_SLIDE;
+            }
           }
         }
+
+        old_player.pos = player.pos;
       }
 
       if get_collision(player, *map, .BOUNCE_PAD) {
-        apply_impulse(player, xy(0, PLAYER_BOUNCE_PAD_JUMP_VELOCITY));
-        player.can_jump = false;
-      }
+        if !player.used_bounce_pad {
+          apply_impulse(player, xy(0, PLAYER_BOUNCE_PAD_JUMP_VELOCITY));
+          player.can_jump = false;
+          player.used_bounce_pad = true;
+        }
+      } else player.used_bounce_pad = false;
 
       coins := get_collision(player, *map, .COIN);
       for coins {

@@ -1,3 +1,78 @@
+// NOTE: This parameter is until the language allows us to query the alignment of types (why it does not already support this is a mystery).
+Arena :: struct (Align := 8) {
+  #assert #run is_pow2(Align) "Arena alignment is not a power of 2!";
+
+  type: enum {
+    MMU;
+    FIXED;
+  }
+  pos: int;
+  commit_pos: int;
+  cap: int;
+}
+
+arena_alloc :: (buff: *void, size: int) -> *Arena {
+  assert(buff != null);
+  result := cast(*Arena) buff;
+  result.type = .FIXED;
+  result.pos = size_of(Arena);
+  result.commit_pos = size;
+  result.cap = size;
+
+  return result;
+}
+
+arena_push :: (arena: *Arena, size: int, $zero_mem := true) -> *void {
+  assert(arena);
+  result: *void;
+
+  base := cast(*u8) arena;
+  aligned_pos := round_up_pow2(arena.pos, arena.Align);
+  new_pos := aligned_pos + size;
+  if new_pos <= arena.cap {
+    result = base + aligned_pos;
+    arena.pos = new_pos;
+    #if zero_mem memset(result, 0, size);
+  } else {
+    // TODO: Handle this gracefully
+    assert(false, "Arena limit reached!");
+  }
+
+  return result;
+}
+
+arena_push :: (arena: *Arena, $T: Type, $initialized := true) -> *T {
+  result := arena_push(arena, size_of(T));
+  #if initialized {
+    ini :: initializer_of(T);
+    #if ini inline ini(result);
+  }
+
+  return cast(*T) result;
+}
+
+arena_pop_to :: (arena: *Arena, pos: int) {
+  assert(arena);
+
+  min_pos := size_of(Arena);
+  max_pos := arena.pos;
+  pos := clamp(pos, min_pos, max_pos);
+  arena.pos = pos;
+}
+
+arena_pop :: (arena: *Arena, amount: int) {
+  new_pos := arena.pos - amount;
+  arena_pop_to(arena, new_pos);
+}
+
+arena_clear :: (arena: *Arena) {
+  arena_pop_to(arena, 0);
+}
+
+arena_pos :: (arena: *Arena) -> int {
+  return arena.pos;
+}
+
 Linked_List :: struct (T: Type) {
   first, last: *T;
   count: int;
@@ -181,6 +256,19 @@ Coroutine_State :: struct {
 round  :: x => ifx x - cast(int) x >= 0.5 then ceil(x) else floor(x);
 sign   :: x => ifx x == 0 then 0 else ifx signbit(x) then -1 else 1;
 norm   :: (x, min, max) => (x-min)/(max-min);
+
+is_pow2 :: inline (x: int) -> bool {
+  return x && !(x & (x - 1));
+}
+
+// TODO: Put assertions on these?
+round_up_pow2 :: inline (x: int, pow2: int) -> int {
+  return (x + pow2 - 1) & -pow2;
+}
+
+round_down_pow2 :: inline (x: int, pow2: int) -> int {
+  return x & -pow2;
+}
 
 get_digits_right_to_left_on_temp :: (x: int) -> [] int {
   push_allocator(temp);
