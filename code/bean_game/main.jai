@@ -26,6 +26,10 @@
 - [X] SDL transition
 - [ ] using,map to clean up SDL3 imports
 - [X] Remove coroutines
+- [ ] Maybe coroutines could be useful actually
+- [ ] Fixed Arena implementation
+- [ ] To communicate player health instead of hearts we could switch player sprite from green -> yellow -> red -> dead
+- [ ] Bordered rects could be drawn with SDL_Rect whatever in a for loop increasing the offset and decreasing the dim each time
 */
 
 AARect :: #type,isa Vector4;
@@ -226,6 +230,36 @@ draw_quad :: (renderer: *SDL_Renderer, tex: *SDL_Texture, rect: AARect, flip_x :
   if flip_x then flip |= .HORIZONTAL;
   if flip_y then flip |= .VERTICAL;
   SDL_RenderTextureRotated(renderer, tex, null, *make_frect(quad), rotation_angle, null, flip);
+}
+
+draw_quad :: (renderer: *SDL_Renderer, p0: Vector2, p1: Vector2, p2: Vector2, p3: Vector2, color: Vector4) {
+  quad_indices :: s32.[0,1,2,0,2,3];
+
+  p := Vector2.[p0, p1, p2, p3];
+  v: [4] SDL_Vertex;
+  for * v {
+    it.position.x = p[it_index].x;
+    it.position.y = RESOLUTION_H - p[it_index].y;
+    it.color = cast,force(SDL_FColor) color;
+  }
+
+  result := SDL_RenderGeometry(renderer, null, v.data, v.count, quad_indices.data, quad_indices.count);
+  assert(result, tprint("%", to_string(SDL_GetError())));
+}
+
+draw_circle_debug :: (renderer: *SDL_Renderer, center: Vector2, radius: int, color: Vector4) {
+  SDL_SetRenderDrawColorFloat(renderer, color.x, color.y, color.z, color.w);
+  for y_int: -radius..radius {
+    for x_int: -radius..radius {
+      y := cast(float) y_int;
+      x := cast(float) x_int;
+      if square(x) + square(y) <= square(cast(float) radius) {
+        dsp_x := center.x + x;
+        dsp_y := RESOLUTION_H - (center.y + y);
+        SDL_RenderPoint(renderer, dsp_x, dsp_y);
+      }
+    }
+  }
 }
 
 Collision :: struct {
@@ -551,7 +585,6 @@ main_loop :: (ctx: *void) #c_call {
       {
         using player;
 
-        /*
         rope_width :: 5;
         for grappling_hook.particles {
           p0 := it.pos - map.cam.pos;
@@ -564,12 +597,10 @@ main_loop :: (ctx: *void) #c_call {
             p1 := next_particle.pos - map.cam.pos;
             p2 := p1 + perpendicular;
             p3 := p0 + perpendicular;
-            //set_color();
-            Simp.immediate_quad(p0, p1, p2, p3, {0, 0, 1, 1});
+            draw_quad(renderer, p0, p1, p2, p3, {0, 0, 1, 1});
           }
-          draw_circle(p0, 2, 100, {1, 0, 0, 1});
+          draw_circle_debug(renderer, it.pos - map.cam.pos, 2, {1, 0, 0, 1});
         }
-        */
 
         flip = player_flip.proc(*player_flip, dt);
         dsp_pos := pos - map.cam.pos;
@@ -718,5 +749,5 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
   #import,file "modules/sdl3/macos/macos.jai";
 }
 #if EMSCRIPTEN {
-  #import,file "modules/emscripten.jai";
+  #import "emscripten";
 }
