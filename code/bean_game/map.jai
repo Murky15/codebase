@@ -150,8 +150,7 @@ my_split_from_left :: (s: string, byte: u8) -> (left: string, right: string) {
   return left, advance(s, cursor);
 }
 
-map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) -> Map {
-
+map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) -> Map {
   rows_in_header :: 4;
   tis_map :: cast(*Type_Info_Struct) type_info(Map);
 
@@ -204,7 +203,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
 
   map.width  = pitch;
   map.height = rows.count;
-  map.tiles = NewArray(map.width * map.height, Tile);
+  map.tiles = arena_push(arena, map.width * map.height, Tile);
   for * map {
     // Map data in memory is flipped vertically from file data
     c := raw_map.data[((rows.count-1) - xx it_index.y) * (pitch+newline_size) + xx it_index.x];
@@ -281,7 +280,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
         // NOTE: Can be tweaked
         x_offset := random_get_within_range(-TILE_RESOLUTION/2, TILE_RESOLUTION/2);
         y_offset := random_get_within_range(-TILE_RESOLUTION/4, 0);
-        foliage := New(Map.Parallax_Effect);
+        foliage := arena_push(arena, Map.Parallax_Effect);
         foliage.layer = parallax_layer;
         foliage.pos = (it_index * TILE_RESOLUTION) + xy(x_offset, y_offset);
         scale := random_get_within_range(0.7,1.5);
@@ -323,7 +322,7 @@ map_load :: (textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) 
   for 1..num_clouds {
     cloud_texture, layer := atile_choose(cloud_textures);
     assert(cloud_texture != null);
-    cloud := New(Map.Parallax_Effect);
+    cloud := arena_push(arena, Map.Parallax_Effect);
     cloud.layer = layer;
     w, h: float;
     SDL_GetTextureSize(cloud_texture, *w, *h);

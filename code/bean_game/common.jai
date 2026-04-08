@@ -1,20 +1,20 @@
 // NOTE: This parameter is until the language allows us to query the alignment of types (why it does not already support this is a mystery).
-Arena :: struct (Align := 8) {
-  #assert #run is_pow2(Align) "Arena alignment is not a power of 2!";
-
+Arena :: struct {
   type: enum {
     MMU;
     FIXED;
   }
+  align: int;
   pos: int;
   commit_pos: int;
   cap: int;
 }
 
-arena_alloc :: (buff: *void, size: int) -> *Arena {
+arena_alloc :: (buff: *void, size: int, align := 8) -> *Arena {
   assert(buff != null);
   result := cast(*Arena) buff;
   result.type = .FIXED;
+  result.align = align;
   result.pos = size_of(Arena);
   result.commit_pos = size;
   result.cap = size;
@@ -23,11 +23,11 @@ arena_alloc :: (buff: *void, size: int) -> *Arena {
 }
 
 arena_push :: (arena: *Arena, size: int, $zero_mem := true) -> *void {
-  assert(arena);
+  assert(arena != null);
   result: *void;
 
   base := cast(*u8) arena;
-  aligned_pos := round_up_pow2(arena.pos, arena.Align);
+  aligned_pos := round_up_pow2(arena.pos, arena.align);
   new_pos := aligned_pos + size;
   if new_pos <= arena.cap {
     result = base + aligned_pos;
@@ -35,7 +35,7 @@ arena_push :: (arena: *Arena, size: int, $zero_mem := true) -> *void {
     #if zero_mem memset(result, 0, size);
   } else {
     // TODO: Handle this gracefully
-    assert(false, "Arena limit reached!");
+    assert(false, "Arena limit reached! Desired allocation size: %. Space remaining in arena: %.", size, arena.cap - arena.pos);
   }
 
   return result;
@@ -51,13 +51,33 @@ arena_push :: (arena: *Arena, $T: Type, $initialized := true) -> *T {
   return cast(*T) result;
 }
 
+arena_push :: (arena: *Arena, count: int, $T: Type, $initialized := true) -> [] T {
+  memory := arena_push(arena, size_of(T) * count);
+
+  result: [] T;
+  result.data = memory;
+  result.count = count;
+
+  #if initialized {
+    ini :: initializer_of(T);
+    #if ini {
+      for 0..count-1 {
+        inline ini(memory);
+        memory += size_of(T);
+      }
+    }
+  }
+
+  return result;
+}
+
 arena_pop_to :: (arena: *Arena, pos: int) {
-  assert(arena);
+  assert(arena != null);
 
   min_pos := size_of(Arena);
   max_pos := arena.pos;
-  pos := clamp(pos, min_pos, max_pos);
-  arena.pos = pos;
+  new_pos := clamp(pos, min_pos, max_pos);
+  arena.pos = new_pos;
 }
 
 arena_pop :: (arena: *Arena, amount: int) {

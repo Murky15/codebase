@@ -31,6 +31,7 @@
 - [ ] To communicate player health instead of hearts we could switch player sprite from green -> yellow -> red -> dead
 - [ ] Bordered rects could be drawn with SDL_Rect whatever in a for loop increasing the offset and decreasing the dim each time
 - [X] Bounce pad bug where the player collides for multiple frames
+- [X] Fixed timestep
 */
 
 AARect :: #type,isa Vector4;
@@ -302,7 +303,6 @@ TILE_RESOLUTION :: TILE_NATIVE_RESOLUTION / TILE_RESOLUTION_DIVISOR;
 RESOLUTION_W :: 640;
 RESOLUTION_H :: 360;
 ASPECT_RATIO :: cast(float) RESOLUTION_W / RESOLUTION_H;
-DT_MAX :: cast(float) 1/60;
 FONT_HEIGHT_DIVISOR :: 24;
 
 PLAYER_MOVE_SPEED :: 350.0;
@@ -318,18 +318,28 @@ WALL_FRICTION\_FORCE: Vector2;
 MOVE\_FORCE: Vector2;
 ACCEL_FORCE: Vector2;
 
+// TODO: Organize this
+level_arena: *Arena;
 map: Map;
+old_map: Map;
+
 input_move_left, input_move_right, input_jump: bool;
 collision_event_memory: [9] Collision_Event;
 collision_events: [] Collision_Event;
-should_run: bool;
-start: u64;
+
 player_flip: Tween_State;
+
 renderer: *SDL_Renderer;
+
 coin_texture: *SDL_Texture;
 x_texture: *SDL_Texture;
 number_textures: [] *SDL_Texture;
 cosmetic_textures: [] *SDL_Texture;
+
+should_run: bool;
+start: u64;
+accumulator: float64;
+frame_time: float64;
 
 bean_game_tick :: (dt: float) {
   player := *map.player;
@@ -556,8 +566,10 @@ bean_game_tick :: (dt: float) {
   cam_update_tracking(*map.cam, dt);
 }
 
-bean_game_render :: (dt: float) {
+bean_game_render :: (frame_time: float, alpha: float) {
   player := *map.player;
+
+  cam_pos := lerp(old_map.cam.pos, map.cam.pos, alpha);
 
   SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
   SDL_RenderClear(renderer);
@@ -565,7 +577,7 @@ bean_game_render :: (dt: float) {
 
   for map.background {
     layer_effect := ifx it.layer > 1 then xx it.layer else 1.0;
-    parallax_cam := map.cam.pos / layer_effect;
+    parallax_cam := cam_pos / layer_effect;
     cam_view := AARect.{xy=parallax_cam, zw=xy(RESOLUTION_W, RESOLUTION_H)};
     if !rects_intersect(cam_view, it.bbox) then continue;
     draw_quad(renderer, it.tex, {xy = it.pos - parallax_cam, zw = it.size});
@@ -576,37 +588,35 @@ bean_game_render :: (dt: float) {
     if it.collected then continue;
     dsp := it_index * TILE_RESOLUTION;
     dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
-    draw_quad(renderer, it.tex, {xy = dsp - map.cam.pos, zw = xy(TILE_RESOLUTION)}, rotation_angle = it.decorative_rotation);
+    draw_quad(renderer, it.tex, {xy = dsp - cam_pos, zw = xy(TILE_RESOLUTION)}, rotation_angle = it.decorative_rotation);
   }
 
   {
-    using player;
-
     rope_width :: 5;
-    for grappling_hook.particles {
-      p0 := it.pos - map.cam.pos;
-      if it_index < grappling_hook.particles.count-1 {
-        next_particle := grappling_hook.particles[it_index + 1];
+    for player.grappling_hook.particles {
+      p0 := it.pos - cam_pos;
+      if it_index < player.grappling_hook.particles.count-1 {
+        next_particle := player.grappling_hook.particles[it_index + 1];
         segment := next_particle.pos - it.pos;
         perpendicular := xy(-segment.y, segment.x);
         perpendicular = unit_vector(perpendicular);
         perpendicular *= rope_width;
-        p1 := next_particle.pos - map.cam.pos;
+        p1 := next_particle.pos - cam_pos;
         p2 := p1 + perpendicular;
         p3 := p0 + perpendicular;
         draw_quad(renderer, p0, p1, p2, p3, {0, 0, 1, 1});
       }
-      draw_circle_debug(renderer, it.pos - map.cam.pos, 2, {1, 0, 0, 1});
+      draw_circle_debug(renderer, it.pos - cam_pos, 2, {1, 0, 0, 1});
     }
 
-    flip = player_flip.proc(*player_flip, dt);
-    dsp_pos := pos - map.cam.pos;
-    dsp_dim := bbox_dim;
-    dsp_dim.x *= abs(cos(PI * flip));
-    dsp_pos.x += (bbox_dim.x - dsp_dim.x) / 2;
-    toggle := facing > 0;
-    if flip > 0.5 then toggle = !toggle;
-    draw_quad(renderer, texture, {xy = dsp_pos, zw = dsp_dim}, flip_x = toggle);
+    player.flip = player_flip.proc(*player_flip, frame_time);
+    dsp_pos := lerp(old_map.player.pos, player.pos, alpha) - cam_pos;
+    dsp_dim := player.bbox_dim;
+    dsp_dim.x *= abs(cos(PI * player.flip));
+    dsp_pos.x += (player.bbox_dim.x - dsp_dim.x) / 2;
+    toggle := player.facing > 0;
+    if player.flip > 0.5 then toggle = !toggle;
+    draw_quad(renderer, player.texture, {xy = dsp_pos, zw = dsp_dim}, flip_x = toggle);
   }
 
   {
@@ -626,7 +636,7 @@ bean_game_render :: (dt: float) {
   }
 
   for logs_to_display {
-    alpha := it.fade.proc(*it.fade, dt);
+    alpha := it.fade.proc(*it.fade, frame_time);
     SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1 - alpha);
     SDL_RenderDebugText(renderer, 20.0, RESOLUTION_H - (20.0 + it_index * 10), temp_c_string(it.message));
     if alpha <= 0.0 {
@@ -636,7 +646,7 @@ bean_game_render :: (dt: float) {
   }
 
   SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1);
-  SDL_RenderDebugTextFormat(renderer, RESOLUTION_W - 100, 20, "FPS: %", cast(int,1.0/dt));
+  SDL_RenderDebugTextFormat(renderer, RESOLUTION_W - 100, 20, "FPS: %", cast(int,1.0/frame_time));
 }
 
 main_loop :: (ctx: *void) #c_call {
@@ -651,18 +661,25 @@ main_loop :: (ctx: *void) #c_call {
 
     reset_temporary_storage();
 
+    dt :: 1.0 / 60.0;
     end := SDL_GetTicks();
-    dt := (end - start) / 1000.0;
+    frame_time = (end - start) / 1000.0;
     start = end;
 
-    bean_game_tick(dt);
-    bean_game_render(dt);
+    accumulator += frame_time;
+    while accumulator >= dt {
+      old_map = map;
+      bean_game_tick(dt);
+      accumulator -= dt;
+    }
+
+    alpha := accumulator / dt;
+    bean_game_render(xx frame_time, xx alpha);
   }
 }
 
 main :: () {
   bg_logger_init_and_equip();
-
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 
   window_width  := 1280;
@@ -691,10 +708,11 @@ main :: () {
                                       (.*)table_find_pointer(*texture_atlas, "item_helmet"),
                                       (.*)table_find_pointer(*texture_atlas, "item_helmetModern")];
   start = SDL_GetTicks();
-  // NOTE: For now let's assume that the world is static
-  // This is a very simple way to represent the world, and must be refined in the future.
   random_seed(cast,trunc(u32) SDL_GetPerformanceCounter());
-  map = map_load(texture_atlas);
+  backing_buffer_size := 1048576; // 1 mebibyte
+  backing_buffer := alloc(backing_buffer_size);
+  level_arena = arena_alloc(backing_buffer, backing_buffer_size);
+  map = map_load(level_arena, texture_atlas);
 
   player := *map.player;
 
