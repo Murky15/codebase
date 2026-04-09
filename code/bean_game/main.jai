@@ -673,7 +673,7 @@ main_loop :: (ctx: *void) #c_call {
       accumulator -= dt;
     }
 
-    alpha := accumulator / dt;
+    alpha := saturate(accumulator / dt);
     bean_game_render(xx frame_time, xx alpha);
   }
 }
