@@ -56,7 +56,6 @@ apply_impulse :: inline (body: *Rigid_Body, mag: Vector2) {
   if mag.y != 0 body.vel.y = mag.y;
 }
 
-// NOTE: ASSUMING CONSTANT FORCES
 integrate :: (body: *Rigid_Body, dt: float) {
   acc := body.force / body.mass;
   body.vel += acc*dt;
@@ -82,7 +81,7 @@ Player :: struct {
   wall_jump_immobility_counter := PLAYER_TIME_IMMOBILE;
   acceleration_counter := PLAYER_TIME_TO_ACCELERATE;
 
-  grappling_hook: Rope(0.1);
+  grappling_hook: Rope(0.1, 10);
 
   texture: *SDL_Texture;
   dir: float;
@@ -95,11 +94,13 @@ Rope :: struct (particle_density := 1.0, jakobsen_iterations := 50) {
   Particle :: struct {
     pos: Vector2;
     old_pos: Vector2;
-
+    //#as using body: Rigid_Body;
+    //body.mass = 0.1;
     fixed: bool;
   }
 
   length: float;
+  desired_particle_dist: float;
   particles: [..] Particle; // Should this be dynamic? Maybe we want to grow or shrink the rope mid swing.
 }
 
@@ -139,6 +140,7 @@ tween_ease :: (using state: *Tween_State, dt: float) -> float {
 begin_swing :: (rope: *Rope, length: float, anchor: Vector2) {
   num_particles := cast(int) round(rope.particle_density * length);
   particle_dist := 1.0 / rope.particle_density;
+  rope.desired_particle_dist = particle_dist;
   rope.length = particle_dist * num_particles;
   for i: 0..num_particles-1 {
     particle: rope.Particle;
@@ -146,6 +148,35 @@ begin_swing :: (rope: *Rope, length: float, anchor: Vector2) {
     particle.pos = anchor + xy(i * particle_dist, 0);
     particle.old_pos = particle.pos;
     array_add(*rope.particles, particle);
+  }
+}
+
+progress_swing :: (rope: *Rope, dt: float) {
+  for * rope.particles {
+    if it.fixed then continue;
+    old_pos := it.pos;
+    it.pos = 2 * it.pos - it.old_pos + xy(0, GRAVITY * 0.1) * square(dt);
+    it.old_pos = old_pos;
+  }
+
+  // Enforce constraints
+  for 0..rope.jakobsen_iterations {
+    for i: 1..rope.particles.count-1 {
+      p0 := *rope.particles[i-1];
+      p1 := *rope.particles[i];
+      dist := distance(p0.pos, p1.pos);
+      dist_error := dist - rope.desired_particle_dist;
+      dir := unit_vector(p1.pos - p0.pos);
+
+      if p0.fixed && !p1.fixed {
+        p1.pos -= dir * dist_error;
+      } else if p1.fixed && !p0.fixed {
+        p0.pos += dir * dist_error;
+      } else if !p0.fixed && !p1.fixed {
+        p0.pos += 0.5 * dir * dist_error;
+        p1.pos -= 0.5 * dir * dist_error;
+      }
+    }
   }
 }
 
@@ -563,6 +594,8 @@ bean_game_tick :: (dt: float) {
     }
   }
 
+  progress_swing(*player.grappling_hook, dt);
+
   cam_update_tracking(*map.cam, dt);
 }
 
@@ -661,7 +694,7 @@ main_loop :: (ctx: *void) #c_call {
 
     reset_temporary_storage();
 
-    dt :: 1.0 / 60.0;
+    dt :: 0.01; // 1.0 / 60.0
     end := SDL_GetTicks();
     frame_time = (end - start) / 1000.0;
     start = end;
