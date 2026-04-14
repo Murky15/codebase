@@ -59,7 +59,7 @@ Map :: struct {
 
   cam: Camera;
   player: Player;
-  grappling_hook: Rope(0.4);
+  grappling_hook: Rope();
 
   tiles: [] Tile;
   width, height: int;

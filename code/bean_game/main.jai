@@ -89,8 +89,8 @@ Player :: struct {
   facing := 1.0;
 }
 
-Rope :: struct (particle_density := 1.0, jakobsen_iterations := 50, debug_draw_particles := false) {
-  Particle :: struct { // TODO: Should we try to make this a rigidbody? Obviously we would need to figure out how to use verlet integration
+Rope :: struct (debug_draw_particles := false) {
+  Particle :: struct { // TODO: Should we try to make this a rigidbody? Obviously we would need to figure out how to use verlet integration.
     pos: Vector2;
     old_pos: Vector2;
     fixed: bool;
@@ -98,11 +98,20 @@ Rope :: struct (particle_density := 1.0, jakobsen_iterations := 50, debug_draw_p
     accel: Vector2;
   }
 
+  Particle_Chunk :: struct {
+    #as using n: Linked_List_Header;
+    p: [50] Particle; // TODO: Test this value.
+  }
+  for_expansion :: (particles: Linked_List(Particle_Chunk), body: Code, flags: For_Flags) #expand {
+    #assert !(flags & .REVERSE);
+
+  }
+
   length: float;
   desired_particle_dist: float;
-  particles: [..] Particle; // Should this be dynamic? Maybe we want to grow or shrink the rope mid swing.
-  attached_body: *Rigid_Body;
-  attached_particle := -1;
+  particle_density: float;
+  jakobsen_iterations: int;
+  particles: Linked_List(Particle_Chunk);
 }
 
 Input_Package :: struct {
@@ -138,33 +147,42 @@ tween_ease :: (using state: *Tween_State, dt: float) -> float {
   return ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
 }
 
-begin_swing :: (rope: *Rope, length: float, anchor: Vector2) {
-  num_particles := cast(int) round(rope.particle_density * length);
-  particle_dist := 1.0 / rope.particle_density;
+initialize_rope :: (arena: *Arena, rope: *Rope, particle_reserves: *Linked_List(Rope.Particle_Chunk), length: float, anchor: Vector2, particle_density := 1.0, jakobsen_iterations := 50) {
+  get_free_chunk_from_reserve :: () -> *Rope.Particle_Chunk #expand {
+    result := particle_reserves.first;
+    if result {
+      particle_reserves.first = particle_reserves.next;
+      particle_reserves.count -= 1;
+      memset(result, 0, size_of(Rope.Particle_Chunk));
+    } else {
+      result = arena_push(arena, Rope.Particle_Chunk);
+    }
+
+    return result;
+  }
+
+  rope.particle_density = particle_density;
+  rope.jakobsen_iterations = jakobsen_iterations;
+  num_particles := cast(int) round(particle_density * length);
+  particle_dist := 1.0 / particle_density;
   rope.desired_particle_dist = particle_dist;
   rope.length = particle_dist * num_particles;
+
+  chunk := get_free_chunk_from_reserve();
   for i: 0..num_particles-1 {
     particle: rope.Particle;
     if i == 0 then particle.fixed = true;
     particle.pos = anchor + xy(i * particle_dist, 0);
     particle.old_pos = particle.pos;
-    array_add(*rope.particles, particle);
+    //array_add(*rope.particles, particle);
   }
 }
 
-progress_swing :: (rope: *Rope, dt: float) {
-  body := rope.attached_body;
-
+simulate_rope :: (rope: *Rope, dt: float) {
   for * rope.particles {
     if it.fixed then continue;
-    acc: Vector2;
-    acc.y = GRAVITY * 0.25;
-    if it_index == rope.attached_particle && body != null {
-      acc.x = body.force.x / body.mass;
-      body.force.x = 0;
-    }
     old_pos := it.pos;
-    it.pos = 2 * it.pos - it.old_pos + acc * square(dt);
+    it.pos = 2 * it.pos - it.old_pos + v2(0, GRAVITY * 0.1) * square(dt);
     it.old_pos = old_pos;
   }
 
@@ -187,23 +205,16 @@ progress_swing :: (rope: *Rope, dt: float) {
       }
     }
   }
-
-  if body != null then body.pos = rope.particles[rope.attached_particle].pos - body.bbox_dim / 2;
 }
 
-attach_to_rope :: (body: *Rigid_Body, rope: *Rope) {
-  rope.attached_body = body;
-  rope.attached_particle = rope.particles.count - 1;
-}
-
-rope_detach_body :: (rope: *Rope) {
-  rope.attached_body = null;
-  rope.attached_particle = -1;
-}
-
-end_swing :: (rope: *Rope) {
-  array_reset(*rope.particles);
-  rope.length = 0;
+destroy_rope :: (rope: *Rope, particle_reserves: *Linked_List(Rope.Particle_Chunk)) {
+  chunk, next: *Rope.Particle_Chunk;
+  chunk = rope.particles.first;
+  for 0..rope.particles.count-1 {
+    next = chunk.next;
+    sll_queue_push(particle_reserves, chunk);
+    chunk = next;
+  }
 }
 
 Player_Update_Inputs :: struct {
@@ -558,7 +569,6 @@ bean_game_tick :: (map: *Map, dt: float) {
         // TODO: Pull this out into function?
         player.can_jump = false;
         apply_impulse(player, xy(0, PLAYER_JUMP_VELOCITY));
-        rope_detach_body(*map.grappling_hook);
         player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
         player.state = .AIR;
       }
@@ -639,7 +649,7 @@ bean_game_tick :: (map: *Map, dt: float) {
     }
   }
 
-  progress_swing(*map.grappling_hook, dt);
+  //progress_swing(*map.grappling_hook, dt);
 
   cam_update_tracking(*map.cam, dt);
 }
@@ -670,6 +680,7 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
   }
 
   {
+    /*
     rope_width :: 5;
     for map.grappling_hook.particles {
       p0 := it.pos - cam_pos;
@@ -688,6 +699,7 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
         draw_circle_debug(renderer, it.pos - cam_pos, 2, {1, 0, 0, 1});
       }
     }
+    */
 
     player.flip = globals.player_flip.proc(*globals.player_flip, frame_time);
     dsp_pos := lerp(old_map.player.pos, player.pos, alpha) - cam_pos;
@@ -810,8 +822,8 @@ main :: () {
   map.cam.offset -= player.bbox.zw / 2;
   cam_set_target(*map.cam, player);
 
-  begin_swing(*map.grappling_hook, 100, player.pos + xy(0, 150));
-  attach_to_rope(player, *map.grappling_hook);
+  //begin_swing(*map.grappling_hook, 100, player.pos + xy(0, 150));
+  initialize_rope(*map.grappling_hook, 100, player.pos + xy(0, 150), 0.5);
   player.state = .SWING;
 
   collision_events = collision_event_memory;

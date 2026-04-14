@@ -3,18 +3,19 @@ Arena :: struct {
   type: enum {
     MMU;
     FIXED;
-  }
-  align: int;
+  } = .FIXED;
+  align := 8;
+  
   pos: int;
   commit_pos: int;
   cap: int;
 }
 
-arena_alloc :: (buff: *void, size: int, align := 8) -> *Arena {
+arena_alloc :: (buff: *void, size: int) -> *Arena {
   assert(buff != null);
   result := cast(*Arena) buff;
-  result.type = .FIXED;
-  result.align = align;
+  ini :: initializer_of(Arena);
+  #if ini inline ini(result);
   result.pos = size_of(Arena);
   result.commit_pos = size;
   result.cap = size;

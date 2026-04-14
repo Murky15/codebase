@@ -89,7 +89,7 @@ cmd :: (args: .. string, redirect_stdout_to_file := "", loc := #caller_location)
   if redirect_stdout_to_file then write_entire_file(redirect_stdout_to_file, output_string);
 }
 
-message_loop :: (build_wasm: bool) -> (success := false) {
+message_loop :: (build_wasm: bool) {
   if !build_wasm then return;
 
   while true {
