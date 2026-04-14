@@ -67,6 +67,7 @@ Player_State :: enum {
   GROUND;
   AIR;
   WALL;
+  SWING;
 }
 
 Player :: struct {
@@ -81,8 +82,6 @@ Player :: struct {
   wall_jump_immobility_counter := PLAYER_TIME_IMMOBILE;
   acceleration_counter := PLAYER_TIME_TO_ACCELERATE;
 
-  grappling_hook: Rope(0.1, 10);
-
   texture: *SDL_Texture;
   dir: float;
   wall_dir: float;
@@ -90,18 +89,20 @@ Player :: struct {
   facing := 1.0;
 }
 
-Rope :: struct (particle_density := 1.0, jakobsen_iterations := 50) {
-  Particle :: struct {
+Rope :: struct (particle_density := 1.0, jakobsen_iterations := 50, debug_draw_particles := false) {
+  Particle :: struct { // TODO: Should we try to make this a rigidbody? Obviously we would need to figure out how to use verlet integration
     pos: Vector2;
     old_pos: Vector2;
-    //#as using body: Rigid_Body;
-    //body.mass = 0.1;
     fixed: bool;
+
+    accel: Vector2;
   }
 
   length: float;
   desired_particle_dist: float;
   particles: [..] Particle; // Should this be dynamic? Maybe we want to grow or shrink the rope mid swing.
+  attached_body: *Rigid_Body;
+  attached_particle := -1;
 }
 
 Input_Package :: struct {
@@ -152,10 +153,18 @@ begin_swing :: (rope: *Rope, length: float, anchor: Vector2) {
 }
 
 progress_swing :: (rope: *Rope, dt: float) {
+  body := rope.attached_body;
+
   for * rope.particles {
     if it.fixed then continue;
+    acc: Vector2;
+    acc.y = GRAVITY * 0.25;
+    if it_index == rope.attached_particle && body != null {
+      acc.x = body.force.x / body.mass;
+      body.force.x = 0;
+    }
     old_pos := it.pos;
-    it.pos = 2 * it.pos - it.old_pos + xy(0, GRAVITY * 0.1) * square(dt);
+    it.pos = 2 * it.pos - it.old_pos + acc * square(dt);
     it.old_pos = old_pos;
   }
 
@@ -178,6 +187,18 @@ progress_swing :: (rope: *Rope, dt: float) {
       }
     }
   }
+
+  if body != null then body.pos = rope.particles[rope.attached_particle].pos - body.bbox_dim / 2;
+}
+
+attach_to_rope :: (body: *Rigid_Body, rope: *Rope) {
+  rope.attached_body = body;
+  rope.attached_particle = rope.particles.count - 1;
+}
+
+rope_detach_body :: (rope: *Rope) {
+  rope.attached_body = null;
+  rope.attached_particle = -1;
 }
 
 end_swing :: (rope: *Rope) {
@@ -344,49 +365,58 @@ PLAYER_TIME_TO_ACCELERATE :: 0.18;
 PLAYER_TIME_IMMOBILE :: 0.3;
 GRAVITY :: -3800.0;
 
-FLOOR_FRICTION_FORCE: Vector2;
-WALL_FRICTION\_FORCE: Vector2;
-MOVE\_FORCE: Vector2;
-ACCEL_FORCE: Vector2;
+// NOTE: Some of these things could probably be better organized somewhere else in the future,
+// but for now this works fine.
+globals: struct {
+  // Platform handles
+  renderer: *SDL_Renderer;
 
-// TODO: Organize this
-level_arena: *Arena;
-map: Map;
-old_map: Map;
+  // Map & memory management
+  level_arena: *Arena;
+  map: Map;
+  old_map: Map;
 
-input_move_left, input_move_right, input_jump: bool;
-collision_event_memory: [9] Collision_Event;
-collision_events: [] Collision_Event;
+  // Physics constants
+  floor_friction_force: Vector2;
+  wall_friction\_force: Vector2;
+  move\_force: Vector2;
+  accel_force: Vector2;
 
-player_flip: Tween_State;
+  // Input collection & collision detection
+  input_move_left, input_move_right, input_jump: bool;
+  collision_event_memory: [9] Collision_Event;
+  collision_events: [] Collision_Event;
 
-renderer: *SDL_Renderer;
+  // Texture cache
+  coin_texture: *SDL_Texture;
+  x_texture: *SDL_Texture;
+  number_textures: [] *SDL_Texture;
+  cosmetic_textures: [] *SDL_Texture;
 
-coin_texture: *SDL_Texture;
-x_texture: *SDL_Texture;
-number_textures: [] *SDL_Texture;
-cosmetic_textures: [] *SDL_Texture;
+  // Timing
+  should_run: bool;
+  start: u64;
+  accumulator: float64;
 
-should_run: bool;
-start: u64;
-accumulator: float64;
-frame_time: float64;
+  // Misc
+  player_flip: Tween_State;
+}
 
-bean_game_tick :: (dt: float) {
+bean_game_tick :: (map: *Map, dt: float) {
   player := *map.player;
 
   e: SDL_Event;
   while SDL_PollEvent(*e) {
     if cast(SDL_EventType) e.type == {
-      case .SDL_EVENT_QUIT; should_run = false;
+      case .SDL_EVENT_QUIT; globals.should_run = false;
 
       case .SDL_EVENT_KEY_UP; #through;
       case .SDL_EVENT_KEY_DOWN; {
         key := e.key.key;
         down := e.key.down;
-        if key == #char "a" || key == SDLK_LEFT  then input_move_left  = down;
-        if key == #char "d" || key == SDLK_RIGHT then input_move_right = down;
-        if key == SDLK_SPACE || key == SDLK_UP || key == #char "w" then input_jump = down;
+        if key == #char "a" || key == SDLK_LEFT  then globals.input_move_left  = down;
+        if key == #char "d" || key == SDLK_RIGHT then globals.input_move_right = down;
+        if key == SDLK_SPACE || key == SDLK_UP || key == #char "w" then globals.input_jump = down;
         if key == #char "r" && down {
           player.pos = map.player_spawn;
           player.vel = {};
@@ -424,12 +454,12 @@ bean_game_tick :: (dt: float) {
   */
 
   dir: float;
-  if input_move_left  dir -= 1;
-  if input_move_right dir += 1;
+  if globals.input_move_left  dir -= 1;
+  if globals.input_move_right dir += 1;
   if dir != 0 {
     if player.facing != dir {
       player.facing = dir;
-      player_flip = tween_init(0.2, tween_lerp);
+      globals.player_flip = tween_init(0.2, tween_lerp);
     }
     if player.dir == 0 {
       player.dir = dir;
@@ -437,7 +467,7 @@ bean_game_tick :: (dt: float) {
     }
   }
 
-  input := Input_Package.{dir, input_jump};
+  input := Input_Package.{dir, globals.input_jump};
 
   if player.state == {
     case .GROUND; {
@@ -479,14 +509,17 @@ bean_game_tick :: (dt: float) {
         player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
       }
 
-      for collision_events {
+      for globals.collision_events {
         if it == .FLOOR {
           player.can_jump = false;
           player.state = .GROUND;
         }
-
         if it == .WALL_SLIDE then player.state = .WALL;
       }
+
+      // TODO: Should we work this into the main collision system?
+      // Test for rope collisions
+
 
       apply_force(player, xy(0, GRAVITY*player.mass));
     }
@@ -509,7 +542,7 @@ bean_game_tick :: (dt: float) {
       }
 
       wall_collision := false;
-      for collision_events {
+      for globals.collision_events {
         if it == .WALL_SLIDE {
           wall_collision = true;
         } else if it == .FLOOR then player.state = .AIR;
@@ -517,25 +550,37 @@ bean_game_tick :: (dt: float) {
       if !wall_collision then player.state = .AIR;
       if player.state == .AIR then player.can_jump = false;
 
-      apply_force(player, xy(0, GRAVITY*player.mass) + WALL_FRICTION_FORCE);
+      apply_force(player, xy(0, GRAVITY*player.mass) + globals.wall_friction_force);
+    }
+
+    case .SWING; { // TODO: Momentum carry after jumping -> steal velocity from the particle we were on and add it to the impulse
+      if input.jump {
+        // TODO: Pull this out into function?
+        player.can_jump = false;
+        apply_impulse(player, xy(0, PLAYER_JUMP_VELOCITY));
+        rope_detach_body(*map.grappling_hook);
+        player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
+        player.state = .AIR;
+      }
     }
   }
 
+  // TODO: These motion physics could probably be more finely tuned for when the player is swinging...
   if player.wall_jump_immobility_counter < PLAYER_TIME_IMMOBILE {
-    apply_force(player, MOVE_FORCE * player.dir);
+    apply_force(player, globals.move_force * player.dir);
     player.wall_jump_immobility_counter += dt;
   } else if player.acceleration_counter < PLAYER_TIME_TO_ACCELERATE {
-    apply_force(player, ACCEL_FORCE * input.dir);
+    apply_force(player, globals.accel_force * input.dir);
     player.acceleration_counter += dt;
   } else if sign(input.dir) == sign(player.dir) {
     if values_are_close(abs(player.vel.x), PLAYER_MOVE_SPEED) {
-      apply_force(player, MOVE_FORCE * input.dir);
+      apply_force(player, globals.move_force * input.dir);
     }
   }
-  apply_force(player, FLOOR_FRICTION_FORCE * -player.dir);
+  apply_force(player, globals.floor_friction_force * -player.dir);
 
   old_player := player.*;
-  integrate(player, dt);
+  if player.state != .SWING then integrate(player, dt);
   if sign(player.vel.x) != sign(player.dir) { // NOTE: Friction has caused us to stop
     player.dir = 0;
     player.vel.x = 0;
@@ -543,17 +588,17 @@ bean_game_tick :: (dt: float) {
   player.vel.x = sign(player.vel.x) * min(abs(player.vel.x), PLAYER_MOVE_SPEED);
 
   // NOTE: Collisions
-  collision_events.count = 0;
+  globals.collision_events.count = 0;
   while true {
-    obstacle_collisions := get_collision(player, *map, .[.GROUND, .WALL]);
+    obstacle_collisions := get_collision(player, map, .[.GROUND, .WALL]);
     if obstacle_collisions.count == 0 then break;
     for obstacle_collisions {
       player_pos_diff := player.pos - old_player.pos;
       if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, it.bbox) {
         if player.vel.y < 0 {
           player.pos.y += it.overlap.w;
-          collision_events.count += 1;
-          collision_events[collision_events.count-1] = .FLOOR;
+          globals.collision_events.count += 1;
+          globals.collision_events[globals.collision_events.count-1] = .FLOOR;
         } else player.pos.y -= it.overlap.w;
         player.vel.y = 0;
       } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
@@ -561,8 +606,8 @@ bean_game_tick :: (dt: float) {
         player.dir = 0;
         player.vel.x = 0;
         if it.tile.type == .WALL && player.vel.y < 0 {
-          collision_events.count += 1;
-          collision_events[collision_events.count-1] = .WALL_SLIDE;
+          globals.collision_events.count += 1;
+          globals.collision_events[globals.collision_events.count-1] = .WALL_SLIDE;
         }
       }
     }
@@ -570,7 +615,7 @@ bean_game_tick :: (dt: float) {
     old_player.pos = player.pos;
   }
 
-  if get_collision(player, *map, .BOUNCE_PAD) {
+  if get_collision(player, map, .BOUNCE_PAD) {
     if !player.used_bounce_pad {
       apply_impulse(player, xy(0, PLAYER_BOUNCE_PAD_JUMP_VELOCITY));
       player.can_jump = false;
@@ -578,7 +623,7 @@ bean_game_tick :: (dt: float) {
     }
   } else player.used_bounce_pad = false;
 
-  coins := get_collision(player, *map, .COIN);
+  coins := get_collision(player, map, .COIN);
   for coins {
     if !it.tile.collected {
       it.tile.collected = true;
@@ -594,12 +639,12 @@ bean_game_tick :: (dt: float) {
     }
   }
 
-  progress_swing(*player.grappling_hook, dt);
+  progress_swing(*map.grappling_hook, dt);
 
   cam_update_tracking(*map.cam, dt);
 }
 
-bean_game_render :: (frame_time: float, alpha: float) {
+bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_time: float, alpha: float) {
   player := *map.player;
 
   cam_pos := lerp(old_map.cam.pos, map.cam.pos, alpha);
@@ -626,10 +671,10 @@ bean_game_render :: (frame_time: float, alpha: float) {
 
   {
     rope_width :: 5;
-    for player.grappling_hook.particles {
+    for map.grappling_hook.particles {
       p0 := it.pos - cam_pos;
-      if it_index < player.grappling_hook.particles.count-1 {
-        next_particle := player.grappling_hook.particles[it_index + 1];
+      if it_index < map.grappling_hook.particles.count-1 {
+        next_particle := map.grappling_hook.particles[it_index + 1];
         segment := next_particle.pos - it.pos;
         perpendicular := xy(-segment.y, segment.x);
         perpendicular = unit_vector(perpendicular);
@@ -639,10 +684,12 @@ bean_game_render :: (frame_time: float, alpha: float) {
         p3 := p0 + perpendicular;
         draw_quad(renderer, p0, p1, p2, p3, {0, 0, 1, 1});
       }
-      draw_circle_debug(renderer, it.pos - cam_pos, 2, {1, 0, 0, 1});
+      if map.grappling_hook.debug_draw_particles {
+        draw_circle_debug(renderer, it.pos - cam_pos, 2, {1, 0, 0, 1});
+      }
     }
 
-    player.flip = player_flip.proc(*player_flip, frame_time);
+    player.flip = globals.player_flip.proc(*globals.player_flip, frame_time);
     dsp_pos := lerp(old_map.player.pos, player.pos, alpha) - cam_pos;
     dsp_dim := player.bbox_dim;
     dsp_dim.x *= abs(cos(PI * player.flip));
@@ -656,14 +703,14 @@ bean_game_render :: (frame_time: float, alpha: float) {
     scoreboard_x := 0.0;
     SCOREBOARD_Y :: 315;
     SCOREBOARD_RESOLUTION :: TILE_RESOLUTION * 1.5;
-    draw_quad(renderer, coin_texture, {xy = xy(scoreboard_x, SCOREBOARD_Y), zw = xy(SCOREBOARD_RESOLUTION)});
+    draw_quad(renderer, globals.coin_texture, {xy = xy(scoreboard_x, SCOREBOARD_Y), zw = xy(SCOREBOARD_RESOLUTION)});
     scoreboard_x += TILE_RESOLUTION;
-    draw_quad(renderer, x_texture, {xy = xy(scoreboard_x, SCOREBOARD_Y), zw = xy(SCOREBOARD_RESOLUTION)});
+    draw_quad(renderer, globals.x_texture, {xy = xy(scoreboard_x, SCOREBOARD_Y), zw = xy(SCOREBOARD_RESOLUTION)});
     scoreboard_x += TILE_RESOLUTION;
 
     coin_digits := get_digits_right_to_left_on_temp(map.coins_collected);
     for < coin_digits {
-      draw_quad(renderer, number_textures[it], {xy = xy(scoreboard_x, SCOREBOARD_Y), zw = xy(SCOREBOARD_RESOLUTION)});
+      draw_quad(renderer, globals.number_textures[it], {xy = xy(scoreboard_x, SCOREBOARD_Y), zw = xy(SCOREBOARD_RESOLUTION)});
       scoreboard_x += TILE_RESOLUTION / 1.8;
     }
   }
@@ -684,7 +731,7 @@ bean_game_render :: (frame_time: float, alpha: float) {
 
 main_loop :: (ctx: *void) #c_call {
   push_context cast(*#Context) ctx {
-    if !should_run {
+    if !globals.should_run {
       #if EMSCRIPTEN {
         emscripten_cancel_main_loop();
       } else {
@@ -696,28 +743,30 @@ main_loop :: (ctx: *void) #c_call {
 
     dt :: 0.01; // 1.0 / 60.0
     end := SDL_GetTicks();
-    frame_time = (end - start) / 1000.0;
-    start = end;
+    frame_time := (end - globals.start) / 1000.0;
+    globals.start = end;
 
-    accumulator += frame_time;
-    while accumulator >= dt {
-      old_map = map;
-      bean_game_tick(dt);
-      accumulator -= dt;
+    globals.accumulator += frame_time;
+    while globals.accumulator >= dt {
+      globals.old_map = globals.map; // TODO: Expensive state copy, can we change this to be a pointer swap?
+      bean_game_tick(*globals.map, dt);
+      globals.accumulator -= dt;
     }
 
-    alpha := saturate(accumulator / dt);
-    bean_game_render(xx frame_time, xx alpha);
+    alpha := saturate(globals.accumulator / dt);
+    bean_game_render(globals.renderer, *globals.map, *globals.old_map, frame_time, xx alpha);
   }
 }
 
 main :: () {
+  using globals;
+
   bg_logger_init_and_equip();
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 
   window_width  := 1280;
   window_height := 720;
-  window := SDL_CreateWindow("Bean Game", xx window_width, xx window_height, 0);
+  window := SDL_CreateWindow("Bean Game", xx window_width, xx window_height, SDL_WINDOW_RESIZABLE);
   renderer = SDL_CreateRenderer(window, null);
   SDL_SetRenderLogicalPresentation(renderer, RESOLUTION_W, RESOLUTION_H, .INTEGER_SCALE);
   SDL_SetRenderVSync(renderer, 1);
@@ -750,10 +799,10 @@ main :: () {
   player := *map.player;
 
   FRICTION_COEFFICIENT :: 1.8;
-  FLOOR_FRICTION_FORCE = xy(-1 * GRAVITY * player.mass * FRICTION_COEFFICIENT, 0);
-  WALL_FRICTION_FORCE = xy(0, 130_000);
-  MOVE_FORCE = FLOOR_FRICTION_FORCE;
-  ACCEL_FORCE = player.mass * xy(PLAYER_MOVE_SPEED / PLAYER_TIME_TO_ACCELERATE, 0) + FLOOR_FRICTION_FORCE;
+  floor_friction_force = xy(-1 * GRAVITY * player.mass * FRICTION_COEFFICIENT, 0);
+  wall_friction_force = xy(0, 130_000);
+  move_force = floor_friction_force;
+  accel_force = player.mass * xy(PLAYER_MOVE_SPEED / PLAYER_TIME_TO_ACCELERATE, 0) + floor_friction_force;
 
   player_flip = tween_init(0.2, tween_lerp);
 
@@ -761,7 +810,9 @@ main :: () {
   map.cam.offset -= player.bbox.zw / 2;
   cam_set_target(*map.cam, player);
 
-  begin_swing(*player.grappling_hook, 100, player.pos + xy(0, 50));
+  begin_swing(*map.grappling_hook, 100, player.pos + xy(0, 150));
+  attach_to_rope(player, *map.grappling_hook);
+  player.state = .SWING;
 
   collision_events = collision_event_memory;
   should_run = true;
