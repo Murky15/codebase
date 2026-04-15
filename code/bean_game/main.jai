@@ -89,7 +89,7 @@ Player :: struct {
   facing := 1.0;
 }
 
-Rope :: struct (debug_draw_particles := false) {
+Rope :: struct {
   Particle :: struct { // TODO: Should we try to make this a rigidbody? Obviously we would need to figure out how to use verlet integration.
     pos: Vector2;
     old_pos: Vector2;
@@ -98,13 +98,11 @@ Rope :: struct (debug_draw_particles := false) {
     accel: Vector2;
   }
 
+  PARTICLES_PER_CHUNK :: 50;
   Particle_Chunk :: struct {
     #as using n: Linked_List_Header;
-    p: [50] Particle; // TODO: Test this value.
-  }
-  for_expansion :: (particles: Linked_List(Particle_Chunk), body: Code, flags: For_Flags) #expand {
-    #assert !(flags & .REVERSE);
-
+    p: [PARTICLES_PER_CHUNK] Particle; // TODO: Test this value.
+    count: int;
   }
 
   length: float;
@@ -112,6 +110,35 @@ Rope :: struct (debug_draw_particles := false) {
   particle_density: float;
   jakobsen_iterations: int;
   particles: Linked_List(Particle_Chunk);
+  num_particles: int;
+}
+
+operator *[] :: (chunks: Linked_List(Rope.Particle_Chunk), index: int) -> *Rope.Particle {
+  local_idx := index - (Rope.PARTICLES_PER_CHUNK * (chunks.count - 1));
+  chunk_idx := index / Rope.PARTICLES_PER_CHUNK;
+  assert(chunk_idx < chunks.count, "Index out of range!");
+  for chunks {
+    if it_index == chunk_idx {
+      assert(local_idx < it.count, "Index out of range!");
+      return *it.p[local_idx];
+    }
+  }
+
+  return null;
+}
+
+particles :: (rope: Rope, body: Code, flags: For_Flags) #expand {
+  #assert !(flags & .REVERSE);
+  for i: 0..rope.num_particles-1 {
+    #if flags & .POINTER {
+      `it := *rope.particles[i];
+    } else {
+      `it := rope.particles[i];
+    }
+    `it_index := i;
+
+    #insert body;
+  }
 }
 
 Input_Package :: struct {
@@ -148,10 +175,10 @@ tween_ease :: (using state: *Tween_State, dt: float) -> float {
 }
 
 initialize_rope :: (arena: *Arena, rope: *Rope, particle_reserves: *Linked_List(Rope.Particle_Chunk), length: float, anchor: Vector2, particle_density := 1.0, jakobsen_iterations := 50) {
-  get_free_chunk_from_reserve :: () -> *Rope.Particle_Chunk #expand {
+  next_chunk :: () -> *Rope.Particle_Chunk #expand {
     result := particle_reserves.first;
     if result {
-      particle_reserves.first = particle_reserves.next;
+      particle_reserves.first = xx particle_reserves.first.next;
       particle_reserves.count -= 1;
       memset(result, 0, size_of(Rope.Particle_Chunk));
     } else {
@@ -168,27 +195,38 @@ initialize_rope :: (arena: *Arena, rope: *Rope, particle_reserves: *Linked_List(
   rope.desired_particle_dist = particle_dist;
   rope.length = particle_dist * num_particles;
 
-  chunk := get_free_chunk_from_reserve();
+  chunk := next_chunk();
+  chunk_idx := 0;
   for i: 0..num_particles-1 {
     particle: rope.Particle;
     if i == 0 then particle.fixed = true;
     particle.pos = anchor + xy(i * particle_dist, 0);
     particle.old_pos = particle.pos;
-    //array_add(*rope.particles, particle);
+    insert_idx := i - (Rope.PARTICLES_PER_CHUNK * chunk_idx);
+    if insert_idx >= Rope.PARTICLES_PER_CHUNK {
+      sll_queue_push(*rope.particles, chunk);
+      chunk = next_chunk();
+      chunk_idx += 1;
+      insert_idx -= Rope.PARTICLES_PER_CHUNK;
+    }
+    chunk.p[insert_idx] = particle;
+    chunk.count += 1;
+    rope.num_particles += 1;
   }
+  sll_queue_push(*rope.particles, chunk);
 }
 
 simulate_rope :: (rope: *Rope, dt: float) {
-  for * rope.particles {
+  for * :particles rope {
     if it.fixed then continue;
     old_pos := it.pos;
-    it.pos = 2 * it.pos - it.old_pos + v2(0, GRAVITY * 0.1) * square(dt);
+    it.pos = 2 * it.pos - it.old_pos + xy(0, GRAVITY) * square(dt);
     it.old_pos = old_pos;
   }
 
   // Enforce constraints
   for 0..rope.jakobsen_iterations {
-    for i: 1..rope.particles.count-1 {
+    for i: 1..rope.num_particles-1 {
       p0 := *rope.particles[i-1];
       p1 := *rope.particles[i];
       dist := distance(p0.pos, p1.pos);
@@ -211,7 +249,7 @@ destroy_rope :: (rope: *Rope, particle_reserves: *Linked_List(Rope.Particle_Chun
   chunk, next: *Rope.Particle_Chunk;
   chunk = rope.particles.first;
   for 0..rope.particles.count-1 {
-    next = chunk.next;
+    next = xx chunk.next;
     sll_queue_push(particle_reserves, chunk);
     chunk = next;
   }
@@ -650,6 +688,8 @@ bean_game_tick :: (map: *Map, dt: float) {
   }
 
   //progress_swing(*map.grappling_hook, dt);
+  simulate_rope(*map.grappling_hook, dt);
+  log("% | %", map.grappling_hook.particles[0], map.grappling_hook.particles.first.p[0]);
 
   cam_update_tracking(*map.cam, dt);
 }
@@ -680,11 +720,11 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
   }
 
   {
-    /*
+
     rope_width :: 5;
-    for map.grappling_hook.particles {
+    for :particles map.grappling_hook {
       p0 := it.pos - cam_pos;
-      if it_index < map.grappling_hook.particles.count-1 {
+      if it_index < map.grappling_hook.num_particles-1 {
         next_particle := map.grappling_hook.particles[it_index + 1];
         segment := next_particle.pos - it.pos;
         perpendicular := xy(-segment.y, segment.x);
@@ -695,11 +735,9 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
         p3 := p0 + perpendicular;
         draw_quad(renderer, p0, p1, p2, p3, {0, 0, 1, 1});
       }
-      if map.grappling_hook.debug_draw_particles {
-        draw_circle_debug(renderer, it.pos - cam_pos, 2, {1, 0, 0, 1});
-      }
+      draw_circle_debug(renderer, it.pos - cam_pos, 2, {1, 0, 0, 1});
     }
-    */
+
 
     player.flip = globals.player_flip.proc(*globals.player_flip, frame_time);
     dsp_pos := lerp(old_map.player.pos, player.pos, alpha) - cam_pos;
@@ -823,8 +861,8 @@ main :: () {
   cam_set_target(*map.cam, player);
 
   //begin_swing(*map.grappling_hook, 100, player.pos + xy(0, 150));
-  initialize_rope(*map.grappling_hook, 100, player.pos + xy(0, 150), 0.5);
-  player.state = .SWING;
+  initialize_rope(level_arena, *map.grappling_hook, *map.free_particle_chunks, 100, player.pos + xy(0, 150), 0.5);
+  //player.state = .SWING;
 
   collision_events = collision_event_memory;
   should_run = true;

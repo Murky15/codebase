@@ -59,7 +59,8 @@ Map :: struct {
 
   cam: Camera;
   player: Player;
-  grappling_hook: Rope();
+  grappling_hook: Rope;
+  free_particle_chunks: Linked_List(Rope.Particle_Chunk);
 
   tiles: [] Tile;
   width, height: int;

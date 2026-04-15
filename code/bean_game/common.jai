@@ -5,7 +5,7 @@ Arena :: struct {
     FIXED;
   } = .FIXED;
   align := 8;
-  
+
   pos: int;
   commit_pos: int;
   cap: int;
