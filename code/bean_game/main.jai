@@ -32,6 +32,7 @@
 - [ ] Bordered rects could be drawn with SDL_Rect whatever in a for loop increasing the offset and decreasing the dim each time
 - [X] Bounce pad bug where the player collides for multiple frames
 - [X] Fixed timestep
+- [ ] Fix fullscreen projection, or figure out how to draw in the borders for odd aspect ratios
 */
 
 AARect :: #type,isa Vector4;
@@ -100,12 +101,11 @@ Rope :: struct {
 
   PARTICLES_PER_CHUNK :: 50;
   Particle_Chunk :: struct {
-    #as using n: Linked_List_Header;
+    using n: Linked_List_Header;
     p: [PARTICLES_PER_CHUNK] Particle; // TODO: Test this value.
     count: int;
   }
 
-  length: float;
   desired_particle_dist: float;
   particle_density: float;
   jakobsen_iterations: int;
@@ -114,14 +114,15 @@ Rope :: struct {
 }
 
 operator *[] :: (chunks: Linked_List(Rope.Particle_Chunk), index: int) -> *Rope.Particle {
-  local_idx := index - (Rope.PARTICLES_PER_CHUNK * (chunks.count - 1));
   chunk_idx := index / Rope.PARTICLES_PER_CHUNK;
   assert(chunk_idx < chunks.count, "Index out of range!");
-  for chunks {
+  local_idx := index;
+  for * chunks {
     if it_index == chunk_idx {
       assert(local_idx < it.count, "Index out of range!");
       return *it.p[local_idx];
     }
+    local_idx -= Rope.PARTICLES_PER_CHUNK;
   }
 
   return null;
@@ -174,7 +175,13 @@ tween_ease :: (using state: *Tween_State, dt: float) -> float {
   return ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
 }
 
-initialize_rope :: (arena: *Arena, rope: *Rope, particle_reserves: *Linked_List(Rope.Particle_Chunk), length: float, anchor: Vector2, particle_density := 1.0, jakobsen_iterations := 50) {
+rope_init :: (rope: *Rope, particle_density := 0.8, jakobsen_iterations := 100) {
+  rope.particle_density = particle_density;
+  rope.jakobsen_iterations = jakobsen_iterations;
+  rope.desired_particle_dist = 1.0 / particle_density;
+}
+
+rope_push_particle :: (arena: *Arena, rope: *Rope, particle_reserves: *Linked_List(Rope.Particle_Chunk), particle: Rope.Particle) {
   next_chunk :: () -> *Rope.Particle_Chunk #expand {
     result := particle_reserves.first;
     if result {
@@ -184,39 +191,19 @@ initialize_rope :: (arena: *Arena, rope: *Rope, particle_reserves: *Linked_List(
     } else {
       result = arena_push(arena, Rope.Particle_Chunk);
     }
+    sll_queue_push(*rope.particles, result);
 
     return result;
   }
 
-  rope.particle_density = particle_density;
-  rope.jakobsen_iterations = jakobsen_iterations;
-  num_particles := cast(int) round(particle_density * length);
-  particle_dist := 1.0 / particle_density;
-  rope.desired_particle_dist = particle_dist;
-  rope.length = particle_dist * num_particles;
-
-  chunk := next_chunk();
-  chunk_idx := 0;
-  for i: 0..num_particles-1 {
-    particle: rope.Particle;
-    if i == 0 then particle.fixed = true;
-    particle.pos = anchor + xy(i * particle_dist, 0);
-    particle.old_pos = particle.pos;
-    insert_idx := i - (Rope.PARTICLES_PER_CHUNK * chunk_idx);
-    if insert_idx >= Rope.PARTICLES_PER_CHUNK {
-      sll_queue_push(*rope.particles, chunk);
-      chunk = next_chunk();
-      chunk_idx += 1;
-      insert_idx -= Rope.PARTICLES_PER_CHUNK;
-    }
-    chunk.p[insert_idx] = particle;
-    chunk.count += 1;
-    rope.num_particles += 1;
-  }
-  sll_queue_push(*rope.particles, chunk);
+  current_chunk := rope.particles.last;
+  if current_chunk == null || current_chunk.count == Rope.PARTICLES_PER_CHUNK then current_chunk = next_chunk();
+  current_chunk.p[current_chunk.count] = particle;
+  current_chunk.count += 1;
+  rope.num_particles += 1;
 }
 
-simulate_rope :: (rope: *Rope, dt: float) {
+rope_integrate :: (rope: *Rope, dt: float) {
   for * :particles rope {
     if it.fixed then continue;
     old_pos := it.pos;
@@ -245,7 +232,7 @@ simulate_rope :: (rope: *Rope, dt: float) {
   }
 }
 
-destroy_rope :: (rope: *Rope, particle_reserves: *Linked_List(Rope.Particle_Chunk)) {
+rope_destroy :: (rope: *Rope, particle_reserves: *Linked_List(Rope.Particle_Chunk)) {
   chunk, next: *Rope.Particle_Chunk;
   chunk = rope.particles.first;
   for 0..rope.particles.count-1 {
@@ -451,6 +438,8 @@ globals: struct {
   player_flip: Tween_State;
 }
 
+my_awesome_rope: Env_Rope;
+
 bean_game_tick :: (map: *Map, dt: float) {
   player := *map.player;
 
@@ -476,13 +465,6 @@ bean_game_tick :: (map: *Map, dt: float) {
   }
 
   /*
-  for Input.get_window_resizes() {
-    Simp.update_window(it.window);
-    window_width = it.width;
-    window_height = it.height;
-    font = load_fonts(window_height / FONT_HEIGHT_DIVISOR);
-  }
-
   #if ENABLE_LEVEL_HOT_RELOAD {
     modtime, _, success := file_modtime_and_size(map.path);
     if modtime > map.last_modification {
@@ -687,10 +669,8 @@ bean_game_tick :: (map: *Map, dt: float) {
     }
   }
 
-  //progress_swing(*map.grappling_hook, dt);
-  simulate_rope(*map.grappling_hook, dt);
-  log("% | %", map.grappling_hook.particles[0], map.grappling_hook.particles.first.p[0]);
-
+  //progress_swing(*my_awesome_rope, dt);
+  rope_integrate(*my_awesome_rope, dt);
   cam_update_tracking(*map.cam, dt);
 }
 
@@ -722,10 +702,10 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
   {
 
     rope_width :: 5;
-    for :particles map.grappling_hook {
+    for :particles my_awesome_rope {
       p0 := it.pos - cam_pos;
-      if it_index < map.grappling_hook.num_particles-1 {
-        next_particle := map.grappling_hook.particles[it_index + 1];
+      if it_index < my_awesome_rope.num_particles-1 {
+        next_particle := my_awesome_rope.particles[it_index + 1];
         segment := next_particle.pos - it.pos;
         perpendicular := xy(-segment.y, segment.x);
         perpendicular = unit_vector(perpendicular);
@@ -814,8 +794,8 @@ main :: () {
   bg_logger_init_and_equip();
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 
-  window_width  := 1280;
-  window_height := 720;
+  window_width  := RESOLUTION_W * 2;
+  window_height := RESOLUTION_H * 2;
   window := SDL_CreateWindow("Bean Game", xx window_width, xx window_height, SDL_WINDOW_RESIZABLE);
   renderer = SDL_CreateRenderer(window, null);
   SDL_SetRenderLogicalPresentation(renderer, RESOLUTION_W, RESOLUTION_H, .INTEGER_SCALE);
@@ -860,8 +840,8 @@ main :: () {
   map.cam.offset -= player.bbox.zw / 2;
   cam_set_target(*map.cam, player);
 
-  //begin_swing(*map.grappling_hook, 100, player.pos + xy(0, 150));
-  initialize_rope(level_arena, *map.grappling_hook, *map.free_particle_chunks, 100, player.pos + xy(0, 150), 0.5);
+  //begin_swing(*my_awesome_rope, 100, player.pos + xy(0, 150));
+  my_awesome_rope = create_rope(level_arena, *map, 100, player.pos + xy(0, 150));
   //player.state = .SWING;
 
   collision_events = collision_event_memory;

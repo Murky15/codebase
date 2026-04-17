@@ -121,7 +121,7 @@ for_expansion :: (list: Linked_List, body: Code, flags: For_Flags) #expand {
     #insert body;
   }
 }
-sll_queue_push :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
+sll_queue_push :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
   if first == null {
     first = n;
     last = n;
@@ -133,7 +133,7 @@ sll_queue_push :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   }
   list.count += 1;
 }
-sll_queue_push_front :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
+sll_queue_push_front :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
   if first == null {
     first = n;
     last = n;
@@ -144,7 +144,7 @@ sll_queue_push_front :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   }
   list.count += 1;
 }
-sll_queue_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
+sll_queue_pop :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
   if first == last {
     first = null;
     last = null;
@@ -153,12 +153,12 @@ sll_queue_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   }
   list.count -= 1;
 }
-sll_stack_push :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
+sll_stack_push :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
   n.next = xx first;
   first = n;
   list.count += 1;
 }
-sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
+sll_stack_pop :: (using list: *Linked_List, n: *$T/interface Linked_List_Header) {
   if first != null {
     first = xx first.next;
   }

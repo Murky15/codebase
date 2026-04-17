@@ -26,8 +26,15 @@ Tile :: struct {
   bob_frequency :: PI;
   collected: bool;
 }
-
 TILE_TILT_AMPLITUDE :: 5;
+
+Env_Rope :: struct {
+  #as using rope: Rope;
+  using n: Linked_List_Header;
+  length: float;
+  attached_body: *Rigid_Body;
+  attached_body_location: int;
+}
 
 Map :: struct {
   version: int;
@@ -42,7 +49,7 @@ Map :: struct {
 
   max_parallax_layers :: 3;
   Parallax_Effect :: struct {
-    #as using n: Linked_List_Header;
+    using n: Linked_List_Header;
 
     layer: u64;
     pos: Vector2;
@@ -59,8 +66,9 @@ Map :: struct {
 
   cam: Camera;
   player: Player;
-  grappling_hook: Rope;
+
   free_particle_chunks: Linked_List(Rope.Particle_Chunk);
+  environmental_ropes: Linked_List(Env_Rope);
 
   tiles: [] Tile;
   width, height: int;
@@ -353,4 +361,21 @@ map_index_pointer :: (map: Map, p: Vector2) -> *Tile {
 map_index :: (map: Map, p: Vector2) -> Tile {
   tile := inline map_index_pointer(map, p);
   return ifx tile == null then Tile.{type=.INVALID} else tile.*;
+}
+
+create_rope :: (arena: *Arena, map: *Map, length: float, anchor: Vector2) -> *Env_Rope {
+  rope := arena_push(arena, Env_Rope);
+  rope_init(rope);
+  num_particles := cast(int) round(rope.particle_density * length);
+  rope.length = rope.desired_particle_dist * num_particles;
+  for i: 0..num_particles-1 {
+    particle: rope.Particle;
+    if i == 0 then particle.fixed = true;
+    particle.pos = anchor + xy(i * rope.desired_particle_dist, 0);
+    particle.old_pos = particle.pos;
+    rope_push_particle(arena, rope, *map.free_particle_chunks, particle);
+  }
+  sll_queue_push(*map.environmental_ropes, rope);
+
+  return rope;
 }
