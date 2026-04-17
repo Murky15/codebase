@@ -30,10 +30,10 @@ TILE_TILT_AMPLITUDE :: 5;
 
 Env_Rope :: struct {
   #as using rope: Rope;
-  using n: Linked_List_Header;
   length: float;
-  attached_body: *Rigid_Body;
-  attached_body_location: int;
+  attached_body: *Rigid_Body; // TODO: Expand this to multiple bodies?
+  attached_body_location := -1;
+  max_attachment_distance := 5.0;
 }
 
 Map :: struct {
@@ -49,7 +49,7 @@ Map :: struct {
 
   max_parallax_layers :: 3;
   Parallax_Effect :: struct {
-    using n: Linked_List_Header;
+    #as using n: Linked_List_Header;
 
     layer: u64;
     pos: Vector2;
@@ -363,7 +363,7 @@ map_index :: (map: Map, p: Vector2) -> Tile {
   return ifx tile == null then Tile.{type=.INVALID} else tile.*;
 }
 
-create_rope :: (arena: *Arena, map: *Map, length: float, anchor: Vector2) -> *Env_Rope {
+create_env_rope :: (arena: *Arena, map: *Map, length: float, anchor: Vector2) -> *Env_Rope {
   rope := arena_push(arena, Env_Rope);
   rope_init(rope);
   num_particles := cast(int) round(rope.particle_density * length);
@@ -378,4 +378,40 @@ create_rope :: (arena: *Arena, map: *Map, length: float, anchor: Vector2) -> *En
   sll_queue_push(*map.environmental_ropes, rope);
 
   return rope;
+}
+
+check_env_rope_collision_and_attach :: (rope: *Env_Rope, body: *Rigid_Body) -> bool {
+  closest_particle := -1;
+  closest_distance := rope.max_attachment_distance;
+  for :particles rope {
+    new_distance := distance(it.pos, body.pos + body.bbox_dim / 2);
+    if new_distance < closest_distance {
+      closest_particle = it_index;
+      closest_distance = new_distance;
+    }
+  }
+
+  if closest_particle != -1 {
+    rope.attached_body_location = closest_particle;
+    rope.attached_body = body;
+    return true;
+  }
+
+  return false;
+}
+
+env_rope_detach_body :: (rope: *Env_Rope) {
+  rope.attached_body = null;
+  rope.attached_body_location = -1;
+}
+
+simulate_env_rope :: (rope: *Env_Rope, dt: float) {
+  if rope.attached_body != null {
+
+  }
+  rope_integrate(rope, dt);
+  if rope.attached_body != null {
+    binding_particle := rope.particles[rope.attached_body_location];
+    rope.attached_body.pos = binding_particle.pos - rope.attached_body.bbox_dim / 2;
+  }
 }

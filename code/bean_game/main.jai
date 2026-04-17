@@ -91,17 +91,19 @@ Player :: struct {
 }
 
 Rope :: struct {
+  #as using n: Linked_List_Header;
+
   Particle :: struct { // TODO: Should we try to make this a rigidbody? Obviously we would need to figure out how to use verlet integration.
     pos: Vector2;
     old_pos: Vector2;
     fixed: bool;
 
-    accel: Vector2;
+    accel := Vector2.{0, GRAVITY};
   }
 
   PARTICLES_PER_CHUNK :: 50;
   Particle_Chunk :: struct {
-    using n: Linked_List_Header;
+    #as using n: Linked_List_Header;
     p: [PARTICLES_PER_CHUNK] Particle; // TODO: Test this value.
     count: int;
   }
@@ -207,7 +209,7 @@ rope_integrate :: (rope: *Rope, dt: float) {
   for * :particles rope {
     if it.fixed then continue;
     old_pos := it.pos;
-    it.pos = 2 * it.pos - it.old_pos + xy(0, GRAVITY) * square(dt);
+    it.pos = 2 * it.pos - it.old_pos + it.accel * square(dt);
     it.old_pos = old_pos;
   }
 
@@ -274,24 +276,23 @@ load_assets :: (renderer: *SDL_Renderer) -> Texture_Atlas {
     pixels: *u8;
   }
   tex_visitor :: (userdata: *void, dirname: *u8, fname: *u8) -> SDL_EnumerationResult #c_call {
-    push_context {
-      bitmaps := cast(*[..] Bitmap) userdata;
-      name := to_string(fname);
-      full_path := join(to_string(dirname), name);
-      bitmap: Bitmap;
-      bitmap.name = copy_string(path_strip_extension(name));
-      #if EMSCRIPTEN {
-        bitmap.pixels = emscripten_get_preloaded_image_data(temp_c_string(full_path), *bitmap.width, *bitmap.height);
-        bitmap.channels = 4; // Hope this is correct...
-      } else {
-        using STB :: #import "stb_image";
-        bitmap.pixels = stbi_load(temp_c_string(full_path), *bitmap.width, *bitmap.height, *bitmap.channels, 0);
-      }
-      if bitmap.pixels == null || bitmap.channels != 4 then return .SDL_ENUM_FAILURE;
-      array_add(bitmaps, bitmap);
-
-      return .SDL_ENUM_CONTINUE;
+    push_context,defer_pop;
+    bitmaps := cast(*[..] Bitmap) userdata;
+    name := to_string(fname);
+    full_path := join(to_string(dirname), name);
+    bitmap: Bitmap;
+    bitmap.name = copy_string(path_strip_extension(name));
+    #if EMSCRIPTEN {
+      bitmap.pixels = emscripten_get_preloaded_image_data(temp_c_string(full_path), *bitmap.width, *bitmap.height);
+      bitmap.channels = 4; // Hope this is correct...
+    } else {
+      using STB :: #import "stb_image";
+      bitmap.pixels = stbi_load(temp_c_string(full_path), *bitmap.width, *bitmap.height, *bitmap.channels, 0);
     }
+    if bitmap.pixels == null || bitmap.channels != 4 then return .SDL_ENUM_FAILURE;
+    array_add(bitmaps, bitmap);
+
+    return .SDL_ENUM_CONTINUE;
   }
   bitmaps: [..] Bitmap;
   bitmaps.allocator = temp;
@@ -438,7 +439,7 @@ globals: struct {
   player_flip: Tween_State;
 }
 
-my_awesome_rope: Env_Rope;
+my_awesome_rope: *Env_Rope;
 
 bean_game_tick :: (map: *Map, dt: float) {
   player := *map.player;
@@ -549,8 +550,9 @@ bean_game_tick :: (map: *Map, dt: float) {
       }
 
       // TODO: Should we work this into the main collision system?
-      // Test for rope collisions
-
+      if check_env_rope_collision_and_attach(my_awesome_rope, player) {
+        player.state = .SWING;
+      }
 
       apply_force(player, xy(0, GRAVITY*player.mass));
     }
@@ -586,6 +588,7 @@ bean_game_tick :: (map: *Map, dt: float) {
 
     case .SWING; { // TODO: Momentum carry after jumping -> steal velocity from the particle we were on and add it to the impulse
       if input.jump {
+        env_rope_detach_body(my_awesome_rope);
         // TODO: Pull this out into function?
         player.can_jump = false;
         apply_impulse(player, xy(0, PLAYER_JUMP_VELOCITY));
@@ -669,8 +672,7 @@ bean_game_tick :: (map: *Map, dt: float) {
     }
   }
 
-  //progress_swing(*my_awesome_rope, dt);
-  rope_integrate(*my_awesome_rope, dt);
+  simulate_env_rope(my_awesome_rope, dt);
   cam_update_tracking(*map.cam, dt);
 }
 
@@ -760,32 +762,31 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
 }
 
 main_loop :: (ctx: *void) #c_call {
-  push_context cast(*#Context) ctx {
-    if !globals.should_run {
-      #if EMSCRIPTEN {
-        emscripten_cancel_main_loop();
-      } else {
-        exit(0);
-      }
+  push_context,defer_pop cast(*#Context) ctx;
+  if !globals.should_run {
+    #if EMSCRIPTEN {
+      emscripten_cancel_main_loop();
+    } else {
+      exit(0);
     }
-
-    reset_temporary_storage();
-
-    dt :: 0.01; // 1.0 / 60.0
-    end := SDL_GetTicks();
-    frame_time := (end - globals.start) / 1000.0;
-    globals.start = end;
-
-    globals.accumulator += frame_time;
-    while globals.accumulator >= dt {
-      globals.old_map = globals.map; // TODO: Expensive state copy, can we change this to be a pointer swap?
-      bean_game_tick(*globals.map, dt);
-      globals.accumulator -= dt;
-    }
-
-    alpha := saturate(globals.accumulator / dt);
-    bean_game_render(globals.renderer, *globals.map, *globals.old_map, frame_time, xx alpha);
   }
+
+  reset_temporary_storage();
+
+  dt :: 0.01; // 1.0 / 60.0
+  end := SDL_GetTicks();
+  frame_time := (end - globals.start) / 1000.0;
+  globals.start = end;
+
+  globals.accumulator += frame_time;
+  while globals.accumulator >= dt {
+    globals.old_map = globals.map; // TODO: Expensive state copy, can we change this to be a pointer swap?
+    bean_game_tick(*globals.map, dt);
+    globals.accumulator -= dt;
+  }
+
+  alpha := saturate(globals.accumulator / dt);
+  bean_game_render(globals.renderer, *globals.map, *globals.old_map, frame_time, xx alpha);
 }
 
 main :: () {
@@ -841,7 +842,7 @@ main :: () {
   cam_set_target(*map.cam, player);
 
   //begin_swing(*my_awesome_rope, 100, player.pos + xy(0, 150));
-  my_awesome_rope = create_rope(level_arena, *map, 100, player.pos + xy(0, 150));
+  my_awesome_rope = create_env_rope(level_arena, *map, 100, player.pos + xy(0, 150));
   //player.state = .SWING;
 
   collision_events = collision_event_memory;
