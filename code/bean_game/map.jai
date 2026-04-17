@@ -406,12 +406,17 @@ env_rope_detach_body :: (rope: *Env_Rope) {
 }
 
 simulate_env_rope :: (rope: *Env_Rope, dt: float) {
+  binding_particle: *Rope.Particle;
+  additional_accel: Vector2;
   if rope.attached_body != null {
-
+    binding_particle = *rope.particles[rope.attached_body_location];
+    additional_accel = rope.attached_body.force / rope.attached_body.mass;
+    binding_particle.accel += additional_accel;
   }
   rope_integrate(rope, dt);
   if rope.attached_body != null {
-    binding_particle := rope.particles[rope.attached_body_location];
     rope.attached_body.pos = binding_particle.pos - rope.attached_body.bbox_dim / 2;
+    binding_particle.accel -= additional_accel; // Should this be an assignment to avoid floating point errors?
+    rope.attached_body.force = xy(0,0); // This is mildly inconvinient.
   }
 }

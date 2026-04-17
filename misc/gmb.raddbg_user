@@ -48,9 +48,9 @@ window:
               input: ""
               cmd: search
             }
-            cursor_line: 531
+            cursor_line: 776
             cursor_column: 1
-            mark_line: 531
+            mark_line: 776
             mark_column: 1
           }
           text:
@@ -62,9 +62,9 @@ window:
               input: ""
               cmd: search
             }
-            cursor_line: 157
+            cursor_line: 281
             cursor_column: 1
-            mark_line: 157
+            mark_line: 281
             mark_column: 1
           }
         }
@@ -122,7 +122,7 @@ window:
     }
   }
   split_x
-  pos: -11 -6
+  pos: 281 144
   monitor: "\\\\.\\DISPLAY1"
   font_size: 11
   maximized

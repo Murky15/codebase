@@ -98,7 +98,7 @@ Rope :: struct {
     old_pos: Vector2;
     fixed: bool;
 
-    accel := Vector2.{0, GRAVITY};
+    accel := Vector2.{0, GRAVITY * 0.2};
   }
 
   PARTICLES_PER_CHUNK :: 50;
@@ -146,6 +146,7 @@ particles :: (rope: Rope, body: Code, flags: For_Flags) #expand {
 
 Input_Package :: struct {
   dir: float;
+  rope_slide_dir: float;
   jump: bool;
 }
 
@@ -420,11 +421,14 @@ globals: struct {
   accel_force: Vector2;
 
   // Input collection & collision detection
-  input_move_left, input_move_right, input_jump: bool;
+  input_move_left, input_move_right: bool;
+  input_slide_up , input_slide_down: bool;
+  input_jump: bool;
   collision_event_memory: [9] Collision_Event;
   collision_events: [] Collision_Event;
 
   // Texture cache
+  texture_atlas: Texture_Atlas;
   coin_texture: *SDL_Texture;
   x_texture: *SDL_Texture;
   number_textures: [] *SDL_Texture;
@@ -455,7 +459,9 @@ bean_game_tick :: (map: *Map, dt: float) {
         down := e.key.down;
         if key == #char "a" || key == SDLK_LEFT  then globals.input_move_left  = down;
         if key == #char "d" || key == SDLK_RIGHT then globals.input_move_right = down;
-        if key == SDLK_SPACE || key == SDLK_UP || key == #char "w" then globals.input_jump = down;
+        if key == #char "w" || key == SDLK_UP    then globals.input_slide_up   = down;
+        if key == #char "s" || key == SDLK_DOWN  then globals.input_slide_down = down;
+        if key == SDLK_SPACE then globals.input_jump = down;
         if key == #char "r" && down {
           player.pos = map.player_spawn;
           player.vel = {};
@@ -464,26 +470,6 @@ bean_game_tick :: (map: *Map, dt: float) {
       }
     }
   }
-
-  /*
-  #if ENABLE_LEVEL_HOT_RELOAD {
-    modtime, _, success := file_modtime_and_size(map.path);
-    if modtime > map.last_modification {
-      // TODO: This is very naive and should definitely be optimized in the near future
-      log("Reloading level...");
-      new_map := map_load(texture_atlas,, temp);
-      if new_map.tiles.data != null {
-        array_free(map.tiles);
-        // TODO: Also must free parallax effects
-        map = map_load(texture_atlas, modtime);
-        map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
-        map.cam.offset -= player.bbox.zw / 2;
-        player = *map.player;
-        cam_set_target(*map.cam, player);
-      } else map.last_modification = modtime;
-    }
-  }
-  */
 
   dir: float;
   if globals.input_move_left  dir -= 1;
@@ -499,7 +485,11 @@ bean_game_tick :: (map: *Map, dt: float) {
     }
   }
 
-  input := Input_Package.{dir, globals.input_jump};
+  rope_slide_dir: float;
+  if globals.input_slide_up   rope_slide_dir += 1;
+  if globals.input_slide_down rope_slide_dir -= 1;
+
+  input := Input_Package.{dir, rope_slide_dir, globals.input_jump};
 
   if player.state == {
     case .GROUND; {
@@ -552,6 +542,7 @@ bean_game_tick :: (map: *Map, dt: float) {
       // TODO: Should we work this into the main collision system?
       if check_env_rope_collision_and_attach(my_awesome_rope, player) {
         player.state = .SWING;
+        player.vel = xy(0,0);
       }
 
       apply_force(player, xy(0, GRAVITY*player.mass));
@@ -802,7 +793,7 @@ main :: () {
   SDL_SetRenderLogicalPresentation(renderer, RESOLUTION_W, RESOLUTION_H, .INTEGER_SCALE);
   SDL_SetRenderVSync(renderer, 1);
 
-  texture_atlas := load_assets(renderer);
+  texture_atlas = load_assets(renderer);
   coin_texture = (.*)table_find_pointer(*texture_atlas, "tile_coin"); // Duplicate
   x_texture = (.*)table_find_pointer(*texture_atlas, "ui_numX");
 
@@ -851,7 +842,36 @@ main :: () {
   #if EMSCRIPTEN {
     emscripten_set_main_loop_arg(main_loop, *context, 0, true);
   } else {
-    while (true) main_loop(*context);
+    while true {
+      #if ENABLE_LEVEL_HOT_RELOAD {
+        using File_Utilities :: #import "File_Utilities";
+        modtime, _, success := file_modtime_and_size(map.path);
+        if modtime > map.last_modification {
+          // TODO: This is very naive and should definitely be optimized in the near future
+          log("Reloading level...");
+          backup_pos := arena_pos(level_arena);
+          new_map := map_load(level_arena, texture_atlas);
+          if new_map.tiles.data != null {
+            old_player_pos := map.player.pos;
+            arena_clear(level_arena);
+            map = map_load(level_arena, texture_atlas, modtime);
+            map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
+            map.cam.offset -= player.bbox.zw / 2;
+            player = *map.player;
+            cam_set_target(*map.cam, player);
+
+            // TODO: DELETE THIS!!!
+            my_awesome_rope = create_env_rope(level_arena, *map, 100, player.pos + xy(0, 150));
+
+            player.pos = old_player_pos;
+          } else {
+            arena_pop_to(level_arena, backup_pos);
+            map.last_modification = modtime;
+          }
+        }
+      }
+      main_loop(*context);
+    }
   }
 }
 
