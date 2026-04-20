@@ -37,7 +37,7 @@ Env_Rope :: struct {
   body_location      := -1;
   body_location_next := -1;
   body_transition: Tween_State;
-  total_transition_velocity := 100.0;
+  transition_velocity := 100.0;
   partial_transition_time: float;
 
   max_attachment_distance := 10.0;
@@ -390,7 +390,7 @@ create_env_rope :: (arena: *Arena, map: *Map, length: float, anchor: Vector2) ->
   }
   sll_queue_push(*map.environmental_ropes, rope);
 
-  total_transition_time := (1.0 / rope.total_transition_velocity) * rope.length;
+  total_transition_time := (1.0 / rope.transition_velocity) * rope.length;
   rope.partial_transition_time = total_transition_time / rope.num_particles;
 
   return rope;
