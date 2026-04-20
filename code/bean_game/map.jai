@@ -33,9 +33,14 @@ TILE_TILT_AMPLITUDE :: 5;
 Env_Rope :: struct {
   #as using rope: Rope;
   length: float;
-  attached_body: *Rigid_Body; // TODO: Expand this to multiple bodies?
-  attached_body_location := -1;
-  max_attachment_distance := 8.0;
+  body: *Rigid_Body; // TODO: Expand this to multiple bodies?
+  body_location      := -1;
+  body_location_next := -1;
+  body_transition: Tween_State;
+  total_transition_velocity := 100.0;
+  partial_transition_time: float;
+
+  max_attachment_distance := 10.0;
 }
 
 Map :: struct {
@@ -385,12 +390,15 @@ create_env_rope :: (arena: *Arena, map: *Map, length: float, anchor: Vector2) ->
   }
   sll_queue_push(*map.environmental_ropes, rope);
 
+  total_transition_time := (1.0 / rope.total_transition_velocity) * rope.length;
+  rope.partial_transition_time = total_transition_time / rope.num_particles;
+
   return rope;
 }
 
 env_rope_attach_at :: (rope: *Env_Rope, body: *Rigid_Body, index: int) {
-  rope.attached_body_location = index;
-  rope.attached_body = body;
+  rope.body_location = index;
+  rope.body = body;
 }
 
 check_env_rope_collision_and_attach :: (rope: *Env_Rope, body: *Rigid_Body) -> bool {
@@ -412,23 +420,48 @@ check_env_rope_collision_and_attach :: (rope: *Env_Rope, body: *Rigid_Body) -> b
   return false;
 }
 
+env_rope_move_body_up :: (rope: *Env_Rope) {
+  if rope.body == null || rope.body_transition.active then return;
+  rope.body_transition = tween_init(rope.partial_transition_time, tween_norm);
+  rope.body_location_next = max(rope.body_location - 1, 0);
+}
+
+env_rope_move_body_down :: (rope: *Env_Rope) {
+  if rope.body == null || rope.body_transition.active then return;
+  rope.body_transition = tween_init(rope.partial_transition_time, tween_norm);
+  rope.body_location_next = min(rope.body_location + 1, rope.num_particles - 1);
+}
+
 env_rope_detach_body :: (rope: *Env_Rope) {
-  rope.attached_body = null;
-  rope.attached_body_location = -1;
+  rope.body = null;
+  rope.body_location = -1;
 }
 
 simulate_env_rope :: (rope: *Env_Rope, dt: float) {
   binding_particle: *Rope.Particle;
   additional_accel: Vector2;
-  if rope.attached_body != null {
-    binding_particle = *rope.particles[rope.attached_body_location];
-    additional_accel = rope.attached_body.force / rope.attached_body.mass;
+  if rope.body != null {
+    binding_particle = *rope.particles[rope.body_location];
+    additional_accel = rope.body.force / rope.body.mass;
     binding_particle.accel += additional_accel;
   }
   rope_integrate(rope, dt);
-  if rope.attached_body != null {
-    rope.attached_body.pos = binding_particle.pos - rope.attached_body.bbox_dim / 2;
+  if rope.body != null {
+    body_pos_p0 := binding_particle.pos - rope.body.bbox_dim / 2;
+    rope.body.pos = body_pos_p0;
+    if rope.body_transition.active {
+      next_particle := *rope.particles[rope.body_location_next];
+      body_pos_p1 := next_particle.pos - rope.body.bbox_dim / 2;
+      t := rope.body_transition.proc(*rope.body_transition, dt);
+      rope.body.pos = lerp(body_pos_p0, body_pos_p1, t);
+
+      // Ended this frame
+      if !rope.body_transition.active {
+        rope.body_location = rope.body_location_next;
+        rope.body_location_next = -1;
+      }
+    }
     binding_particle.accel -= additional_accel; // Should this be an assignment to avoid floating point errors?
-    rope.attached_body.force = xy(0,0); // This is mildly inconvinient.
+    rope.body.force = xy(0,0); // This is mildly inconvinient.
   }
 }

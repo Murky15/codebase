@@ -98,18 +98,18 @@ Player :: struct {
 Rope :: struct {
   #as using n: Linked_List_Header;
 
-  Particle :: struct { // TODO: Should we try to make this a rigidbody? Obviously we would need to figure out how to use verlet integration.
+  Particle :: struct {
     pos: Vector2;
     old_pos: Vector2;
     fixed: bool;
 
-    accel := Vector2.{0, GRAVITY * 0.2};
+    accel := Vector2.{0, GRAVITY * 0.4};
   }
 
   PARTICLES_PER_CHUNK :: 50;
   Particle_Chunk :: struct {
     #as using n: Linked_List_Header;
-    p: [PARTICLES_PER_CHUNK] Particle; // TODO: Test this value.
+    p: [PARTICLES_PER_CHUNK] Particle;
     count: int;
   }
 
@@ -164,6 +164,7 @@ Tween_State :: struct {
   started_at: float;
   index: float;
 
+  active: bool;
   proc: Tween_Proc;
 }
 
@@ -172,17 +173,20 @@ tween_init :: (duration: float, proc: Tween_Proc) -> Tween_State {
   result.duration = duration;
   result.started_at = SDL_GetTicks() / 1000.0;
   result.proc = proc;
+  result.active = true;
 
   return result;
 }
 
-tween_lerp :: (using state: *Tween_State, dt: float) -> float {
+tween_norm :: (using state: *Tween_State, dt: float) -> float {
   index += dt;
-  return saturate(norm(started_at + index, started_at, started_at + duration));
+  t := saturate(norm(started_at + index, started_at, started_at + duration));
+  if t == 1.0 then active = false;
+  return t;
 }
 
 tween_ease :: (using state: *Tween_State, dt: float) -> float {
-  t := tween_lerp(state, dt);
+  t := tween_norm(state, dt);
   return ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
 }
 
@@ -475,7 +479,7 @@ bean_game_tick :: (map: *Map, dt: float) {
   if dir != 0 {
     if player.facing != dir {
       player.facing = dir;
-      globals.player_flip = tween_init(0.2, tween_lerp);
+      globals.player_flip = tween_init(0.2, tween_norm);
     }
     if player.dir == 0 {
       player.dir = dir;
@@ -582,8 +586,9 @@ bean_game_tick :: (map: *Map, dt: float) {
 
     case .SWING; { // TODO: Momentum carry after jumping -> steal velocity from the particle we were on and add it to the impulse.
       if input.rope_slide_dir > 0 {
-        lerp ??
+        env_rope_move_body_up(player.swinging_from);
       } else if input.rope_slide_dir < 0 {
+        env_rope_move_body_down(player.swinging_from);
       }
 
       if input.jump {
@@ -839,7 +844,7 @@ main :: () {
   move_force = floor_friction_force;
   accel_force = player.mass * xy(PLAYER_MOVE_SPEED / PLAYER_TIME_TO_ACCELERATE, 0) + floor_friction_force;
 
-  player_flip = tween_init(0.2, tween_lerp);
+  player_flip = tween_init(0.2, tween_norm);
 
   map.cam.offset = {RESOLUTION_W/2, RESOLUTION_H/2};
   map.cam.offset -= player.bbox.zw / 2;
