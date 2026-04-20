@@ -9,6 +9,9 @@
 - [X] Coins
 - [X] Wall jumping / friction
 - [ ] Grappling hook
+- [ ] Environmental ropes
+- [ ] Signs with user-specified text
+- [ ] Spikes & traps
 - [X] Player flip direction
 - [X] Autotiling
 - [X] Parallax backgrounds
@@ -88,6 +91,8 @@ Player :: struct {
   wall_dir: float;
   flip: float;
   facing := 1.0;
+
+  swinging_from: *Env_Rope;
 }
 
 Rope :: struct {
@@ -107,6 +112,10 @@ Rope :: struct {
     p: [PARTICLES_PER_CHUNK] Particle; // TODO: Test this value.
     count: int;
   }
+
+  // Visual settings
+  thickness := 5.0;
+  padding := 2.0;
 
   desired_particle_dist: float;
   particle_density: float;
@@ -131,8 +140,7 @@ operator *[] :: (chunks: Linked_List(Rope.Particle_Chunk), index: int) -> *Rope.
 }
 
 particles :: (rope: Rope, body: Code, flags: For_Flags) #expand {
-  #assert !(flags & .REVERSE);
-  for i: 0..rope.num_particles-1 {
+  for <=cast(bool, flags & .REVERSE) i: 0..rope.num_particles-1 {
     #if flags & .POINTER {
       `it := *rope.particles[i];
     } else {
@@ -178,7 +186,7 @@ tween_ease :: (using state: *Tween_State, dt: float) -> float {
   return ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
 }
 
-rope_init :: (rope: *Rope, particle_density := 0.8, jakobsen_iterations := 100) {
+rope_init :: (rope: *Rope, particle_density := 0.3, jakobsen_iterations := 10) {
   rope.particle_density = particle_density;
   rope.jakobsen_iterations = jakobsen_iterations;
   rope.desired_particle_dist = 1.0 / particle_density;
@@ -243,14 +251,6 @@ rope_destroy :: (rope: *Rope, particle_reserves: *Linked_List(Rope.Particle_Chun
     sll_queue_push(particle_reserves, chunk);
     chunk = next;
   }
-}
-
-Player_Update_Inputs :: struct {
-  player: *Player;
-  input: Input_Package;
-  dt: float;
-
-  collision_events: [] Collision_Event;
 }
 
 Camera :: struct {
@@ -386,7 +386,7 @@ get_collision :: (player: *Player, map: *Map, tile_type: Tile_Type) -> [] Collis
   return get_collision(player, map, .[tile_type]);
 }
 
-ENABLE_LEVEL_HOT_RELOAD :: true;
+ENABLE_LEVEL_HOT_RELOAD :: !EMSCRIPTEN;
 TILE_NATIVE_RESOLUTION :: 64;
 TILE_RESOLUTION_DIVISOR :: 2;
 TILE_RESOLUTION :: TILE_NATIVE_RESOLUTION / TILE_RESOLUTION_DIVISOR;
@@ -442,8 +442,6 @@ globals: struct {
   // Misc
   player_flip: Tween_State;
 }
-
-my_awesome_rope: *Env_Rope;
 
 bean_game_tick :: (map: *Map, dt: float) {
   player := *map.player;
@@ -540,10 +538,15 @@ bean_game_tick :: (map: *Map, dt: float) {
       }
 
       // TODO: Should we work this into the main collision system?
-      if check_env_rope_collision_and_attach(my_awesome_rope, player) {
-        player.state = .SWING;
-        player.vel = xy(0,0);
+      // TODO: Momentum carry after latching -> steal velocity from the player and apply to particle as impulse.
+      for * map.environmental_ropes {
+        if player.vel.y < 0 && check_env_rope_collision_and_attach(it, player) {
+          player.state = .SWING;
+          player.vel = xy(0,0);
+          player.swinging_from = it;
+        }
       }
+
 
       apply_force(player, xy(0, GRAVITY*player.mass));
     }
@@ -577,9 +580,15 @@ bean_game_tick :: (map: *Map, dt: float) {
       apply_force(player, xy(0, GRAVITY*player.mass) + globals.wall_friction_force);
     }
 
-    case .SWING; { // TODO: Momentum carry after jumping -> steal velocity from the particle we were on and add it to the impulse
+    case .SWING; { // TODO: Momentum carry after jumping -> steal velocity from the particle we were on and add it to the impulse.
+      if input.rope_slide_dir > 0 {
+        lerp ??
+      } else if input.rope_slide_dir < 0 {
+      }
+
       if input.jump {
-        env_rope_detach_body(my_awesome_rope);
+        env_rope_detach_body(player.swinging_from);
+        player.swinging_from = null;
         // TODO: Pull this out into function?
         player.can_jump = false;
         apply_impulse(player, xy(0, PLAYER_JUMP_VELOCITY));
@@ -663,7 +672,10 @@ bean_game_tick :: (map: *Map, dt: float) {
     }
   }
 
-  simulate_env_rope(my_awesome_rope, dt);
+  for * map.environmental_ropes {
+    simulate_env_rope(it, dt);
+  }
+
   cam_update_tracking(*map.cam, dt);
 }
 
@@ -692,26 +704,27 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     draw_quad(renderer, it.tex, {xy = dsp - cam_pos, zw = xy(TILE_RESOLUTION)}, rotation_angle = it.decorative_rotation);
   }
 
-  {
-
-    rope_width :: 5;
-    for :particles my_awesome_rope {
-      p0 := it.pos - cam_pos;
-      if it_index < my_awesome_rope.num_particles-1 {
-        next_particle := my_awesome_rope.particles[it_index + 1];
+  for rope: map.environmental_ropes {
+    for :particles rope {
+      if it_index < rope.num_particles-1 {
+        next_particle := rope.particles[it_index + 1];
         segment := next_particle.pos - it.pos;
+        padding := unit_vector(segment) * rope.padding;
         perpendicular := xy(-segment.y, segment.x);
         perpendicular = unit_vector(perpendicular);
-        perpendicular *= rope_width;
-        p1 := next_particle.pos - cam_pos;
-        p2 := p1 + perpendicular;
-        p3 := p0 + perpendicular;
+        half_thick := perpendicular * rope.thickness / 2;
+        full_thick := perpendicular * rope.thickness;
+        p0 := -padding + (it.pos - cam_pos) - half_thick;
+        p1 :=  padding + (next_particle.pos - cam_pos) - half_thick;
+        p2 := p1 + full_thick;
+        p3 := p0 + full_thick;
         draw_quad(renderer, p0, p1, p2, p3, {0, 0, 1, 1});
       }
       draw_circle_debug(renderer, it.pos - cam_pos, 2, {1, 0, 0, 1});
     }
+  }
 
-
+  {
     player.flip = globals.player_flip.proc(*globals.player_flip, frame_time);
     dsp_pos := lerp(old_map.player.pos, player.pos, alpha) - cam_pos;
     dsp_dim := player.bbox_dim;
@@ -832,10 +845,6 @@ main :: () {
   map.cam.offset -= player.bbox.zw / 2;
   cam_set_target(*map.cam, player);
 
-  //begin_swing(*my_awesome_rope, 100, player.pos + xy(0, 150));
-  my_awesome_rope = create_env_rope(level_arena, *map, 100, player.pos + xy(0, 150));
-  //player.state = .SWING;
-
   collision_events = collision_event_memory;
   should_run = true;
 
@@ -859,10 +868,6 @@ main :: () {
             map.cam.offset -= player.bbox.zw / 2;
             player = *map.player;
             cam_set_target(*map.cam, player);
-
-            // TODO: DELETE THIS!!!
-            my_awesome_rope = create_env_rope(level_arena, *map, 100, player.pos + xy(0, 150));
-
             player.pos = old_player_pos;
           } else {
             arena_pop_to(level_arena, backup_pos);

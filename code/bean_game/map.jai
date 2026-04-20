@@ -7,6 +7,8 @@ Tile_Type :: enum {
   PLAYER_SPAWN;
   BOUNCE_PAD;
   COIN;
+  ROPE;
+  ROPE_LONG;
 }
 
 Collision_Event :: enum {
@@ -33,7 +35,7 @@ Env_Rope :: struct {
   length: float;
   attached_body: *Rigid_Body; // TODO: Expand this to multiple bodies?
   attached_body_location := -1;
-  max_attachment_distance := 5.0;
+  max_attachment_distance := 8.0;
 }
 
 Map :: struct {
@@ -68,7 +70,7 @@ Map :: struct {
   player: Player;
 
   free_particle_chunks: Linked_List(Rope.Particle_Chunk);
-  environmental_ropes: Linked_List(Env_Rope);
+  environmental_ropes:  Linked_List(Env_Rope);
 
   tiles: [] Tile;
   width, height: int;
@@ -161,6 +163,7 @@ my_split_from_left :: (s: string, byte: u8) -> (left: string, right: string) {
 }
 
 map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) -> Map {
+  // NOTE: Parse text file
   rows_in_header :: 4;
   tis_map :: cast(*Type_Info_Struct) type_info(Map);
 
@@ -217,7 +220,7 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
   for * map {
     // Map data in memory is flipped vertically from file data
     c := raw_map.data[((rows.count-1) - xx it_index.y) * (pitch+newline_size) + xx it_index.x];
-    type := Tile_Type.EMPTY;
+    type := Tile_Type.INVALID;
     if c == {
       case #char "#"; type = .EMPTY;
       case #char "g"; type = .GROUND;
@@ -228,6 +231,11 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
       case #char "p"; {
         type = .PLAYER_SPAWN;
         map.player_spawn = it_index * TILE_RESOLUTION;
+      }
+      case #char "r"; type = .ROPE; #through;
+      case #char "R"; {
+        if type == .EMPTY then type = .ROPE_LONG;
+        create_env_rope(arena, *map, ifx type == .ROPE then TILE_RESOLUTION * 3.0 else TILE_RESOLUTION * 6.0, it_index * TILE_RESOLUTION);
       }
       case; {
         log_error("Error parsing level data on row %. Unrecognized map symbol: %", (rows.count+rows_in_header)-it_index.y, to_string(*c,1));
@@ -380,6 +388,11 @@ create_env_rope :: (arena: *Arena, map: *Map, length: float, anchor: Vector2) ->
   return rope;
 }
 
+env_rope_attach_at :: (rope: *Env_Rope, body: *Rigid_Body, index: int) {
+  rope.attached_body_location = index;
+  rope.attached_body = body;
+}
+
 check_env_rope_collision_and_attach :: (rope: *Env_Rope, body: *Rigid_Body) -> bool {
   closest_particle := -1;
   closest_distance := rope.max_attachment_distance;
@@ -392,8 +405,7 @@ check_env_rope_collision_and_attach :: (rope: *Env_Rope, body: *Rigid_Body) -> b
   }
 
   if closest_particle != -1 {
-    rope.attached_body_location = closest_particle;
-    rope.attached_body = body;
+    env_rope_attach_at(rope, body, closest_particle);
     return true;
   }
 
