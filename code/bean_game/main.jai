@@ -185,6 +185,13 @@ tween_norm :: (using state: *Tween_State, dt: float) -> float {
   return t;
 }
 
+tween_norm_unsaturated :: (using state: *Tween_State, dt: float) -> float {
+  index += dt;
+  t := norm(started_at + index, started_at, started_at + duration);
+  if t >= 1.0 then active = false;
+  return t;
+}
+
 tween_ease :: (using state: *Tween_State, dt: float) -> float {
   t := tween_norm(state, dt);
   return ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
@@ -678,7 +685,8 @@ bean_game_tick :: (map: *Map, dt: float) {
   }
 
   for * map.environmental_ropes {
-    simulate_env_rope(it, dt);
+    still_changing_rope_position := it == player.swinging_from && input.rope_slide_dir != 0;
+    simulate_env_rope(it, dt, still_changing_rope_position);
   }
 
   cam_update_tracking(*map.cam, dt);
@@ -782,7 +790,7 @@ main_loop :: (ctx: *void) #c_call {
 
   reset_temporary_storage();
 
-  dt :: 0.01; // 1.0 / 60.0
+  dt :: 0.01; // 100 hz
   end := SDL_GetTicks();
   frame_time := (end - globals.start) / 1000.0;
   globals.start = end;

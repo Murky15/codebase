@@ -390,8 +390,7 @@ create_env_rope :: (arena: *Arena, map: *Map, length: float, anchor: Vector2) ->
   }
   sll_queue_push(*map.environmental_ropes, rope);
 
-  total_transition_time := (1.0 / rope.transition_velocity) * rope.length;
-  rope.partial_transition_time = total_transition_time / rope.num_particles;
+  rope.partial_transition_time = (1.0 / rope.transition_velocity) * rope.desired_particle_dist;
 
   return rope;
 }
@@ -422,13 +421,13 @@ check_env_rope_collision_and_attach :: (rope: *Env_Rope, body: *Rigid_Body) -> b
 
 env_rope_move_body_up :: (rope: *Env_Rope) {
   if rope.body == null || rope.body_transition.active then return;
-  rope.body_transition = tween_init(rope.partial_transition_time, tween_norm);
+  rope.body_transition = tween_init(rope.partial_transition_time, tween_norm_unsaturated);
   rope.body_location_next = max(rope.body_location - 1, 0);
 }
 
 env_rope_move_body_down :: (rope: *Env_Rope) {
   if rope.body == null || rope.body_transition.active then return;
-  rope.body_transition = tween_init(rope.partial_transition_time, tween_norm);
+  rope.body_transition = tween_init(rope.partial_transition_time, tween_norm_unsaturated);
   rope.body_location_next = min(rope.body_location + 1, rope.num_particles - 1);
 }
 
@@ -437,7 +436,7 @@ env_rope_detach_body :: (rope: *Env_Rope) {
   rope.body_location = -1;
 }
 
-simulate_env_rope :: (rope: *Env_Rope, dt: float) {
+simulate_env_rope :: (rope: *Env_Rope, dt: float, still_changing_rope_position: bool) {
   binding_particle: *Rope.Particle;
   additional_accel: Vector2;
   if rope.body != null {
@@ -457,8 +456,21 @@ simulate_env_rope :: (rope: *Env_Rope, dt: float) {
 
       // Ended this frame
       if !rope.body_transition.active {
+        // NOTE: This is a crappy way to get around a timing bug where the time to scale the rope increases
+        // directly with the particle density due to the accumulation of incorrect timekeeping here.
+        // There has to be a better way to do this.
+        direction := rope.body_location_next - rope.body_location;
         rope.body_location = rope.body_location_next;
         rope.body_location_next = -1;
+        if still_changing_rope_position && direction != 0 {
+          overflow := (t - 1.0) * rope.body_transition.duration;
+          if direction == -1 {
+            env_rope_move_body_up(rope);
+          } else if direction == 1 {
+            env_rope_move_body_down(rope);
+          }
+          rope.body_transition.index += overflow;
+        }
       }
     }
     binding_particle.accel -= additional_accel; // Should this be an assignment to avoid floating point errors?
