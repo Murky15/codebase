@@ -464,11 +464,13 @@ simulate_env_rope :: (rope: *Env_Rope, dt: float, still_changing_rope_position: 
         rope.body_location_next = -1;
         if still_changing_rope_position && direction != 0 {
           overflow := (t - 1.0) * rope.body_transition.duration;
+          ended_at := rope.body_transition.started_at + rope.body_transition.duration;
           if direction == -1 {
             env_rope_move_body_up(rope);
           } else if direction == 1 {
             env_rope_move_body_down(rope);
           }
+          rope.body_transition.started_at = ended_at;
           rope.body_transition.index += overflow;
         }
       }
