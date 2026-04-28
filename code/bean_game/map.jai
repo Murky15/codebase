@@ -33,10 +33,12 @@ TILE_TILT_AMPLITUDE :: 5;
 Env_Rope :: struct {
   #as using rope: Rope;
   length: float;
+
   body: *Rigid_Body; // TODO: Expand this to multiple bodies?
   body_location      := -1;
   body_location_next := -1;
   body_transition: Tween_State;
+
   transition_velocity := 100.0;
   partial_transition_time: float;
 
@@ -65,10 +67,6 @@ Map :: struct {
 
     #overlay (pos) bbox: AARect;
   }
-  // A dynamic array here will lead to memory
-  // fragmentation because we are using an arena,
-  // which is why I am inclined to use Linked Lists.
-  //background: [..] Parallax_Effect;
   background: Linked_List(Parallax_Effect);
 
   cam: Camera;
@@ -349,7 +347,7 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
     cloud.layer = layer;
     w, h: float;
     SDL_GetTextureSize(cloud_texture, *w, *h);
-    cloud.size = xy(w, h);
+    cloud.size = xy(w,h);
     x := random_get_within_range(-cloud.size.x, (map.width-1.0) * TILE_RESOLUTION);
     y := random_get_within_range(-cloud.size.y, (map.height-1.0) * TILE_RESOLUTION);
     cloud.pos = xy(x,y);
@@ -359,7 +357,7 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
 
   map.player.pos = map.player_spawn;
   map.player.texture = (.*)table_find_pointer(*textures, "character_roundRed");
-  map.player.mass = 50;
+  map.player.mass = 10;
 
   return map;
 }
@@ -383,7 +381,10 @@ create_env_rope :: (arena: *Arena, map: *Map, length: float, anchor: Vector2) ->
   rope.length = rope.desired_particle_dist * num_particles;
   for i: 0..num_particles-1 {
     particle: rope.Particle;
-    if i == 0 then particle.fixed = true;
+    if i == 0 {
+      particle.invmass = 0;
+      particle.fixed = true;
+    }
     particle.pos = anchor + xy(i * rope.desired_particle_dist, 0);
     particle.old_pos = particle.pos;
     rope_push_particle(arena, rope, *map.free_particle_chunks, particle);
@@ -395,12 +396,7 @@ create_env_rope :: (arena: *Arena, map: *Map, length: float, anchor: Vector2) ->
   return rope;
 }
 
-env_rope_attach_at :: (rope: *Env_Rope, body: *Rigid_Body, index: int) {
-  rope.body_location = index;
-  rope.body = body;
-}
-
-check_env_rope_collision_and_attach :: (rope: *Env_Rope, body: *Rigid_Body) -> bool {
+check_env_rope_collision_and_attach :: (rope: *Env_Rope, body: *Rigid_Body, dt: float) -> bool {
   closest_particle := -1;
   closest_distance := rope.max_attachment_distance;
   for :particles rope {
@@ -412,7 +408,7 @@ check_env_rope_collision_and_attach :: (rope: *Env_Rope, body: *Rigid_Body) -> b
   }
 
   if closest_particle != -1 {
-    env_rope_attach_at(rope, body, closest_particle);
+    env_rope_attach_at(rope, body, closest_particle, dt);
     return true;
   }
 
@@ -431,23 +427,40 @@ env_rope_move_body_down :: (rope: *Env_Rope) {
   rope.body_location_next = min(rope.body_location + 1, rope.num_particles - 1);
 }
 
-env_rope_detach_body :: (rope: *Env_Rope) {
+env_rope_attach_at :: (rope: *Env_Rope, body: *Rigid_Body, index: int, dt: float) {
+  particle := *rope.particles[index];
+  if !particle.fixed {
+    particle.old_pos = particle.pos - body.vel * dt;
+  }
+  rope.body_location = index;
+  rope.body = body;
+}
+
+env_rope_detach_body :: (rope: *Env_Rope, dt: float) {
+  particle := *rope.particles[rope.body_location];
+  particle_vel := (particle.pos - particle.old_pos) / dt;
+  particle_vel.y = max(PLAYER_ROPE_JUMP_MIN_VELOCITY, particle_vel.y);
+  apply_impulse(rope.body, particle_vel * ROPE_PARTICLE_IMPULSE_SCALE);
+
   rope.body = null;
   rope.body_location = -1;
+  rope.body_location_next = -1;
+  rope.body_transition.active = false;
 }
 
 simulate_env_rope :: (rope: *Env_Rope, dt: float, still_changing_rope_position: bool) {
-  binding_particle: *Rope.Particle;
-  additional_accel: Vector2;
   if rope.body != null {
-    binding_particle = *rope.particles[rope.body_location];
-    additional_accel = rope.body.force / rope.body.mass;
-    binding_particle.accel += additional_accel;
-  }
-  rope_integrate(rope, dt);
-  if rope.body != null {
+    binding_particle := *rope.particles[rope.body_location];
+    additional_accel: Vector2;
+    if !binding_particle.fixed {
+      additional_accel = rope.body.force / rope.body.mass;
+      binding_particle.accel += additional_accel;
+      binding_particle.invmass = 1 / rope.body.mass;
+    }
+    rope_integrate(rope, dt);
     body_pos_p0 := binding_particle.pos - rope.body.bbox_dim / 2;
     rope.body.pos = body_pos_p0;
+
     if rope.body_transition.active {
       next_particle := *rope.particles[rope.body_location_next];
       body_pos_p1 := next_particle.pos - rope.body.bbox_dim / 2;
@@ -475,7 +488,11 @@ simulate_env_rope :: (rope: *Env_Rope, dt: float, still_changing_rope_position: 
         }
       }
     }
-    binding_particle.accel -= additional_accel; // Should this be an assignment to avoid floating point errors?
-    rope.body.force = xy(0,0); // This is mildly inconvinient.
-  }
+    if !binding_particle.fixed {
+      binding_particle.accel -= additional_accel; // Should this be an assignment to avoid floating point errors?
+      binding_particle.invmass = 1;
+    }
+
+    rope.body.force = xy(0,0);
+  } else rope_integrate(rope, dt);
 }

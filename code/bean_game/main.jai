@@ -9,7 +9,7 @@
 - [X] Coins
 - [X] Wall jumping / friction
 - [ ] Grappling hook
-- [ ] Environmental ropes
+- [X] Environmental ropes
 - [ ] Signs with user-specified text
 - [ ] Spikes & traps
 - [X] Player flip direction
@@ -101,9 +101,10 @@ Rope :: struct {
   Particle :: struct {
     pos: Vector2;
     old_pos: Vector2;
+    invmass := 1.0;
     fixed: bool;
 
-    accel := Vector2.{0, GRAVITY * 0.4};
+    accel := Vector2.{0, GRAVITY};
   }
 
   PARTICLES_PER_CHUNK :: 50;
@@ -115,7 +116,7 @@ Rope :: struct {
 
   // Visual settings
   thickness := 5.0;
-  padding := 2.0;
+  padding := 1.0;
 
   desired_particle_dist: float;
   particle_density: float;
@@ -197,7 +198,7 @@ tween_ease :: (using state: *Tween_State, dt: float) -> float {
   return ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
 }
 
-rope_init :: (rope: *Rope, particle_density := 0.3, jakobsen_iterations := 10) {
+rope_init :: (rope: *Rope, particle_density := 0.3, jakobsen_iterations := 50) {
   rope.particle_density = particle_density;
   rope.jakobsen_iterations = jakobsen_iterations;
   rope.desired_particle_dist = 1.0 / particle_density;
@@ -238,18 +239,12 @@ rope_integrate :: (rope: *Rope, dt: float) {
     for i: 1..rope.num_particles-1 {
       p0 := *rope.particles[i-1];
       p1 := *rope.particles[i];
-      dist := distance(p0.pos, p1.pos);
-      dist_error := dist - rope.desired_particle_dist;
-      dir := unit_vector(p1.pos - p0.pos);
-
-      if p0.fixed && !p1.fixed {
-        p1.pos -= dir * dist_error;
-      } else if p1.fixed && !p0.fixed {
-        p0.pos += dir * dist_error;
-      } else if !p0.fixed && !p1.fixed {
-        p0.pos += 0.5 * dir * dist_error;
-        p1.pos -= 0.5 * dir * dist_error;
-      }
+      delta := p1.pos - p0.pos;
+      length := sqrt(dot(delta, delta));
+      diff := (length - rope.desired_particle_dist)
+             /(length * (p0.invmass + p1.invmass));
+      p0.pos += p0.invmass * delta * diff;
+      p1.pos -= p1.invmass * delta * diff;
     }
   }
 }
@@ -408,10 +403,14 @@ FONT_HEIGHT_DIVISOR :: 24;
 
 PLAYER_MOVE_SPEED :: 350.0;
 PLAYER_JUMP_VELOCITY :: 1000.0;
+PLAYER_ROPE_JUMP_MIN_VELOCITY :: PLAYER_JUMP_VELOCITY / 3;
 PLAYER_BOUNCE_PAD_JUMP_VELOCITY :: 1200.0;
 PLAYER_COYOTE_TIME_GRACE_PERIOD :: 0.1;
 PLAYER_TIME_TO_ACCELERATE :: 0.18;
 PLAYER_TIME_IMMOBILE :: 0.3;
+
+ROPE_PARTICLE_IMPULSE_SCALE :: 2;
+
 GRAVITY :: -3800.0;
 
 // NOTE: Some of these things could probably be better organized somewhere else in the future,
@@ -549,15 +548,13 @@ bean_game_tick :: (map: *Map, dt: float) {
       }
 
       // TODO: Should we work this into the main collision system?
-      // TODO: Momentum carry after latching -> steal velocity from the player and apply to particle as impulse.
       for * map.environmental_ropes {
-        if player.vel.y < 0 && check_env_rope_collision_and_attach(it, player) {
+        if player.vel.y < 0 && check_env_rope_collision_and_attach(it, player, dt) {
           player.state = .SWING;
           player.vel = xy(0,0);
           player.swinging_from = it;
         }
       }
-
 
       apply_force(player, xy(0, GRAVITY*player.mass));
     }
@@ -599,11 +596,10 @@ bean_game_tick :: (map: *Map, dt: float) {
       }
 
       if input.jump {
-        env_rope_detach_body(player.swinging_from);
+        env_rope_detach_body(player.swinging_from, dt);
         player.swinging_from = null;
         // TODO: Pull this out into function?
         player.can_jump = false;
-        apply_impulse(player, xy(0, PLAYER_JUMP_VELOCITY));
         player.coyote_counter = PLAYER_COYOTE_TIME_GRACE_PERIOD;
         player.state = .AIR;
       }
@@ -731,9 +727,9 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
         p1 :=  padding + (next_particle.pos - cam_pos) - half_thick;
         p2 := p1 + full_thick;
         p3 := p0 + full_thick;
-        draw_quad(renderer, p0, p1, p2, p3, {0, 0, 1, 1});
+        draw_quad(renderer, p0, p1, p2, p3, {176.0/255, 105.0/255, 219.0/255, 1});
       }
-      draw_circle_debug(renderer, it.pos - cam_pos, 2, {1, 0, 0, 1});
+      //draw_circle_debug(renderer, it.pos - cam_pos, 2, {1, 0, 0, 1});
     }
   }
 
@@ -848,7 +844,7 @@ main :: () {
 
   FRICTION_COEFFICIENT :: 1.8;
   floor_friction_force = xy(-1 * GRAVITY * player.mass * FRICTION_COEFFICIENT, 0);
-  wall_friction_force = xy(0, 130_000);
+  wall_friction_force = xy(0, 3000 * player.mass);
   move_force = floor_friction_force;
   accel_force = player.mass * xy(PLAYER_MOVE_SPEED / PLAYER_TIME_TO_ACCELERATE, 0) + floor_friction_force;
 

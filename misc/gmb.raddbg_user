@@ -20,12 +20,11 @@ window:
           }
           0.50:
           {
-            watch: expression: "query:breakpoints"
+            watch: selected expression: "query:breakpoints"
             watch: expression: "query:watch_pins"
             text:
             {
               expression: "query:output"
-              selected
               query: input: ""
               cursor_line: 1
               cursor_column: 1
@@ -37,21 +36,22 @@ window:
         }
         0.623888:
         {
+          selected
           getting_started
           text:
           {
             selected
-            expression: "file:\"W:/code/bean_game/main.jai\".data"
+            expression: "file:\"W:/code/bean_game/map.jai\".data"
             auto: 1
             query:
             {
               input: ""
               cmd: search
             }
-            cursor_line: 776
-            cursor_column: 1
-            mark_line: 776
-            mark_column: 1
+            cursor_line: 455
+            cursor_column: 17
+            mark_line: 455
+            mark_column: 17
           }
           text:
           {
@@ -84,7 +84,6 @@ window:
         }
         0.40:
         {
-          selected
           watch:
           {
             expression: "query:call_stack"
@@ -122,7 +121,7 @@ window:
     }
   }
   split_x
-  pos: 281 144
+  pos: -11 -6
   monitor: "\\\\.\\DISPLAY1"
   font_size: 11
   maximized
