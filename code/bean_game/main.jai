@@ -84,16 +84,18 @@ Player :: struct {
   state: Player_State;
   health := PLAYER_MAX_LIVES - 1;
 
-  can_jump: bool;
+  can_jump:        bool;
   used_bounce_pad: bool;
-  coyote_counter := PLAYER_COYOTE_TIME_GRACE_PERIOD;
+
+  coyote_counter               := PLAYER_COYOTE_TIME_GRACE_PERIOD;
   wall_jump_immobility_counter := PLAYER_TIME_IMMOBILE;
-  acceleration_counter := PLAYER_TIME_TO_ACCELERATE;
+  acceleration_counter         := PLAYER_TIME_TO_ACCELERATE;
+  damage_cooldown              := PLAYER_GRACE_PERIOD;
 
   texture: [PLAYER_MAX_LIVES] *SDL_Texture;
-  dir: float;
+  dir:      float;
   wall_dir: float;
-  flip: float;
+  flip:     float;
   facing := 1.0;
 
   swinging_from: *Env_Rope;
@@ -161,45 +163,6 @@ Input_Package :: struct {
   dir: float;
   rope_slide_dir: float;
   jump: bool;
-}
-
-Tween_Proc :: #type (state: *Tween_State, dt: float) -> float;
-Tween_State :: struct {
-  duration: float;
-  started_at: float;
-  index: float;
-
-  active: bool;
-  proc: Tween_Proc;
-}
-
-tween_init :: (duration: float, proc: Tween_Proc) -> Tween_State {
-  result: Tween_State;
-  result.duration = duration;
-  result.started_at = SDL_GetTicks() / 1000.0;
-  result.proc = proc;
-  result.active = true;
-
-  return result;
-}
-
-tween_norm :: (using state: *Tween_State, dt: float) -> float {
-  index += dt;
-  t := saturate(norm(started_at + index, started_at, started_at + duration));
-  if t == 1.0 then active = false;
-  return t;
-}
-
-tween_norm_unsaturated :: (using state: *Tween_State, dt: float) -> float {
-  index += dt;
-  t := norm(started_at + index, started_at, started_at + duration);
-  if t >= 1.0 then active = false;
-  return t;
-}
-
-tween_ease :: (using state: *Tween_State, dt: float) -> float {
-  t := tween_norm(state, dt);
-  return ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
 }
 
 rope_init :: (rope: *Rope, particle_density := 0.3, jakobsen_iterations := 50) {
@@ -413,6 +376,8 @@ PLAYER_BOUNCE_PAD_JUMP_VELOCITY :: 1200.0;
 PLAYER_COYOTE_TIME_GRACE_PERIOD :: 0.1;
 PLAYER_TIME_TO_ACCELERATE :: 0.18;
 PLAYER_TIME_IMMOBILE :: 0.3;
+PLAYER_GRACE_PERIOD  :: 0.5;
+PLAYER_BLINK_TIME    :: 0.1;
 
 ROPE_PARTICLE_IMPULSE_SCALE :: 2;
 
@@ -634,31 +599,30 @@ bean_game_tick :: (map: *Map, dt: float) {
   player.vel.x = sign(player.vel.x) * min(abs(player.vel.x), PLAYER_MOVE_SPEED);
 
   // NOTE: Collisions
+  if player.damage_cooldown < PLAYER_GRACE_PERIOD {
+    player.damage_cooldown += dt;
+  }
+
   globals.collision_events.count = 0;
-  while true {
-    obstacle_collisions := get_collision(player, map, .[.GROUND, .WALL]);
-    if obstacle_collisions.count == 0 then break;
-    for obstacle_collisions {
-      player_pos_diff := player.pos - old_player.pos;
-      if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, it.bbox) {
-        if player.vel.y < 0 {
-          player.pos.y += it.overlap.w;
-          globals.collision_events.count += 1;
-          globals.collision_events[globals.collision_events.count-1] = .FLOOR;
-        } else player.pos.y -= it.overlap.w;
-        player.vel.y = 0;
-      } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
-        player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
-        player.dir = 0;
-        player.vel.x = 0;
-        if it.tile.type == .WALL && player.vel.y < 0 {
-          globals.collision_events.count += 1;
-          globals.collision_events[globals.collision_events.count-1] = .WALL_SLIDE;
-        }
+  obstacle_collisions := get_collision(player, map, .[.GROUND, .WALL]);
+  for obstacle_collisions {
+    player_pos_diff := player.pos - old_player.pos;
+    if rects_intersect(old_player.bbox + {y=player_pos_diff.y}, it.bbox) {
+      if player.vel.y < 0 {
+        player.pos.y += it.overlap.w;
+        globals.collision_events.count += 1;
+        globals.collision_events[globals.collision_events.count-1] = .FLOOR;
+      } else player.pos.y -= it.overlap.w;
+      player.vel.y = 0;
+    } else if rects_intersect(old_player.bbox + {x=player_pos_diff.x}, it.bbox) {
+      player.pos.x += -sign(player_pos_diff.x) * it.overlap.z;
+      player.dir = 0;
+      player.vel.x = 0;
+      if it.tile.type == .WALL && player.vel.y < 0 {
+        globals.collision_events.count += 1;
+        globals.collision_events[globals.collision_events.count-1] = .WALL_SLIDE;
       }
     }
-
-    old_player.pos = player.pos;
   }
 
   if get_collision(player, map, .BOUNCE_PAD) {
@@ -668,6 +632,21 @@ bean_game_tick :: (map: *Map, dt: float) {
       player.used_bounce_pad = true;
     }
   } else player.used_bounce_pad = false;
+
+  if player.damage_cooldown >= PLAYER_GRACE_PERIOD && get_collision(player, map, .[.SPIKE, .SPIKE_SPINNING]) {
+    player.health -= 1;
+    player.damage_cooldown = 0;
+  }
+
+  if player.health < PLAYER_MAX_LIVES - 1 {
+    hearts := get_collision(player, map, .HEART);
+    for hearts {
+      if !it.tile.collected {
+        it.tile.collected = true;
+        player.health = min(player.health + 1, PLAYER_MAX_LIVES - 1);
+      }
+    }
+  }
 
   coins := get_collision(player, map, .COIN);
   for coins {
@@ -679,12 +658,9 @@ bean_game_tick :: (map: *Map, dt: float) {
 
   for * map {
     if it.collected then continue;
-    if it.type == .COIN || it.type == .WATER {
+    if it.bobs {
       it.bob_counter += dt;
       it.bob_counter = fmod_cycling(it.bob_counter, (2 * PI) / it.bob_frequency);
-    }
-    if it.type == .SPIKE_SPINNING {
-      it.rotation += it.angular_speed * dt;
     }
   }
 
@@ -733,11 +709,12 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     }
   }
 
-  for :visible_only map {
+  for * :visible_only map {
     if it.tex == null then continue;
     if it.collected then continue;
     dsp := it_index * TILE_RESOLUTION;
     dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
+    it.rotation += it.angular_speed * frame_time;
     draw_quad(renderer, it.tex, {xy = dsp - cam_pos, zw = xy(TILE_RESOLUTION)}, rotation_angle = it.rotation);
   }
 
@@ -749,7 +726,12 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     dsp_pos.x += (player.bbox_dim.x - dsp_dim.x) / 2;
     toggle := player.facing > 0;
     if player.flip > 0.5 then toggle = !toggle;
-    draw_quad(renderer, player.texture[player.health], {xy = dsp_pos, zw = dsp_dim}, flip_x = toggle);
+    show := true;
+    if player.damage_cooldown < PLAYER_GRACE_PERIOD {
+      blink := cast(int) (player.damage_cooldown / PLAYER_BLINK_TIME);
+      if blink % 2 == 0 then show = false; else show = true;
+    }
+    if show then draw_quad(renderer, player.texture[player.health], {xy = dsp_pos, zw = dsp_dim}, flip_x = toggle);
   }
 
   {

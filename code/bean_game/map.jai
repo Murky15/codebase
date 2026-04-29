@@ -4,6 +4,7 @@ Tile_Type :: enum {
   BOUNCE_PAD;
   COIN;
   GROUND;
+  HEART;
   PLAYER_SPAWN;
   ROPE;
   ROPE_LONG;
@@ -26,9 +27,10 @@ Tile :: struct {
   rotation: float;
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
 
+  bobs: bool;
   bob_counter: float;
   bob_amplitude: float;
-  bob_frequency :: PI;
+  bob_frequency: float;
   collected: bool;
 
   angular_speed: float;
@@ -250,6 +252,7 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
       }
       case #char "S"; type = .SPIKE_SPINNING;
       case #char "s"; type = .SPIKE;
+      case #char "H"; type = .HEART;
       case #char "h"; type = .SPIKE_TRAP;
       case #char "t"; type = .WALL;
       case #char "w"; type = .WATER;
@@ -301,6 +304,7 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
   env_rope_anchor_texture := atlas_fetch(*textures, "tile_crateSmall");
   spike_texture           := atlas_fetch(*textures, "tile_spikes");
   spike_spinning_texture  := atlas_fetch(*textures, "tile_spike");
+  heart_texture           := atlas_fetch(*textures, "tile_heart");
 
 
   // NOTE: Not associated with tiles
@@ -342,6 +346,8 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
       }
       case .WATER; {
         it.tex = above_ground_tiles[2].tex;
+        it.bobs = true;
+        it.bob_frequency = PI / 2;
         it.bob_counter = random_get_within_range(0, (2 * PI) / it.bob_frequency);
         it.bob_amplitude = 5.0;
       }
@@ -351,8 +357,21 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
       }
       case .COIN; {
         it.tex = atile_choose(coin_textures);
+        it.bobs = true;
+        it.bob_frequency = PI;
         it.bob_counter = random_get_within_range(0, (2 * PI) / it.bob_frequency);
         it.bob_amplitude = 3.0;
+      }
+      case .HEART; {
+        it.tex = heart_texture;
+        it.bobs = true;
+        it.bob_frequency = 2 * PI;
+        it.bob_counter = random_get_within_range(0, (2 * PI) / it.bob_frequency);
+        it.bob_amplitude = 3.0;
+      }
+      case .SPIKE_SPINNING; {
+        it.tex = spike_spinning_texture;
+        it.angular_speed = TILE_SPIKE_SPINNING_ANGULAR_SPEED;
       }
 
       case .WALL; it.tex = tower_texture;
@@ -360,10 +379,6 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
       case .ROPE; it.tex = env_rope_anchor_texture;
       case .SPIKE_TRAP; #through;
       case .SPIKE; it.tex = spike_texture;
-      case .SPIKE_SPINNING; {
-        it.tex = spike_spinning_texture;
-        it.angular_speed = TILE_SPIKE_SPINNING_ANGULAR_SPEED;
-      }
     }
   }
 

@@ -169,6 +169,45 @@ sll_stack_pop :: (using list: *Linked_List, n: *$T/Linked_List_Header) {
   list.count -= 1;
 }
 
+Tween_Proc :: #type (state: *Tween_State, dt: float) -> float;
+Tween_State :: struct {
+  duration: float;
+  started_at: float;
+  index: float;
+
+  active: bool;
+  proc: Tween_Proc;
+}
+
+tween_init :: (duration: float, proc: Tween_Proc) -> Tween_State {
+  result: Tween_State;
+  result.duration = duration;
+  result.started_at = SDL_GetTicks() / 1000.0;
+  result.proc = proc;
+  result.active = true;
+
+  return result;
+}
+
+tween_norm :: (using state: *Tween_State, dt: float) -> float {
+  index += dt;
+  t := saturate(norm(started_at + index, started_at, started_at + duration));
+  if t == 1.0 then active = false;
+  return t;
+}
+
+tween_norm_unsaturated :: (using state: *Tween_State, dt: float) -> float {
+  index += dt;
+  t := norm(started_at + index, started_at, started_at + duration);
+  if t >= 1.0 then active = false;
+  return t;
+}
+
+tween_ease :: (using state: *Tween_State, dt: float) -> float {
+  t := tween_norm(state, dt);
+  return ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
+}
+
 /* NOTE: Fun experiment but not very practical.
 Coroutine_Proc :: #type (*void);
 
