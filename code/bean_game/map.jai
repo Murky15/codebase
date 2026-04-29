@@ -1,14 +1,17 @@
 Tile_Type :: enum {
   INVALID;
   EMPTY;
-  GROUND;
-  WALL;
-  WATER;
-  PLAYER_SPAWN;
   BOUNCE_PAD;
   COIN;
+  GROUND;
+  PLAYER_SPAWN;
   ROPE;
   ROPE_LONG;
+  SPIKE;
+  SPIKE_SPINNING;
+  SPIKE_TRAP;
+  WALL;
+  WATER;
 }
 
 Collision_Event :: enum {
@@ -20,15 +23,18 @@ Collision_Event :: enum {
 Tile :: struct {
   type: Tile_Type;
   tex: *SDL_Texture;
+  rotation: float;
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
-  decorative_rotation: float;
 
   bob_counter: float;
   bob_amplitude: float;
   bob_frequency :: PI;
   collected: bool;
+
+  angular_speed: float;
 }
 TILE_TILT_AMPLITUDE :: 5;
+TILE_SPIKE_SPINNING_ANGULAR_SPEED :: 500.0;
 
 Env_Rope :: struct {
   #as using rope: Rope;
@@ -165,6 +171,10 @@ my_split_from_left :: (s: string, byte: u8) -> (left: string, right: string) {
   return left, advance(s, cursor);
 }
 
+atlas_fetch :: inline (atlas: *Texture_Atlas, key: string) -> *SDL_Texture {
+  return (.*)table_find_pointer(atlas, key);
+}
+
 map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) -> Map {
   // NOTE: Parse text file
   rows_in_header :: 4;
@@ -226,19 +236,26 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
     type := Tile_Type.INVALID;
     if c == {
       case #char "#"; type = .EMPTY;
-      case #char "g"; type = .GROUND;
       case #char "b"; type = .BOUNCE_PAD;
       case #char "c"; type = .COIN;
-      case #char "w"; type = .WATER;
-      case #char "t"; type = .WALL;
-      case #char "p"; {
-        type = .PLAYER_SPAWN;
-        map.player_spawn = it_index * TILE_RESOLUTION;
-      }
+      case #char "g"; type = .GROUND;
       case #char "r"; type = .ROPE; #through;
       case #char "R"; {
         if type == .EMPTY then type = .ROPE_LONG;
-        create_env_rope(arena, *map, ifx type == .ROPE then TILE_RESOLUTION * 3.0 else TILE_RESOLUTION * 6.0, it_index * TILE_RESOLUTION);
+        length := ifx type == .ROPE then TILE_RESOLUTION * 3.0 else TILE_RESOLUTION * 6.0;
+        anchor_pos := it_index * TILE_RESOLUTION;
+        anchor_pos.x += TILE_RESOLUTION / 2;
+        anchor_pos.y += 1; // Padding
+        create_env_rope(arena, *map, length, anchor_pos);
+      }
+      case #char "S"; type = .SPIKE_SPINNING;
+      case #char "s"; type = .SPIKE;
+      case #char "h"; type = .SPIKE_TRAP;
+      case #char "t"; type = .WALL;
+      case #char "w"; type = .WATER;
+      case #char "p"; {
+        type = .PLAYER_SPAWN;
+        map.player_spawn = it_index * TILE_RESOLUTION;
       }
       case; {
         log_error("Error parsing level data on row %. Unrecognized map symbol: %", (rows.count+rows_in_header)-it_index.y, to_string(*c,1));
@@ -258,7 +275,7 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
   }
   atile :: (tex_name: string, probability := 100.0, default := false, layer := 1) -> Autotile #expand {
     #assert layer <= Map.max_parallax_layers;
-    return {(.*)table_find_pointer(*`textures, tex_name), probability, default, layer};
+    return {atlas_fetch(*textures, tex_name), probability, default, layer};
   }
   atile_choose :: inline (tiles: [] Autotile) -> *SDL_Texture, u64 {
     default: *Autotile;
@@ -276,19 +293,21 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
   }
 
   // NOTE: Associated with tiles
-  above_ground_tiles := Autotile.[atile("tile_grass"), atile("tile_top"), atile("tile_water")];
-  below_ground_tiles := Autotile.[atile("tile", 50.0, true), atile("tile_diagonal", 16.0), atile("tile_stone", 16.0), atile("tile_border", 16.0)];
-  bounce_pad_texture := (.*)table_find_pointer(*textures, "tile_belt");
-  tower_texture := (.*)table_find_pointer(*textures, "tile_brick");
-  // TODO: A lot of textures have alternate counterparts (coins/gems spikes/cogs)
-  // Should we autotile these or keep them as separate entities?
-  coin_textures := Autotile.[atile("tile_coin", 50), atile("tile_gem", 50)];
+  above_ground_tiles      := Autotile.[atile("tile_grass"), atile("tile_top"), atile("tile_water")];
+  below_ground_tiles      := Autotile.[atile("tile", 50.0, true), atile("tile_diagonal", 16.0), atile("tile_stone", 16.0), atile("tile_border", 16.0)];
+  coin_textures           := Autotile.[atile("tile_coin", 50), atile("tile_gem", 50)];
+  bounce_pad_texture      := atlas_fetch(*textures, "tile_belt");
+  tower_texture           := atlas_fetch(*textures, "tile_brick");
+  env_rope_anchor_texture := atlas_fetch(*textures, "tile_crateSmall");
+  spike_texture           := atlas_fetch(*textures, "tile_spikes");
+  spike_spinning_texture  := atlas_fetch(*textures, "tile_spike");
+
 
   // NOTE: Not associated with tiles
   // TODO: I'm temporarily removing `atile("background_treeLarge", 4.0, layer=2), atile("background_tree", 4.0, layer=2)` from the following list because I can't figure out
   // how to make them look good with parallax scrolling
   environment_textures := Autotile.[atile("tile_tree", 8.0, layer=1), atile("tile_bushHalf", 8.0, layer=1), atile("tile_bush", 8.0, layer=1)];
-  cloud_textures := Autotile.[atile("background_cloudA", 50.0, layer=3), atile("background_cloudB", 50.0, layer=3)];
+  cloud_textures       := Autotile.[atile("background_cloudA", 50.0, layer=3), atile("background_cloudB", 50.0, layer=3)];
 
   for * map {
     above := map_index(map, it_index + {0, 1}).type;
@@ -313,15 +332,14 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
         sll_queue_push(*map.background, foliage);
       }
       case .GROUND; {
-        it.decorative_rotation = random_get_within_range(-TILE_TILT_AMPLITUDE, TILE_TILT_AMPLITUDE);
+        it.rotation = random_get_within_range(-TILE_TILT_AMPLITUDE, TILE_TILT_AMPLITUDE);
         it.tex = ifx above != .GROUND && above != .WATER {
           ifx below != .GROUND then above_ground_tiles[1].tex else above_ground_tiles[0].tex;
         } else {
-          it.decorative_rotation += 90.0 * (random_get() % 4);
+          it.rotation += 90.0 * (random_get() % 4);
           atile_choose(below_ground_tiles);
         }
       }
-      case .WALL; it.tex = tower_texture;
       case .WATER; {
         it.tex = above_ground_tiles[2].tex;
         it.bob_counter = random_get_within_range(0, (2 * PI) / it.bob_frequency);
@@ -335,6 +353,16 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
         it.tex = atile_choose(coin_textures);
         it.bob_counter = random_get_within_range(0, (2 * PI) / it.bob_frequency);
         it.bob_amplitude = 3.0;
+      }
+
+      case .WALL; it.tex = tower_texture;
+      case .ROPE_LONG; #through;
+      case .ROPE; it.tex = env_rope_anchor_texture;
+      case .SPIKE_TRAP; #through;
+      case .SPIKE; it.tex = spike_texture;
+      case .SPIKE_SPINNING; {
+        it.tex = spike_spinning_texture;
+        it.angular_speed = TILE_SPIKE_SPINNING_ANGULAR_SPEED;
       }
     }
   }
@@ -356,7 +384,9 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
   }
 
   map.player.pos = map.player_spawn;
-  map.player.texture = (.*)table_find_pointer(*textures, "character_roundRed");
+  map.player.texture[2] = atlas_fetch(*textures, "character_roundRed");
+  map.player.texture[1] = atlas_fetch(*textures, "character_roundYellow");
+  map.player.texture[0] = atlas_fetch(*textures, "character_roundPurple");
   map.player.mass = 10;
 
   return map;

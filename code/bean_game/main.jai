@@ -1,4 +1,7 @@
 /* TODO
+X = completed
+O = Scrapped / Pushed back to later release
+
 - [X] Levels stored as text files
 - [X] Custom for expansion for looping over map
 - [X] Correctly handling window resizes
@@ -8,33 +11,33 @@
 - [X] Bounce pads
 - [X] Coins
 - [X] Wall jumping / friction
-- [ ] Grappling hook
 - [X] Environmental ropes
-- [ ] Signs with user-specified text
-- [ ] Spikes & traps
 - [X] Player flip direction
 - [X] Autotiling
 - [X] Parallax backgrounds
 - [X] Coroutines
-- [ ] Hands
-- [ ] Cosmetics
 - [X] Debug messages and font display (Custom logger that writes messages to the screen!)
 - [X] Occlusion culling
-- [ ] Main menu
 - [X] Include user data in logger to change message display duration
-- [ ] Audio
-- [ ] Downloading level files from the web and checking for updates
 - [X] Physics system overhaul
 - [X] WASM build with Emscripten + SDL3
 - [X] SDL transition
-- [ ] using,map to clean up SDL3 imports
 - [X] Remove coroutines
-- [ ] Maybe coroutines could be useful actually
 - [X] Fixed Arena implementation
-- [ ] To communicate player health instead of hearts we could switch player sprite from green -> yellow -> red -> dead
-- [ ] Bordered rects could be drawn with SDL_Rect whatever in a for loop increasing the offset and decreasing the dim each time
 - [X] Bounce pad bug where the player collides for multiple frames
 - [X] Fixed timestep
+- [O] Grappling hook
+- [O] using,map to clean up SDL3 imports
+- [O] Maybe coroutines could be useful actually
+- [ ] Hands
+- [ ] Signs with user-specified text
+- [ ] Spikes & traps
+- [ ] Cosmetics
+- [ ] Main menu
+- [ ] Audio
+- [ ] Downloading level files from the web and checking for updates
+- [ ] To communicate player health instead of hearts we could switch player sprite from green -> yellow -> red -> dead
+- [ ] Bordered rects could be drawn with SDL_Rect whatever in a for loop increasing the offset and decreasing the dim each time
 - [ ] Fix fullscreen projection, or figure out how to draw in the borders for odd aspect ratios
 */
 
@@ -79,6 +82,7 @@ Player :: struct {
   body.bbox_dim = Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
 
   state: Player_State;
+  health := PLAYER_MAX_LIVES - 1;
 
   can_jump: bool;
   used_bounce_pad: bool;
@@ -86,7 +90,7 @@ Player :: struct {
   wall_jump_immobility_counter := PLAYER_TIME_IMMOBILE;
   acceleration_counter := PLAYER_TIME_TO_ACCELERATE;
 
-  texture: *SDL_Texture;
+  texture: [PLAYER_MAX_LIVES] *SDL_Texture;
   dir: float;
   wall_dir: float;
   flip: float;
@@ -401,6 +405,7 @@ RESOLUTION_H :: 360;
 ASPECT_RATIO :: cast(float) RESOLUTION_W / RESOLUTION_H;
 FONT_HEIGHT_DIVISOR :: 24;
 
+PLAYER_MAX_LIVES :: 3;
 PLAYER_MOVE_SPEED :: 350.0;
 PLAYER_JUMP_VELOCITY :: 1000.0;
 PLAYER_ROPE_JUMP_MIN_VELOCITY :: PLAYER_JUMP_VELOCITY / 3;
@@ -678,6 +683,9 @@ bean_game_tick :: (map: *Map, dt: float) {
       it.bob_counter += dt;
       it.bob_counter = fmod_cycling(it.bob_counter, (2 * PI) / it.bob_frequency);
     }
+    if it.type == .SPIKE_SPINNING {
+      it.rotation += it.angular_speed * dt;
+    }
   }
 
   for * map.environmental_ropes {
@@ -705,14 +713,6 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     draw_quad(renderer, it.tex, {xy = it.pos - parallax_cam, zw = it.size});
   }
 
-  for :visible_only map {
-    if it.tex == null then continue;
-    if it.collected then continue;
-    dsp := it_index * TILE_RESOLUTION;
-    dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
-    draw_quad(renderer, it.tex, {xy = dsp - cam_pos, zw = xy(TILE_RESOLUTION)}, rotation_angle = it.decorative_rotation);
-  }
-
   for rope: map.environmental_ropes {
     for :particles rope {
       if it_index < rope.num_particles-1 {
@@ -733,6 +733,14 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     }
   }
 
+  for :visible_only map {
+    if it.tex == null then continue;
+    if it.collected then continue;
+    dsp := it_index * TILE_RESOLUTION;
+    dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
+    draw_quad(renderer, it.tex, {xy = dsp - cam_pos, zw = xy(TILE_RESOLUTION)}, rotation_angle = it.rotation);
+  }
+
   {
     player.flip = globals.player_flip.proc(*globals.player_flip, frame_time);
     dsp_pos := lerp(old_map.player.pos, player.pos, alpha) - cam_pos;
@@ -741,7 +749,7 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     dsp_pos.x += (player.bbox_dim.x - dsp_dim.x) / 2;
     toggle := player.facing > 0;
     if player.flip > 0.5 then toggle = !toggle;
-    draw_quad(renderer, player.texture, {xy = dsp_pos, zw = dsp_dim}, flip_x = toggle);
+    draw_quad(renderer, player.texture[player.health], {xy = dsp_pos, zw = dsp_dim}, flip_x = toggle);
   }
 
   {
@@ -816,23 +824,23 @@ main :: () {
   SDL_SetRenderVSync(renderer, 1);
 
   texture_atlas = load_assets(renderer);
-  coin_texture = (.*)table_find_pointer(*texture_atlas, "tile_coin"); // Duplicate
-  x_texture = (.*)table_find_pointer(*texture_atlas, "ui_numX");
+  coin_texture = atlas_fetch(*texture_atlas, "tile_coin"); // Duplicate
+  x_texture = atlas_fetch(*texture_atlas, "ui_numX");
 
-  number_textures = *SDL_Texture.[(.*)table_find_pointer(*texture_atlas, "ui_num0"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num1"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num2"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num3"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num4"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num5"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num6"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num7"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num8"),
-                                    (.*)table_find_pointer(*texture_atlas, "ui_num9")];
-  cosmetic_textures = *SDL_Texture.[(.*)table_find_pointer(*texture_atlas, "item_hat"),
-                                      (.*)table_find_pointer(*texture_atlas, "item_hatTop"),
-                                      (.*)table_find_pointer(*texture_atlas, "item_helmet"),
-                                      (.*)table_find_pointer(*texture_atlas, "item_helmetModern")];
+  number_textures = *SDL_Texture.[atlas_fetch(*texture_atlas, "ui_num0"),
+                                    atlas_fetch(*texture_atlas, "ui_num1"),
+                                    atlas_fetch(*texture_atlas, "ui_num2"),
+                                    atlas_fetch(*texture_atlas, "ui_num3"),
+                                    atlas_fetch(*texture_atlas, "ui_num4"),
+                                    atlas_fetch(*texture_atlas, "ui_num5"),
+                                    atlas_fetch(*texture_atlas, "ui_num6"),
+                                    atlas_fetch(*texture_atlas, "ui_num7"),
+                                    atlas_fetch(*texture_atlas, "ui_num8"),
+                                    atlas_fetch(*texture_atlas, "ui_num9")];
+  cosmetic_textures = *SDL_Texture.[atlas_fetch(*texture_atlas, "item_hat"),
+                                      atlas_fetch(*texture_atlas, "item_hatTop"),
+                                      atlas_fetch(*texture_atlas, "item_helmet"),
+                                      atlas_fetch(*texture_atlas, "item_helmetModern")];
   start = SDL_GetTicks();
   random_seed(cast,trunc(u32) SDL_GetPerformanceCounter());
   backing_buffer_size := 1048576; // 1 mebibyte
