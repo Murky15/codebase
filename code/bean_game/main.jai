@@ -26,12 +26,12 @@ O = Scrapped / Pushed back to later release
 - [X] Fixed Arena implementation
 - [X] Bounce pad bug where the player collides for multiple frames
 - [X] Fixed timestep
+- [X] Spikes & traps
 - [O] Grappling hook
 - [O] using,map to clean up SDL3 imports
 - [O] Maybe coroutines could be useful actually
 - [ ] Hands
 - [ ] Signs with user-specified text
-- [ ] Spikes & traps
 - [ ] Cosmetics
 - [ ] Main menu
 - [ ] Audio
@@ -386,6 +386,13 @@ GRAVITY :: -3800.0;
 // NOTE: Some of these things could probably be better organized somewhere else in the future,
 // but for now this works fine.
 globals: struct {
+  game_state: enum {
+    NONE;
+    MENU;
+    PLAY;
+    PAUSE;
+  } = .MENU;
+
   // Platform handles
   renderer: *SDL_Renderer;
 
@@ -409,9 +416,12 @@ globals: struct {
 
   // Texture cache
   texture_atlas: Texture_Atlas;
-  coin_texture: *SDL_Texture;
-  x_texture: *SDL_Texture;
-  number_textures: [] *SDL_Texture;
+
+  coin_texture:         *SDL_Texture;
+  x_texture:            *SDL_Texture;
+  ui_box_texture:       *SDL_Texture;
+  ui_select_texture:    *SDL_Texture;
+  number_textures:   [] *SDL_Texture;
   cosmetic_textures: [] *SDL_Texture;
 
   // Timing
@@ -423,9 +433,7 @@ globals: struct {
   player_flip: Tween_State;
 }
 
-bean_game_tick :: (map: *Map, dt: float) {
-  player := *map.player;
-
+collect_input :: () {
   e: SDL_Event;
   while SDL_PollEvent(*e) {
     if cast(SDL_EventType) e.type == {
@@ -441,13 +449,19 @@ bean_game_tick :: (map: *Map, dt: float) {
         if key == #char "s" || key == SDLK_DOWN  then globals.input_slide_down = down;
         if key == SDLK_SPACE then globals.input_jump = down;
         if key == #char "r" && down {
-          player.pos = map.player_spawn;
-          player.vel = {};
+          globals.map.player.pos = globals.map.player_spawn;
+          globals.map.player.vel = {};
           log("Resetting player");
         }
       }
     }
   }
+}
+
+bean_game_tick :: (map: *Map, dt: float) {
+  player := *map.player;
+
+  collect_input();
 
   dir: float;
   if globals.input_move_left  dir -= 1;
@@ -633,14 +647,20 @@ bean_game_tick :: (map: *Map, dt: float) {
     }
   } else player.used_bounce_pad = false;
 
-  if player.damage_cooldown >= PLAYER_GRACE_PERIOD && get_collision(player, map, .[.SPIKE, .SPIKE_SPINNING]) {
-    player.health -= 1;
-    player.damage_cooldown = 0;
+  if player.damage_cooldown >= PLAYER_GRACE_PERIOD {
+    for get_collision(player, map, .[.SPIKE, .SPIKE_SPINNING, .SPIKE_TRAP]) {
+      tile := it.tile;
+      if tile.type == .SPIKE_TRAP && tile.trap_state == .HIDDEN {
+        tile.trap_animation = tween_init(TILE_SPIKE_TRAP_RELEASE_TIME, tween_norm);
+        tile.trap_state = .SPRING;
+      }
+      player.health -= 1;
+      player.damage_cooldown = 0;
+    }
   }
 
   if player.health < PLAYER_MAX_LIVES - 1 {
-    hearts := get_collision(player, map, .HEART);
-    for hearts {
+    for get_collision(player, map, .HEART) {
       if !it.tile.collected {
         it.tile.collected = true;
         player.health = min(player.health + 1, PLAYER_MAX_LIVES - 1);
@@ -648,19 +668,10 @@ bean_game_tick :: (map: *Map, dt: float) {
     }
   }
 
-  coins := get_collision(player, map, .COIN);
-  for coins {
+  for get_collision(player, map, .COIN) {
     if !it.tile.collected {
       it.tile.collected = true;
       map.coins_collected += 1;
-    }
-  }
-
-  for * map {
-    if it.collected then continue;
-    if it.bobs {
-      it.bob_counter += dt;
-      it.bob_counter = fmod_cycling(it.bob_counter, (2 * PI) / it.bob_frequency);
     }
   }
 
@@ -686,7 +697,7 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     parallax_cam := cam_pos / layer_effect;
     cam_view := AARect.{xy=parallax_cam, zw=xy(RESOLUTION_W, RESOLUTION_H)};
     if !rects_intersect(cam_view, it.bbox) then continue;
-    draw_quad(renderer, it.tex, {xy = it.pos - parallax_cam, zw = it.size});
+    draw_quad(renderer, it.tex, {xy = it.pos - parallax_cam, zw = it.size}, rotation_angle = it.rotation);
   }
 
   for rope: map.environmental_ropes {
@@ -709,12 +720,51 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     }
   }
 
-  for * :visible_only map {
+  for * map {
+    if it.collected then continue;
+    it.rotation += it.angular_speed * frame_time;
+    if it.bobs {
+      it.bob_counter += frame_time;
+      it.bob_counter = fmod_cycling(it.bob_counter, (2 * PI) / it.bob_frequency);
+    }
+
+    // TODO: Now here is a situation where coroutines could be useful
+    if it.type == .SPIKE_TRAP {
+      if it.trap_state == {
+        case .SPRING; {
+          t := it.trap_animation.proc(*it.trap_animation, frame_time);
+          it.trap_display_offset = lerp(TILE_SPIKE_TRAP_HIDDEN_OFFSET, 0, t);
+          if !it.trap_animation.active {
+            it.trap_state = .ACTIVE;
+            it.trap_animation = tween_init(TILE_SPIKE_TRAP_ACTIVE_DURATION, tween_norm);
+          }
+        }
+
+        case .ACTIVE; {
+          it.trap_animation.proc(*it.trap_animation, frame_time);
+          if !it.trap_animation.active {
+            it.trap_state = .RETRACT;
+            it.trap_animation = tween_init(TILE_SPIKE_TRAP_RETRACT_TIME, tween_norm);
+          }
+        }
+
+        case .RETRACT; {
+          t := it.trap_animation.proc(*it.trap_animation, frame_time);
+          it.trap_display_offset = lerp(0, TILE_SPIKE_TRAP_HIDDEN_OFFSET, t);
+          if !it.trap_animation.active {
+            it.trap_state = .HIDDEN;
+          }
+        }
+      }
+    }
+  }
+
+  for :visible_only map {
     if it.tex == null then continue;
     if it.collected then continue;
     dsp := it_index * TILE_RESOLUTION;
     dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
-    it.rotation += it.angular_speed * frame_time;
+    dsp.y -= it.trap_display_offset;
     draw_quad(renderer, it.tex, {xy = dsp - cam_pos, zw = xy(TILE_RESOLUTION)}, rotation_angle = it.rotation);
   }
 
@@ -764,6 +814,15 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
   SDL_RenderDebugTextFormat(renderer, RESOLUTION_W - 100, 20, "FPS: %", cast(int,1.0/frame_time));
 }
 
+bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer) {
+  collect_input();
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+  SDL_RenderClear(renderer);
+  defer SDL_RenderPresent(renderer);
+
+
+}
+
 main_loop :: (ctx: *void) #c_call {
   push_context,defer_pop cast(*#Context) ctx;
   if !globals.should_run {
@@ -781,15 +840,19 @@ main_loop :: (ctx: *void) #c_call {
   frame_time := (end - globals.start) / 1000.0;
   globals.start = end;
 
-  globals.accumulator += frame_time;
-  while globals.accumulator >= dt {
-    globals.old_map = globals.map; // TODO: Expensive state copy, can we change this to be a pointer swap?
-    bean_game_tick(*globals.map, dt);
-    globals.accumulator -= dt;
-  }
+  if globals.game_state == .MENU {
+    bean_game_main_menu_tick_and_render(globals.renderer);
+  } else if globals.game_state == .PLAY {
+    globals.accumulator += frame_time;
+    while globals.accumulator >= dt {
+      globals.old_map = globals.map; // TODO: Expensive state copy, can we change this to be a pointer swap?
+      bean_game_tick(*globals.map, dt);
+      globals.accumulator -= dt;
+    }
 
-  alpha := saturate(globals.accumulator / dt);
-  bean_game_render(globals.renderer, *globals.map, *globals.old_map, frame_time, xx alpha);
+    alpha := saturate(globals.accumulator / dt);
+    bean_game_render(globals.renderer, *globals.map, *globals.old_map, frame_time, xx alpha);
+  }
 }
 
 main :: () {
@@ -808,6 +871,8 @@ main :: () {
   texture_atlas = load_assets(renderer);
   coin_texture = atlas_fetch(*texture_atlas, "tile_coin"); // Duplicate
   x_texture = atlas_fetch(*texture_atlas, "ui_numX");
+  ui_box_texture = atlas_fetch(*texture_atlas, "ui_box");
+  ui_select_texture = atlas_fetch(*texture_atlas, "ui_select");
 
   number_textures = *SDL_Texture.[atlas_fetch(*texture_atlas, "ui_num0"),
                                     atlas_fetch(*texture_atlas, "ui_num1"),

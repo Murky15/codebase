@@ -24,19 +24,35 @@ Collision_Event :: enum {
 Tile :: struct {
   type: Tile_Type;
   tex: *SDL_Texture;
-  rotation: float;
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
+  collected: bool;
+
+  rotation: float;
+  angular_speed: float;
 
   bobs: bool;
   bob_counter: float;
   bob_amplitude: float;
   bob_frequency: float;
-  collected: bool;
 
-  angular_speed: float;
+  trap_state: enum {
+    NONE;
+    HIDDEN;
+    SPRING;
+    ACTIVE;
+    RETRACT;
+  } = .NONE;
+  trap_animation: Tween_State;
+  trap_index: float;
+  trap_display_offset: float;
 }
-TILE_TILT_AMPLITUDE :: 5;
+
+TILE_TILT_AMPLITUDE :: 5.0;
 TILE_SPIKE_SPINNING_ANGULAR_SPEED :: 500.0;
+TILE_SPIKE_TRAP_HIDDEN_OFFSET :: TILE_RESOLUTION/1.5;
+TILE_SPIKE_TRAP_RELEASE_TIME :: 0.2;
+TILE_SPIKE_TRAP_ACTIVE_DURATION :: 2.0;
+TILE_SPIKE_TRAP_RETRACT_TIME :: 1.0;
 
 Env_Rope :: struct {
   #as using rope: Rope;
@@ -71,6 +87,7 @@ Map :: struct {
     layer: u64;
     pos: Vector2;
     size: Vector2;
+    rotation: float;
     tex: *SDL_Texture;
 
     #overlay (pos) bbox: AARect;
@@ -89,10 +106,13 @@ Map :: struct {
   coins_collected: int;
 }
 
+// NOTE: The `<` on the y loops in these macros is a little hack I came up with
+// so that traps would render behind the tiles below them.
+
 for_expansion :: (map: Map, body: Code, flags: For_Flags) #expand {
   #assert !(flags & .REVERSE);
   if map.tiles.data == null then return;
-  for y: 0..map.height-1 {
+  for < y: 0..map.height-1 {
     for x: 0..map.width-1 {
       index := y * map.width + x;
       #if flags & .POINTER {
@@ -118,7 +138,7 @@ visible_only :: (map: Map, body: Code, flags: For_Flags) #expand {
   min_y := cast(int) cam_min_bounds.y;
   max_x := cast(int) cam_max_bounds.x;
   max_y := cast(int) cam_max_bounds.y;
-  for y: min_y..max_y {
+  for < y: min_y..max_y {
     for x: min_x..max_x {
       `it_index := Vector2.{xx x, xx y};
       #if flags & .POINTER {
@@ -333,6 +353,7 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
         foliage.size = xy(w  * scale /TILE_RESOLUTION_DIVISOR,
                           h * scale /TILE_RESOLUTION_DIVISOR);
         foliage.tex = foliage_texture;
+        foliage.rotation = random_get_within_range(-TILE_TILT_AMPLITUDE, TILE_TILT_AMPLITUDE);
         sll_queue_push(*map.background, foliage);
       }
       case .GROUND; {
@@ -377,7 +398,11 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
       case .WALL; it.tex = tower_texture;
       case .ROPE_LONG; #through;
       case .ROPE; it.tex = env_rope_anchor_texture;
-      case .SPIKE_TRAP; #through;
+
+      case .SPIKE_TRAP; {
+        it.trap_state = .HIDDEN;
+        it.trap_display_offset = TILE_SPIKE_TRAP_HIDDEN_OFFSET;
+      } #through;
       case .SPIKE; it.tex = spike_texture;
     }
   }
