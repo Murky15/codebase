@@ -451,8 +451,8 @@ globals: struct {
     NONE;
     MENU;
     PLAY;
-    PAUSE;
-  } = .MENU;
+  } = .PLAY;
+  paused: bool;
 
   // Platform handles
   renderer: *SDL_Renderer;

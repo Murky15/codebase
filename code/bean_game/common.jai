@@ -208,7 +208,6 @@ tween_ease :: (using state: *Tween_State, dt: float) -> float {
   return ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
 }
 
-/* NOTE: Fun experiment but not very practical.
 Coroutine_Proc :: #type (*void);
 
 Coroutine_Status :: enum {
@@ -220,6 +219,9 @@ Coroutine_Status :: enum {
 Coroutine :: struct {
   status: Coroutine_Status;
   fiber: *void;
+
+  counter: float;
+  wait_duration: float;
 
   proc: Coroutine_Proc;
   param: *void;
@@ -242,9 +244,13 @@ co_create :: (proc: Coroutine_Proc, param := null) -> Coroutine {
   return result;
 }
 
-co_resume :: (co: *Coroutine, in := null, out := null) {
+co_resume :: (co: *Coroutine, dt: float, in := null, out := null) {
   assert(context.co_state != null);
   if co.status == .DEAD then return;
+  if co.counter < co.wait_duration {
+    co.counter += dt;
+    return;
+  }
   prev_caller := context.co_state.calling_fiber;
   prev_active := context.co_state.active_coroutine;
   defer {
@@ -262,23 +268,27 @@ co_resume :: (co: *Coroutine, in := null, out := null) {
   } else co.status = .SUSPENDED;
 }
 
-co_param :: inline () -> *void {
+co_this :: inline () -> *Coroutine {
   assert(context.co_state != null && context.co_state.active_coroutine);
-  return context.co_state.active_coroutine.param;
+  return context.co_state.active_coroutine;
+}
+
+co_param :: inline () -> *void {
+  return co_this().param;
 }
 
 co_input :: inline () -> *void {
-  assert(context.co_state != null && context.co_state.active_coroutine);
-  return context.co_state.active_coroutine.in;
+  return co_this().in;
 }
 
 co_output :: inline () -> *void {
-  assert(context.co_state != null && context.co_state.active_coroutine);
-  return context.co_state.active_coroutine.out;
+  return co_this().out;
 }
 
-co_yield :: () {
-  assert(context.co_state != null && context.co_state.active_coroutine);
+co_yield :: (wait_duration := 0.0) {
+  co := co_this();
+  co.wait_duration = wait_duration;
+  co.counter = 0;
   SwitchToFiber(context.co_state.calling_fiber);
 }
 
@@ -315,7 +325,6 @@ Coroutine_State :: struct {
 }
 
 #scope_export
-*/
 
 round  :: x => ifx x - cast(int) x >= 0.5 then ceil(x) else floor(x);
 sign   :: x => ifx x == 0 then 0 else ifx signbit(x) then -1 else 1;
