@@ -210,14 +210,12 @@ tween_ease :: (using state: *Tween_State, dt: float) -> float {
 
 Coroutine_Proc :: #type (*void);
 
-Coroutine_Status :: enum {
-  DEAD;
-  ACTIVE;
-  SUSPENDED;
-}
-
 Coroutine :: struct {
-  status: Coroutine_Status;
+  status: enum {
+    DEAD;
+    ACTIVE;
+    SUSPENDED;
+  } = .DEAD;
   fiber: *void;
 
   counter: float;
@@ -245,8 +243,7 @@ co_create :: (proc: Coroutine_Proc, param := null) -> Coroutine {
 }
 
 co_resume :: (co: *Coroutine, dt: float, in := null, out := null) {
-  assert(context.co_state != null);
-  if co.status == .DEAD then return;
+  if co.status == .DEAD || context.co_state == null then return;
   if co.counter < co.wait_duration {
     co.counter += dt;
     return;

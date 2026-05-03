@@ -35,15 +35,7 @@ Tile :: struct {
   bob_amplitude: float;
   bob_frequency: float;
 
-  trap_state: enum {
-    NONE;
-    HIDDEN;
-    SPRING;
-    ACTIVE;
-    RETRACT;
-  } = .NONE;
-  trap_animation: Tween_State;
-  trap_index: float;
+  trap_animation: Coroutine;
   trap_display_offset: float;
 }
 
@@ -400,7 +392,6 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
       case .ROPE; it.tex = env_rope_anchor_texture;
 
       case .SPIKE_TRAP; {
-        it.trap_state = .HIDDEN;
         it.trap_display_offset = TILE_SPIKE_TRAP_HIDDEN_OFFSET;
       } #through;
       case .SPIKE; it.tex = spike_texture;

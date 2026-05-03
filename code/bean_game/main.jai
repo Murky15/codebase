@@ -27,9 +27,9 @@ O = Scrapped / Pushed back to later release
 - [X] Bounce pad bug where the player collides for multiple frames
 - [X] Fixed timestep
 - [X] Spikes & traps
+- [X] Maybe coroutines could be useful actually
 - [O] Grappling hook
 - [O] using,map to clean up SDL3 imports
-- [O] Maybe coroutines could be useful actually
 - [ ] Hands
 - [ ] Signs with user-specified text
 - [ ] Cosmetics
@@ -226,6 +226,36 @@ rope_destroy :: (rope: *Rope, particle_reserves: *Linked_List(Rope.Particle_Chun
   }
 }
 
+Spike_Trap_Routine_Params :: struct {
+  trap: *Tile;
+}
+
+Spike_Trap_Routine_Inputs :: struct {
+  dt: float;
+}
+
+spike_trap_routine :: (param: *void) {
+  trap := cast(*Tile) param;
+  tween := tween_init(TILE_SPIKE_TRAP_RELEASE_TIME, tween_norm);
+
+  while tween.active {
+    co_yield();
+    dt := (.*) cast(*float) co_input();
+    t := tween.proc(*tween, dt);
+    trap.trap_display_offset = lerp(TILE_SPIKE_TRAP_HIDDEN_OFFSET, 0, t);
+  }
+
+  co_yield(TILE_SPIKE_TRAP_ACTIVE_DURATION);
+  tween = tween_init(TILE_SPIKE_TRAP_RETRACT_TIME, tween_norm);
+
+  while tween.active {
+    co_yield();
+    dt := (.*) cast(*float) co_input();
+    t := tween.proc(*tween, dt);
+    trap.trap_display_offset = lerp(0, TILE_SPIKE_TRAP_HIDDEN_OFFSET, t);
+  }
+}
+
 Camera :: struct {
   tracking: *Player;
   pos: Vector2;
@@ -342,9 +372,11 @@ Bitmap_Font :: struct {
   atlas: [] SDL_FRect;
 }
 
+/*
 load_font :: () -> Bitmap_Font {
 
 }
+*/
 
 make_frect :: inline (rect: AARect) -> SDL_FRect {
   return SDL_FRect.{rect.x, rect.y, rect.z, rect.w};
@@ -451,7 +483,7 @@ globals: struct {
     NONE;
     MENU;
     PLAY;
-  } = .PLAY;
+  } = .MENU;
   paused: bool;
 
   // Platform handles
@@ -711,9 +743,8 @@ bean_game_tick :: (map: *Map, dt: float) {
   if player.damage_cooldown >= PLAYER_GRACE_PERIOD {
     for get_collision(player, map, .[.SPIKE, .SPIKE_SPINNING, .SPIKE_TRAP]) {
       tile := it.tile;
-      if tile.type == .SPIKE_TRAP && tile.trap_state == .HIDDEN {
-        tile.trap_animation = tween_init(TILE_SPIKE_TRAP_RELEASE_TIME, tween_norm);
-        tile.trap_state = .SPRING;
+      if tile.type == .SPIKE_TRAP && tile.trap_animation.status == .DEAD {
+        tile.trap_animation = co_create(spike_trap_routine, tile);
       }
       player.health -= 1;
       player.damage_cooldown = 0;
@@ -791,32 +822,7 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
 
     // TODO: Now here is a situation where coroutines could be useful
     if it.type == .SPIKE_TRAP {
-      if it.trap_state == {
-        case .SPRING; {
-          t := it.trap_animation.proc(*it.trap_animation, frame_time);
-          it.trap_display_offset = lerp(TILE_SPIKE_TRAP_HIDDEN_OFFSET, 0, t);
-          if !it.trap_animation.active {
-            it.trap_state = .ACTIVE;
-            it.trap_animation = tween_init(TILE_SPIKE_TRAP_ACTIVE_DURATION, tween_norm);
-          }
-        }
-
-        case .ACTIVE; {
-          it.trap_animation.proc(*it.trap_animation, frame_time);
-          if !it.trap_animation.active {
-            it.trap_state = .RETRACT;
-            it.trap_animation = tween_init(TILE_SPIKE_TRAP_RETRACT_TIME, tween_norm);
-          }
-        }
-
-        case .RETRACT; {
-          t := it.trap_animation.proc(*it.trap_animation, frame_time);
-          it.trap_display_offset = lerp(0, TILE_SPIKE_TRAP_HIDDEN_OFFSET, t);
-          if !it.trap_animation.active {
-            it.trap_state = .HIDDEN;
-          }
-        }
-      }
+      co_resume(*it.trap_animation, frame_time, *frame_time);
     }
   }
 

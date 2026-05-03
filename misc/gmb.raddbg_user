@@ -36,22 +36,21 @@ window:
         }
         0.623888:
         {
-          selected
           getting_started
           text:
           {
             selected
-            expression: "file:\"W:/code/bean_game/map.jai\".data"
+            expression: "file:\"W:/code/bean_game/main.jai\".data"
             auto: 1
             query:
             {
               input: ""
               cmd: search
             }
-            cursor_line: 455
-            cursor_column: 17
-            mark_line: 455
-            mark_column: 17
+            cursor_line: 245
+            cursor_column: 1
+            mark_line: 245
+            mark_column: 1
           }
           text:
           {
@@ -62,9 +61,9 @@ window:
               input: ""
               cmd: search
             }
-            cursor_line: 281
+            cursor_line: 318
             cursor_column: 1
-            mark_line: 281
+            mark_line: 318
             mark_column: 1
           }
         }
@@ -84,6 +83,7 @@ window:
         }
         0.40:
         {
+          selected
           watch:
           {
             expression: "query:call_stack"
@@ -121,7 +121,7 @@ window:
     }
   }
   split_x
-  pos: -11 -6
+  pos: 281 144
   monitor: "\\\\.\\DISPLAY1"
   font_size: 11
   maximized
