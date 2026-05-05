@@ -284,14 +284,13 @@ load_assets :: (renderer: *SDL_Renderer) -> Texture_Atlas {
     push_context,defer_pop;
     bitmaps := cast(*[..] Bitmap) userdata;
     name := to_string(fname);
-    full_path := join(to_string(dirname), name);
+    full_path := join(to_string(dirname), name,, temp);
     bitmap: Bitmap;
     bitmap.name = copy_string(path_strip_extension(name));
     #if EMSCRIPTEN {
       bitmap.pixels = emscripten_get_preloaded_image_data(temp_c_string(full_path), *bitmap.width, *bitmap.height);
       bitmap.channels = 4; // Hope this is correct...
     } else {
-      using STB :: #import "stb_image";
       bitmap.pixels = stbi_load(temp_c_string(full_path), *bitmap.width, *bitmap.height, *bitmap.channels, 0);
     }
     if bitmap.pixels == null || bitmap.channels != 4 then return .SDL_ENUM_FAILURE;
@@ -316,67 +315,52 @@ load_assets :: (renderer: *SDL_Renderer) -> Texture_Atlas {
   return atlas;
 }
 
-/*
-function Texture_Atlas
-load_font (Arena* arena, String8 absolute_path_to_bitmap, r_create_texture_type r_create_texture) {
-  Texture_Atlas result = {0};
+Bitmap_Font :: struct {
+  texture: *SDL_Texture;
+  glyph_width, glyph_height: int;
+  atlas: [] SDL_FRect;
+}
 
-  // NOTE: Hard-coded monospace font dimensions in pixels
-  // and characters *in-order*
-  local_persist read_only u64 glyph_width  = 6;
-  local_persist read_only u64 glyph_height = 12;
-  local_persist read_only u8 glyph_lookup[] = {
-    ' ','!','"','#','$','%','&','\'','(',')','*','+',',','-','.','/',
-    '0','1','2','3','4','5','6','7','8','9',':',';','<','=','>','?',
-    '@','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O',
-    'P','Q','R','S','T','U','V','W','X','Y','Z','[','\\',']','^','_',
-    '`','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o',
-    'p','q','r','s','t','u','v','w','x','y','z','{','|','}','~','?',
-    '?','?','?','?','?','?','?','?','?','?','?','?','?','?','?','?',
-    '?','?','?','?','?','?','?','?','?','?','?','?','?','?','?','?',
-  };
+load_font :: (renderer: *SDL_Renderer) -> Bitmap_Font {
+  font_path := join(art_path, "/../monogram-bitmap.png",, temp);
+  width, height, channels: s32;
+  pixels := stbi_load(temp_c_string(font_path), *width, *height, *channels, 0);
+  assert(pixels != null && channels == 4);
+  surface := SDL_CreateSurfaceFrom(width, height, .ABGR8888, pixels, width * 4);
 
-  scratch_block (&arena,1) {
-    String8 bitmap_data = os_read_file(scratch.arena, absolute_path_to_bitmap, false);
-    if (bitmap_data.len == 0) {
-      printf("Unable to find font!\n");
-      exit(1);
-    }
-    PNG_Bitmap_RGBA bitmap = png_decode(arena, bitmap_data);
-    result.texture = r_create_texture(bitmap, false);
-    result.num_sprites = (bitmap.width / glyph_width) * (bitmap.height / glyph_height);
-    result.sprites = arena_pushn(arena, Sprite, result.num_sprites);
-    u64 i = 0;
-    for (u64 y = 0; y < bitmap.height; y += glyph_height) {
-      for (u64 x = 0; x < bitmap.width; x += glyph_width) {
-        // NOTE: Get rid of these unhandled non-ascii characters
-        if (i > 94) {
-          break;
-        }
-        Atlas_Coords coords = {.offset = v2(x,y), .scale = v2(glyph_width, glyph_height)};
-        u8 c = glyph_lookup[i];
-        Sprite *sprite = &result.sprites[c];
-        sprite->name = str8_cstring((const char*)&c);
-        sprite->coords[0] = coords;
-        ++i;
-      }
+  glyph_width  :: 6;
+  glyph_height :: 12;
+  atlas_width := width / glyph_width;
+  atlas_height := height / glyph_height;
+  glyph_lookup: [] u8 = .[
+    " ","!","\"","#","$","%","&","'","(",")","*","+",",","-",".","/",
+    "0","1","2","3","4","5","6","7","8","9",":",";","<","=",">","?",
+    "@","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O",
+    "P","Q","R","S","T","U","V","W","X","Y","Z","[","\\","]","^","_",
+    "`","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o",
+    "p","q","r","s","t","u","v","w","x","y","z","{","|","}","~","?",
+    "?","?","?","?","?","?","?","?","?","?","?","?","?","?","?","?",
+    "?","?","?","?","?","?","?","?","?","?","?","?","?","?","?","?",
+  ];
+
+  result: Bitmap_Font;
+  result.texture = SDL_CreateTextureFromSurface(renderer, surface);
+  result.glyph_width = glyph_width;
+  result.glyph_height = glyph_height;
+  result.atlas = NewArray(atlas_width * atlas_height, SDL_FRect);
+
+  for y: 0..atlas_height-1 {
+    for x: 0..atlas_width-1 {
+      i := y * atlas_width + x;
+      if i > 94 then break; // NOTE: We don't process extended ASCII characters
+      coords := SDL_FRect.{cast(float) x * glyph_width, cast(float) y * glyph_height, glyph_width, glyph_height};
+      c := glyph_lookup[i];
+      result.atlas[c] = coords;
     }
   }
 
   return result;
 }
-*/
-
-Bitmap_Font :: struct {
-  texture: *SDL_Texture;
-  atlas: [] SDL_FRect;
-}
-
-/*
-load_font :: () -> Bitmap_Font {
-
-}
-*/
 
 make_frect :: inline (rect: AARect) -> SDL_FRect {
   return SDL_FRect.{rect.x, rect.y, rect.z, rect.w};
@@ -418,6 +402,15 @@ draw_circle_debug :: (renderer: *SDL_Renderer, center: Vector2, radius: int, col
         SDL_RenderPoint(renderer, dsp_x, dsp_y);
       }
     }
+  }
+}
+
+draw_text :: (renderer: *SDL_Renderer, font: Bitmap_Font, pos: Vector2, str: string) {
+  chars := cast([] u8) str;
+  for chars {
+    glyph := font.atlas[it];
+    dest := SDL_FRect.{pos.x + (2 * font.glyph_width * it_index), pos.y, font.glyph_width * 2.0, font.glyph_height * 2.0};
+    SDL_RenderTexture(renderer, font.texture, *glyph, *dest);
   }
 }
 
@@ -509,6 +502,7 @@ globals: struct {
 
   // Texture cache
   texture_atlas: Texture_Atlas;
+  font_atlas: Bitmap_Font;
 
   coin_texture:         *SDL_Texture;
   x_texture:            *SDL_Texture;
@@ -887,7 +881,7 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer) {
   SDL_RenderClear(renderer);
   defer SDL_RenderPresent(renderer);
 
-
+  draw_text(renderer, globals.font_atlas, xy(100,100), "HELLO WORLD!");
 }
 
 main_loop :: (ctx: *void) #c_call {
@@ -936,6 +930,7 @@ main :: () {
   SDL_SetRenderVSync(renderer, 1);
 
   texture_atlas = load_assets(renderer);
+  font_atlas = load_font(renderer);
   coin_texture = atlas_fetch(*texture_atlas, "tile_coin"); // Duplicate
   x_texture = atlas_fetch(*texture_atlas, "ui_numX");
   ui_box_texture = atlas_fetch(*texture_atlas, "ui_box");
@@ -1055,4 +1050,6 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
 }
 #if EMSCRIPTEN {
   #import "emscripten";
+} else {
+  #import "stb_image";
 }
