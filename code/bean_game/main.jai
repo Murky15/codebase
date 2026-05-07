@@ -345,6 +345,7 @@ load_font :: (renderer: *SDL_Renderer) -> Bitmap_Font {
 
   result: Bitmap_Font;
   result.texture = SDL_CreateTextureFromSurface(renderer, surface);
+  SDL_SetTextureScaleMode(result.texture, .NEAREST);
   result.glyph_width = glyph_width;
   result.glyph_height = glyph_height;
   result.atlas = NewArray(atlas_width * atlas_height, SDL_FRect);
@@ -405,11 +406,11 @@ draw_circle_debug :: (renderer: *SDL_Renderer, center: Vector2, radius: int, col
   }
 }
 
-draw_text :: (renderer: *SDL_Renderer, font: Bitmap_Font, pos: Vector2, str: string) {
+draw_text :: (renderer: *SDL_Renderer, font: Bitmap_Font, pos: Vector2, scale: float, str: string) {
   chars := cast([] u8) str;
   for chars {
     glyph := font.atlas[it];
-    dest := SDL_FRect.{pos.x + (2 * font.glyph_width * it_index), pos.y, font.glyph_width * 2.0, font.glyph_height * 2.0};
+    dest := SDL_FRect.{pos.x + (scale * font.glyph_width * it_index), pos.y, font.glyph_width * scale, font.glyph_height * scale};
     SDL_RenderTexture(renderer, font.texture, *glyph, *dest);
   }
 }
@@ -881,7 +882,9 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer) {
   SDL_RenderClear(renderer);
   defer SDL_RenderPresent(renderer);
 
-  draw_text(renderer, globals.font_atlas, xy(100,100), "HELLO WORLD!");
+
+
+  draw_text(renderer, globals.font_atlas, xy(100,100), 1, "HELLO WORLD!");
 }
 
 main_loop :: (ctx: *void) #c_call {
