@@ -406,6 +406,7 @@ draw_circle_debug :: (renderer: *SDL_Renderer, center: Vector2, radius: int, col
   }
 }
 
+// NOTE: This API kinda sucks, but I don't have time to imagine something better
 draw_text :: (renderer: *SDL_Renderer, font: Bitmap_Font, pos: Vector2, scale: float, str: string) {
   chars := cast([] u8) str;
   for chars {
@@ -452,6 +453,7 @@ TILE_RESOLUTION_DIVISOR :: 2;
 TILE_RESOLUTION :: TILE_NATIVE_RESOLUTION / TILE_RESOLUTION_DIVISOR;
 RESOLUTION_W :: 640;
 RESOLUTION_H :: 360;
+RESOLUTION_WINDOW_SCALE :: 2;
 ASPECT_RATIO :: cast(float) RESOLUTION_W / RESOLUTION_H;
 FONT_HEIGHT_DIVISOR :: 24;
 
@@ -480,8 +482,11 @@ globals: struct {
   } = .MENU;
   paused: bool;
 
-  // Platform handles
+  // Platform
   renderer: *SDL_Renderer;
+  mouse_pos: SDL_FPoint;
+  old_mouse_button: bool;
+  mouse_button: bool;
 
   // Map & memory management
   level_arena: *Arena;
@@ -522,6 +527,7 @@ globals: struct {
 }
 
 collect_input :: () {
+  globals.old_mouse_button = globals.mouse_button;
   e: SDL_Event;
   while SDL_PollEvent(*e) {
     if cast(SDL_EventType) e.type == {
@@ -541,6 +547,18 @@ collect_input :: () {
           globals.map.player.vel = {};
           log("Resetting player");
         }
+      }
+
+      case .SDL_EVENT_MOUSE_MOTION; {
+        SDL_ConvertEventToRenderCoordinates(globals.renderer, *e);
+        motion := e.motion;
+        globals.mouse_pos.x = motion.x;
+        globals.mouse_pos.y = motion.y;
+      }
+      case .SDL_EVENT_MOUSE_BUTTON_UP; #through;
+      case .SDL_EVENT_MOUSE_BUTTON_DOWN; {
+        button := e.button;
+        globals.mouse_button = button.down;
       }
     }
   }
@@ -876,15 +894,55 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
   SDL_RenderDebugTextFormat(renderer, RESOLUTION_W - 100, 20, "FPS: %", cast(int,1.0/frame_time));
 }
 
+SDL_PointInRectFloat :: inline (p: *SDL_FPoint, r: *SDL_FRect) -> bool {
+    return ifx ( p && r && (p.x >= r.x) && (p.x <= (r.x + r.w)) &&
+             (p.y >= r.y) && (p.y <= (r.y + r.h)) ) then true else false;
+}
+
 bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer) {
   collect_input();
   SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
   SDL_RenderClear(renderer);
   defer SDL_RenderPresent(renderer);
 
+  // TODO: Add UI formatting
+  draw_text(renderer, globals.font_atlas, xy(240,70), 1, "The");
+  draw_text(renderer, globals.font_atlas, xy(240,80), 3, "BEAN GAME");
 
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+  mrects := SDL_FRect.[
+    {260, 130, 120, 30},
+    {260, 170, 120, 30},
+    {260, 210, 120, 30},
+    {260, 250, 120, 30},
+  ];
+  SDL_RenderRects(renderer, mrects.data, mrects.count);
+  draw_text(renderer, globals.font_atlas, xy(mrects[0].x + 33, mrects[0].y + 3), 2, "Play");
+  draw_text(renderer, globals.font_atlas, xy(mrects[1].x + 18, mrects[1].y + 3), 2, "Options");
+  draw_text(renderer, globals.font_atlas, xy(mrects[2].x + 26, mrects[2].y + 3), 2, "Editor");
+  draw_text(renderer, globals.font_atlas, xy(mrects[3].x + 35, mrects[3].y + 3), 2, "Quit");
 
-  draw_text(renderer, globals.font_atlas, xy(100,100), 1, "HELLO WORLD!");
+  for * mrects {
+    if SDL_PointInRectFloat(*globals.mouse_pos, it) {
+      border := it.*;
+      border.x -= 5;
+      border.y -= 5;
+      border.w += 10;
+      border.h += 10;
+      if globals.mouse_button {
+        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+      } else {
+        if globals.old_mouse_button {
+          if it_index == {
+            case 0; globals.game_state = .PLAY;
+            case 3; globals.should_run = false;
+          }
+        }
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+      }
+      SDL_RenderRect(renderer, *border);
+    }
+  }
 }
 
 main_loop :: (ctx: *void) #c_call {
@@ -925,8 +983,8 @@ main :: () {
   bg_logger_init_and_equip();
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 
-  window_width  := RESOLUTION_W * 2;
-  window_height := RESOLUTION_H * 2;
+  window_width  := RESOLUTION_W * RESOLUTION_WINDOW_SCALE;
+  window_height := RESOLUTION_H * RESOLUTION_WINDOW_SCALE;
   window := SDL_CreateWindow("Bean Game", xx window_width, xx window_height, SDL_WINDOW_RESIZABLE);
   renderer = SDL_CreateRenderer(window, null);
   SDL_SetRenderLogicalPresentation(renderer, RESOLUTION_W, RESOLUTION_H, .INTEGER_SCALE);
@@ -950,9 +1008,9 @@ main :: () {
                                     atlas_fetch(*texture_atlas, "ui_num8"),
                                     atlas_fetch(*texture_atlas, "ui_num9")];
   cosmetic_textures = *SDL_Texture.[atlas_fetch(*texture_atlas, "item_hat"),
-                                      atlas_fetch(*texture_atlas, "item_hatTop"),
-                                      atlas_fetch(*texture_atlas, "item_helmet"),
-                                      atlas_fetch(*texture_atlas, "item_helmetModern")];
+                                    atlas_fetch(*texture_atlas, "item_hatTop"),
+                                    atlas_fetch(*texture_atlas, "item_helmet"),
+                                    atlas_fetch(*texture_atlas, "item_helmetModern")];
   start = SDL_GetTicks();
   random_seed(cast,trunc(u32) SDL_GetPerformanceCounter());
   backing_buffer_size := 1048576; // 1 mebibyte
