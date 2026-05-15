@@ -35,7 +35,7 @@ Tile :: struct {
   bob_amplitude: float;
   bob_frequency: float;
 
-  trap_animation: Coroutine;
+  trap_animation: Coroutine(*Tile, float);
   trap_display_offset: float;
 }
 

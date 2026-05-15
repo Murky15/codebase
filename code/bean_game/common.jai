@@ -208,9 +208,9 @@ tween_ease :: (using state: *Tween_State, dt: float) -> float {
   return ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
 }
 
-Coroutine_Proc :: #type (*void);
+Coroutine_Proc :: #type ();
 
-Coroutine :: struct {
+Coroutine_Header :: struct {
   status: enum {
     DEAD;
     ACTIVE;
@@ -220,29 +220,29 @@ Coroutine :: struct {
 
   counter: float;
   wait_duration: float;
-
   proc: Coroutine_Proc;
-  param: *void;
-  in: *void;
-  out: *void;
 }
 
-co_create :: (proc: Coroutine_Proc, param := null) -> Coroutine {
+Coroutine :: struct (Param := void, In := void, Out := void) {
+  using header: Coroutine_Header;
+  param: Param;
+  in: In;
+  out: Out;
+}
+
+co_init :: (co: *Coroutine, proc: Coroutine_Proc, param: co.Param) {
   if context.co_state == null {
     context.co_state = New(Coroutine_State);
     context.co_state.calling_fiber = ConvertThreadToFiber(null);
   }
 
-  result: Coroutine;
-  result.status = .SUSPENDED;
-  result.fiber = CreateFiber(0, fiber_bootstrap, *context);
-  result.proc = proc;
-  result.param = param;
-
-  return result;
+  co.status = .SUSPENDED;
+  co.fiber = CreateFiber(0, fiber_bootstrap, *context);
+  co.proc = proc;
+  co.param = param;
 }
 
-co_resume :: (co: *Coroutine, dt: float, in := null, out := null) {
+co_resume :: (co: *Coroutine, dt: float) {
   if co.status == .DEAD || context.co_state == null then return;
   if co.counter < co.wait_duration {
     co.counter += dt;
@@ -255,31 +255,33 @@ co_resume :: (co: *Coroutine, dt: float, in := null, out := null) {
     context.co_state.active_coroutine = prev_active;
   }
   context.co_state.calling_fiber = ifx prev_active == null prev_caller else prev_active.fiber;
-  context.co_state.active_coroutine = co;
+  context.co_state.active_coroutine = cast(*Coroutine_Header) co;
   co.status = .ACTIVE;
-  co.in = in;
-  co.out = out;
   SwitchToFiber(co.fiber);
   if co.status == .DEAD {
     co_delete(co);
   } else co.status = .SUSPENDED;
 }
 
-co_this :: inline () -> *Coroutine {
+co_resume :: (co: *Coroutine, dt: float, in: co.In) {
+  co.in = in;
+  co_resume(co, dt);
+}
+
+co_resume :: (co: *Coroutine, dt: float, in: co.In, out: co.Out) {
+  co.in = in;
+  co.out = out;
+  co_resume(co, dt);
+}
+
+co_this :: inline ($Co: Type) -> *Co {
+  assert(context.co_state != null && context.co_state.active_coroutine);
+  return cast(*Co) context.co_state.active_coroutine;
+}
+
+co_this :: inline () -> *Coroutine_Header {
   assert(context.co_state != null && context.co_state.active_coroutine);
   return context.co_state.active_coroutine;
-}
-
-co_param :: inline () -> *void {
-  return co_this().param;
-}
-
-co_input :: inline () -> *void {
-  return co_this().in;
-}
-
-co_output :: inline () -> *void {
-  return co_this().out;
 }
 
 co_yield :: (wait_duration := 0.0) {
@@ -296,10 +298,9 @@ co_delete :: (co: *Coroutine) {
 }
 
 #scope_file
-
 Coroutine_State :: struct {
   calling_fiber: *void;
-  active_coroutine: *Coroutine;
+  active_coroutine: *Coroutine_Header;
 }
 #add_context co_state: *Coroutine_State;
 
@@ -314,14 +315,14 @@ Coroutine_State :: struct {
     ctx_pointer := cast(*#Context)lpParameter;
     push_context ctx_pointer {
       co := context.co_state.active_coroutine;
-      co.proc(co.param);
+      co.proc();
       co.status = .DEAD;
       SwitchToFiber(context.co_state.calling_fiber);
     }
   }
 }
-
 #scope_export
+
 
 round  :: x => ifx x - cast(int) x >= 0.5 then ceil(x) else floor(x);
 sign   :: x => ifx x == 0 then 0 else ifx signbit(x) then -1 else 1;

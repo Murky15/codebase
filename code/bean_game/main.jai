@@ -226,21 +226,14 @@ rope_destroy :: (rope: *Rope, particle_reserves: *Linked_List(Rope.Particle_Chun
   }
 }
 
-Spike_Trap_Routine_Params :: struct {
-  trap: *Tile;
-}
-
-Spike_Trap_Routine_Inputs :: struct {
-  dt: float;
-}
-
-spike_trap_routine :: (param: *void) {
-  trap := cast(*Tile) param;
+spike_trap_routine :: () {
+  co := co_this(type_of(Tile.trap_animation));
+  trap := co.param;
   tween := tween_init(TILE_SPIKE_TRAP_RELEASE_TIME, tween_norm);
 
   while tween.active {
     co_yield();
-    dt := (.*) cast(*float) co_input();
+    dt := co.in;
     t := tween.proc(*tween, dt);
     trap.trap_display_offset = lerp(TILE_SPIKE_TRAP_HIDDEN_OFFSET, 0, t);
   }
@@ -250,7 +243,7 @@ spike_trap_routine :: (param: *void) {
 
   while tween.active {
     co_yield();
-    dt := (.*) cast(*float) co_input();
+    dt := co.in;
     t := tween.proc(*tween, dt);
     trap.trap_display_offset = lerp(0, TILE_SPIKE_TRAP_HIDDEN_OFFSET, t);
   }
@@ -757,7 +750,7 @@ bean_game_tick :: (map: *Map, dt: float) {
     for get_collision(player, map, .[.SPIKE, .SPIKE_SPINNING, .SPIKE_TRAP]) {
       tile := it.tile;
       if tile.type == .SPIKE_TRAP && tile.trap_animation.status == .DEAD {
-        tile.trap_animation = co_create(spike_trap_routine, tile);
+        co_init(*tile.trap_animation, spike_trap_routine, tile);
       }
       player.health -= 1;
       player.damage_cooldown = 0;
@@ -833,9 +826,8 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
       it.bob_counter = fmod_cycling(it.bob_counter, (2 * PI) / it.bob_frequency);
     }
 
-    // TODO: Now here is a situation where coroutines could be useful
     if it.type == .SPIKE_TRAP {
-      co_resume(*it.trap_animation, frame_time, *frame_time);
+      co_resume(*it.trap_animation, frame_time, frame_time);
     }
   }
 
