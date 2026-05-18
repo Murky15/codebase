@@ -557,3 +557,59 @@ simulate_env_rope :: (rope: *Env_Rope, dt: float, still_changing_rope_position: 
     rope.body.force = xy(0,0);
   } else rope_integrate(rope, dt);
 }
+
+Menu_Box_Click_Event_Proc :: #type (*void);
+Menu_Box :: struct {
+  rect: SDL_FRect;
+  draw_border := true;
+  filled: bool;
+
+  union {
+    text: string;
+    sprite: *SDL_Texture;
+  }
+
+  content_pos: Vector2;
+  content_scale: float;
+
+  interactive: bool;
+  user_data: *void;
+  on_click: Menu_Box_Click_Event_Proc;
+}
+
+Menu :: struct {
+  dim: SDL_FRect;
+  font: Bitmap_Font;
+  boxes: [..] Menu_Box;
+}
+
+MENU_LAYOUT_CENTER :: -1;
+Menu_Autolayout :: enum {
+  NONE;
+  HORIZONTAL;
+  VERTICAL;
+}
+
+menu_frame_begin :: (menu: *Menu, dim: SDL_FRect, font: Bitmap_Font) {
+
+}
+
+menu_push_autolayout :: (menu: *Menu, anchor: float, spacing: float) {
+
+}
+
+menu_add_box :: (menu: *Menu, x: float, y: float, text: string, scale := 1.0) -> *Menu_Box {
+
+}
+
+menu_add_box  :: (menu: *Menu, dim: Vector2, text: string) -> *Menu_Box {
+
+}
+
+menu_add_box  :: (menu: *Menu, dim: Vector2, text: string, on_click: Menu_Box_Click_Event_Proc, user_data := null) -> *Menu_Box {
+
+}
+
+menu_submit_and_process_input :: () {
+
+}

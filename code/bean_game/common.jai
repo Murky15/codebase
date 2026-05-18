@@ -208,23 +208,28 @@ tween_ease :: (using state: *Tween_State, dt: float) -> float {
   return ifx t < 0.5 then 4 * pow(t, 3) else 1 - pow(-2 * t + 2, 3) / 2;
 }
 
-Coroutine_Proc :: #type ();
+Coroutine_Proc :: #type (*Coroutine_Header);
 
 Coroutine_Header :: struct {
+  type: Type;
+
   status: enum {
     DEAD;
     ACTIVE;
     SUSPENDED;
   } = .DEAD;
-  fiber: *void;
 
   counter: float;
   wait_duration: float;
   proc: Coroutine_Proc;
+
+  fiber: *void;
 }
 
 Coroutine :: struct (Param := void, In := void, Out := void) {
   using header: Coroutine_Header;
+  header.type = #this;
+
   param: Param;
   in: In;
   out: Out;
@@ -274,9 +279,14 @@ co_resume :: (co: *Coroutine, dt: float, in: co.In, out: co.Out) {
   co_resume(co, dt);
 }
 
-co_this :: inline ($Co: Type) -> *Co {
-  assert(context.co_state != null && context.co_state.active_coroutine);
-  return cast(*Co) context.co_state.active_coroutine;
+// NOTE: Casts coroutine in a type safe way
+co_this :: inline (header: *Coroutine_Header, $Co: Type) -> *Co {
+  assert(
+    context.co_state != null
+    && context.co_state.active_coroutine == header
+    && Co == header.type);
+
+  return cast(*Co) header;
 }
 
 co_this :: inline () -> *Coroutine_Header {
@@ -299,8 +309,8 @@ co_delete :: (co: *Coroutine) {
 
 #scope_file
 Coroutine_State :: struct {
-  calling_fiber: *void;
   active_coroutine: *Coroutine_Header;
+  calling_fiber: *void;
 }
 #add_context co_state: *Coroutine_State;
 
@@ -312,10 +322,10 @@ Coroutine_State :: struct {
   DeleteFiber :: (lpFiber: *void) #foreign kernel32;
 
   fiber_bootstrap :: (lpParameter: *void) #c_call {
-    ctx_pointer := cast(*#Context)lpParameter;
+    ctx_pointer := cast(*#Context) lpParameter;
     push_context ctx_pointer {
-      co := context.co_state.active_coroutine;
-      co.proc();
+      co := ctx_pointer.co_state.active_coroutine;
+      co.proc(co);
       co.status = .DEAD;
       SwitchToFiber(context.co_state.calling_fiber);
     }

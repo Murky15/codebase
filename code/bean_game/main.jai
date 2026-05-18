@@ -226,8 +226,8 @@ rope_destroy :: (rope: *Rope, particle_reserves: *Linked_List(Rope.Particle_Chun
   }
 }
 
-spike_trap_routine :: () {
-  co := co_this(type_of(Tile.trap_animation));
+spike_trap_routine :: (header: *Coroutine_Header) {
+  co := co_this(header, type_of(Tile.trap_animation));
   trap := co.param;
   tween := tween_init(TILE_SPIKE_TRAP_RELEASE_TIME, tween_norm);
 
@@ -937,6 +937,39 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer) {
   }
 }
 
+#if false {
+bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer) {
+  home_menu_on_click :: (user_data: *void) {
+    index := cast(int) user_data;
+    if index == {
+      case 0; globals.game_state = .PLAY;
+      case 3; globals.should_run = false;
+    }
+  }
+
+  // Rendering init
+  if globals.main_menu_state == {
+    case .HOME; {
+      menu: Menu;
+      menu_frame_begin(*menu, {0, 0, RESOLUTION_W, RESOLUTION_H}, globals.font);
+      title_box := menu_add_box(*menu, MENU_LAYOUT_CENTER, 70, "BEAN GAME", 3);
+      menu_add_box(*menu, title_box.dim.x, title_box.dim.y, "The", 1);
+      menu_push_autolayout(*menu, .VERTICAL, 130, 40);
+      button_text := string.[
+        "Play",
+        "Options",
+        "Editor",
+        "Quit",
+      ];
+      for button_text {
+        box_dim :: Vector2.{120, 30};
+        menu_add_box(*menu, box_dim, it, home_menu_on_click, cast(*void) it_index);
+      }
+    }
+  }
+}
+}
+
 main_loop :: (ctx: *void) #c_call {
   push_context,defer_pop cast(*#Context) ctx;
   if !globals.should_run {
@@ -1084,7 +1117,7 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
   }
 }
 
-#load "map.jai";
+#load "map_and_menu.jai";
 #load "common.jai";
 
 #import "Basic";
