@@ -168,6 +168,11 @@ rects_intersect :: (a: Vector4, b: Vector4) -> bool, AARect {
   return is_intersecting, overlap;
 }
 
+center_rect :: inline (smaller: AARect, larger: AARect) -> offset: Vector2 {
+  assert(smaller.z < larger.z && smaller.w < larger.w);
+  return larger.xy - smaller.xy + (larger.zw - smaller.zw) / 2;
+}
+
 // Copy so we don't use inline assembly
 my_split_from_left :: (s: string, byte: u8) -> (left: string, right: string) {
   cursor := 0;
@@ -561,9 +566,10 @@ simulate_env_rope :: (rope: *Env_Rope, dt: float, still_changing_rope_position: 
 Menu_Box_Click_Event_Proc :: #type (*void);
 Menu_Box :: struct {
   rect: SDL_FRect;
-  draw_border := true;
+  draw_border: bool;
   filled: bool;
 
+  content_type: enum {TEXT; SPRITE;};
   union {
     text: string;
     sprite: *SDL_Texture;
@@ -580,6 +586,14 @@ Menu_Box :: struct {
 Menu :: struct {
   dim: SDL_FRect;
   font: Bitmap_Font;
+
+  Autolayout: struct {
+    style: Menu_Autolayout;
+    anchor: Vector2;
+    spacing: float;
+    index: int;
+  }
+
   boxes: [..] Menu_Box;
 }
 
@@ -589,27 +603,93 @@ Menu_Autolayout :: enum {
   HORIZONTAL;
   VERTICAL;
 }
-
-menu_frame_begin :: (menu: *Menu, dim: SDL_FRect, font: Bitmap_Font) {
-
+Menu_Content_Align :: enum {
+  // LEFT;
+  RIGHT;
+  CENTER;
 }
 
-menu_push_autolayout :: (menu: *Menu, anchor: float, spacing: float) {
+menu_frame_begin :: (menu: *Menu, dim: SDL_FRect, font: Bitmap_Font) {
+  menu.dim = dim;
+  menu.font = font;
+  menu.boxes.allocator = context.allocator; // NOTE: So that we can use ,, temp for true immediate mode UI
+}
 
+menu_push_autolayout :: (menu: *Menu, style: Menu_Autolayout, anchor_x: float, anchor_y: float, spacing: float) #expand {
+  assert((style == .VERTICAL && anchor_y != MENU_LAYOUT_CENTER)
+    && (style == .HORIZONTAL && anchor_x != MENU_LAYOUT_CENTER));
+
+  old_layout := menu.Autolayout;
+  `defer menu.Autolayout = old_layout;
+
+  menu.Autolayout.style = style;
+  menu.Autolayout.anchor = xy(anchor_x, anchor_y);
+  menu.Autolayout.spacing = spacing;
+  menu.Autolayout.index = 0;
 }
 
 menu_add_box :: (menu: *Menu, x: float, y: float, text: string, scale := 1.0) -> *Menu_Box {
+  box := array_add(*menu.boxes);
 
+  text_dim := get_pixel_dim(menu.font, text, scale);
+  box.rect = {x, y, text_dim.x, text_dim.y};
+
+  box.draw_border = false;
+  box.filled = false;
+  box.interactive = false;
+
+  box.content_type = .TEXT;
+  box.text = text;
+  box.content_pos = xy(0,0);
+  box.content_scale = scale;
+
+  return box;
 }
 
-menu_add_box  :: (menu: *Menu, dim: Vector2, text: string) -> *Menu_Box {
+menu_add_box  :: (menu: *Menu, dim: Vector2, align: Menu_Content_Align, text: string) -> *Menu_Box {
+  assert(menu.Autolayout.style != .NONE, "UI system does not know where to put this box because no autolayout style was pushed!");
+  box := array_add(*menu.boxes);
 
+  advance_amt: Vector2;
+  x, y := menu.Autolayout.anchor.x, menu.Autolayout.anchor.y;
+  if menu.Autolayout.style == .HORIZONTAL {
+    x += menu.Autolayout.spacing * menu.Autolayout.index;
+    if y == MENU_LAYOUT_CENTER {
+      y += center_rect({x=x, y=y, zw = dim}, make_aarect(menu.dim)).y;
+    }
+  } else if menu.Autolayout.style == .VERTICAL {
+    y += menu.Autolayout.spacing * menu.Autolayout.index;
+    if x == MENU_LAYOUT_CENTER {
+      x += center_rect({x=x, y=y, zw = dim}, make_aarect(menu.dim)).x;
+    }
+  }
+
+  box.rect = {x, y, dim.x, dim.y};
+
+  box.draw_border = true;
+  box.filled = false;
+  box.interactive = false;
+
+  box.content_type = .TEXT;
+  box.text = text;
+
+  text_room := dim / xy(cast(float) menu.font.glyph_width, cast(float) menu.font.glyph_height);
+  box.content_scale = floor(min(text_room.x, text_room.y));
+  text_dim := get_pixel_dim(menu.font, text, box.content_scale);
+  box.content_pos = ifx align == .CENTER center_rect({zw = text_dim}, {zw = dim}) else xy(0,0);
+
+  return box;
 }
 
-menu_add_box  :: (menu: *Menu, dim: Vector2, text: string, on_click: Menu_Box_Click_Event_Proc, user_data := null) -> *Menu_Box {
+menu_add_box  :: (menu: *Menu, dim: Vector2, align: Menu_Content_Align, text: string, on_click: Menu_Box_Click_Event_Proc, user_data := null) -> *Menu_Box {
+  box := menu_add_box(menu, dim, align, text);
+  box.interactive = true;
+  box.user_data = user_data;
+  box.on_click = on_click;
 
+  return box;
 }
 
-menu_submit_and_process_input :: () {
+menu_submit_and_process_input :: (menu: *Menu) {
 
 }

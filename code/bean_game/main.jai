@@ -356,8 +356,16 @@ load_font :: (renderer: *SDL_Renderer) -> Bitmap_Font {
   return result;
 }
 
+get_pixel_dim :: inline (font: Bitmap_Font, text: string, scale: float) -> Vector2 {
+  return xy(cast(float) font.glyph_width * text.count, cast(float) font.glyph_height) * scale;
+}
+
 make_frect :: inline (rect: AARect) -> SDL_FRect {
   return SDL_FRect.{rect.x, rect.y, rect.z, rect.w};
+}
+
+make_aarect :: inline (rect: SDL_FRect) -> AARect {
+  return AARect.{rect.x, rect.y, rect.w, rect.h};
 }
 
 draw_quad :: (renderer: *SDL_Renderer, tex: *SDL_Texture, rect: AARect, flip_x := false, flip_y := false, rotation_angle := 0.0) {
@@ -951,10 +959,11 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer) {
   if globals.main_menu_state == {
     case .HOME; {
       menu: Menu;
-      menu_frame_begin(*menu, {0, 0, RESOLUTION_W, RESOLUTION_H}, globals.font);
+      menu_frame_begin(*menu, {0, 0, RESOLUTION_W, RESOLUTION_H}, globals.font,, temp);
+      defer menu_submit_and_process_input(*menu);
       title_box := menu_add_box(*menu, MENU_LAYOUT_CENTER, 70, "BEAN GAME", 3);
       menu_add_box(*menu, title_box.dim.x, title_box.dim.y, "The", 1);
-      menu_push_autolayout(*menu, .VERTICAL, 130, 40);
+      menu_push_autolayout(*menu, .VERTICAL, MENU_LAYOUT_CENTER, 130, 40);
       button_text := string.[
         "Play",
         "Options",
