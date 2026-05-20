@@ -159,6 +159,11 @@ particles :: (rope: Rope, body: Code, flags: For_Flags) #expand {
   }
 }
 
+Mouse :: struct {
+  pos: Vector2;
+  left_down: bool;
+}
+
 Input_Package :: struct {
   dir: float;
   rope_slide_dir: float;
@@ -483,11 +488,17 @@ globals: struct {
   } = .MENU;
   paused: bool;
 
+  // TODO: Move this into a struct
+  main_menu_state: enum {
+    HOME;
+  }
+
   // Platform
   renderer: *SDL_Renderer;
   mouse_pos: SDL_FPoint;
-  old_mouse_button: bool;
   mouse_button: bool;
+  old_mouse_pos: SDL_FPoint;
+  old_mouse_button: bool;
 
   // Map & memory management
   level_arena: *Arena;
@@ -528,6 +539,7 @@ globals: struct {
 }
 
 collect_input :: () {
+  globals.old_mouse_pos = globals.mouse_pos;
   globals.old_mouse_button = globals.mouse_button;
   e: SDL_Event;
   while SDL_PollEvent(*e) {
@@ -900,53 +912,6 @@ SDL_PointInRectFloat :: inline (p: *SDL_FPoint, r: *SDL_FRect) -> bool {
 }
 
 bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer) {
-  collect_input();
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-  SDL_RenderClear(renderer);
-  defer SDL_RenderPresent(renderer);
-
-  // TODO: Add UI formatting
-  draw_text(renderer, globals.font_atlas, xy(240,70), 1, "The");
-  draw_text(renderer, globals.font_atlas, xy(240,80), 3, "BEAN GAME");
-
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-  mrects := SDL_FRect.[
-    {260, 130, 120, 30},
-    {260, 170, 120, 30},
-    {260, 210, 120, 30},
-    {260, 250, 120, 30},
-  ];
-  SDL_RenderRects(renderer, mrects.data, mrects.count);
-  draw_text(renderer, globals.font_atlas, xy(mrects[0].x + 33, mrects[0].y + 3), 2, "Play");
-  draw_text(renderer, globals.font_atlas, xy(mrects[1].x + 18, mrects[1].y + 3), 2, "Options");
-  draw_text(renderer, globals.font_atlas, xy(mrects[2].x + 26, mrects[2].y + 3), 2, "Editor");
-  draw_text(renderer, globals.font_atlas, xy(mrects[3].x + 35, mrects[3].y + 3), 2, "Quit");
-
-  for * mrects {
-    if SDL_PointInRectFloat(*globals.mouse_pos, it) {
-      border := it.*;
-      border.x -= 5;
-      border.y -= 5;
-      border.w += 10;
-      border.h += 10;
-      if globals.mouse_button {
-        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-      } else {
-        if globals.old_mouse_button {
-          if it_index == {
-            case 0; globals.game_state = .PLAY;
-            case 3; globals.should_run = false;
-          }
-        }
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-      }
-      SDL_RenderRect(renderer, *border);
-    }
-  }
-}
-
-#if false {
-bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer) {
   home_menu_on_click :: (user_data: *void) {
     index := cast(int) user_data;
     if index == {
@@ -955,14 +920,20 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer) {
     }
   }
 
-  // Rendering init
+  collect_input();
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+  SDL_RenderClear(renderer);
+  defer SDL_RenderPresent(renderer);
+
   if globals.main_menu_state == {
     case .HOME; {
       menu: Menu;
-      menu_frame_begin(*menu, {0, 0, RESOLUTION_W, RESOLUTION_H}, globals.font,, temp);
-      defer menu_submit_and_process_input(*menu);
+      menu_frame_begin(*menu, {0, 0, RESOLUTION_W, RESOLUTION_H}, globals.font_atlas,, temp);
+      mouse, old_mouse := Mouse.{cast,force(Vector2) globals.mouse_pos, globals.mouse_button},
+                          Mouse.{cast,force(Vector2) globals.old_mouse_pos, globals.old_mouse_button};
+      defer menu_submit_and_process_input(renderer, mouse, old_mouse, *menu);
       title_box := menu_add_box(*menu, MENU_LAYOUT_CENTER, 70, "BEAN GAME", 3);
-      menu_add_box(*menu, title_box.dim.x, title_box.dim.y, "The", 1);
+      menu_add_box(*menu, title_box.rect.x, title_box.rect.y - 8, "The", 1);
       menu_push_autolayout(*menu, .VERTICAL, MENU_LAYOUT_CENTER, 130, 40);
       button_text := string.[
         "Play",
@@ -972,11 +943,10 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer) {
       ];
       for button_text {
         box_dim :: Vector2.{120, 30};
-        menu_add_box(*menu, box_dim, it, home_menu_on_click, cast(*void) it_index);
+        menu_add_box(*menu, box_dim, .CENTER, it, home_menu_on_click, cast(*void) it_index);
       }
     }
   }
-}
 }
 
 main_loop :: (ctx: *void) #c_call {

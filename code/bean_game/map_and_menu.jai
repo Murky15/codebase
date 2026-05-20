@@ -569,7 +569,7 @@ Menu_Box :: struct {
   draw_border: bool;
   filled: bool;
 
-  content_type: enum {TEXT; SPRITE;};
+  content_type: enum {NONE; TEXT; SPRITE;};
   union {
     text: string;
     sprite: *SDL_Texture;
@@ -581,6 +581,8 @@ Menu_Box :: struct {
   interactive: bool;
   user_data: *void;
   on_click: Menu_Box_Click_Event_Proc;
+
+  #overlay (rect) aarect: AARect;
 }
 
 Menu :: struct {
@@ -617,7 +619,7 @@ menu_frame_begin :: (menu: *Menu, dim: SDL_FRect, font: Bitmap_Font) {
 
 menu_push_autolayout :: (menu: *Menu, style: Menu_Autolayout, anchor_x: float, anchor_y: float, spacing: float) #expand {
   assert((style == .VERTICAL && anchor_y != MENU_LAYOUT_CENTER)
-    && (style == .HORIZONTAL && anchor_x != MENU_LAYOUT_CENTER));
+    || (style == .HORIZONTAL && anchor_x != MENU_LAYOUT_CENTER));
 
   old_layout := menu.Autolayout;
   `defer menu.Autolayout = old_layout;
@@ -632,7 +634,11 @@ menu_add_box :: (menu: *Menu, x: float, y: float, text: string, scale := 1.0) ->
   box := array_add(*menu.boxes);
 
   text_dim := get_pixel_dim(menu.font, text, scale);
-  box.rect = {x, y, text_dim.x, text_dim.y};
+  // TODO: Remove unnecessary computation!
+  center := center_rect({zw=text_dim}, make_aarect(menu.dim));
+  dsp_x := ifx x == MENU_LAYOUT_CENTER center.x else x;
+  dsp_y := ifx y == MENU_LAYOUT_CENTER center.y else y;
+  box.rect = {dsp_x, dsp_y, text_dim.x, text_dim.y};
 
   box.draw_border = false;
   box.filled = false;
@@ -663,6 +669,7 @@ menu_add_box  :: (menu: *Menu, dim: Vector2, align: Menu_Content_Align, text: st
       x += center_rect({x=x, y=y, zw = dim}, make_aarect(menu.dim)).x;
     }
   }
+  menu.Autolayout.index += 1;
 
   box.rect = {x, y, dim.x, dim.y};
 
@@ -690,6 +697,30 @@ menu_add_box  :: (menu: *Menu, dim: Vector2, align: Menu_Content_Align, text: st
   return box;
 }
 
-menu_submit_and_process_input :: (menu: *Menu) {
+menu_submit_and_process_input :: (renderer: *SDL_Renderer, mouse: Mouse, old_mouse: Mouse, menu: *Menu) {
+  for menu.boxes {
+    if it.interactive && SDL_PointInRectFloat(*cast,force(SDL_FPoint) mouse.pos, *it.rect) {
+      border := it.rect;
+      // TODO: Make this configurable
+      border.x -= 5;
+      border.y -= 5;
+      border.w += 10;
+      border.h += 10;
+      if mouse.left_down {
+        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+      } else {
+        if old_mouse.left_down { // NOTE: Click!
+          it.on_click(it.user_data);
+        }
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+      }
+      SDL_RenderRect(renderer, *border);
+    }
 
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    if it.draw_border SDL_RenderRect(renderer, *it.rect);
+    if it.content_type == .TEXT {
+      draw_text(renderer, menu.font, it.aarect.xy + it.content_pos, it.content_scale, it.text);
+    }
+  }
 }

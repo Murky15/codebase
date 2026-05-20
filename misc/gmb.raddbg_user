@@ -41,16 +41,16 @@ window:
           text:
           {
             selected
-            expression: "file:\"W:/code/bean_game/main.jai\".data"
+            expression: "file:\"W:/code/bean_game/map_and_menu.jai\".data"
             auto: 1
             query:
             {
               input: ""
               cmd: search
             }
-            cursor_line: 238
+            cursor_line: 627
             cursor_column: 1
-            mark_line: 238
+            mark_line: 627
             mark_column: 1
           }
           text:
@@ -101,12 +101,14 @@ window:
         watch: expression: "query:targets"
         watch:
         {
+          selected
           expression: ""
           watch: it
           watch: map
           watch: context
+          watch: menu
         }
-        watch: selected expression: "query:locals"
+        watch: expression: "query:locals"
       }
       0.50:
       {
@@ -121,7 +123,7 @@ window:
     }
   }
   split_x
-  pos: -11 -6
+  pos: 281 144
   monitor: "\\\\.\\DISPLAY1"
   font_size: 11
   maximized
