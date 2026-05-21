@@ -488,10 +488,7 @@ globals: struct {
   } = .MENU;
   paused: bool;
 
-  // TODO: Move this into a struct
-  main_menu_state: enum {
-    HOME;
-  }
+  main_menu: Main_Menu;
 
   // Platform
   renderer: *SDL_Renderer;
@@ -911,7 +908,20 @@ SDL_PointInRectFloat :: inline (p: *SDL_FPoint, r: *SDL_FRect) -> bool {
              (p.y >= r.y) && (p.y <= (r.y + r.h)) ) then true else false;
 }
 
-bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer) {
+Main_Menu :: struct {
+  state: enum {
+    HOME;
+  }
+
+  Graphic :: struct {
+    type: enum {NONE; CLOUD; GROUND;};
+    tex: *SDL_Texture;
+    pos: Vector2;
+  }
+  graphics: [..] Graphic;
+}
+
+bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Main_Menu, frame_time: float) {
   home_menu_on_click :: (user_data: *void) {
     index := cast(int) user_data;
     if index == {
@@ -920,12 +930,32 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer) {
     }
   }
 
+  if main_menu.graphics.count == 0 {
+    NUM_CLOUDS :: 40;
+    GROUND_HEIGHT :: 10;
+    GROUND_WIDTH :: RESOLUTION_W / TILE_RESOLUTION;
+    NUM_TILES :: GROUND_WIDTH * GROUND_HEIGHT;
+    array_reserve(*main_menu.graphics, NUM_TILES + NUM_CLOUDS);
+
+    for y: 0..GROUND_HEIGHT-1 {
+      for x: 0..GROUND_WIDTH-1 {
+        graphic: Main_Menu.Graphic;
+        graphic.type = .GROUND;
+        //graphic.tex =
+        //array_add();
+      }
+    }
+    for NUM_TILES..NUM_TILES + NUM_CLOUDS-1 {
+
+    }
+  }
+
   collect_input();
   SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
   SDL_RenderClear(renderer);
   defer SDL_RenderPresent(renderer);
 
-  if globals.main_menu_state == {
+  if main_menu.state == {
     case .HOME; {
       menu: Menu;
       menu_frame_begin(*menu, {0, 0, RESOLUTION_W, RESOLUTION_H}, globals.font_atlas,, temp);
@@ -967,7 +997,7 @@ main_loop :: (ctx: *void) #c_call {
   globals.start = end;
 
   if globals.game_state == .MENU {
-    bean_game_main_menu_tick_and_render(globals.renderer);
+    bean_game_main_menu_tick_and_render(globals.renderer, *globals.main_menu, frame_time);
   } else if globals.game_state == .PLAY {
     globals.accumulator += frame_time;
     while globals.accumulator >= dt {

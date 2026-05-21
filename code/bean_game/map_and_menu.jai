@@ -194,6 +194,33 @@ atlas_fetch :: inline (atlas: *Texture_Atlas, key: string) -> *SDL_Texture {
   return (.*)table_find_pointer(atlas, key);
 }
 
+Autotile :: struct {
+  tex: *SDL_Texture;
+  probability: float;
+  default: bool;
+  parallax_layer: u64;
+}
+
+atile :: (tex_name: string, probability := 100.0, default := false, layer := 1) -> Autotile #expand {
+  #assert layer <= Map.max_parallax_layers;
+  return {atlas_fetch(*globals.texture_atlas, tex_name), probability, default, layer};
+}
+
+atile_choose :: inline (tiles: [] Autotile) -> (texture: *SDL_Texture, parallax_layer: u64) {
+  default: *Autotile;
+  rand := cast(float) (random_get() % 100) + 1;
+  for tiles {
+    rand -= it.probability;
+    if rand <= 0 {
+      return it.tex, it.parallax_layer;
+    } else if it.default then default = *tiles[it_index];
+  }
+
+  if default != null {
+    return default.tex, default.parallax_layer;
+  } else return null, 0;
+}
+
 map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) -> Map {
   // NOTE: Parse text file
   rows_in_header :: 4;
@@ -287,30 +314,6 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
   }
 
   // NOTE: Texture pass
-  Autotile :: struct {
-    tex: *SDL_Texture;
-    probability: float;
-    default: bool;
-    parallax_layer: u64;
-  }
-  atile :: (tex_name: string, probability := 100.0, default := false, layer := 1) -> Autotile #expand {
-    #assert layer <= Map.max_parallax_layers;
-    return {atlas_fetch(*textures, tex_name), probability, default, layer};
-  }
-  atile_choose :: inline (tiles: [] Autotile) -> *SDL_Texture, u64 {
-    default: *Autotile;
-    rand := cast(float) (random_get() % 100) + 1;
-    for tiles {
-      rand -= it.probability;
-      if rand <= 0 {
-        return it.tex, it.parallax_layer;
-      } else if it.default then default = *tiles[it_index];
-    }
-
-    if default != null {
-      return default.tex, default.parallax_layer;
-    } else return null, 0;
-  }
 
   // NOTE: Associated with tiles
   above_ground_tiles      := Autotile.[atile("tile_grass"), atile("tile_top"), atile("tile_water")];
@@ -562,6 +565,9 @@ simulate_env_rope :: (rope: *Env_Rope, dt: float, still_changing_rope_position: 
     rope.body.force = xy(0,0);
   } else rope_integrate(rope, dt);
 }
+
+// TODO: Store hashmap keyed with a unique Menu_Box ID that returns
+// persistent animation state
 
 Menu_Box_Click_Event_Proc :: #type (*void);
 Menu_Box :: struct {
