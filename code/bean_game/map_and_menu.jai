@@ -9,7 +9,7 @@ Tile_Type :: enum {
   HEART;
   PLAYER_SPAWN;
   ROPE;
-  ROPE_LONG;
+  //ROPE_LONG;
   SPIKE;
   SPIKE_SPINNING;
   SPIKE_TRAP;
@@ -20,11 +20,169 @@ Tile_Type :: enum {
 Tile_Meta :: struct {
   key: u8;
   type: Tile_Type;
-  parsed: Code;
-  textured: Code;
+  parse_pass: Code;
+  texture_pass: Code;
 }
 
+TILE_EMPTY :: Tile_Meta.{
+  key = #char "#",
+  type = .EMPTY,
 
+  texture_pass = #code {
+    if below != .GROUND then continue;
+    foliage_texture, parallax_layer := atile_choose(environment_textures);
+    if foliage_texture == null then continue;
+    // NOTE: Can be tweaked
+    x_offset := random_get_within_range(-TILE_RESOLUTION/2, TILE_RESOLUTION/2);
+    y_offset := random_get_within_range(-TILE_RESOLUTION/4, 0);
+    foliage := arena_push(arena, Map.Parallax_Effect);
+    foliage.layer = parallax_layer;
+    foliage.pos = (it_index * TILE_RESOLUTION) + xy(x_offset, y_offset);
+    scale := random_get_within_range(0.7,1.5);
+    w, h: float;
+    SDL_GetTextureSize(foliage_texture, *w, *h);
+    foliage.size = xy(w  * scale /TILE_RESOLUTION_DIVISOR,
+                      h * scale /TILE_RESOLUTION_DIVISOR);
+    foliage.tex = foliage_texture;
+    foliage.rotation = random_get_within_range(-TILE_TILT_AMPLITUDE, TILE_TILT_AMPLITUDE);
+    sll_queue_push(*map.background, foliage);
+  }
+};
+
+TILE_BOUNCE_PAD :: Tile_Meta.{
+  key = #char "b",
+  type = .BOUNCE_PAD,
+
+  texture_pass = #code {
+    tile.tex = bounce_pad_texture;
+    tile.bbox_dim = {TILE_RESOLUTION, 1.0 /*TILE_RESOLUTION/3*/};
+  }
+};
+
+TILE_COIN :: Tile_Meta.{
+  key = #char "c",
+  type = .COIN,
+
+  texture_pass = #code {
+    tile.tex = atile_choose(coin_textures);
+    tile.bobs = true;
+    tile.bob_frequency = PI;
+    tile.bob_counter = random_get_within_range(0, (2 * PI) / tile.bob_frequency);
+    tile.bob_amplitude = 3.0;
+  }
+};
+
+TILE_GROUND :: Tile_Meta.{
+  key = #char "g",
+  type = .GROUND,
+
+  texture_pass = #code {
+    tile.rotation = random_get_within_range(-TILE_TILT_AMPLITUDE, TILE_TILT_AMPLITUDE);
+    tile.tex = ifx above != .GROUND && above != .WATER {
+      ifx below != .GROUND then above_ground_tiles[1].tex else above_ground_tiles[0].tex;
+    } else {
+      tile.rotation += 90.0 * (random_get() % 4);
+      atile_choose(below_ground_tiles);
+    }
+  }
+};
+
+TILE_HEART :: Tile_Meta.{
+  key = #char "H",
+  type = .HEART,
+
+  texture_pass = #code {
+    tile.tex = heart_texture;
+    tile.bobs = true;
+    tile.bob_frequency = 2 * PI;
+    tile.bob_counter = random_get_within_range(0, (2 * PI) / tile.bob_frequency);
+    tile.bob_amplitude = 3.0;
+  }
+};
+
+TILE_PLAYER_SPAWN :: Tile_Meta.{
+  key = #char "p",
+  type = .PLAYER_SPAWN,
+
+  parse_pass = #code { map.player_spawn = it_index * TILE_RESOLUTION; }
+};
+
+TILE_ROPE :: Tile_Meta.{
+  key = #char "r",
+  type = .ROPE,
+
+  parse_pass = #code {
+    length := TILE_RESOLUTION * 3.0;
+    anchor_pos := it_index * TILE_RESOLUTION;
+    anchor_pos.x += TILE_RESOLUTION / 2;
+    anchor_pos.y += 1; // Padding
+    create_env_rope(arena, *map, length, anchor_pos);
+  },
+
+  texture_pass = #code { tile.tex = env_rope_anchor_texture; }
+};
+
+TILE_SPIKE :: Tile_Meta.{
+  key = #char "s",
+  type = .SPIKE,
+
+  texture_pass = #code { tile.tex = spike_texture; }
+};
+
+TILE_SPIKE_SPINNING :: Tile_Meta.{
+  key = #char "S",
+  type = .SPIKE_SPINNING,
+
+  texture_pass = #code {
+    tile.tex = spike_spinning_texture;
+    tile.angular_speed = TILE_SPIKE_SPINNING_ANGULAR_SPEED;
+  }
+};
+
+TILE_SPIKE_TRAP :: Tile_Meta.{
+  key = #char "h",
+  type = .SPIKE_TRAP,
+
+  texture_pass = #code {
+    tile.tex = spike_texture;
+    tile.trap_display_offset = TILE_SPIKE_TRAP_HIDDEN_OFFSET;
+  }
+};
+
+TILE_WALL :: Tile_Meta.{
+  key = #char "t",
+  type = .WALL,
+
+  texture_pass = #code { tile.tex = tower_texture; }
+};
+
+TILE_WATER :: Tile_Meta.{
+  key = #char "w",
+  type = .WATER,
+
+  texture_pass = #code {
+    tile.tex = above_ground_tiles[2].tex;
+    tile.bobs = true;
+    tile.bob_frequency = PI / 2;
+    tile.bob_counter = random_get_within_range(0, (2 * PI) / tile.bob_frequency);
+    tile.bob_amplitude = 5.0;
+  }
+};
+
+COMBINED_TILE_META :: Tile_Meta.[
+  TILE_EMPTY,
+  TILE_BOUNCE_PAD,
+  TILE_COIN,
+  TILE_GROUND,
+  TILE_HEART,
+  TILE_PLAYER_SPAWN,
+  TILE_ROPE,
+  TILE_SPIKE,
+  TILE_SPIKE_SPINNING,
+  TILE_SPIKE_TRAP,
+  TILE_WALL,
+  TILE_WATER,
+];
 
 Tile :: struct {
   type: Tile_Type;
@@ -291,36 +449,23 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
     // Map data in memory is flipped vertically from file data
     c := raw_map.data[((rows.count-1) - xx it_index.y) * (pitch+newline_size) + xx it_index.x];
     type := Tile_Type.INVALID;
-    if c == {
-      case #char "#"; type = .EMPTY;
-      case #char "b"; type = .BOUNCE_PAD;
-      case #char "c"; type = .COIN;
-      case #char "g"; type = .GROUND;
-      case #char "r"; type = .ROPE; #through;
-      case #char "R"; {
-        if type == .EMPTY then type = .ROPE_LONG;
-        length := ifx type == .ROPE then TILE_RESOLUTION * 3.0 else TILE_RESOLUTION * 6.0;
-        anchor_pos := it_index * TILE_RESOLUTION;
-        anchor_pos.x += TILE_RESOLUTION / 2;
-        anchor_pos.y += 1; // Padding
-        create_env_rope(arena, *map, length, anchor_pos);
+
+    #insert -> string {
+      builder: String_Builder;
+      print_to_builder(*builder, "if c == {\n");
+      for COMBINED_TILE_META {
+        parse_pass := tprint("#insert,scope() -> Code { return COMBINED_TILE_META[%].parse_pass; }", it_index);
+        print_to_builder(*builder, "\tcase %; { type = .%; % }\n", it.key, it.type, parse_pass);
       }
-      case #char "S"; type = .SPIKE_SPINNING;
-      case #char "s"; type = .SPIKE;
-      case #char "H"; type = .HEART;
-      case #char "h"; type = .SPIKE_TRAP;
-      case #char "t"; type = .WALL;
-      case #char "w"; type = .WATER;
-      case #char "p"; {
-        type = .PLAYER_SPAWN;
-        map.player_spawn = it_index * TILE_RESOLUTION;
-      }
-      case; {
-        log_error("Error parsing level data on row %. Unrecognized map symbol: %", (rows.count+rows_in_header)-it_index.y, to_string(*c,1));
-        return {};
-      }
+      print_to_builder(*builder, "}");
+
+      return builder_to_string(*builder);
     }
 
+    if type == .INVALID {
+      log_error("Error parsing level data on row %. Unrecognized map symbol: %", (rows.count+rows_in_header)-it_index.y, to_string(*c,1));
+      return {};
+    }
     it.type = type;
   }
 
@@ -343,76 +488,19 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
   environment_textures := Autotile.[atile("tile_tree", 8.0, layer=1), atile("tile_bushHalf", 8.0, layer=1), atile("tile_bush", 8.0, layer=1)];
   cloud_textures       := Autotile.[atile("background_cloudA", 50.0, layer=3), atile("background_cloudB", 50.0, layer=3)];
 
-  for * map {
+  for * tile: map {
     above := map_index(map, it_index + {0, 1}).type;
     below := map_index(map, it_index + {0,-1}).type;
-    if it.type == {
-      case .EMPTY; {
-        if below != .GROUND then continue;
-        foliage_texture, parallax_layer := atile_choose(environment_textures);
-        if foliage_texture == null then continue;
-        // NOTE: Can be tweaked
-        x_offset := random_get_within_range(-TILE_RESOLUTION/2, TILE_RESOLUTION/2);
-        y_offset := random_get_within_range(-TILE_RESOLUTION/4, 0);
-        foliage := arena_push(arena, Map.Parallax_Effect);
-        foliage.layer = parallax_layer;
-        foliage.pos = (it_index * TILE_RESOLUTION) + xy(x_offset, y_offset);
-        scale := random_get_within_range(0.7,1.5);
-        w, h: float;
-        SDL_GetTextureSize(foliage_texture, *w, *h);
-        foliage.size = xy(w  * scale /TILE_RESOLUTION_DIVISOR,
-                          h * scale /TILE_RESOLUTION_DIVISOR);
-        foliage.tex = foliage_texture;
-        foliage.rotation = random_get_within_range(-TILE_TILT_AMPLITUDE, TILE_TILT_AMPLITUDE);
-        sll_queue_push(*map.background, foliage);
+    #insert -> string {
+      builder: String_Builder;
+      print_to_builder(*builder, "if tile.type == {\n");
+      for COMBINED_TILE_META {
+        texture_pass := tprint("#insert,scope() -> Code { return COMBINED_TILE_META[%].texture_pass; }", it_index);
+        print_to_builder(*builder, "\tcase .%; { % }\n", it.type, texture_pass);
       }
-      case .GROUND; {
-        it.rotation = random_get_within_range(-TILE_TILT_AMPLITUDE, TILE_TILT_AMPLITUDE);
-        it.tex = ifx above != .GROUND && above != .WATER {
-          ifx below != .GROUND then above_ground_tiles[1].tex else above_ground_tiles[0].tex;
-        } else {
-          it.rotation += 90.0 * (random_get() % 4);
-          atile_choose(below_ground_tiles);
-        }
-      }
-      case .WATER; {
-        it.tex = above_ground_tiles[2].tex;
-        it.bobs = true;
-        it.bob_frequency = PI / 2;
-        it.bob_counter = random_get_within_range(0, (2 * PI) / it.bob_frequency);
-        it.bob_amplitude = 5.0;
-      }
-      case .BOUNCE_PAD; {
-        it.tex = bounce_pad_texture;
-        it.bbox_dim = {TILE_RESOLUTION, 1.0 /*TILE_RESOLUTION/3*/};
-      }
-      case .COIN; {
-        it.tex = atile_choose(coin_textures);
-        it.bobs = true;
-        it.bob_frequency = PI;
-        it.bob_counter = random_get_within_range(0, (2 * PI) / it.bob_frequency);
-        it.bob_amplitude = 3.0;
-      }
-      case .HEART; {
-        it.tex = heart_texture;
-        it.bobs = true;
-        it.bob_frequency = 2 * PI;
-        it.bob_counter = random_get_within_range(0, (2 * PI) / it.bob_frequency);
-        it.bob_amplitude = 3.0;
-      }
-      case .SPIKE_SPINNING; {
-        it.tex = spike_spinning_texture;
-        it.angular_speed = TILE_SPIKE_SPINNING_ANGULAR_SPEED;
-      }
+      print_to_builder(*builder, "}");
 
-      case .WALL; it.tex = tower_texture;
-      case .ROPE_LONG; #through;
-      case .ROPE; it.tex = env_rope_anchor_texture;
-
-      case .SPIKE_TRAP; {
-        it.trap_display_offset = TILE_SPIKE_TRAP_HIDDEN_OFFSET;
-      } #through;
-      case .SPIKE; it.tex = spike_texture;
+      return builder_to_string(*builder);
     }
   }
 
