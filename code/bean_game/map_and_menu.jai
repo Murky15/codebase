@@ -1,3 +1,5 @@
+// TODO: Could I somehow use metaprogramming to enhance the process of adding tiles?
+
 Tile_Type :: enum {
   INVALID;
   EMPTY;
@@ -15,11 +17,14 @@ Tile_Type :: enum {
   WATER;
 }
 
-Collision_Event :: enum {
-  NONE;
-  FLOOR;
-  WALL_SLIDE;
+Tile_Meta :: struct {
+  key: u8;
+  type: Tile_Type;
+  parsed: Code;
+  textured: Code;
 }
+
+
 
 Tile :: struct {
   type: Tile_Type;
@@ -45,6 +50,12 @@ TILE_SPIKE_TRAP_HIDDEN_OFFSET :: TILE_RESOLUTION/1.5;
 TILE_SPIKE_TRAP_RELEASE_TIME :: 0.2;
 TILE_SPIKE_TRAP_ACTIVE_DURATION :: 2.0;
 TILE_SPIKE_TRAP_RETRACT_TIME :: 1.0;
+
+Collision_Event :: enum {
+  NONE;
+  FLOOR;
+  WALL_SLIDE;
+}
 
 Env_Rope :: struct {
   #as using rope: Rope;
@@ -325,7 +336,6 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
   spike_texture           := atlas_fetch(*textures, "tile_spikes");
   spike_spinning_texture  := atlas_fetch(*textures, "tile_spike");
   heart_texture           := atlas_fetch(*textures, "tile_heart");
-
 
   // NOTE: Not associated with tiles
   // TODO: I'm temporarily removing `atile("background_treeLarge", 4.0, layer=2), atile("background_tree", 4.0, layer=2)` from the following list because I can't figure out
