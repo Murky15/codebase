@@ -30,7 +30,7 @@ TILE_EMPTY :: Tile_Meta.{
 
   texture_pass = #code {
     if below != .GROUND then continue;
-    foliage_texture, parallax_layer := atile_choose(environment_textures);
+    foliage_texture, parallax_layer := atile_choose(globals.environment_textures);
     if foliage_texture == null then continue;
     // NOTE: Can be tweaked
     x_offset := random_get_within_range(-TILE_RESOLUTION/2, TILE_RESOLUTION/2);
@@ -54,7 +54,7 @@ TILE_BOUNCE_PAD :: Tile_Meta.{
   type = .BOUNCE_PAD,
 
   texture_pass = #code {
-    tile.tex = bounce_pad_texture;
+    tile.tex = globals.bounce_pad_texture;
     tile.bbox_dim = {TILE_RESOLUTION, 1.0 /*TILE_RESOLUTION/3*/};
   }
 };
@@ -64,7 +64,7 @@ TILE_COIN :: Tile_Meta.{
   type = .COIN,
 
   texture_pass = #code {
-    tile.tex = atile_choose(coin_textures);
+    tile.tex = atile_choose(globals.coin_textures);
     tile.bobs = true;
     tile.bob_frequency = PI;
     tile.bob_counter = random_get_within_range(0, (2 * PI) / tile.bob_frequency);
@@ -79,10 +79,10 @@ TILE_GROUND :: Tile_Meta.{
   texture_pass = #code {
     tile.rotation = random_get_within_range(-TILE_TILT_AMPLITUDE, TILE_TILT_AMPLITUDE);
     tile.tex = ifx above != .GROUND && above != .WATER {
-      ifx below != .GROUND then above_ground_tiles[1].tex else above_ground_tiles[0].tex;
+      ifx below != .GROUND then globals.above_ground_tiles[1].tex else globals.above_ground_tiles[0].tex;
     } else {
       tile.rotation += 90.0 * (random_get() % 4);
-      atile_choose(below_ground_tiles);
+      atile_choose(globals.below_ground_tiles);
     }
   }
 };
@@ -92,7 +92,7 @@ TILE_HEART :: Tile_Meta.{
   type = .HEART,
 
   texture_pass = #code {
-    tile.tex = heart_texture;
+    tile.tex = globals.heart_texture;
     tile.bobs = true;
     tile.bob_frequency = 2 * PI;
     tile.bob_counter = random_get_within_range(0, (2 * PI) / tile.bob_frequency);
@@ -119,14 +119,14 @@ TILE_ROPE :: Tile_Meta.{
     create_env_rope(arena, *map, length, anchor_pos);
   },
 
-  texture_pass = #code { tile.tex = env_rope_anchor_texture; }
+  texture_pass = #code { tile.tex = globals.env_rope_anchor_texture; }
 };
 
 TILE_SPIKE :: Tile_Meta.{
   key = #char "s",
   type = .SPIKE,
 
-  texture_pass = #code { tile.tex = spike_texture; }
+  texture_pass = #code { tile.tex = globals.spike_texture; }
 };
 
 TILE_SPIKE_SPINNING :: Tile_Meta.{
@@ -134,7 +134,7 @@ TILE_SPIKE_SPINNING :: Tile_Meta.{
   type = .SPIKE_SPINNING,
 
   texture_pass = #code {
-    tile.tex = spike_spinning_texture;
+    tile.tex = globals.spike_spinning_texture;
     tile.angular_speed = TILE_SPIKE_SPINNING_ANGULAR_SPEED;
   }
 };
@@ -144,7 +144,7 @@ TILE_SPIKE_TRAP :: Tile_Meta.{
   type = .SPIKE_TRAP,
 
   texture_pass = #code {
-    tile.tex = spike_texture;
+    tile.tex = globals.spike_texture;
     tile.trap_display_offset = TILE_SPIKE_TRAP_HIDDEN_OFFSET;
   }
 };
@@ -153,7 +153,7 @@ TILE_WALL :: Tile_Meta.{
   key = #char "t",
   type = .WALL,
 
-  texture_pass = #code { tile.tex = tower_texture; }
+  texture_pass = #code { tile.tex = globals.tower_texture; }
 };
 
 TILE_WATER :: Tile_Meta.{
@@ -161,7 +161,7 @@ TILE_WATER :: Tile_Meta.{
   type = .WATER,
 
   texture_pass = #code {
-    tile.tex = above_ground_tiles[2].tex;
+    tile.tex = globals.above_ground_tiles[2].tex;
     tile.bobs = true;
     tile.bob_frequency = PI / 2;
     tile.bob_counter = random_get_within_range(0, (2 * PI) / tile.bob_frequency);
@@ -450,7 +450,7 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
     c := raw_map.data[((rows.count-1) - xx it_index.y) * (pitch+newline_size) + xx it_index.x];
     type := Tile_Type.INVALID;
 
-    #insert -> string {
+     #insert -> string {
       builder: String_Builder;
       print_to_builder(*builder, "if c == {\n");
       for COMBINED_TILE_META {
@@ -471,23 +471,6 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
 
   // NOTE: Texture pass
 
-  // NOTE: Associated with tiles
-  above_ground_tiles      := Autotile.[atile("tile_grass"), atile("tile_top"), atile("tile_water")];
-  below_ground_tiles      := Autotile.[atile("tile", 50.0, true), atile("tile_diagonal", 16.0), atile("tile_stone", 16.0), atile("tile_border", 16.0)];
-  coin_textures           := Autotile.[atile("tile_coin", 50), atile("tile_gem", 50)];
-  bounce_pad_texture      := atlas_fetch(*textures, "tile_belt");
-  tower_texture           := atlas_fetch(*textures, "tile_brick");
-  env_rope_anchor_texture := atlas_fetch(*textures, "tile_crateSmall");
-  spike_texture           := atlas_fetch(*textures, "tile_spikes");
-  spike_spinning_texture  := atlas_fetch(*textures, "tile_spike");
-  heart_texture           := atlas_fetch(*textures, "tile_heart");
-
-  // NOTE: Not associated with tiles
-  // TODO: I'm temporarily removing `atile("background_treeLarge", 4.0, layer=2), atile("background_tree", 4.0, layer=2)` from the following list because I can't figure out
-  // how to make them look good with parallax scrolling
-  environment_textures := Autotile.[atile("tile_tree", 8.0, layer=1), atile("tile_bushHalf", 8.0, layer=1), atile("tile_bush", 8.0, layer=1)];
-  cloud_textures       := Autotile.[atile("background_cloudA", 50.0, layer=3), atile("background_cloudB", 50.0, layer=3)];
-
   for * tile: map {
     above := map_index(map, it_index + {0, 1}).type;
     below := map_index(map, it_index + {0,-1}).type;
@@ -506,7 +489,7 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
 
   num_clouds := 40;
   for 1..num_clouds {
-    cloud_texture, layer := atile_choose(cloud_textures);
+    cloud_texture, layer := atile_choose(globals.cloud_textures);
     assert(cloud_texture != null);
     cloud := arena_push(arena, Map.Parallax_Effect);
     cloud.layer = layer;

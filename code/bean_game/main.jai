@@ -526,6 +526,18 @@ globals: struct {
   number_textures:   [] *SDL_Texture;
   cosmetic_textures: [] *SDL_Texture;
 
+  above_ground_tiles:    [] Autotile;
+  below_ground_tiles:    [] Autotile;
+  coin_textures:         [] Autotile;
+  environment_textures:  [] Autotile;
+  cloud_textures:        [] Autotile;
+  bounce_pad_texture:      *SDL_Texture;
+  tower_texture:           *SDL_Texture;
+  env_rope_anchor_texture: *SDL_Texture;
+  spike_texture:           *SDL_Texture;
+  spike_spinning_texture:  *SDL_Texture;
+  heart_texture:           *SDL_Texture;
+
   // Timing
   should_run: bool;
   start: u64;
@@ -913,12 +925,14 @@ Main_Menu :: struct {
     HOME;
   }
 
+  /*
   Graphic :: struct {
     type: enum {NONE; CLOUD; GROUND;};
     tex: *SDL_Texture;
     pos: Vector2;
   }
-  graphics: [..] Graphic;
+  */
+  graphics: [..] Tile;
 }
 
 bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Main_Menu, frame_time: float) {
@@ -939,10 +953,12 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Mai
 
     for y: 0..GROUND_HEIGHT-1 {
       for x: 0..GROUND_WIDTH-1 {
-        graphic: Main_Menu.Graphic;
-        graphic.type = .GROUND;
-        //graphic.tex =
-        //array_add();
+        above := Tile_Type.GROUND;
+        below := Tile_Type.GROUND;
+        tile: Tile;
+        tile.type = .GROUND;
+        #insert,scope() -> Code { return TILE_GROUND.texture_pass; }
+        array_add(*main_menu.graphics, tile);
       }
     }
     for NUM_TILES..NUM_TILES + NUM_CLOUDS-1 {
@@ -1045,6 +1061,24 @@ main :: () {
                                     atlas_fetch(*texture_atlas, "item_hatTop"),
                                     atlas_fetch(*texture_atlas, "item_helmet"),
                                     atlas_fetch(*texture_atlas, "item_helmetModern")];
+
+  // NOTE: Associated with tiles
+  above_ground_tiles      = Autotile.[atile("tile_grass"), atile("tile_top"), atile("tile_water")];
+  below_ground_tiles      = Autotile.[atile("tile", 50.0, true), atile("tile_diagonal", 16.0), atile("tile_stone", 16.0), atile("tile_border", 16.0)];
+  coin_textures           = Autotile.[atile("tile_coin", 50), atile("tile_gem", 50)];
+  bounce_pad_texture      = atlas_fetch(*texture_atlas, "tile_belt");
+  tower_texture           = atlas_fetch(*texture_atlas, "tile_brick");
+  env_rope_anchor_texture = atlas_fetch(*texture_atlas, "tile_crateSmall");
+  spike_texture           = atlas_fetch(*texture_atlas, "tile_spikes");
+  spike_spinning_texture  = atlas_fetch(*texture_atlas, "tile_spike");
+  heart_texture           = atlas_fetch(*texture_atlas, "tile_heart");
+
+  // NOTE: Not associated with tiles
+  // TODO: I'm temporarily removing `atile("background_treeLarge", 4.0, layer=2), atile("background_tree", 4.0, layer=2)` from the following list because I can't figure out
+  // how to make them look good with parallax scrolling
+  environment_textures = Autotile.[atile("tile_tree", 8.0, layer=1), atile("tile_bushHalf", 8.0, layer=1), atile("tile_bush", 8.0, layer=1)];
+  cloud_textures       = Autotile.[atile("background_cloudA", 50.0, layer=3), atile("background_cloudB", 50.0, layer=3)];
+
   start = SDL_GetTicks();
   random_seed(cast,trunc(u32) SDL_GetPerformanceCounter());
   backing_buffer_size := 1048576; // 1 mebibyte
