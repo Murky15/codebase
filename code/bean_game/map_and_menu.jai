@@ -1,5 +1,3 @@
-// TODO: Could I somehow use metaprogramming to enhance the process of adding tiles?
-
 Tile_Type :: enum {
   INVALID;
   EMPTY;
@@ -29,23 +27,28 @@ TILE_EMPTY :: Tile_Meta.{
   type = .EMPTY,
 
   texture_pass = #code {
-    if below != .GROUND then continue;
-    foliage_texture, parallax_layer := atile_choose(globals.environment_textures);
-    if foliage_texture == null then continue;
-    // NOTE: Can be tweaked
-    x_offset := random_get_within_range(-TILE_RESOLUTION/2, TILE_RESOLUTION/2);
-    y_offset := random_get_within_range(-TILE_RESOLUTION/4, 0);
-    foliage := arena_push(arena, Map.Parallax_Effect);
-    foliage.layer = parallax_layer;
-    foliage.pos = (it_index * TILE_RESOLUTION) + xy(x_offset, y_offset);
-    scale := random_get_within_range(0.7,1.5);
-    w, h: float;
-    SDL_GetTextureSize(foliage_texture, *w, *h);
-    foliage.size = xy(w  * scale /TILE_RESOLUTION_DIVISOR,
-                      h * scale /TILE_RESOLUTION_DIVISOR);
-    foliage.tex = foliage_texture;
-    foliage.rotation = random_get_within_range(-TILE_TILT_AMPLITUDE, TILE_TILT_AMPLITUDE);
-    sll_queue_push(*map.background, foliage);
+    if below == .GROUND { // NOTE: Foliage
+      foliage_texture, parallax_layer := atile_choose(globals.environment_textures);
+      if foliage_texture == null then continue;
+      x_offset := random_get_within_range(-TILE_RESOLUTION/2, TILE_RESOLUTION/2);
+      y_offset := random_get_within_range(-TILE_RESOLUTION/4, 0);
+      tile.pos_offset = xy(x_offset, y_offset);
+      scale := random_get_within_range(0.7,1.5);
+      w, h: float;
+      SDL_GetTextureSize(foliage_texture, *w, *h);
+      tile.size = xy(w * scale / TILE_RESOLUTION_DIVISOR,
+                     h * scale / TILE_RESOLUTION_DIVISOR);
+      tile.tex = foliage_texture;
+      tile.rotation = random_get_within_range(-TILE_TILT_AMPLITUDE, TILE_TILT_AMPLITUDE);
+    } else { // NOTE: Clouds
+      cloud_texture, layer := atile_choose(globals.cloud_textures);
+      if cloud_texture == null then continue;
+      tile.parallax_layer = layer;
+      w, h: float;
+      SDL_GetTextureSize(cloud_texture, *w, *h);
+      tile.size = xy(w,h);
+      tile.tex = cloud_texture;
+    }
   }
 };
 
@@ -186,8 +189,13 @@ COMBINED_TILE_META :: Tile_Meta.[
 
 Tile :: struct {
   type: Tile_Type;
+
   tex: *SDL_Texture;
+  pos_offset: Vector2;
   bbox_dim := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
+  size := Vector2.{TILE_RESOLUTION, TILE_RESOLUTION};
+  parallax_layer: u64 = 1;
+
   collected: bool;
 
   rotation: float;
@@ -231,29 +239,19 @@ Env_Rope :: struct {
 }
 
 Map :: struct {
-  version: int;
-  name: string;
-  author: string;
-  description: string;
+  using Header :: struct {
+    version: int;
+    name: string;
+    author: string;
+    description: string;
+  }
 
   #if ENABLE_LEVEL_HOT_RELOAD {
     path: string;
     last_modification: Apollo_Time;
   }
 
-  max_parallax_layers :: 3;
-  Parallax_Effect :: struct {
-    #as using n: Linked_List_Header;
-
-    layer: u64;
-    pos: Vector2;
-    size: Vector2;
-    rotation: float;
-    tex: *SDL_Texture;
-
-    #overlay (pos) bbox: AARect;
-  }
-  background: Linked_List(Parallax_Effect);
+  max_parallax_layers :: 15;
 
   cam: Camera;
   player: Player;
@@ -391,7 +389,7 @@ atile_choose :: inline (tiles: [] Autotile) -> (texture: *SDL_Texture, parallax_
 }
 
 map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO_TIME_INVALID) -> Map {
-  // NOTE: Parse text file
+  // NOTE: Parse Header
   rows_in_header :: 4;
   tis_map :: cast(*Type_Info_Struct) type_info(Map);
 
@@ -449,12 +447,11 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
     // Map data in memory is flipped vertically from file data
     c := raw_map.data[((rows.count-1) - xx it_index.y) * (pitch+newline_size) + xx it_index.x];
     type := Tile_Type.INVALID;
-
      #insert -> string {
       builder: String_Builder;
       print_to_builder(*builder, "if c == {\n");
       for COMBINED_TILE_META {
-        parse_pass := tprint("#insert,scope() -> Code { return COMBINED_TILE_META[%].parse_pass; }", it_index);
+        parse_pass := tprint("insert_code_from_struct(COMBINED_TILE_META[%].parse_pass);", it_index);
         print_to_builder(*builder, "\tcase %; { type = .%; % }\n", it.key, it.type, parse_pass);
       }
       print_to_builder(*builder, "}");
@@ -470,7 +467,6 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
   }
 
   // NOTE: Texture pass
-
   for * tile: map {
     above := map_index(map, it_index + {0, 1}).type;
     below := map_index(map, it_index + {0,-1}).type;
@@ -478,29 +474,13 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
       builder: String_Builder;
       print_to_builder(*builder, "if tile.type == {\n");
       for COMBINED_TILE_META {
-        texture_pass := tprint("#insert,scope() -> Code { return COMBINED_TILE_META[%].texture_pass; }", it_index);
+        texture_pass := tprint("insert_code_from_struct(COMBINED_TILE_META[%].texture_pass);", it_index);
         print_to_builder(*builder, "\tcase .%; { % }\n", it.type, texture_pass);
       }
       print_to_builder(*builder, "}");
 
       return builder_to_string(*builder);
     }
-  }
-
-  num_clouds := 40;
-  for 1..num_clouds {
-    cloud_texture, layer := atile_choose(globals.cloud_textures);
-    assert(cloud_texture != null);
-    cloud := arena_push(arena, Map.Parallax_Effect);
-    cloud.layer = layer;
-    w, h: float;
-    SDL_GetTextureSize(cloud_texture, *w, *h);
-    cloud.size = xy(w,h);
-    x := random_get_within_range(-cloud.size.x, (map.width-1.0) * TILE_RESOLUTION);
-    y := random_get_within_range(-cloud.size.y, (map.height-1.0) * TILE_RESOLUTION);
-    cloud.pos = xy(x,y);
-    cloud.tex = cloud_texture;
-    sll_queue_push_front(*map.background, cloud);
   }
 
   map.player.pos = map.player_spawn;
@@ -655,6 +635,7 @@ Menu_Box :: struct {
   rect: SDL_FRect;
   draw_border: bool;
   filled: bool;
+  transparent_background: bool;
 
   content_type: enum {NONE; TEXT; SPRITE;};
   union {
@@ -804,6 +785,10 @@ menu_submit_and_process_input :: (renderer: *SDL_Renderer, mouse: Mouse, old_mou
       SDL_RenderRect(renderer, *border);
     }
 
+    if !it.transparent_background {
+      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_RenderFillRect(renderer, *it.rect);
+    }
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     if it.draw_border SDL_RenderRect(renderer, *it.rect);
     if it.content_type == .TEXT {

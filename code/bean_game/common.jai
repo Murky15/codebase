@@ -232,7 +232,7 @@ Coroutine :: struct (Param := void, In := void, Out := void) {
 
   param: Param;
   in: In;
-  out: Out;
+  out: *Out;
 }
 
 co_init :: (co: *Coroutine, proc: Coroutine_Proc, param: co.Param) {
@@ -273,7 +273,12 @@ co_resume :: (co: *Coroutine, dt: float, in: co.In) {
   co_resume(co, dt);
 }
 
-co_resume :: (co: *Coroutine, dt: float, in: co.In, out: co.Out) {
+co_resume :: (co: *Coroutine, dt: float, out: *co.Out) {
+  co.out = out;
+  co_resume(co, dt);
+}
+
+co_resume :: (co: *Coroutine, dt: float, in: co.In, out: *co.Out) {
   co.in = in;
   co.out = out;
   co_resume(co, dt);
@@ -333,6 +338,13 @@ Coroutine_State :: struct {
 }
 #scope_export
 
+// NOTE: This is a very strange macro. Why do I need to do all of this
+// instead of a simple #insert code?
+insert_code_from_struct :: ($code: Code, scope := #caller_code) #expand {
+  #insert,scope(scope) #run (code: Code) -> Code {
+    return code;
+  }(code);
+}
 
 round  :: x => ifx x - cast(int) x >= 0.5 then ceil(x) else floor(x);
 sign   :: x => ifx x == 0 then 0 else ifx signbit(x) then -1 else 1;

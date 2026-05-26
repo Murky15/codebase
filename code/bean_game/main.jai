@@ -819,12 +819,35 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
   SDL_RenderClear(renderer);
   defer SDL_RenderPresent(renderer);
 
-  for map.background {
-    layer_effect := ifx it.layer > 1 then xx it.layer else 1.0;
-    parallax_cam := cam_pos / layer_effect;
-    cam_view := AARect.{xy=parallax_cam, zw=xy(RESOLUTION_W, RESOLUTION_H)};
-    if !rects_intersect(cam_view, it.bbox) then continue;
-    draw_quad(renderer, it.tex, {xy = it.pos - parallax_cam, zw = it.size}, rotation_angle = it.rotation);
+  for * map {
+    if it.collected then continue;
+    it.rotation += it.angular_speed * frame_time;
+    if it.bobs {
+      it.bob_counter += frame_time;
+      it.bob_counter = fmod_cycling(it.bob_counter, (2 * PI) / it.bob_frequency);
+    }
+
+    if it.type == .SPIKE_TRAP {
+      co_resume(*it.trap_animation, frame_time, frame_time);
+    }
+
+    if it.parallax_layer > 1 {
+      parallax_cam := cam_pos / cast(float) it.parallax_layer;
+      cam_view := AARect.{xy=parallax_cam, zw=xy(RESOLUTION_W, RESOLUTION_H)};
+      pos := it_index * TILE_RESOLUTION;
+      if !rects_intersect(cam_view, {xy=pos, zw=it.size}) then continue;
+      draw_quad(renderer, it.tex, {xy = pos - parallax_cam, zw = it.size}, rotation_angle = it.rotation);
+    }
+  }
+
+  for :visible_only map {
+    if it.tex == null then continue;
+    if it.collected then continue;
+    if it.parallax_layer > 1 then continue;
+    dsp := (it_index * TILE_RESOLUTION) + it.pos_offset;
+    dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
+    dsp.y -= it.trap_display_offset;
+    draw_quad(renderer, it.tex, {xy = dsp - cam_pos, zw = it.size}, rotation_angle = it.rotation);
   }
 
   for rope: map.environmental_ropes {
@@ -845,28 +868,6 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
       }
       //draw_circle_debug(renderer, it.pos - cam_pos, 2, {1, 0, 0, 1});
     }
-  }
-
-  for * map {
-    if it.collected then continue;
-    it.rotation += it.angular_speed * frame_time;
-    if it.bobs {
-      it.bob_counter += frame_time;
-      it.bob_counter = fmod_cycling(it.bob_counter, (2 * PI) / it.bob_frequency);
-    }
-
-    if it.type == .SPIKE_TRAP {
-      co_resume(*it.trap_animation, frame_time, frame_time);
-    }
-  }
-
-  for :visible_only map {
-    if it.tex == null then continue;
-    if it.collected then continue;
-    dsp := it_index * TILE_RESOLUTION;
-    dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
-    dsp.y -= it.trap_display_offset;
-    draw_quad(renderer, it.tex, {xy = dsp - cam_pos, zw = xy(TILE_RESOLUTION)}, rotation_angle = it.rotation);
   }
 
   {
@@ -944,25 +945,28 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Mai
     }
   }
 
+  NUM_CLOUDS :: 40;
+  HEIGHT :: RESOLUTION_H / TILE_RESOLUTION;
+  WIDTH  :: RESOLUTION_W / TILE_RESOLUTION;
+  GROUND_LEVEL  :: 4;
   if main_menu.graphics.count == 0 {
-    NUM_CLOUDS :: 40;
-    GROUND_HEIGHT :: 10;
-    GROUND_WIDTH :: RESOLUTION_W / TILE_RESOLUTION;
-    NUM_TILES :: GROUND_WIDTH * GROUND_HEIGHT;
+    NUM_TILES :: WIDTH * HEIGHT+1;
     array_reserve(*main_menu.graphics, NUM_TILES + NUM_CLOUDS);
 
-    for y: 0..GROUND_HEIGHT-1 {
-      for x: 0..GROUND_WIDTH-1 {
-        above := Tile_Type.GROUND;
-        below := Tile_Type.GROUND;
-        tile: Tile;
-        tile.type = .GROUND;
-        #insert,scope() -> Code { return TILE_GROUND.texture_pass; }
-        array_add(*main_menu.graphics, tile);
+    // NOTE: +1 for foliage
+    for y: 0..HEIGHT {
+      above := ifx y >= GROUND_LEVEL-1 then Tile_Type.EMPTY else Tile_Type.GROUND;
+      below := ifx y >= GROUND_LEVEL+1 then Tile_Type.EMPTY else Tile_Type.GROUND;
+      for x: 0..WIDTH-1 {
+        tile := array_add(*main_menu.graphics);
+        if y >= GROUND_LEVEL {
+          tile.type = .EMPTY;
+          insert_code_from_struct(TILE_EMPTY.texture_pass);
+        } else {
+          tile.type = .GROUND;
+          insert_code_from_struct(TILE_GROUND.texture_pass);
+        }
       }
-    }
-    for NUM_TILES..NUM_TILES + NUM_CLOUDS-1 {
-
     }
   }
 
@@ -970,6 +974,24 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Mai
   SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
   SDL_RenderClear(renderer);
   defer SDL_RenderPresent(renderer);
+
+  for * < main_menu.graphics {
+    y := it_index / WIDTH;
+    x := it_index - (y * WIDTH);
+    pos := xy(xx x, xx y) * TILE_RESOLUTION + it.pos_offset;
+    draw_quad(renderer, it.tex, {xy=pos, zw=it.size}, rotation_angle = it.rotation);
+
+    // TODO: Make this better? Can we spawn more clouds?
+    if it.parallax_layer > 1 {
+      if pos.x > RESOLUTION_W {
+        it.pos_offset.x = (cast(float) -x * TILE_RESOLUTION) - it.size.x;
+        dsp_y := cast(float) y * TILE_RESOLUTION;
+        it.pos_offset.y = random_get_within_range((GROUND_LEVEL * TILE_RESOLUTION) - dsp_y, RESOLUTION_H - dsp_y);
+      } else {
+        it.pos_offset.x += 15.0 * frame_time * 1.0 / xx it.parallax_layer;
+      }
+    }
+  }
 
   if main_menu.state == {
     case .HOME; {
@@ -979,7 +1001,9 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Mai
                           Mouse.{cast,force(Vector2) globals.old_mouse_pos, globals.old_mouse_button};
       defer menu_submit_and_process_input(renderer, mouse, old_mouse, *menu);
       title_box := menu_add_box(*menu, MENU_LAYOUT_CENTER, 70, "BEAN GAME", 3);
-      menu_add_box(*menu, title_box.rect.x, title_box.rect.y - 8, "The", 1);
+      title_box.transparent_background = true;
+      little_box := menu_add_box(*menu, title_box.rect.x, title_box.rect.y - 8, "The", 1);
+      little_box.transparent_background = true;
       menu_push_autolayout(*menu, .VERTICAL, MENU_LAYOUT_CENTER, 130, 40);
       button_text := string.[
         "Play",
@@ -1073,11 +1097,11 @@ main :: () {
   spike_spinning_texture  = atlas_fetch(*texture_atlas, "tile_spike");
   heart_texture           = atlas_fetch(*texture_atlas, "tile_heart");
 
-  // NOTE: Not associated with tiles
+  environment_textures    = Autotile.[atile("tile_tree", 8.0), atile("tile_bushHalf", 8.0), atile("tile_bush", 8.0)];
+  cloud_textures          = Autotile.[atile("background_cloudA", 2.0, layer=3), atile("background_cloudB", 2.0, layer=4)];
+
   // TODO: I'm temporarily removing `atile("background_treeLarge", 4.0, layer=2), atile("background_tree", 4.0, layer=2)` from the following list because I can't figure out
   // how to make them look good with parallax scrolling
-  environment_textures = Autotile.[atile("tile_tree", 8.0, layer=1), atile("tile_bushHalf", 8.0, layer=1), atile("tile_bush", 8.0, layer=1)];
-  cloud_textures       = Autotile.[atile("background_cloudA", 50.0, layer=3), atile("background_cloudB", 50.0, layer=3)];
 
   start = SDL_GetTicks();
   random_seed(cast,trunc(u32) SDL_GetPerformanceCounter());
