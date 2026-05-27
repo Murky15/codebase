@@ -188,6 +188,8 @@ COMBINED_TILE_META :: Tile_Meta.[
 ];
 
 Tile :: struct {
+  #as using n: Linked_List_Header;
+
   type: Tile_Type;
 
   tex: *SDL_Texture;
@@ -251,7 +253,8 @@ Map :: struct {
     last_modification: Apollo_Time;
   }
 
-  max_parallax_layers :: 15;
+  MAX_PARALLAX_LAYERS :: 5;
+  background_effects: [MAX_PARALLAX_LAYERS] Linked_List(Tile);
 
   cam: Camera;
   player: Player;
@@ -369,7 +372,8 @@ Autotile :: struct {
 }
 
 atile :: (tex_name: string, probability := 100.0, default := false, layer := 1) -> Autotile #expand {
-  #assert layer <= Map.max_parallax_layers;
+  #assert layer <= Map.MAX_PARALLAX_LAYERS;
+  #assert probability <= 100.0;
   return {atlas_fetch(*globals.texture_atlas, tex_name), probability, default, layer};
 }
 
@@ -481,6 +485,9 @@ map_load :: (arena: *Arena, textures: Texture_Atlas, last_modification := APOLLO
 
       return builder_to_string(*builder);
     }
+
+    // NOTE: Bucket tiles based on parallax layer for easy iteration
+    sll_queue_push(*map.background_effects[tile.parallax_layer-1], tile);
   }
 
   map.player.pos = map.player_spawn;
@@ -665,6 +672,7 @@ Menu :: struct {
   }
 
   boxes: [..] Menu_Box;
+  //2previously_added: *Menu_Box;
 }
 
 MENU_LAYOUT_CENTER :: -1;
@@ -674,8 +682,8 @@ Menu_Autolayout :: enum {
   VERTICAL;
 }
 Menu_Content_Align :: enum {
-  // LEFT;
-  RIGHT;
+  LEFT;
+  //RIGHT;
   CENTER;
 }
 
@@ -720,14 +728,14 @@ menu_add_box :: (menu: *Menu, x: float, y: float, text: string, scale := 1.0) ->
   return box;
 }
 
-menu_add_box  :: (menu: *Menu, dim: Vector2, align: Menu_Content_Align, text: string) -> *Menu_Box {
+menu_add_box  :: (menu: *Menu, dim: Vector2, align := Menu_Content_Align.LEFT, text := "") -> *Menu_Box {
   assert(menu.Autolayout.style != .NONE, "UI system does not know where to put this box because no autolayout style was pushed!");
   box := array_add(*menu.boxes);
 
   advance_amt: Vector2;
   x, y := menu.Autolayout.anchor.x, menu.Autolayout.anchor.y;
   if menu.Autolayout.style == .HORIZONTAL {
-    x += menu.Autolayout.spacing * menu.Autolayout.index;
+    x += (dim.x + menu.Autolayout.spacing) * menu.Autolayout.index;
     if y == MENU_LAYOUT_CENTER {
       y += center_rect({x=x, y=y, zw = dim}, make_aarect(menu.dim)).y;
     }

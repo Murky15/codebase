@@ -700,7 +700,7 @@ bean_game_tick :: (map: *Map, dt: float) {
       apply_force(player, xy(0, GRAVITY*player.mass) + globals.wall_friction_force);
     }
 
-    case .SWING; { // TODO: Momentum carry after jumping -> steal velocity from the particle we were on and add it to the impulse.
+    case .SWING; {
       if input.rope_slide_dir > 0 {
         env_rope_move_body_up(player.swinging_from);
       } else if input.rope_slide_dir < 0 {
@@ -819,6 +819,7 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
   SDL_RenderClear(renderer);
   defer SDL_RenderPresent(renderer);
 
+  // NOTE: Update render animations
   for * map {
     if it.collected then continue;
     it.rotation += it.angular_speed * frame_time;
@@ -830,16 +831,25 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     if it.type == .SPIKE_TRAP {
       co_resume(*it.trap_animation, frame_time, frame_time);
     }
+  }
 
-    if it.parallax_layer > 1 {
+  // NOTE: Render background parallax effects
+
+  for < bucket, bucket_index: map.background_effects {
+    if bucket_index == 0 continue;
+    for * bucket {
+      tile_index := it - map.tiles.data;
+      y := tile_index / map.width;
+      x := tile_index - (y * map.width);
       parallax_cam := cam_pos / cast(float) it.parallax_layer;
       cam_view := AARect.{xy=parallax_cam, zw=xy(RESOLUTION_W, RESOLUTION_H)};
-      pos := it_index * TILE_RESOLUTION;
+      pos := xy(xx x, xx y) * TILE_RESOLUTION;
       if !rects_intersect(cam_view, {xy=pos, zw=it.size}) then continue;
       draw_quad(renderer, it.tex, {xy = pos - parallax_cam, zw = it.size}, rotation_angle = it.rotation);
     }
   }
 
+  // NOTE: Render visible tiles
   for :visible_only map {
     if it.tex == null then continue;
     if it.collected then continue;
@@ -850,6 +860,7 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     draw_quad(renderer, it.tex, {xy = dsp - cam_pos, zw = it.size}, rotation_angle = it.rotation);
   }
 
+  // NOTE: Render ropes
   for rope: map.environmental_ropes {
     for :particles rope {
       if it_index < rope.num_particles-1 {
@@ -870,6 +881,7 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     }
   }
 
+  // NOTE: Render player
   {
     player.flip = globals.player_flip.proc(*globals.player_flip, frame_time);
     dsp_pos := lerp(old_map.player.pos, player.pos, alpha) - cam_pos;
@@ -886,6 +898,7 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     if show then draw_quad(renderer, player.texture[player.health], {xy = dsp_pos, zw = dsp_dim}, flip_x = toggle);
   }
 
+  // NOTE: Render scoreboard
   {
     scoreboard_x := 0.0;
     SCOREBOARD_Y :: 315;
@@ -902,6 +915,7 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     }
   }
 
+  // NOTE: Render logs
   for logs_to_display {
     alpha := it.fade.proc(*it.fade, frame_time);
     SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1 - alpha);
@@ -924,15 +938,9 @@ SDL_PointInRectFloat :: inline (p: *SDL_FPoint, r: *SDL_FRect) -> bool {
 Main_Menu :: struct {
   state: enum {
     HOME;
+    PLAY;
   }
 
-  /*
-  Graphic :: struct {
-    type: enum {NONE; CLOUD; GROUND;};
-    tex: *SDL_Texture;
-    pos: Vector2;
-  }
-  */
   graphics: [..] Tile;
 }
 
@@ -940,7 +948,7 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Mai
   home_menu_on_click :: (user_data: *void) {
     index := cast(int) user_data;
     if index == {
-      case 0; globals.game_state = .PLAY;
+      case 0; globals.main_menu.state = .PLAY;
       case 3; globals.should_run = false;
     }
   }
@@ -993,13 +1001,13 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Mai
     }
   }
 
+  menu: Menu;
+  menu_frame_begin(*menu, {0, 0, RESOLUTION_W, RESOLUTION_H}, globals.font_atlas,, temp);
+  mouse, old_mouse := Mouse.{cast,force(Vector2) globals.mouse_pos, globals.mouse_button},
+                      Mouse.{cast,force(Vector2) globals.old_mouse_pos, globals.old_mouse_button};
+  defer menu_submit_and_process_input(renderer, mouse, old_mouse, *menu);
   if main_menu.state == {
     case .HOME; {
-      menu: Menu;
-      menu_frame_begin(*menu, {0, 0, RESOLUTION_W, RESOLUTION_H}, globals.font_atlas,, temp);
-      mouse, old_mouse := Mouse.{cast,force(Vector2) globals.mouse_pos, globals.mouse_button},
-                          Mouse.{cast,force(Vector2) globals.old_mouse_pos, globals.old_mouse_button};
-      defer menu_submit_and_process_input(renderer, mouse, old_mouse, *menu);
       title_box := menu_add_box(*menu, MENU_LAYOUT_CENTER, 70, "BEAN GAME", 3);
       title_box.transparent_background = true;
       little_box := menu_add_box(*menu, title_box.rect.x, title_box.rect.y - 8, "The", 1);
@@ -1015,6 +1023,18 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Mai
         box_dim :: Vector2.{120, 30};
         menu_add_box(*menu, box_dim, .CENTER, it, home_menu_on_click, cast(*void) it_index);
       }
+    }
+
+    case .PLAY; {
+      thing := menu_add_box(*menu, MENU_LAYOUT_CENTER, MENU_LAYOUT_CENTER, xy(80 * 4, 80));
+      menu_push_autolayout(*menu, .HORIZONTAL, 0, MENU_LAYOUT_CENTER, 40);
+      arrow_box_dim :: Vector2.{20, 20};
+      //menu_add_box(*menu, arrow_box_dim);
+      for 1..4 {
+        box_dim :: Vector2.{80, 80};
+        menu_add_box(*menu, box_dim);
+      }
+      //menu_add_box(*menu, arrow_box_dim);
     }
   }
 }
@@ -1098,7 +1118,7 @@ main :: () {
   heart_texture           = atlas_fetch(*texture_atlas, "tile_heart");
 
   environment_textures    = Autotile.[atile("tile_tree", 8.0), atile("tile_bushHalf", 8.0), atile("tile_bush", 8.0)];
-  cloud_textures          = Autotile.[atile("background_cloudA", 2.0, layer=3), atile("background_cloudB", 2.0, layer=4)];
+  cloud_textures          = Autotile.[atile("background_cloudA", 3.5, layer=3), atile("background_cloudB", 3.5, layer=4)];
 
   // TODO: I'm temporarily removing `atile("background_treeLarge", 4.0, layer=2), atile("background_tree", 4.0, layer=2)` from the following list because I can't figure out
   // how to make them look good with parallax scrolling
