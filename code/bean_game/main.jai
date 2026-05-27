@@ -28,17 +28,18 @@ O = Scrapped / Pushed back to later release
 - [X] Fixed timestep
 - [X] Spikes & traps
 - [X] Maybe coroutines could be useful actually
+- [X] To communicate player health instead of hearts we could switch player sprite from green -> yellow -> red -> dead
 - [O] Grappling hook
 - [O] using,map to clean up SDL3 imports
+- [O] Bordered rects could be drawn with SDL_Rect whatever in a for loop increasing the offset and decreasing the dim each time
 - [ ] Hands
 - [ ] Signs with user-specified text
 - [ ] Cosmetics
 - [ ] Main menu
 - [ ] Audio
 - [ ] Downloading level files from the web and checking for updates
-- [ ] To communicate player health instead of hearts we could switch player sprite from green -> yellow -> red -> dead
-- [ ] Bordered rects could be drawn with SDL_Rect whatever in a for loop increasing the offset and decreasing the dim each time
 - [ ] Fix fullscreen projection, or figure out how to draw in the borders for odd aspect ratios
+- [ ] Clean up differences in usage of SDL_FRect and AARect and SDL coordinate system vs ours
 */
 
 AARect :: #type,isa Vector4;
@@ -382,6 +383,14 @@ draw_quad :: (renderer: *SDL_Renderer, tex: *SDL_Texture, rect: AARect, flip_x :
   SDL_RenderTextureRotated(renderer, tex, null, *make_frect(quad), rotation_angle, null, flip);
 }
 
+draw_quad_flipped :: (renderer: *SDL_Renderer, tex: *SDL_Texture, rect: AARect, flip_x := false, flip_y := false, rotation_angle := 0.0) {
+  quad := rect;
+  flip: SDL_FlipMode;
+  if flip_x then flip |= .HORIZONTAL;
+  if flip_y then flip |= .VERTICAL;
+  SDL_RenderTextureRotated(renderer, tex, null, *make_frect(quad), rotation_angle, null, flip);
+}
+
 draw_quad :: (renderer: *SDL_Renderer, p0: Vector2, p1: Vector2, p2: Vector2, p3: Vector2, color: Vector4) {
   quad_indices :: s32.[0,1,2,0,2,3];
 
@@ -519,24 +528,29 @@ globals: struct {
   texture_atlas: Texture_Atlas;
   font_atlas: Bitmap_Font;
 
-  coin_texture:         *SDL_Texture;
-  x_texture:            *SDL_Texture;
-  ui_box_texture:       *SDL_Texture;
-  ui_select_texture:    *SDL_Texture;
-  number_textures:   [] *SDL_Texture;
-  cosmetic_textures: [] *SDL_Texture;
+  coin_texture:            *SDL_Texture;
+  x_texture:               *SDL_Texture;
+  ui_box_texture:          *SDL_Texture;
+  ui_select_texture:       *SDL_Texture;
+  number_textures:      [] *SDL_Texture;
+  cosmetic_textures:    [] *SDL_Texture;
 
-  above_ground_tiles:    [] Autotile;
-  below_ground_tiles:    [] Autotile;
-  coin_textures:         [] Autotile;
-  environment_textures:  [] Autotile;
-  cloud_textures:        [] Autotile;
+  above_ground_tiles:   []  Autotile;
+  below_ground_tiles:   []  Autotile;
+  coin_textures:        []  Autotile;
+  environment_textures: []  Autotile;
+  cloud_textures:       []  Autotile;
   bounce_pad_texture:      *SDL_Texture;
   tower_texture:           *SDL_Texture;
   env_rope_anchor_texture: *SDL_Texture;
   spike_texture:           *SDL_Texture;
   spike_spinning_texture:  *SDL_Texture;
   heart_texture:           *SDL_Texture;
+
+  left_arrow_texture:      *SDL_Texture;
+  right_arrow_texture:     *SDL_Texture;
+  peg_texture:             *SDL_Texture;
+
 
   // Timing
   should_run: bool;
@@ -953,6 +967,19 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Mai
     }
   }
 
+  play_arrow_on_click :: (user_data: *void) {
+    dir := cast(int) user_data;
+    if dir == 0 {
+      log("Left!");
+    } else if dir == 1 {
+      log("Right!");
+    }
+  }
+
+  play_level_on_click :: (user_data: *void) {
+
+  }
+
   NUM_CLOUDS :: 40;
   HEIGHT :: RESOLUTION_H / TILE_RESOLUTION;
   WIDTH  :: RESOLUTION_W / TILE_RESOLUTION;
@@ -1002,17 +1029,14 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Mai
   }
 
   menu: Menu;
-  menu_frame_begin(*menu, {0, 0, RESOLUTION_W, RESOLUTION_H}, globals.font_atlas,, temp);
   mouse, old_mouse := Mouse.{cast,force(Vector2) globals.mouse_pos, globals.mouse_button},
                       Mouse.{cast,force(Vector2) globals.old_mouse_pos, globals.old_mouse_button};
-  defer menu_submit_and_process_input(renderer, mouse, old_mouse, *menu);
+  menu_create_scoped(*menu, {0, 0, RESOLUTION_W, RESOLUTION_H}, globals.font_atlas, renderer, mouse, old_mouse,, temp);
   if main_menu.state == {
     case .HOME; {
-      title_box := menu_add_box(*menu, MENU_LAYOUT_CENTER, 70, "BEAN GAME", 3);
-      title_box.transparent_background = true;
-      little_box := menu_add_box(*menu, title_box.rect.x, title_box.rect.y - 8, "The", 1);
-      little_box.transparent_background = true;
-      menu_push_autolayout(*menu, .VERTICAL, MENU_LAYOUT_CENTER, 130, 40);
+      title_box := menu_add_box(MENU_LAYOUT_CENTER, 70, "BEAN GAME", 3);
+      little_box := menu_add_box(title_box.rect.x, title_box.rect.y - 8, "The", 1);
+      menu_push_autolayout(.VERTICAL, MENU_LAYOUT_CENTER, 130, {120, 30}, 40);
       button_text := string.[
         "Play",
         "Options",
@@ -1020,21 +1044,40 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Mai
         "Quit",
       ];
       for button_text {
-        box_dim :: Vector2.{120, 30};
-        menu_add_box(*menu, box_dim, .CENTER, it, home_menu_on_click, cast(*void) it_index);
+        menu_add_box(.CENTER, it, home_menu_on_click, cast(*void) it_index);
       }
     }
 
     case .PLAY; {
-      thing := menu_add_box(*menu, MENU_LAYOUT_CENTER, MENU_LAYOUT_CENTER, xy(80 * 4, 80));
-      menu_push_autolayout(*menu, .HORIZONTAL, 0, MENU_LAYOUT_CENTER, 40);
-      arrow_box_dim :: Vector2.{20, 20};
-      //menu_add_box(*menu, arrow_box_dim);
-      for 1..4 {
-        box_dim :: Vector2.{80, 80};
-        menu_add_box(*menu, box_dim);
+      menu_add_box(MENU_LAYOUT_CENTER, 70, "LEVEL SELECT", 3);
+
+      level_box_spacing :: 40;
+      num_levels_visible :: 4;
+      group_width :: ((80 + level_box_spacing) * num_levels_visible) - level_box_spacing;
+      group := menu_add_box(AARect.{MENU_LAYOUT_CENTER, MENU_LAYOUT_CENTER, group_width, 80});
+      group.draw_border = false;
+      group.transparent_background = true;
+
+      {
+        menu_push_autolayout(.HORIZONTAL, group.rect.x, group.rect.y, {80, 80}, level_box_spacing);
+        for 0..num_levels_visible-1 {
+          menu_add_box();
+        }
       }
-      //menu_add_box(*menu, arrow_box_dim);
+
+      arrow_box_dim := xy(TILE_RESOLUTION);
+      leftovers  := AARect.{0, group.rect.y, group.rect.x, group.rect.h};
+      rightovers := AARect.{group.rect.x + group.rect.w, leftovers.y, leftovers.z, leftovers.w};
+      left_arrow_pos := center_rect({zw=arrow_box_dim}, leftovers);
+      right_arrow_pos := center_rect({zw=arrow_box_dim}, rightovers);
+      ground_height := cast(float) RESOLUTION_H - (GROUND_LEVEL * TILE_RESOLUTION + arrow_box_dim.y);
+
+      left_arrow := AARect.{x=left_arrow_pos.x, y=ground_height, zw=arrow_box_dim};
+      right_arrow := AARect.{x=right_arrow_pos.x, y=ground_height, zw=arrow_box_dim};
+      menu_add_box(left_arrow, .FILL, globals.left_arrow_texture, play_arrow_on_click, cast(*void) 0);
+      menu_add_box(right_arrow, .FILL, globals.right_arrow_texture, play_arrow_on_click, cast(*void) 1);
+
+      menu_add_box({MENU_LAYOUT_CENTER, 270, 120, 30}, .CENTER, "Back", (u: *void) {globals.main_menu.state = .HOME;});
     }
   }
 }
@@ -1119,6 +1162,10 @@ main :: () {
 
   environment_textures    = Autotile.[atile("tile_tree", 8.0), atile("tile_bushHalf", 8.0), atile("tile_bush", 8.0)];
   cloud_textures          = Autotile.[atile("background_cloudA", 3.5, layer=3), atile("background_cloudB", 3.5, layer=4)];
+
+  left_arrow_texture      = atlas_fetch(*texture_atlas, "tile_arrowLeft");
+  right_arrow_texture     = atlas_fetch(*texture_atlas, "tile_arrowRight");
+  peg_texture             = atlas_fetch(*texture_atlas, "tile_treeTrunk");
 
   // TODO: I'm temporarily removing `atile("background_treeLarge", 4.0, layer=2), atile("background_tree", 4.0, layer=2)` from the following list because I can't figure out
   // how to make them look good with parallax scrolling

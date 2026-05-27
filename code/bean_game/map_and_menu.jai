@@ -667,6 +667,7 @@ Menu :: struct {
   Autolayout: struct {
     style: Menu_Autolayout;
     anchor: Vector2;
+    box_dim: Vector2;
     spacing: float;
     index: int;
   }
@@ -685,15 +686,26 @@ Menu_Content_Align :: enum {
   LEFT;
   //RIGHT;
   CENTER;
+  FILL;
 }
 
-menu_frame_begin :: (menu: *Menu, dim: SDL_FRect, font: Bitmap_Font) {
+#add_context menu: *Menu;
+menu_create_scoped :: (menu: *Menu, dim: SDL_FRect, font: Bitmap_Font, renderer: *SDL_Renderer, mouse: Mouse, old_mouse: Mouse) #expand {
   menu.dim = dim;
   menu.font = font;
   menu.boxes.allocator = context.allocator; // NOTE: So that we can use ,, temp for true immediate mode UI
+  old_menu := context.menu;
+  `defer {
+    menu_submit_and_process_input(renderer, mouse, old_mouse, menu);
+    context.menu = old_menu;
+  }
+  context.menu = menu;
 }
 
-menu_push_autolayout :: (menu: *Menu, style: Menu_Autolayout, anchor_x: float, anchor_y: float, spacing: float) #expand {
+menu_push_autolayout :: (style: Menu_Autolayout, anchor_x: float, anchor_y: float, box_dim: Vector2, spacing: float) #expand {
+  menu := context.menu;
+  assert(menu != null);
+
   assert((style == .VERTICAL && anchor_y != MENU_LAYOUT_CENTER)
     || (style == .HORIZONTAL && anchor_x != MENU_LAYOUT_CENTER));
 
@@ -702,38 +714,21 @@ menu_push_autolayout :: (menu: *Menu, style: Menu_Autolayout, anchor_x: float, a
 
   menu.Autolayout.style = style;
   menu.Autolayout.anchor = xy(anchor_x, anchor_y);
+  menu.Autolayout.box_dim = box_dim;
   menu.Autolayout.spacing = spacing;
   menu.Autolayout.index = 0;
 }
 
-menu_add_box :: (menu: *Menu, x: float, y: float, text: string, scale := 1.0) -> *Menu_Box {
-  box := array_add(*menu.boxes);
+menu_add_box  :: (align := Menu_Content_Align.LEFT, text := "", on_click: Menu_Box_Click_Event_Proc = null, user_data := null) -> *Menu_Box {
+  menu := context.menu;
+  assert(menu != null);
 
-  text_dim := get_pixel_dim(menu.font, text, scale);
-  // TODO: Remove unnecessary computation!
-  center := center_rect({zw=text_dim}, make_aarect(menu.dim));
-  dsp_x := ifx x == MENU_LAYOUT_CENTER center.x else x;
-  dsp_y := ifx y == MENU_LAYOUT_CENTER center.y else y;
-  box.rect = {dsp_x, dsp_y, text_dim.x, text_dim.y};
-
-  box.draw_border = false;
-  box.filled = false;
-  box.interactive = false;
-
-  box.content_type = .TEXT;
-  box.text = text;
-  box.content_pos = xy(0,0);
-  box.content_scale = scale;
-
-  return box;
-}
-
-menu_add_box  :: (menu: *Menu, dim: Vector2, align := Menu_Content_Align.LEFT, text := "") -> *Menu_Box {
   assert(menu.Autolayout.style != .NONE, "UI system does not know where to put this box because no autolayout style was pushed!");
   box := array_add(*menu.boxes);
 
   advance_amt: Vector2;
   x, y := menu.Autolayout.anchor.x, menu.Autolayout.anchor.y;
+  dim := menu.Autolayout.box_dim;
   if menu.Autolayout.style == .HORIZONTAL {
     x += (dim.x + menu.Autolayout.spacing) * menu.Autolayout.index;
     if y == MENU_LAYOUT_CENTER {
@@ -753,6 +748,75 @@ menu_add_box  :: (menu: *Menu, dim: Vector2, align := Menu_Content_Align.LEFT, t
   box.filled = false;
   box.interactive = false;
 
+  if text.count > 0 {
+    box.content_type = .TEXT;
+    box.text = text;
+
+    text_room := dim / xy(cast(float) menu.font.glyph_width, cast(float) menu.font.glyph_height);
+    box.content_scale = floor(min(text_room.x, text_room.y));
+    text_dim := get_pixel_dim(menu.font, text, box.content_scale);
+    box.content_pos = ifx align == .CENTER center_rect({zw = text_dim}, {zw = dim}) else xy(0,0);
+  }
+
+  if on_click != null {
+    box.interactive = true;
+    box.user_data = user_data;
+    box.on_click = on_click;
+  }
+
+  return box;
+}
+
+menu_add_box :: (rect: AARect, on_click: Menu_Box_Click_Event_Proc = null, user_data := null) -> *Menu_Box {
+  menu := context.menu;
+  assert(menu != null);
+
+  box := array_add(*menu.boxes);
+  x := rect.x;
+  y := rect.y;
+  dim := rect.zw;
+  center := center_rect({zw=dim}, make_aarect(menu.dim));
+  dsp_x := ifx x == MENU_LAYOUT_CENTER center.x else x;
+  dsp_y := ifx y == MENU_LAYOUT_CENTER center.y else y;
+  box.rect = {dsp_x, dsp_y, dim.x, dim.y};
+
+  box.draw_border = true;
+  box.filled = false;
+  box.interactive = false;
+
+  if on_click != null {
+    box.interactive = true;
+    box.user_data = user_data;
+    box.on_click = on_click;
+  }
+
+  return box;
+}
+
+menu_add_box :: (rect: AARect, align: Menu_Content_Align, sprite: *SDL_Texture, on_click: Menu_Box_Click_Event_Proc = null, user_data := null) -> *Menu_Box {
+  menu := context.menu;
+  assert(menu != null);
+
+  assert(align == .FILL);
+
+  box := menu_add_box(rect, on_click, user_data);
+  box.content_type = .SPRITE;
+  box.sprite = sprite;
+  box.content_pos = xy(0,0);
+  box.content_scale = 1.0;
+  box.transparent_background = true;
+  box.draw_border = false;
+
+  return box;
+}
+
+menu_add_box :: (rect: AARect, align: Menu_Content_Align, text: string, on_click: Menu_Box_Click_Event_Proc = null, user_data := null) -> *Menu_Box {
+  menu := context.menu;
+  assert(menu != null);
+
+  box := menu_add_box(rect, on_click, user_data);
+  dim := rect.zw;
+
   box.content_type = .TEXT;
   box.text = text;
 
@@ -764,11 +828,28 @@ menu_add_box  :: (menu: *Menu, dim: Vector2, align := Menu_Content_Align.LEFT, t
   return box;
 }
 
-menu_add_box  :: (menu: *Menu, dim: Vector2, align: Menu_Content_Align, text: string, on_click: Menu_Box_Click_Event_Proc, user_data := null) -> *Menu_Box {
-  box := menu_add_box(menu, dim, align, text);
-  box.interactive = true;
-  box.user_data = user_data;
-  box.on_click = on_click;
+menu_add_box :: (x: float, y: float, text: string, scale := 1.0) -> *Menu_Box {
+  menu := context.menu;
+  assert(menu != null);
+
+  box := array_add(*menu.boxes);
+
+  text_dim := get_pixel_dim(menu.font, text, scale);
+  // TODO: Remove unnecessary computation!
+  center := center_rect({zw=text_dim}, make_aarect(menu.dim));
+  dsp_x := ifx x == MENU_LAYOUT_CENTER center.x else x;
+  dsp_y := ifx y == MENU_LAYOUT_CENTER center.y else y;
+  box.rect = {dsp_x, dsp_y, text_dim.x, text_dim.y};
+
+  box.draw_border = false;
+  box.filled = false;
+  box.transparent_background = true;
+  box.interactive = false;
+
+  box.content_type = .TEXT;
+  box.text = text;
+  box.content_pos = xy(0,0);
+  box.content_scale = scale;
 
   return box;
 }
@@ -801,6 +882,8 @@ menu_submit_and_process_input :: (renderer: *SDL_Renderer, mouse: Mouse, old_mou
     if it.draw_border SDL_RenderRect(renderer, *it.rect);
     if it.content_type == .TEXT {
       draw_text(renderer, menu.font, it.aarect.xy + it.content_pos, it.content_scale, it.text);
+    } else if it.content_type == .SPRITE {
+      draw_quad_flipped(renderer, it.sprite, it.aarect);
     }
   }
 }
