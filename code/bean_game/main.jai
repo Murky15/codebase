@@ -1054,9 +1054,11 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Mai
       level_box_spacing :: 40;
       num_levels_visible :: 4;
       group_width :: ((80 + level_box_spacing) * num_levels_visible) - level_box_spacing;
-      group := menu_add_box(AARect.{MENU_LAYOUT_CENTER, MENU_LAYOUT_CENTER, group_width, 80});
+      group := menu_add_box({MENU_LAYOUT_CENTER, MENU_LAYOUT_CENTER, group_width, 80});
       group.draw_border = false;
       group.transparent_background = true;
+
+      menu_add_box(MENU_LAYOUT_CENTER, group.rect.y - 25, "Page 1/1", 1.5);
 
       {
         menu_push_autolayout(.HORIZONTAL, group.rect.x, group.rect.y, {80, 80}, level_box_spacing);
