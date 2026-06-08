@@ -7,3 +7,6 @@
 [submodule "code/gameboy/extra_modules/sdl3"]
 	path = code/gameboy/extra_modules/sdl3
 	url = https://github.com/overlord-systems/jai-sdl3
+[submodule "code/bean_game/clay/clay_source"]
+	path = code/bean_game/clay/clay_source
+	url = https://github.com/nicbarker/clay
