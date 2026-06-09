@@ -1,53 +1,4 @@
-AT_COMPILE_TIME :: true;
-
-#if AT_COMPILE_TIME {
-  #run,stallable {
-    set_build_options_dc(.{do_output=false});
-    path_to_clay_source = tprint("%/clay_source/clay.h", #filepath);
-    if !build_library() || !generate_bindings() {
-      compiler_set_workspace_status(.FAILED);
-    }
-  }
-}
-
-build_library :: (target := OS) -> bool {
-  extra: [..] string;
-  array_add(*extra, "-DCLAY_IMPLEMENTATION");
-
-  if target == .WINDOWS {
-    array_add(*extra, "-Tc");
-  } else {
-    array_add(*extra, "-x", "c");
-  }
-  success := build_cpp_static_lib("clay", path_to_clay_source, extra = extra);
-
-  return success;
-}
-
-generate_bindings :: () -> bool {
-  opts: Generate_Bindings_Options;
-  {
-    using opts;
-
-    array_add(*libraries, .{filename="clay"});
-    array_add(*source_files, path_to_clay_source);
-
-    header = HANDWRITTEN_MACRO_API_BINDINGS;
-
-    generate_compile_time_struct_checks = false;
-  }
-
-  return generate_bindings(opts, "clay_bindings.jai");
-}
-
-#scope_file
-
-path_to_clay_source: string;
-
-// NOTE PascalCase consistent with rest of API
-HANDWRITTEN_MACRO_API_BINDINGS :: #string EOF
-
-// Public Macro API ------------------------
+// NOTE: Handwritten macro API
 
 Clay_BorderOutside :: inline (width: u16) -> Clay_BorderWidth {
   return {width, width, width, width, 0};
@@ -105,7 +56,7 @@ Clay_MakeString :: inline (str: string) -> Clay_String {
     }
 */
 
-Clay_UI :: (element := Clay_ElementDeclaration.{}) #expand -> bool {
+Clay_UI :: (element := Clay_ElementDeclaration.{}) -> bool #expand {
   Clay__OpenElement();
   Clay__ConfigureOpenElement(element);
   `defer Clay__CloseElement();
@@ -113,7 +64,7 @@ Clay_UI :: (element := Clay_ElementDeclaration.{}) #expand -> bool {
   return true;
 }
 
-Clay_UI :: (id: Clay_ElementId, element := Clay_ElementDeclaration.{}) #expand -> bool {
+Clay_UI :: (id: Clay_ElementId, element := Clay_ElementDeclaration.{}) -> bool #expand {
   Clay__OpenElementWidthId(id);
   Clay__ConfigureOpenElement(element);
   `defer Clay__CloseElement();
@@ -127,9 +78,4 @@ Clay_Text :: inline ($$text: string, config := Clay_TextElementConfig.{}) {
   Clay__OpenTextElement(wrapped, config);
 }
 
-EOF
-
-#import "Basic";
-#import "Bindings_Generator";
-#import "BuildCpp";
-#import "Compiler";
+#load "clay_bindings.jai";

@@ -1,75 +1,97 @@
 OUTPUT_NAME :: "BeanGame";
 
 #run {
-  w := compiler_create_workspace();
   options := get_build_options();
+  options.text_output_flags = xx 0;
+  options.output_path = join(#filepath, "../../build");
 
   args := options.compile_time_command_line;
 
-  build_wasm := false;
-  for arg: args {
-    if arg == {
-      case "wasm"; build_wasm = true;
-    }
-  }
+  build_wasm    := array_find(args, "wasm");
+  build_website := array_find(args, "website");
 
-  // TODO: This process will need to be expanded obviously.
-  art_path, map_path: string;
-  ifx OS == {
-    case .WINDOWS; {
-      art_path = "W:/assets/bean_game/sprites";
-      map_path = "W:/code/bean_game/level.bgdat";
-    }
-  }
-
-  exposed_art_path := art_path;
-  exposed_map_path := map_path;
-
-  if build_wasm {
-    log("Building WASM target with Emscripten backend...");
-
-    exposed_art_path = "sprites";
-    exposed_map_path = "level.bgdat";
-
-    options.output_type = .OBJECT_FILE;
-    options.runtime_support_definitions = .ENTRY_POINT_AND_INIT;
-    options.backtrace_on_crash = .OFF;
-    options.llvm_options.output_bitcode = true;
-    remap_import(w, "", "Default_Allocator", "Emscripten_Allocator");
-  }
-  options.backend = .LLVM;
-  options.text_output_flags = xx 0;
-  options.output_executable_name = OUTPUT_NAME;
-  options.output_path = join(#filepath, "../../build");
-  set_optimization(*options, .VERY_DEBUG);
-  set_build_options(options, w);
-
-  compiler_begin_intercept(w);
+  // NOTE: Website build
   {
-    add_build_string(tprint("EMSCRIPTEN :: %;", build_wasm), w);
-    add_build_string(tprint("art_path :: \"%\";\nmap_path :: \"%\";", exposed_art_path, exposed_map_path), w);
-    add_build_file(join(#filepath, "main.jai"), w);
-    message_loop(build_wasm);
+    w := compiler_create_workspace("Website");
+    walloc_object_file_path := join(#filepath, "modules/Walloc/walloc.o");
+
+    web_opts := options;
+    web_opts.os_target = .WASM;
+    web_opts.cpu_target = .CUSTOM;
+    web_opts.emit_debug_info = .DWARF;
+    web_opts.backtrace_on_crash = .OFF;
+    web_opts.output_executable_name = "test_website";
+    web_opts.backend = .LLVM;
+    web_opts.llvm_options.target_system_features = "+bulk-memory";
+    web_opts.llvm_options.enable_split_modules = false;
+    web_opts.llvm_options.function_sections = true;
+    web_opts.additional_linker_arguments = .[walloc_object_file_path];
+    set_build_options(web_opts, w);
+
+    remap_import(w, "*", "Default_Allocator", "Walloc");
+    add_build_file(join(#filepath, "website.jai"), w);
   }
-  compiler_end_intercept(w);
 
-  //emcc_result := run_command();
-  //emcc -sMEMORY64=1 -sUSE_SDL=3 --use-preload-plugins --preload-file ..\assets\bean_game\sprites@sprites --preload-file ..\code\bean_game\level.bgdat@level.bgdat BeanGame.bc -o test.html
+  // NOTE: Game build
+  {
+    w := compiler_create_workspace("Game");
 
-  if build_wasm {
-    emscripten: [..] string;
-    array_add(*emscripten, "emcc.bat");
-    array_add(*emscripten, "-sMEMORY64=1");
-    array_add(*emscripten, "-sUSE_SDL=3");
-    array_add(*emscripten, "--use-preload-plugins");
-    array_add(*emscripten, "--preload-file");
-    array_add(*emscripten, tprint("%@sprites", art_path));
-    array_add(*emscripten, "--preload-file");
-    array_add(*emscripten, tprint("%@level.bgdat", map_path));
-    array_add(*emscripten, tprint("%/%.bc", options.output_path, OUTPUT_NAME));
-    array_add(*emscripten, "-o");
-    array_add(*emscripten, tprint("%/%.html", options.output_path, OUTPUT_NAME));
-    cmd(..emscripten);
+    // TODO: This process will need to be expanded obviously.
+    art_path, map_path: string;
+    ifx OS == {
+      case .WINDOWS; {
+        art_path = "W:/assets/bean_game/sprites";
+        map_path = "W:/code/bean_game/level.bgdat";
+      }
+    }
+
+    exposed_art_path := art_path;
+    exposed_map_path := map_path;
+
+    if build_wasm {
+      log("Building WASM target with Emscripten backend...");
+
+      exposed_art_path = "sprites";
+      exposed_map_path = "level.bgdat";
+
+      // NOTE: Rather than use the actual .WASM backend that Jai provides,
+      // I am using the raw LLVM backend to interface with emscripten.
+      // This allows us to continue using SDL3.
+      options.output_type = .OBJECT_FILE;
+      options.runtime_support_definitions = .ENTRY_POINT_AND_INIT;
+      options.backtrace_on_crash = .OFF;
+      options.llvm_options.output_bitcode = true;
+      remap_import(w, "", "Default_Allocator", "Emscripten_Allocator");
+    }
+    options.backend = .LLVM;
+    options.output_executable_name = OUTPUT_NAME;
+    set_optimization(*options, .VERY_DEBUG);
+    set_build_options(options, w);
+
+    compiler_begin_intercept(w);
+    {
+      add_build_string(tprint("EMSCRIPTEN :: %;", build_wasm), w);
+      add_build_string(tprint("art_path :: \"%\";\nmap_path :: \"%\";", exposed_art_path, exposed_map_path), w);
+      add_build_file(join(#filepath, "main.jai"), w);
+      message_loop(build_wasm);
+    }
+    compiler_end_intercept(w);
+
+    if build_wasm {
+      emscripten: [..] string;
+      array_add(*emscripten, "emcc.bat");
+      array_add(*emscripten, "-sMEMORY64=1");
+      array_add(*emscripten, "-sUSE_SDL=3");
+      array_add(*emscripten, "--use-preload-plugins");
+      array_add(*emscripten, "--preload-file");
+      array_add(*emscripten, tprint("%@sprites", art_path));
+      array_add(*emscripten, "--preload-file");
+      array_add(*emscripten, tprint("%@level.bgdat", map_path));
+      array_add(*emscripten, tprint("%/%.bc", options.output_path, OUTPUT_NAME));
+      array_add(*emscripten, "-o");
+      array_add(*emscripten, tprint("%/%.html", options.output_path, OUTPUT_NAME));
+      cmd(..emscripten);
+    }
   }
 
   set_build_options_dc({do_output=false});

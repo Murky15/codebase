@@ -34,6 +34,10 @@ key_binding: F2
 error_regex: ^(?P<file>.*):(?P<line>\d+),(?P<col>\d+): (?P<type>Error|Warning|Info|...):* (?P<msg>.*)|^(?P<msg1>.*error LNK.*)
 build_command: jai %BUILD_WORKING_DIR%/code/bean_game/first.jai - wasm
 key_binding: F3
+[Build Website]
+error_regex: ^(?P<file>.*):(?P<line>\d+),(?P<col>\d+): (?P<type>Error|Warning|Info|...):* (?P<msg>.*)|^(?P<msg1>.*error LNK.*)
+build_command: jai %BUILD_WORKING_DIR%/code/bean_game/first.jai - website
+key_binding: F4
 
 # [Build Gameboy]
 # error_regex: ^(?P<file>.*):(?P<line>\d+),(?P<col>\d+): (?P<type>Error|Warning|Info|...):* (?P<msg>.*)|^(?P<msg1>.*error LNK.*)

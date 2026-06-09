@@ -1,89 +1,8 @@
 //
 // This file was auto-generated using the following command:
 //
-// jai first.jai
+// jai generate.jai - -compile -wasm
 //
-
-// Public Macro API ------------------------
-
-Clay_BorderOutside :: inline (width: u16) -> Clay_BorderWidth {
-  return {width, width, width, width, 0};
-}
-
-Clay_BorderAll :: inline (width: u16) -> Clay_BorderWidth {
-  return {width, width, width, width, width};
-}
-
-Clay_CornerRadiusAll :: inline (radius: float) -> Clay_CornerRadius {
-  return {radius, radius, radius, radius};
-}
-
-Clay_PaddingAll :: inline (padding: u16) -> Clay_Padding {
-  return {padding, padding, padding, padding};
-}
-
-Clay_SizingFit :: inline (minMax := Clay_SizingMinMax.{}) -> Clay_SizingAxis {
-  return {size = {minMax = minMax}, type = .FIT};
-}
-
-Clay_SizingGrow :: inline (minMax := Clay_SizingMinMax.{}) -> Clay_SizingAxis {
-  return {size = {minMax = minMax}, type = .GROW};
-}
-
-Clay_SizingFixed :: inline (fixedSize: float) -> Clay_SizingAxis {
-  return {size = {minMax = {fixedSize, fixedSize}}, type = .FIXED};
-}
-
-Clay_SizingPercent :: inline (percentOfParent: float) -> Clay_SizingAxis {
-  return {size = {percent = percentOfParent}, type = .PERCENT};
-}
-
-Clay_Id :: inline (label: string, index: u32 = 0) -> Clay_ElementId {
-  return Clay__HashString(label, index);
-}
-
-Clay_IdLocal :: inline (label: string, index: u32 = 0) -> Clay_ElementId {
-  return Clay__HashStringWithOffset(label, index, Clay_GetOpenElementId());
-}
-
-Clay_MakeString :: inline (str: string) -> Clay_String {
-  return {chars = str.data, length = cast(u32)str.len};
-}
-
-/* NOTE
-    Compared to the C usage of element macros:
-    CLAY(CLAY_ID("Outer"), { .layout = { .padding = CLAY_PADDING_ALL(16) } }) {
-      // Child elements here
-    }
-
-    We use `if` statements in Jai to scope child elements and obtain the same effect:
-    if Clay_UI(Clay_Id("outer"), { layout = { padding = Clay_PaddingAll(16) } }) {
-      // Child elements here
-    }
-*/
-
-Clay_UI :: (element := Clay_ElementDeclaration.{}) #expand -> bool {
-  Clay__OpenElement();
-  Clay__ConfigureOpenElement(element);
-  `defer Clay__CloseElement();
-
-  return true;
-}
-
-Clay_UI :: (id: Clay_ElementId, element := Clay_ElementDeclaration.{}) #expand -> bool {
-  Clay__OpenElementWidthId(id);
-  Clay__ConfigureOpenElement(element);
-  `defer Clay__CloseElement();
-
-  return true;
-}
-
-Clay_Text :: inline ($$text: string, config := Clay_TextElementConfig.{}) {
-  wrapped := Clay_MakeString(text);
-  #if is_constant(text) then wrapped.isStaticallyAllocated = true;
-  Clay__OpenTextElement(wrapped, config);
-}
-
 
 
 
@@ -169,7 +88,7 @@ Clay_CornerRadius :: struct {
 }
 
 // Controls the direction in which child elements will be automatically laid out.
-Clay_LayoutDirection :: enum s32 {
+Clay_LayoutDirection :: enum u8 {
     LEFT_TO_RIGHT :: 0;
 
     TOP_TO_BOTTOM :: 1;
@@ -180,7 +99,7 @@ Clay_LayoutDirection :: enum s32 {
 }
 
 // Controls the alignment along the x axis (horizontal) of child elements.
-Clay_LayoutAlignmentX :: enum s32 {
+Clay_LayoutAlignmentX :: enum u8 {
     LEFT   :: 0;
 
     RIGHT  :: 1;
@@ -195,7 +114,7 @@ Clay_LayoutAlignmentX :: enum s32 {
 }
 
 // Controls the alignment along the y axis (vertical) of child elements.
-Clay_LayoutAlignmentY :: enum s32 {
+Clay_LayoutAlignmentY :: enum u8 {
     TOP    :: 0;
 
     BOTTOM :: 1;
@@ -210,7 +129,7 @@ Clay_LayoutAlignmentY :: enum s32 {
 }
 
 // Controls how the element takes up space inside its parent container.
-Clay__SizingType :: enum s32 {
+Clay__SizingType :: enum u8 {
     FIT     :: 0;
 
     GROW    :: 1;
@@ -287,7 +206,7 @@ Clay__Clay_LayoutConfigWrapper :: struct {
 CLAY_LAYOUT_DEFAULT: Clay_LayoutConfig #elsewhere clay;
 
 // Controls how text "wraps", that is how it is broken into multiple lines when there is insufficient horizontal space.
-Clay_TextElementConfigWrapMode :: enum s32 {
+Clay_TextElementConfigWrapMode :: enum u8 {
     WORDS    :: 0;
 
     NEWLINES :: 1;
@@ -302,7 +221,7 @@ Clay_TextElementConfigWrapMode :: enum s32 {
 }
 
 // Controls how wrapped lines of text are horizontally aligned within the outer text bounding box.
-Clay_TextAlignment :: enum s32 {
+Clay_TextAlignment :: enum u8 {
     LEFT   :: 0;
 
     CENTER :: 1;
@@ -374,7 +293,7 @@ Clay__Clay_ImageElementConfigWrapper :: struct {
 
 // Controls where a floating element is offset relative to its parent element.
 // Note: see https://github.com/user-attachments/assets/b8c6dfaa-c1b1-41a4-be55-013473e4a6ce for a visual explanation.
-Clay_FloatingAttachPointType :: enum s32 {
+Clay_FloatingAttachPointType :: enum u8 {
     LEFT_TOP      :: 0;
     LEFT_CENTER   :: 1;
     LEFT_BOTTOM   :: 2;
@@ -403,7 +322,7 @@ Clay_FloatingAttachPoints :: struct {
 }
 
 // Controls how mouse pointer events like hover and click are captured or passed through to elements underneath a floating element.
-Clay_PointerCaptureMode :: enum s32 {
+Clay_PointerCaptureMode :: enum u8 {
     CAPTURE     :: 0;
 
     PASSTHROUGH :: 1;
@@ -414,7 +333,7 @@ Clay_PointerCaptureMode :: enum s32 {
 }
 
 // Controls which element a floating element is "attached" to (i.e. relative offset from).
-Clay_FloatingAttachToElement :: enum s32 {
+Clay_FloatingAttachToElement :: enum u8 {
     NONE            :: 0;
 
     PARENT          :: 1;
@@ -433,7 +352,7 @@ Clay_FloatingAttachToElement :: enum s32 {
 }
 
 // Controls whether or not a floating element is clipped to the same clipping rectangle as the element it's attached to.
-Clay_FloatingClipToElement :: enum s32 {
+Clay_FloatingClipToElement :: enum u8 {
     NONE            :: 0;
 
     ATTACHED_PARENT :: 1;
@@ -541,7 +460,7 @@ Clay_TransitionData :: struct {
     borderWidth:     Clay_BorderWidth;
 }
 
-Clay_TransitionState :: enum s32 {
+Clay_TransitionState :: enum u32 {
     IDLE          :: 0;
     ENTERING      :: 1;
     TRANSITIONING :: 2;
@@ -553,7 +472,7 @@ Clay_TransitionState :: enum s32 {
     CLAY_TRANSITION_STATE_EXITING       :: EXITING;
 }
 
-Clay_TransitionProperty :: enum s32 {
+Clay_TransitionProperty :: enum u32 {
     NONE             :: 0;
     X                :: 1;
     Y                :: 2;
@@ -595,7 +514,7 @@ Clay_TransitionCallbackArguments :: struct {
     properties:      Clay_TransitionProperty;
 }
 
-Clay_TransitionEnterTriggerType :: enum s32 {
+Clay_TransitionEnterTriggerType :: enum u8 {
     SKIP_ON_FIRST_PARENT_FRAME    :: 0;
     TRIGGER_ON_FIRST_PARENT_FRAME :: 1;
 
@@ -603,7 +522,7 @@ Clay_TransitionEnterTriggerType :: enum s32 {
     CLAY_TRANSITION_ENTER_TRIGGER_ON_FIRST_PARENT_FRAME :: TRIGGER_ON_FIRST_PARENT_FRAME;
 }
 
-Clay_TransitionExitTriggerType :: enum s32 {
+Clay_TransitionExitTriggerType :: enum u8 {
     SKIP_WHEN_PARENT_EXITS    :: 0;
     TRIGGER_WHEN_PARENT_EXITS :: 1;
 
@@ -611,7 +530,7 @@ Clay_TransitionExitTriggerType :: enum s32 {
     CLAY_TRANSITION_EXIT_TRIGGER_WHEN_PARENT_EXITS :: TRIGGER_WHEN_PARENT_EXITS;
 }
 
-Clay_TransitionInteractionHandlingType :: enum s32 {
+Clay_TransitionInteractionHandlingType :: enum u8 {
     DISABLE_INTERACTIONS_WHILE_TRANSITIONING_POSITION :: 0;
     ALLOW_INTERACTIONS_WHILE_TRANSITIONING_POSITION   :: 1;
 
@@ -619,7 +538,7 @@ Clay_TransitionInteractionHandlingType :: enum s32 {
     CLAY_TRANSITION_ALLOW_INTERACTIONS_WHILE_TRANSITIONING_POSITION   :: ALLOW_INTERACTIONS_WHILE_TRANSITIONING_POSITION;
 }
 
-Clay_ExitTransitionSiblingOrdering :: enum s32 {
+Clay_ExitTransitionSiblingOrdering :: enum u8 {
     UNDERNEATH_SIBLINGS :: 0;
     NATURAL_ORDER       :: 1;
     ABOVE_SIBLINGS      :: 2;
@@ -788,7 +707,7 @@ Clay_ElementData :: struct {
 }
 
 // Used by renderers to determine specific handling for each render command.
-Clay_RenderCommandType :: enum s32 {
+Clay_RenderCommandType :: enum u8 {
     NONE                :: 0;
 
     RECTANGLE           :: 1;
@@ -872,7 +791,7 @@ Clay_RenderCommandArray :: struct {
 }
 
 // Represents the current state of interaction with clay this frame.
-Clay_PointerDataInteractionState :: enum s32 {
+Clay_PointerDataInteractionState :: enum u8 {
     PRESSED_THIS_FRAME  :: 0;
 
     PRESSED             :: 1;
@@ -948,7 +867,7 @@ Clay__Clay_ElementDeclarationWrapper :: struct {
 }
 
 // Represents the type of error clay encountered while computing layout.
-Clay_ErrorType :: enum s32 {
+Clay_ErrorType :: enum u8 {
     TEXT_MEASUREMENT_FUNCTION_NOT_PROVIDED :: 0;
 
     ARENA_CAPACITY_EXCEEDED                :: 1;
@@ -1167,4 +1086,16 @@ Clay__debugViewWidth: u32 #elsewhere clay;
 
 #scope_file
 
-clay :: #library,no_dll "./clay";
+
+#if OS == .WINDOWS {
+    clay :: #library,no_dll "windows/clay";
+} else #if OS == .LINUX {
+    clay :: #library,no_dll "linux/clay";
+} else #if OS == .MACOS {
+    clay :: #library,no_dll "macos/clay";
+} else #if OS == .WASM {
+    clay :: #library,no_dll "wasm/clay";
+} else {
+    #assert false;
+}
+
