@@ -1,12 +1,3 @@
-[submodule "code/geometry_compiler"]
-	path = code/geometry_compiler
-	url = https://git.mr4th.com/mr4th/geometry_compiler
-[submodule "code/soniboy/extra_modules/Json"]
-	path = code/gameboy/extra_modules/Json
-	url = https://github.com/rluba/jaison
-[submodule "code/gameboy/extra_modules/sdl3"]
-	path = code/gameboy/extra_modules/sdl3
-	url = https://github.com/overlord-systems/jai-sdl3
 [submodule "code/bean_game/modules/clay/clay_source"]
 	path = code/bean_game/modules/clay/clay_source
 	url = https://github.com/nicbarker/clay
