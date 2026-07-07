@@ -11,28 +11,41 @@ OUTPUT_NAME :: "BeanGame";
   build_website := array_find(args, "website");
 
   // NOTE: Website build
-  {
+  if build_website {
     w := compiler_create_workspace("Website");
-    walloc_object_file_path := join(#filepath, "modules/Walloc/walloc.o");
 
     web_opts := options;
-    web_opts.os_target = .WASM;
-    web_opts.cpu_target = .CUSTOM;
-    web_opts.emit_debug_info = .DWARF;
-    web_opts.backtrace_on_crash = .OFF;
-    web_opts.output_executable_name = "test_website";
-    web_opts.backend = .LLVM;
-    web_opts.llvm_options.target_system_features = "+bulk-memory";
-    web_opts.llvm_options.enable_split_modules = false;
-    web_opts.llvm_options.function_sections = true;
-    web_opts.additional_linker_arguments = .[walloc_object_file_path];
-    set_build_options(web_opts, w);
+    {
+      using web_opts;
+      output_path                         = #filepath; // TODO: Temporary!
+      output_type                         = .EXECUTABLE;
+      backend                             = .LLVM;
+      os_target                           = .WASM;
+      cpu_target                          = .CUSTOM;
+      emit_debug_info                     = .DWARF;
+      backtrace_on_crash                  = .OFF;
+      runtime_support_definitions         = .OMIT;
+      output_executable_name              = "index";
+      llvm_options.target_system_features = "+bulk-memory"; // NOTE: Not working?
+      llvm_options.enable_split_modules   = false;
+      llvm_options.function_sections      = true;
 
+      walloc_object_file_path := join(#filepath, "modules/Walloc/walloc.o");
+      additional_linker_arguments = .[walloc_object_file_path];
+    }
+
+    import_paths: [..] string;
+    array_add(*import_paths, join(#filepath, "modules"));
+    for web_opts.import_path array_add(*import_paths, it);
+    web_opts.import_path = import_paths;
+
+    set_build_options(web_opts, w);
     remap_import(w, "*", "Default_Allocator", "Walloc");
     add_build_file(join(#filepath, "website.jai"), w);
   }
 
   // NOTE: Game build
+  // TODO: For emscripten builds, compile to WASM object file and then call emcc on that, not the llvm bc
   {
     w := compiler_create_workspace("Game");
 
@@ -48,7 +61,7 @@ OUTPUT_NAME :: "BeanGame";
     exposed_art_path := art_path;
     exposed_map_path := map_path;
 
-    if build_wasm {
+    if build_wasm { // TODO: Make this its own workspace?
       log("Building WASM target with Emscripten backend...");
 
       exposed_art_path = "sprites";

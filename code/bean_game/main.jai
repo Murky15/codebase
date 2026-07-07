@@ -303,7 +303,6 @@ load_assets :: (renderer: *SDL_Renderer) -> Texture_Atlas {
   assert(texture_read_success, "Error loading textures!");
 
   atlas: Texture_Atlas;
-  init(*atlas, bitmaps.count);
   for bitmaps {
     surface := SDL_CreateSurfaceFrom(it.width, it.height, .ABGR8888, it.pixels, it.width * 4);
     texture := SDL_CreateTextureFromSurface(renderer, surface);
@@ -494,7 +493,7 @@ globals: struct {
     NONE;
     MENU;
     PLAY;
-  } = .MENU;
+  } = .PLAY;
   paused: bool;
 
   main_menu: Main_Menu;
@@ -863,17 +862,6 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
     }
   }
 
-  // NOTE: Render visible tiles
-  for :visible_only map {
-    if it.tex == null then continue;
-    if it.collected then continue;
-    if it.parallax_layer > 1 then continue;
-    dsp := (it_index * TILE_RESOLUTION) + it.pos_offset;
-    dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
-    dsp.y -= it.trap_display_offset;
-    draw_quad(renderer, it.tex, {xy = dsp - cam_pos, zw = it.size}, rotation_angle = it.rotation);
-  }
-
   // NOTE: Render ropes
   for rope: map.environmental_ropes {
     for :particles rope {
@@ -889,10 +877,21 @@ bean_game_render :: (renderer: *SDL_Renderer, map: *Map, old_map: *Map, frame_ti
         p1 :=  padding + (next_particle.pos - cam_pos) - half_thick;
         p2 := p1 + full_thick;
         p3 := p0 + full_thick;
-        draw_quad(renderer, p0, p1, p2, p3, {176.0/255, 105.0/255, 219.0/255, 1});
+        draw_quad(renderer, p0, p1, p2, p3, color(176, 105, 219, 255));
       }
       //draw_circle_debug(renderer, it.pos - cam_pos, 2, {1, 0, 0, 1});
     }
+  }
+
+  // NOTE: Render visible tiles
+  for :visible_only map {
+    if it.tex == null then continue;
+    if it.collected then continue;
+    if it.parallax_layer > 1 then continue;
+    dsp := (it_index * TILE_RESOLUTION) + it.pos_offset;
+    dsp.y += it.bob_amplitude * sin(it.bob_frequency * it.bob_counter);
+    dsp.y -= it.trap_display_offset;
+    draw_quad(renderer, it.tex, {xy = dsp - cam_pos, zw = it.size}, rotation_angle = it.rotation);
   }
 
   // NOTE: Render player
@@ -1233,6 +1232,18 @@ Log_Message :: struct {
   fade: Tween_State;
 }
 
+Blorg :: struct {
+  message: string;
+  fade: Tween_State;
+}
+
+#run {
+  tis := cast(*Type_Info_Struct) type_info(Log_Message);
+  log("%", tis.alignment);
+  tis = cast(*Type_Info_Struct) type_info(Blorg);
+  log("%", tis.alignment);
+}
+
 logs_to_display: [..] Log_Message;
 bg_logger_init_and_equip :: () {
   context.logger = bg_logger;
@@ -1263,13 +1274,8 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
 #import "Hash_Table";
 #import "PCG";
 
-#if OS == .WINDOWS {
-  #import,file "modules/sdl3/windows/windows.jai";
-} else #if OS == .LINUX {
-  #import,file "modules/sdl3/linux/linux.jai";
-} else #if OS == .MACOS {
-  #import,file "modules/sdl3/macos/macos.jai";
-}
+#import "sdl3";
+
 #if EMSCRIPTEN {
   #import "emscripten";
 } else {

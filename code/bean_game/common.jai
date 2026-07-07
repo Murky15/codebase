@@ -1,10 +1,10 @@
-// NOTE: This parameter is until the language allows us to query the alignment of types (why it does not already support this is a mystery).
+// NOTE: I know, I know, I should really buy into the Jai allocator system, but right now it's just so much more convinient to do it this way.
+// Next project, I promise.
 Arena :: struct {
   type: enum {
     MMU;
     FIXED;
   } = .FIXED;
-  align := 8;
 
   pos: int;
   commit_pos: int;
@@ -14,8 +14,7 @@ Arena :: struct {
 arena_alloc :: (buff: *void, size: int) -> *Arena {
   assert(buff != null);
   result := cast(*Arena) buff;
-  ini :: initializer_of(Arena);
-  #if ini inline ini(result);
+  Initialize(result);
   result.pos = size_of(Arena);
   result.commit_pos = size;
   result.cap = size;
@@ -23,12 +22,12 @@ arena_alloc :: (buff: *void, size: int) -> *Arena {
   return result;
 }
 
-arena_push :: (arena: *Arena, size: int, $zero_mem := true) -> *void {
+arena_push :: (arena: *Arena, size: int, align := 8, $zero_mem := true) -> *void {
   assert(arena != null);
   result: *void;
 
   base := cast(*u8) arena;
-  aligned_pos := round_up_pow2(arena.pos, arena.align);
+  aligned_pos := round_up_pow2(arena.pos, align);
   new_pos := aligned_pos + size;
   if new_pos <= arena.cap {
     result = base + aligned_pos;
@@ -232,7 +231,7 @@ Coroutine :: struct (Param := void, In := void, Out := void) {
 
   param: Param;
   in: In;
-  out: *Out;
+  out: Out;
 }
 
 co_init :: (co: *Coroutine, proc: Coroutine_Proc, param: co.Param) {
@@ -247,11 +246,11 @@ co_init :: (co: *Coroutine, proc: Coroutine_Proc, param: co.Param) {
   co.param = param;
 }
 
-co_resume :: (co: *Coroutine, dt: float) {
-  if co.status == .DEAD || context.co_state == null then return;
+co_resume :: (co: *Coroutine, dt: float) -> co.Out {
+  if co.status == .DEAD || context.co_state == null then return co.out;
   if co.counter < co.wait_duration {
     co.counter += dt;
-    return;
+    return co.out;
   }
   prev_caller := context.co_state.calling_fiber;
   prev_active := context.co_state.active_coroutine;
@@ -266,22 +265,13 @@ co_resume :: (co: *Coroutine, dt: float) {
   if co.status == .DEAD {
     co_delete(co);
   } else co.status = .SUSPENDED;
+
+  return co.out;
 }
 
-co_resume :: (co: *Coroutine, dt: float, in: co.In) {
+co_resume :: (co: *Coroutine, dt: float, in: co.In) -> co.Out {
   co.in = in;
-  co_resume(co, dt);
-}
-
-co_resume :: (co: *Coroutine, dt: float, out: *co.Out) {
-  co.out = out;
-  co_resume(co, dt);
-}
-
-co_resume :: (co: *Coroutine, dt: float, in: co.In, out: *co.Out) {
-  co.in = in;
-  co.out = out;
-  co_resume(co, dt);
+  return co_resume(co, dt);
 }
 
 // NOTE: Casts coroutine in a type safe way
@@ -374,4 +364,8 @@ get_digits_right_to_left_on_temp :: (x: int) -> [] int {
   }
 
   return digits;
+}
+
+color :: (r: u8, g: u8, b: u8, a: u8) -> Vector4 {
+  return {xx r, xx g, xx b, xx a} / 255.0;
 }

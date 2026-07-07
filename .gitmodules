@@ -1,3 +1,6 @@
 [submodule "code/bean_game/modules/clay/clay_source"]
 	path = code/bean_game/modules/clay/clay_source
 	url = https://github.com/nicbarker/clay
+[submodule "code/bean_game/modules/sdl3"]
+	path = code/bean_game/modules/sdl3
+	url = https://github.com/overlord-systems/jai-sdl3
