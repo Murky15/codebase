@@ -12,7 +12,7 @@ current_theme := cast(s32) Default_Themes.Default;
 
     window_width, window_height := 1280, 720;
     window = create_window(window_width, window_height, "Bean Game Website");
-    Simp.set_render_target(window, .LEFT_HANDED);
+    Simp.set_render_target(window);
 
     quit := false;
     last_time := seconds_since_init();
@@ -34,7 +34,7 @@ current_theme := cast(s32) Default_Themes.Default;
       Simp.clear_render_target(bg_col.x, bg_col.y, bg_col.z, 1);
 
       x, y, width, height := get_dimensions(window, true);
-      draw_frame(*context, width, height, cast(float) current_time, dt);
+      collect_render_commands(*context, width, height, cast(float) current_time, dt);
 
       Simp.swap_buffers(window);
 
@@ -100,7 +100,7 @@ collect_render_commands :: (ctx: *#Context, width: s32, height: s32, current_tim
 }
 
 #import "Basic";
-#import "GetRect_LeftHanded"()(Type_Indicator = GetRect_Type_Indicator);
+#import "GetRect"()(Type_Indicator = GetRect_Type_Indicator);
 #import "Math";
 #import "String";
 
