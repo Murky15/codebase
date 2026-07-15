@@ -286,7 +286,7 @@ load_assets :: (renderer: *SDL_Renderer) -> Texture_Atlas {
     full_path := join(to_string(dirname), name,, temp);
     bitmap: Bitmap;
     bitmap.name = copy_string(path_strip_extension(name));
-    #if EMSCRIPTEN {
+    #if OS == .WASM {
       bitmap.pixels = emscripten_get_preloaded_image_data(temp_c_string(full_path), *bitmap.width, *bitmap.height);
       bitmap.channels = 4; // Hope this is correct...
     } else {
@@ -320,7 +320,7 @@ Bitmap_Font :: struct {
 }
 
 load_font :: (renderer: *SDL_Renderer) -> Bitmap_Font {
-  font_path := join(art_path, "/../monogram-bitmap.png",, temp);
+  font_path := join(art_path, "/../fonts/monogram-bitmap.png",, temp);
   width, height, channels: s32;
   pixels := stbi_load(temp_c_string(font_path), *width, *height, *channels, 0);
   assert(pixels != null && channels == 4);
@@ -461,7 +461,7 @@ get_collision :: (player: *Player, map: *Map, tile_type: Tile_Type) -> [] Collis
   return get_collision(player, map, .[tile_type]);
 }
 
-ENABLE_LEVEL_HOT_RELOAD :: !EMSCRIPTEN;
+ENABLE_LEVEL_HOT_RELOAD :: OS != .WASM;
 TILE_NATIVE_RESOLUTION :: 64;
 TILE_RESOLUTION_DIVISOR :: 2;
 TILE_RESOLUTION :: TILE_NATIVE_RESOLUTION / TILE_RESOLUTION_DIVISOR;
@@ -1086,7 +1086,7 @@ bean_game_main_menu_tick_and_render :: (renderer: *SDL_Renderer, main_menu: *Mai
 main_loop :: (ctx: *void) #c_call {
   push_context,defer_pop cast(*#Context) ctx;
   if !globals.should_run {
-    #if EMSCRIPTEN {
+    #if OS == .WASM {
       emscripten_cancel_main_loop();
     } else {
       exit(0);
@@ -1195,7 +1195,7 @@ main :: () {
   collision_events = collision_event_memory;
   should_run = true;
 
-  #if EMSCRIPTEN {
+  #if OS == .WASM {
     emscripten_set_main_loop_arg(main_loop, *context, 0, true);
   } else {
     while true {
@@ -1276,7 +1276,7 @@ bg_logger :: (message: string, data: *void, info: Log_Info) {
 
 #import "sdl3";
 
-#if EMSCRIPTEN {
+#if OS == .WASM {
   #import "emscripten";
 } else {
   #import "stb_image";

@@ -1,8 +1,9 @@
 // raddbg 0.9.25 project file
 
-recent_file: path: "../code/bean_game/map_and_menu.jai"
-recent_file: path: "C:/Users/gmb/Workspace/Tools/jai/modules/Runtime_Support.jai"
 recent_file: path: "../code/bean_game/main.jai"
+recent_file: path: "C:/Users/gmb/Workspace/Tools/jai/modules/Runtime_Support.jai"
+recent_file: path: "C:/Users/gmb/Workspace/Tools/jai/modules/String/module.jai"
+recent_file: path: "../code/bean_game/map_and_menu.jai"
 recent_file: path: "../code/bean_game/common.jai"
 recent_file: path: "T:/jai/modules/Math/module.jai"
 recent_file: path: "../code/bean_game/map.jai"
@@ -36,5 +37,10 @@ target:
 debug_info:
 {
   path: "W:/build/BeanGame.pdb"
-  timestamp: 66215245176504
+  timestamp: 66219906272191
+}
+breakpoint:
+{
+  source_location: "../code/bean_game/main.jai:323:1"
+  hit_count: 1
 }

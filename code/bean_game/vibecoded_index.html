@@ -98,6 +98,11 @@
   function describeArg(a) {
     return `${typeof a}${typeof a === "bigint" ? "n" : ""}(${a})`;
   }
+  function logJSON(tag, obj) {
+    if (!DEBUG_ABI) return;
+    // JSON.stringify throws on BigInt by default -- stringify it ourselves instead.
+    console.log(tag, JSON.stringify(obj, (k, v) => (typeof v === "bigint" ? v.toString() + "n" : v)));
+  }
   function withAbiProbe(fns) {
     if (!DEBUG_ABI) return fns;
     const wrapped = {};
@@ -105,7 +110,7 @@
       wrapped[name] = (...args) => {
         if (!loggedOnce.has(name)) {
           loggedOnce.add(name);
-          console.debug(`[ABI PROBE] ${name}(${args.map(describeArg).join(", ")})`);
+          console.log(`[ABI PROBE] ${name}(${args.map(describeArg).join(", ")})`);
         }
         return fns[name](...args);
       };
@@ -401,6 +406,20 @@
     web_set_scissor: (x0, y0, x1, y1) => {
       flushBatch();
       scissorRect = { x0: Number(x0), y0: Number(y0), x1: Number(x1), y1: Number(y1) };
+
+      if (DEBUG_ABI && !loggedOnce.has("set_scissor_values")) {
+        loggedOnce.add("set_scissor_values");
+        const glX = Math.max(0, Math.floor(scissorRect.x0));
+        const glY = Math.max(0, Math.floor(scissorRect.y0));
+        const glW = Math.max(0, Math.ceil(scissorRect.x1 - scissorRect.x0));
+        const glH = Math.max(0, Math.ceil(scissorRect.y1 - scissorRect.y0));
+        logJSON("[set_scissor]", {
+          raw: { x0: scissorRect.x0, y0: scissorRect.y0, x1: scissorRect.x1, y1: scissorRect.y1 },
+          glScissor: { x: glX, y: glY, w: glW, h: glH },
+          canvasClientWidth: gl.canvas.clientWidth,
+          canvasClientHeight: gl.canvas.clientHeight,
+        });
+      }
     },
 
     // clear_scissor: ()
@@ -446,30 +465,12 @@
       fontBackBuffer.textAlign = "left";
 
       const metrics = fontBackBuffer.measureText(str);
-      // Prefer fontBoundingBox* (whole-font metrics from the font's own
-      // tables) over actualBoundingBox* (per-string ink bounds): custom
-      // @font-face fonts are notoriously inconsistent about populating
-      // actualBoundingBox*, often returning 0 instead of leaving it
-      // null/undefined -- which `??` would accept as a "real" zero and
-      // collapse the text quad's height. `||` here deliberately treats a
-      // spurious 0 the same as missing, falling through to the next option.
-      const ascent  = Math.max(1, Math.ceil(metrics.fontBoundingBoxAscent  || metrics.actualBoundingBoxAscent  || pixelHeight * 0.8));
-      const descent = Math.max(0, Math.ceil(metrics.fontBoundingBoxDescent || metrics.actualBoundingBoxDescent || pixelHeight * 0.2));
       const width   = Math.max(1, Math.ceil(metrics.width));
-      const height  = ascent + descent;
+      const height  = pixelHeight;
 
       if (DEBUG_ABI && !loggedOnce.has("prepare_text_metrics")) {
         loggedOnce.add("prepare_text_metrics");
-        console.debug("[prepare_text]", {
-          str, pixelHeight, ascent, descent, width, height,
-          rawMetrics: {
-            width: metrics.width,
-            actualBoundingBoxAscent: metrics.actualBoundingBoxAscent,
-            actualBoundingBoxDescent: metrics.actualBoundingBoxDescent,
-            fontBoundingBoxAscent: metrics.fontBoundingBoxAscent,
-            fontBoundingBoxDescent: metrics.fontBoundingBoxDescent,
-          },
-        });
+        logJSON("[prepare_text]", { str, pixelHeight, width, height });
       }
 
       fontCanvas.width  = width;
@@ -480,7 +481,7 @@
       fontBackBuffer.textAlign = "left";
       fontBackBuffer.clearRect(0, 0, width, height);
       fontBackBuffer.fillStyle = "white"; // tinted later via vertex color
-      fontBackBuffer.fillText(str, 0, ascent);
+      fontBackBuffer.fillText(str, 0, height);
 
       let glTexture = fontEntry.prepared ? fontEntry.prepared.texture : null;
       if (!glTexture) glTexture = gl.createTexture();
@@ -491,7 +492,7 @@
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-      fontEntry.prepared = { texture: glTexture, width, height, ascent, descent };
+      fontEntry.prepared = { texture: glTexture, width, height };
 
       return BigInt(width);
     },
@@ -503,7 +504,7 @@
       if (!fontEntry || !fontEntry.prepared) return;
 
       const color = readVec4(textColorPtr);
-      const { texture, width, height, ascent, descent } = fontEntry.prepared;
+      const { texture, width, height } = fontEntry.prepared;
 
       // Text uses the same batched pipeline: flush whatever's pending under
       // the current shader/scissor state, draw this quad on its own with
@@ -516,14 +517,16 @@
       currentTextureHandle = texIndex;
       blendEnabled = true;
 
-      const bx = Number(x), by = Number(y) - descent;
+      // Baseline sits at the bottom of the canvas (row=height), so the
+      // quad's bottom edge is the baseline itself (y), and the quad
+      // extends upward by the full requested pixel height.
+      const bx = Number(x), by = Number(y);
       const tx = bx + width, ty = by + height;
 
       if (DEBUG_ABI && !loggedOnce.has("draw_prepared_text_values")) {
         loggedOnce.add("draw_prepared_text_values");
-        console.debug("[draw_prepared_text]", {
-          rawX: Number(x), rawY: Number(y),
-          ascent, descent, width, height,
+        logJSON("[draw_prepared_text]", {
+          rawX: Number(x), rawY: Number(y), width, height,
           bx, by, tx, ty,
           canvasHeight: gl.canvas.clientHeight,
           pixelHeight: fontEntry.pixelHeight,
@@ -546,14 +549,23 @@
     },
 
     // get_mouse_pointer_position: (window: Window_Type, right_handed: bool) -> (x: int, y: int, success: bool)
-    // REVISED: real wasm multi-value return (no sret pointer -- see the ABI
-    // probe / DEBUG_ABI notes above). Each s64 field becomes its own i64
-    // result; the trailing bool becomes its own i32 result.
-    web_get_mouse_pointer_position: (window, right_handed) => {
+    // CONFIRMED via ABI probe: this actually receives 3 arguments (a hidden
+    // sret pointer first, then window, right_handed), not 2 -- the earlier
+    // "multi-value array return" guess was never actually exercised/tested
+    // and was wrong. Composite_Return is {ret0:s64; ret1:s64; ret2:bool},
+    // written through the sret pointer exactly like get_font_at_size.
+    web_get_mouse_pointer_position: (retPtr, window, right_handed) => {
       const h = gl.canvas.clientHeight;
       const x = Math.round(mouseX);
       const y = right_handed ? Math.round(h - mouseY) : Math.round(mouseY);
-      return [BigInt(x), BigInt(y), mouseInside ? 1 : 0];
+
+      const p = Number(retPtr);
+      const view = jaiView();
+      view.setBigInt64(p,      BigInt(x), true); // ret0: x
+      view.setBigInt64(p + 8,  BigInt(y), true); // ret1: y
+      view.setInt32(p + 16, mouseInside ? 1 : 0, true); // ret2: success
+
+      return retPtr;
     },
 
     // get_font_at_size: (memory: [] u8, pixel_height: int) -> *Font
