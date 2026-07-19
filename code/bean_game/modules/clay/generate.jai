@@ -1,3 +1,8 @@
+/*
+  NOTE: Ok, new plan. What if I wrapped the WASM build into a static library. Would that play nice with Jai's builtin linking architecture?
+  Then I can replicate the sdl3 renderer and use emscripten to compile for the web! Giving me a desktop and web renderer.
+*/
+
 AT_COMPILE_TIME :: true;
 
 SOURCE_DIR :: "clay_source";
@@ -10,7 +15,7 @@ library_dir: string;
 
 #if AT_COMPILE_TIME {
   #run,stallable {
-    set_build_options_dc(.{do_output=false});
+    set_build_options_dc({do_output=false});
     options := get_build_options();
     args := options.compile_time_command_line;
     if !build_library(args) || !generate_bindings() {
@@ -48,29 +53,29 @@ build_library :: (args: [] string) -> bool {
     return false;
   }
 
-  success := true;
-  if compile {
-    make_directory_if_it_does_not_exist(library_dir, recursive=true);
+  if !compile return true;
 
-    library_location := join(library_dir, "/", LIBRARY_BASE_NAME);
-    if target_os == .WASM {
-      build_clay_wasm: [..] string;
-      array_add(*build_clay_wasm, "clang");
-      array_add(*build_clay_wasm, "-Os");
-      array_add(*build_clay_wasm, "-DCLAY_IMPLEMENTATION");
-      array_add(*build_clay_wasm, "-DCLAY_WASM");
-      array_add(*build_clay_wasm, "-mbulk-memory");
-      array_add(*build_clay_wasm, "--target=wasm64-unknown-unknown");
-      array_add(*build_clay_wasm, "-m64");
-      array_add(*build_clay_wasm, "-nostdlib");
-      array_add(*build_clay_wasm, "-c");
-      array_add(*build_clay_wasm, "-o");
-      array_add(*build_clay_wasm, join(library_location, ".o"));
-      array_add(*build_clay_wasm, "-x");
-      array_add(*build_clay_wasm, "c");
-      array_add(*build_clay_wasm, source_file);
-      success &&= cmd(..build_clay_wasm);
-    }
+  success := true;
+  make_directory_if_it_does_not_exist(library_dir, recursive=true);
+  library_location := join(library_dir, "/", LIBRARY_BASE_NAME);
+  if target_os == .WASM { // TODO: Unnecessary when BuildCpp has better WASM support.
+    obj_name := join(library_location, ".o");
+    ar\_name := join(library_location, ".a");
+    success &&= cmd("clang",
+                    "-Os",
+                    "-DCLAY_IMPLEMENTATION",
+                    "-DCLAY_WASM",
+                    "-mbulk-memory",
+                    "--target=wasm64-unknown-unknown",
+                    "-nostdlib",
+                    "-c",
+                    "-o",
+                    obj_name,
+                    "-x", "c",
+                    source_file);
+    success &&= cmd("ar", "-rcs", ar_name, obj_name);
+    file_delete(obj_name);
+  } else {
     extra: [..] string;
     array_add(*extra, "-DCLAY_IMPLEMENTATION");
     if target_os == .WINDOWS {
@@ -78,13 +83,18 @@ build_library :: (args: [] string) -> bool {
     } else {
       array_add(*extra, "-x", "c");
     }
-    success &&= build_cpp_static_lib(library_location, source_file, target = target_os, extra = extra);
+    success = build_cpp_static_lib(library_location, source_file, extra = extra);
   }
 
   return success;
 }
 
 generate_bindings :: () -> bool {
+  if target_os == .WASM {
+    log("The bindings generator can only read desktop library formats!");
+    return true;
+  }
+
   opts: Generate_Bindings_Options;
   {
     using opts;
@@ -97,19 +107,10 @@ generate_bindings :: () -> bool {
     footer = tprint(FOOTER, LIBRARY_BASE_NAME);
 
     generate_compile_time_struct_checks = false;
-
-    visitor = clay_visitor;
   }
 
-  return generate_bindings(opts, "clay_bindings.jai");
-}
-
-clay_visitor :: (decl: *Declaration, parent_decl: *Declaration) -> result: Declaration_Visit_Result = .RECURSE {
-  if target_os == .WASM && decl.library {
-    decl.library.identifier = "";
-  }
-
-  return;
+  output_filename := "clay_bindings.jai";
+  return generate_bindings(opts, output_filename);
 }
 
 cmd :: (args: .. string, redirect_stdout_to_file := "", loc := #caller_location) -> bool {
@@ -123,13 +124,12 @@ cmd :: (args: .. string, redirect_stdout_to_file := "", loc := #caller_location)
     return false;
   }
 
-  if redirect_stdout_to_file then write_entire_file(redirect_stdout_to_file, output_string);
+  if redirect_stdout_to_file write_entire_file(redirect_stdout_to_file, output_string);
 
   return true;
 }
 
 FOOTER :: #string EOF
-#scope_module
 #if OS == .WINDOWS {
   %1 :: #library,no_dll "windows/%1";
 } else #if OS == .LINUX {
@@ -137,9 +137,7 @@ FOOTER :: #string EOF
 } else #if OS == .MACOS {
   %1 :: #library,no_dll "macos/%1";
 } else #if OS == .WASM {
-  // NOTE: Do nothing.
-} else {
-  #assert false;
+  %1 :: #library,no_dll "wasm/%1";
 }
 EOF
 

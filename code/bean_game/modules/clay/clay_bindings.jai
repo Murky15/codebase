@@ -1,7 +1,7 @@
 //
 // This file was auto-generated using the following command:
 //
-// jai generate.jai - -compile -wasm
+// jai modules/clay/generate.jai
 //
 
 
@@ -88,7 +88,7 @@ Clay_CornerRadius :: struct {
 }
 
 // Controls the direction in which child elements will be automatically laid out.
-Clay_LayoutDirection :: enum u8 {
+Clay_LayoutDirection :: enum s32 {
     LEFT_TO_RIGHT :: 0;
 
     TOP_TO_BOTTOM :: 1;
@@ -99,7 +99,7 @@ Clay_LayoutDirection :: enum u8 {
 }
 
 // Controls the alignment along the x axis (horizontal) of child elements.
-Clay_LayoutAlignmentX :: enum u8 {
+Clay_LayoutAlignmentX :: enum s32 {
     LEFT   :: 0;
 
     RIGHT  :: 1;
@@ -114,7 +114,7 @@ Clay_LayoutAlignmentX :: enum u8 {
 }
 
 // Controls the alignment along the y axis (vertical) of child elements.
-Clay_LayoutAlignmentY :: enum u8 {
+Clay_LayoutAlignmentY :: enum s32 {
     TOP    :: 0;
 
     BOTTOM :: 1;
@@ -129,7 +129,7 @@ Clay_LayoutAlignmentY :: enum u8 {
 }
 
 // Controls how the element takes up space inside its parent container.
-Clay__SizingType :: enum u8 {
+Clay__SizingType :: enum s32 {
     FIT     :: 0;
 
     GROW    :: 1;
@@ -162,9 +162,10 @@ Clay_SizingMinMax :: struct {
 
 // Controls the sizing of this element along one axis inside its parent container.
 Clay_SizingAxis :: struct {
-    size: union {
-        minMax:  Clay_SizingMinMax; // Controls the minimum and maximum size in pixels that this element is allowed to grow or shrink to, overriding sizing types such as FIT or GROW.
-        percent: float; // Expects 0-1 range. Clamps the axis size to a percent of the parent container's axis size minus padding and child gaps.
+    size: struct {
+        minMax: Clay_SizingMinMax; // Controls the minimum and maximum size in pixels that this element is allowed to grow or shrink to, overriding sizing types such as FIT or GROW.
+
+        #overlay (minMax) percent: float; // Expects 0-1 range. Clamps the axis size to a percent of the parent container's axis size minus padding and child gaps.
     };
 
     type: Clay__SizingType; // Controls how the element takes up space inside its parent container.
@@ -203,10 +204,10 @@ Clay__Clay_LayoutConfigWrapper :: struct {
     wrapped: Clay_LayoutConfig;
 }
 
-CLAY_LAYOUT_DEFAULT: Clay_LayoutConfig #elsewhere ;
+CLAY_LAYOUT_DEFAULT: Clay_LayoutConfig #elsewhere clay;
 
 // Controls how text "wraps", that is how it is broken into multiple lines when there is insufficient horizontal space.
-Clay_TextElementConfigWrapMode :: enum u8 {
+Clay_TextElementConfigWrapMode :: enum s32 {
     WORDS    :: 0;
 
     NEWLINES :: 1;
@@ -221,7 +222,7 @@ Clay_TextElementConfigWrapMode :: enum u8 {
 }
 
 // Controls how wrapped lines of text are horizontally aligned within the outer text bounding box.
-Clay_TextAlignment :: enum u8 {
+Clay_TextAlignment :: enum s32 {
     LEFT   :: 0;
 
     CENTER :: 1;
@@ -293,7 +294,7 @@ Clay__Clay_ImageElementConfigWrapper :: struct {
 
 // Controls where a floating element is offset relative to its parent element.
 // Note: see https://github.com/user-attachments/assets/b8c6dfaa-c1b1-41a4-be55-013473e4a6ce for a visual explanation.
-Clay_FloatingAttachPointType :: enum u8 {
+Clay_FloatingAttachPointType :: enum s32 {
     LEFT_TOP      :: 0;
     LEFT_CENTER   :: 1;
     LEFT_BOTTOM   :: 2;
@@ -322,7 +323,7 @@ Clay_FloatingAttachPoints :: struct {
 }
 
 // Controls how mouse pointer events like hover and click are captured or passed through to elements underneath a floating element.
-Clay_PointerCaptureMode :: enum u8 {
+Clay_PointerCaptureMode :: enum s32 {
     CAPTURE     :: 0;
 
     PASSTHROUGH :: 1;
@@ -333,7 +334,7 @@ Clay_PointerCaptureMode :: enum u8 {
 }
 
 // Controls which element a floating element is "attached" to (i.e. relative offset from).
-Clay_FloatingAttachToElement :: enum u8 {
+Clay_FloatingAttachToElement :: enum s32 {
     NONE            :: 0;
 
     PARENT          :: 1;
@@ -352,7 +353,7 @@ Clay_FloatingAttachToElement :: enum u8 {
 }
 
 // Controls whether or not a floating element is clipped to the same clipping rectangle as the element it's attached to.
-Clay_FloatingClipToElement :: enum u8 {
+Clay_FloatingClipToElement :: enum s32 {
     NONE            :: 0;
 
     ATTACHED_PARENT :: 1;
@@ -460,7 +461,7 @@ Clay_TransitionData :: struct {
     borderWidth:     Clay_BorderWidth;
 }
 
-Clay_TransitionState :: enum u32 {
+Clay_TransitionState :: enum s32 {
     IDLE          :: 0;
     ENTERING      :: 1;
     TRANSITIONING :: 2;
@@ -472,7 +473,7 @@ Clay_TransitionState :: enum u32 {
     CLAY_TRANSITION_STATE_EXITING       :: EXITING;
 }
 
-Clay_TransitionProperty :: enum u32 {
+Clay_TransitionProperty :: enum s32 {
     NONE             :: 0;
     X                :: 1;
     Y                :: 2;
@@ -514,7 +515,7 @@ Clay_TransitionCallbackArguments :: struct {
     properties:      Clay_TransitionProperty;
 }
 
-Clay_TransitionEnterTriggerType :: enum u8 {
+Clay_TransitionEnterTriggerType :: enum s32 {
     SKIP_ON_FIRST_PARENT_FRAME    :: 0;
     TRIGGER_ON_FIRST_PARENT_FRAME :: 1;
 
@@ -522,7 +523,7 @@ Clay_TransitionEnterTriggerType :: enum u8 {
     CLAY_TRANSITION_ENTER_TRIGGER_ON_FIRST_PARENT_FRAME :: TRIGGER_ON_FIRST_PARENT_FRAME;
 }
 
-Clay_TransitionExitTriggerType :: enum u8 {
+Clay_TransitionExitTriggerType :: enum s32 {
     SKIP_WHEN_PARENT_EXITS    :: 0;
     TRIGGER_WHEN_PARENT_EXITS :: 1;
 
@@ -530,7 +531,7 @@ Clay_TransitionExitTriggerType :: enum u8 {
     CLAY_TRANSITION_EXIT_TRIGGER_WHEN_PARENT_EXITS :: TRIGGER_WHEN_PARENT_EXITS;
 }
 
-Clay_TransitionInteractionHandlingType :: enum u8 {
+Clay_TransitionInteractionHandlingType :: enum s32 {
     DISABLE_INTERACTIONS_WHILE_TRANSITIONING_POSITION :: 0;
     ALLOW_INTERACTIONS_WHILE_TRANSITIONING_POSITION   :: 1;
 
@@ -538,7 +539,7 @@ Clay_TransitionInteractionHandlingType :: enum u8 {
     CLAY_TRANSITION_ALLOW_INTERACTIONS_WHILE_TRANSITIONING_POSITION   :: ALLOW_INTERACTIONS_WHILE_TRANSITIONING_POSITION;
 }
 
-Clay_ExitTransitionSiblingOrdering :: enum u8 {
+Clay_ExitTransitionSiblingOrdering :: enum s32 {
     UNDERNEATH_SIBLINGS :: 0;
     NATURAL_ORDER       :: 1;
     ABOVE_SIBLINGS      :: 2;
@@ -655,27 +656,22 @@ Clay_BorderRenderData :: struct {
 }
 
 // A struct union containing data specific to this command's .commandType
-Clay_RenderData :: union {
-    // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_RECTANGLE
-    rectangle:    Clay_RectangleRenderData;
+Clay_RenderData :: struct {
+    // largest member, moved to the start of the struct/union to support #overlay. // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_TEXT
+    text: Clay_TextRenderData;
 
-    // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_TEXT
-    text:         Clay_TextRenderData;
-
-    // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_IMAGE
-    image:        Clay_ImageRenderData;
-
-    // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_CUSTOM
-    custom:       Clay_CustomRenderData;
-
-    // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_BORDER
-    border:       Clay_BorderRenderData;
-
-    // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START|END
-    clip:         Clay_ClipRenderData;
-
-    // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_OVERLAY_COLOR_START|END
-    overlayColor: Clay_OverlayColorRenderData;
+    #overlay (text) // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_RECTANGLE
+rectangle:    Clay_RectangleRenderData;
+    #overlay (text) // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_IMAGE
+image:        Clay_ImageRenderData;
+    #overlay (text) // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_CUSTOM
+custom:       Clay_CustomRenderData;
+    #overlay (text) // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_BORDER
+border:       Clay_BorderRenderData;
+    #overlay (text) // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START|END
+clip:         Clay_ClipRenderData;
+    #overlay (text) // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_OVERLAY_COLOR_START|END
+overlayColor: Clay_OverlayColorRenderData;
 }
 
 // Data representing the current internal state of a scrolling element.
@@ -707,7 +703,7 @@ Clay_ElementData :: struct {
 }
 
 // Used by renderers to determine specific handling for each render command.
-Clay_RenderCommandType :: enum u8 {
+Clay_RenderCommandType :: enum s32 {
     NONE                :: 0;
 
     RECTANGLE           :: 1;
@@ -791,7 +787,7 @@ Clay_RenderCommandArray :: struct {
 }
 
 // Represents the current state of interaction with clay this frame.
-Clay_PointerDataInteractionState :: enum u8 {
+Clay_PointerDataInteractionState :: enum s32 {
     PRESSED_THIS_FRAME  :: 0;
 
     PRESSED             :: 1;
@@ -867,7 +863,7 @@ Clay__Clay_ElementDeclarationWrapper :: struct {
 }
 
 // Represents the type of error clay encountered while computing layout.
-Clay_ErrorType :: enum u8 {
+Clay_ErrorType :: enum s32 {
     TEXT_MEASUREMENT_FUNCTION_NOT_PROVIDED :: 0;
 
     ARENA_CAPACITY_EXCEEDED                :: 1;
@@ -939,154 +935,153 @@ Clay_ErrorHandler :: struct {
 }
 
 // Returns the size, in bytes, of the minimum amount of memory Clay requires to operate at its current settings.
-Clay_MinMemorySize :: () -> u32 #foreign ;
+Clay_MinMemorySize :: () -> u32 #foreign clay;
 
 // Creates an arena for clay to use for its internal allocations, given a certain capacity in bytes and a pointer to an allocation of at least that size.
 // Intended to be used with Clay_MinMemorySize in the following way:
 // uint32_t minMemoryRequired = Clay_MinMemorySize();
 // Clay_Arena clayMemory = Clay_CreateArenaWithCapacityAndMemory(minMemoryRequired, malloc(minMemoryRequired));
-Clay_CreateArenaWithCapacityAndMemory :: (capacity: u64, memory: *void) -> Clay_Arena #foreign ;
+Clay_CreateArenaWithCapacityAndMemory :: (capacity: u64, memory: *void) -> Clay_Arena #foreign clay;
 
 // Sets the state of the "pointer" (i.e. the mouse or touch) in Clay's internal data. Used for detecting and responding to mouse events in the debug view,
 // as well as for Clay_Hovered() and scroll element handling.
-Clay_SetPointerState :: (position: Clay_Vector2, pointerDown: bool) -> void #foreign ;
+Clay_SetPointerState :: (position: Clay_Vector2, pointerDown: bool) -> void #foreign clay;
 
 // Returns the state of the "pointer" (i.e. the mouse or touch) which was set via Clay_SetPointerState().
-Clay_GetPointerState :: () -> Clay_PointerData #foreign ;
+Clay_GetPointerState :: () -> Clay_PointerData #foreign clay;
 
 // Initialize Clay's internal arena and setup required data before layout can begin. Only needs to be called once.
 // - arena can be created using Clay_CreateArenaWithCapacityAndMemory()
 // - layoutDimensions are the initial bounding dimensions of the layout (i.e. the screen width and height for a full screen layout)
 // - errorHandler is used by Clay to inform you if something has gone wrong in configuration or layout.
-Clay_Initialize :: (arena: Clay_Arena, layoutDimensions: Clay_Dimensions, errorHandler: Clay_ErrorHandler) -> *Clay_Context #foreign ;
+Clay_Initialize :: (arena: Clay_Arena, layoutDimensions: Clay_Dimensions, errorHandler: Clay_ErrorHandler) -> *Clay_Context #foreign clay;
 
 // Returns the Context that clay is currently using. Used when using multiple instances of clay simultaneously.
-Clay_GetCurrentContext :: () -> *Clay_Context #foreign ;
+Clay_GetCurrentContext :: () -> *Clay_Context #foreign clay;
 
 // Sets the context that clay will use to compute the layout.
 // Used to restore a context saved from Clay_GetCurrentContext when using multiple instances of clay simultaneously.
-Clay_SetCurrentContext :: (_context: *Clay_Context) -> void #foreign ;
+Clay_SetCurrentContext :: (_context: *Clay_Context) -> void #foreign clay;
 
 // Updates the state of Clay's internal scroll data, updating scroll content positions if scrollDelta is non zero, and progressing momentum scrolling.
 // - enableDragScrolling when set to true will enable mobile device like "touch drag" scroll of scroll containers, including momentum scrolling after the touch has ended.
 // - scrollDelta is the amount to scroll this frame on each axis in pixels.
 // - deltaTime is the time in seconds since the last "frame" (scroll update)
-Clay_UpdateScrollContainers :: (enableDragScrolling: bool, scrollDelta: Clay_Vector2, deltaTime: float) -> void #foreign ;
+Clay_UpdateScrollContainers :: (enableDragScrolling: bool, scrollDelta: Clay_Vector2, deltaTime: float) -> void #foreign clay;
 
 // Returns the internally stored scroll offset for the currently open element.
 // Generally intended for use with clip elements to create scrolling containers.
-Clay_GetScrollOffset :: () -> Clay_Vector2 #foreign ;
+Clay_GetScrollOffset :: () -> Clay_Vector2 #foreign clay;
 
 // Updates the layout dimensions in response to the window or outer container being resized.
-Clay_SetLayoutDimensions :: (dimensions: Clay_Dimensions) -> void #foreign ;
+Clay_SetLayoutDimensions :: (dimensions: Clay_Dimensions) -> void #foreign clay;
 
 // Returns the current dimensions set by Clay_SetLayoutDimensions.
-Clay_GetLayoutDimensions :: () -> Clay_Dimensions #foreign ;
+Clay_GetLayoutDimensions :: () -> Clay_Dimensions #foreign clay;
 
 // Called before starting any layout declarations.
-Clay_BeginLayout :: () -> void #foreign ;
+Clay_BeginLayout :: () -> void #foreign clay;
 
 // Called when all layout declarations are finished.
 // Computes the layout and generates and returns the array of render commands to draw.
-Clay_EndLayout :: (deltaTime: float) -> Clay_RenderCommandArray #foreign ;
+Clay_EndLayout :: (deltaTime: float) -> Clay_RenderCommandArray #foreign clay;
 
 // Gets the ID of the currently open element, useful for retrieving IDs generated by CLAY_AUTO_ID()
-Clay_GetOpenElementId :: () -> u32 #foreign ;
+Clay_GetOpenElementId :: () -> u32 #foreign clay;
 
 // Calculates a hash ID from the given idString.
 // Generally only used for dynamic strings when CLAY_ID("stringLiteral") can't be used.
-Clay_GetElementId :: (idString: Clay_String) -> Clay_ElementId #foreign ;
+Clay_GetElementId :: (idString: Clay_String) -> Clay_ElementId #foreign clay;
 
 // Calculates a hash ID from the given idString and index.
 // - index is used to avoid constructing dynamic ID strings in loops.
 // Generally only used for dynamic strings when CLAY_IDI("stringLiteral", index) can't be used.
-Clay_GetElementIdWithIndex :: (idString: Clay_String, index: u32) -> Clay_ElementId #foreign ;
+Clay_GetElementIdWithIndex :: (idString: Clay_String, index: u32) -> Clay_ElementId #foreign clay;
 
 // Returns layout data such as the final calculated bounding box for an element with a given ID.
 // The returned Clay_ElementData contains a `found` bool that will be true if an element with the provided ID was found.
 // This ID can be calculated either with CLAY_ID() for string literal IDs, or Clay_GetElementId for dynamic strings.
-Clay_GetElementData :: (id: Clay_ElementId) -> Clay_ElementData #foreign ;
+Clay_GetElementData :: (id: Clay_ElementId) -> Clay_ElementData #foreign clay;
 
 // Returns true if the pointer position provided by Clay_SetPointerState is within the current element's bounding box.
 // Works during element declaration, e.g. CLAY({ .backgroundColor = Clay_Hovered() ? BLUE : RED });
-Clay_Hovered :: () -> bool #foreign ;
+Clay_Hovered :: () -> bool #foreign clay;
 
 // Bind a callback that will be called when the pointer position provided by Clay_SetPointerState is within the current element's bounding box.
 // - onHoverFunction is a function pointer to a user defined function.
 // - userData is a pointer that will be transparently passed through when the onHoverFunction is called.
-Clay_OnHover :: (onHoverFunction: #type (elementId: Clay_ElementId, pointerData: Clay_PointerData, userData: *void) -> void #c_call, userData: *void) -> void #foreign ;
+Clay_OnHover :: (onHoverFunction: #type (elementId: Clay_ElementId, pointerData: Clay_PointerData, userData: *void) -> void #c_call, userData: *void) -> void #foreign clay;
 
 // An imperative function that returns true if the pointer position provided by Clay_SetPointerState is within the element with the provided ID's bounding box.
 // This ID can be calculated either with CLAY_ID() for string literal IDs, or Clay_GetElementId for dynamic strings.
-Clay_PointerOver :: (elementId: Clay_ElementId) -> bool #foreign ;
+Clay_PointerOver :: (elementId: Clay_ElementId) -> bool #foreign clay;
 
 // Returns the array of element IDs that the pointer is currently over.
-Clay_GetPointerOverIds :: () -> Clay_ElementIdArray #foreign ;
+Clay_GetPointerOverIds :: () -> Clay_ElementIdArray #foreign clay;
 
 // Returns data representing the state of the scrolling element with the provided ID.
 // The returned Clay_ScrollContainerData contains a `found` bool that will be true if a scroll element was found with the provided ID.
 // An imperative function that returns true if the pointer position provided by Clay_SetPointerState is within the element with the provided ID's bounding box.
 // This ID can be calculated either with CLAY_ID() for string literal IDs, or Clay_GetElementId for dynamic strings.
-Clay_GetScrollContainerData :: (id: Clay_ElementId) -> Clay_ScrollContainerData #foreign ;
+Clay_GetScrollContainerData :: (id: Clay_ElementId) -> Clay_ScrollContainerData #foreign clay;
 
 // Binds a callback function that Clay will call to determine the dimensions of a given string slice.
 // - measureTextFunction is a user provided function that adheres to the interface Clay_Dimensions (Clay_StringSlice text, Clay_TextElementConfig *config, void *userData);
 // - userData is a pointer that will be transparently passed through when the measureTextFunction is called.
-Clay_SetMeasureTextFunction :: (measureTextFunction: #type (text: Clay_StringSlice, config: *Clay_TextElementConfig, userData: *void) -> Clay_Dimensions #c_call, userData: *void) -> void #foreign ;
+Clay_SetMeasureTextFunction :: (measureTextFunction: #type (text: Clay_StringSlice, config: *Clay_TextElementConfig, userData: *void) -> Clay_Dimensions #c_call, userData: *void) -> void #foreign clay;
 
 // Experimental - Used in cases where Clay needs to integrate with a system that manages its own scrolling containers externally.
 // Please reach out if you plan to use this function, as it may be subject to change.
-Clay_SetQueryScrollOffsetFunction :: (queryScrollOffsetFunction: #type (elementId: u32, userData: *void) -> Clay_Vector2 #c_call, userData: *void) -> void #foreign ;
+Clay_SetQueryScrollOffsetFunction :: (queryScrollOffsetFunction: #type (elementId: u32, userData: *void) -> Clay_Vector2 #c_call, userData: *void) -> void #foreign clay;
 
 // A bounds-checked "get" function for the Clay_RenderCommandArray returned from Clay_EndLayout().
-Clay_RenderCommandArray_Get :: (array: *Clay_RenderCommandArray, index: s32) -> *Clay_RenderCommand #foreign ;
+Clay_RenderCommandArray_Get :: (array: *Clay_RenderCommandArray, index: s32) -> *Clay_RenderCommand #foreign clay;
 
 // Enables and disables Clay's internal debug tools.
 // This state is retained and does not need to be set each frame.
-Clay_SetDebugModeEnabled :: (enabled: bool) -> void #foreign ;
+Clay_SetDebugModeEnabled :: (enabled: bool) -> void #foreign clay;
 
 // Returns true if Clay's internal debug tools are currently enabled.
-Clay_IsDebugModeEnabled :: () -> bool #foreign ;
+Clay_IsDebugModeEnabled :: () -> bool #foreign clay;
 
 // Enables and disables visibility culling. By default, Clay will not generate render commands for elements whose bounding box is entirely outside the screen.
-Clay_SetCullingEnabled :: (enabled: bool) -> void #foreign ;
+Clay_SetCullingEnabled :: (enabled: bool) -> void #foreign clay;
 
 // Returns the maximum number of UI elements supported by Clay's current configuration.
-Clay_GetMaxElementCount :: () -> s32 #foreign ;
+Clay_GetMaxElementCount :: () -> s32 #foreign clay;
 
 // Modifies the maximum number of UI elements supported by Clay's current configuration.
 // This may require reallocating additional memory, and re-calling Clay_Initialize();
-Clay_SetMaxElementCount :: (maxElementCount: s32) -> void #foreign ;
+Clay_SetMaxElementCount :: (maxElementCount: s32) -> void #foreign clay;
 
 // Returns the maximum number of measured "words" (whitespace seperated runs of characters) that Clay can store in its internal text measurement cache.
-Clay_GetMaxMeasureTextCacheWordCount :: () -> s32 #foreign ;
+Clay_GetMaxMeasureTextCacheWordCount :: () -> s32 #foreign clay;
 
 // Modifies the maximum number of measured "words" (whitespace seperated runs of characters) that Clay can store in its internal text measurement cache.
 // This may require reallocating additional memory, and re-calling Clay_Initialize();
-Clay_SetMaxMeasureTextCacheWordCount :: (maxMeasureTextCacheWordCount: s32) -> void #foreign ;
+Clay_SetMaxMeasureTextCacheWordCount :: (maxMeasureTextCacheWordCount: s32) -> void #foreign clay;
 
 // Resets Clay's internal text measurement cache. Useful if font mappings have changed or fonts have been reloaded.
-Clay_ResetMeasureTextCache :: () -> void #foreign ;
+Clay_ResetMeasureTextCache :: () -> void #foreign clay;
 
 // A built in transition function that uses the "Ease Out" curve
-Clay_EaseOut :: (arguments: Clay_TransitionCallbackArguments) -> bool #foreign ;
+Clay_EaseOut :: (arguments: Clay_TransitionCallbackArguments) -> bool #foreign clay;
 
 // Internal API functions required by macros ----------------------
-Clay__OpenElement :: () -> void #foreign ;
-Clay__OpenElementWithId :: (elementId: Clay_ElementId) -> void #foreign ;
-Clay__ConfigureOpenElement :: (config: Clay_ElementDeclaration) -> void #foreign ;
-Clay__ConfigureOpenElementPtr :: (config: *Clay_ElementDeclaration) -> void #foreign ;
-Clay__CloseElement :: () -> void #foreign ;
-Clay__HashString :: (key: Clay_String, seed: u32) -> Clay_ElementId #foreign ;
-Clay__HashStringWithOffset :: (key: Clay_String, offset: u32, seed: u32) -> Clay_ElementId #foreign ;
-Clay__OpenTextElement :: (text: Clay_String, textConfig: Clay_TextElementConfig) -> void #foreign ;
+Clay__OpenElement :: () -> void #foreign clay;
+Clay__OpenElementWithId :: (elementId: Clay_ElementId) -> void #foreign clay;
+Clay__ConfigureOpenElement :: (config: Clay_ElementDeclaration) -> void #foreign clay;
+Clay__ConfigureOpenElementPtr :: (config: *Clay_ElementDeclaration) -> void #foreign clay;
+Clay__CloseElement :: () -> void #foreign clay;
+Clay__HashString :: (key: Clay_String, seed: u32) -> Clay_ElementId #foreign clay;
+Clay__HashStringWithOffset :: (key: Clay_String, offset: u32, seed: u32) -> Clay_ElementId #foreign clay;
+Clay__OpenTextElement :: (text: Clay_String, textConfig: Clay_TextElementConfig) -> void #foreign clay;
 
-Clay__debugViewHighlightColor: Clay_Color #elsewhere ;
-Clay__debugViewWidth: u32 #elsewhere ;
+Clay__debugViewHighlightColor: Clay_Color #elsewhere clay;
+Clay__debugViewWidth: u32 #elsewhere clay;
 
 #scope_file
 
-#scope_module
 #if OS == .WINDOWS {
   clay :: #library,no_dll "windows/clay";
 } else #if OS == .LINUX {
@@ -1094,7 +1089,7 @@ Clay__debugViewWidth: u32 #elsewhere ;
 } else #if OS == .MACOS {
   clay :: #library,no_dll "macos/clay";
 } else #if OS == .WASM {
-  // NOTE: Do nothing.
+  clay :: #library,no_dll "wasm/clay";
 } else {
   #assert false;
 }

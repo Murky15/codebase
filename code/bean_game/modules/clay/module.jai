@@ -3,7 +3,6 @@
   - [ ] Error in the clay.h CLAY macro example code (CLAY_ID is in the wrong spot)
   - [ ] Line 4077 of clay.h, incorrect CLAY_WASM_EXPORT name
 */
-// TODO: There was also an  that I could fix
 
 // NOTE: Handwritten macro API
 
@@ -97,7 +96,7 @@ Clay_PushUI :: (id: Clay_ElementId, element := Clay_ElementDeclaration.{}) -> bo
 
 Clay_Text :: inline ($$text: string, config := Clay_TextElementConfig.{}) {
   wrapped := Clay_MakeString(text);
-  #if is_constant(text) then wrapped.isStaticallyAllocated = true;
+  #if is_constant(text) wrapped.isStaticallyAllocated = true;
   Clay__OpenTextElement(wrapped, config);
 }
 
