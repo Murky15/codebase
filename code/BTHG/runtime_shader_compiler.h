@@ -13,8 +13,17 @@ typedef struct Compiled_Shader_Data {
   Shader_Format format;
   u32 *data;
   u64 count;
+  bool succeeded;
 } Compiled_Shader_Data;
 
-Compiled_Shader_Data compile_shader_from_file (Arena *arena, String8 file_path);
+#if LANG_CPP
+extern "C" {
+#endif
+
+Compiled_Shader_Data compile_shader_from_file (Arena *arena, Str8 file_path, Str8 entry_point, Str8 profile, Str8_List *messages_out);
+
+#if LANG_CPP
+}
+#endif
 
 #endif // RUNTIME_SHADER_COMPILER_H

@@ -41,6 +41,37 @@ SDL_AppInit (void **appstate, int argc, char **argv) {
     return SDL_APP_FAILURE;
   }
 
+  SDL_GPUShaderCreateInfo vsinfo = {0};
+  ScratchBlock(&perm,1) {
+    Str8_List vs_compilation_messages = {0};
+    Compiled_Shader_Data vs_source = compile_shader_from_file(
+      scratch.arena,
+      str8_lit("whatever.hlsl"),
+      str8_lit("vs_main"),
+      str8_lit("vs_6_0"),
+      &vs_compilation_messages
+    );
+    for EachInList(vs_compilation_messages) SDL_Log("VS Compilation: %.*s\n", str8_expand(it->string));
+    //SDL_GPUShader *vertex_shader = SDL_CreateGPUShader(gpu, &vsinfo);
+  }
+
+  SDL_GPUGraphicsPipelineCreateInfo gfx_pipeline_info = {0};
+  /*
+  gfx_pipeline_info.vertex_shader = ;
+  gfx_pipeline_info.fragment_shader = ;
+  gfx_pipeline_info.vertex_input_state = ;
+  gfx_pipeline_info.primitive_type = ;
+  gfx_pipeline_info.rasterizer_state = ;
+  gfx_pipeline_info.multisample_state = ;
+  gfx_pipeline_info.depth_stencil_state = ;
+  gfx_pipeline_info.target_info = ;
+  SDL_GPUGraphicsPipeline *gfx_pipeline = SDL_CreateGPUGraphicsPipeline(gpu, &gfx_pipeline_info);
+  if (gfx_pipeline == NULL) {
+    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Could not create graphics pipeline: %s", SDL_GetError());
+    return SDL_APP_FAILURE;
+  }
+  */
+
   Vec2 vbuffer_data[] = {
     V2(0, 0),
     V2(0.5f, 1),
@@ -67,27 +98,6 @@ SDL_AppInit (void **appstate, int argc, char **argv) {
   SDL_EndGPUCopyPass(copy_pass);
   SDL_SubmitGPUCommandBuffer(copy_commands);
 
-
-  SDL_GPUShaderCreateInfo vsinfo = {0};
-  //SDL_GPUShader *vertex_shader = SDL_CreateGPUShader(gpu, &vsinfo);
-
-
-  SDL_GPUGraphicsPipelineCreateInfo gfx_pipeline_info = {0};
-  /*
-  gfx_pipeline_info.vertex_shader = ;
-  gfx_pipeline_info.fragment_shader = ;
-  gfx_pipeline_info.vertex_input_state = ;
-  gfx_pipeline_info.primitive_type = ;
-  gfx_pipeline_info.rasterizer_state = ;
-  gfx_pipeline_info.multisample_state = ;
-  gfx_pipeline_info.depth_stencil_state = ;
-  gfx_pipeline_info.target_info = ;
-  SDL_GPUGraphicsPipeline *gfx_pipeline = SDL_CreateGPUGraphicsPipeline(gpu, &gfx_pipeline_info);
-  if (gfx_pipeline == NULL) {
-    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Could not create graphics pipeline: %s", SDL_GetError());
-    return SDL_APP_FAILURE;
-  }
-  */
 
   game_state.perm = perm;
   game_state.window = window;

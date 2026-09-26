@@ -20,10 +20,12 @@ window:
           }
           0.50:
           {
-            watch: selected expression: "query:breakpoints"
+            selected
+            watch: expression: "query:breakpoints"
             watch: expression: "query:watch_pins"
             text:
             {
+              selected
               expression: "query:output"
               query: input: ""
               cursor_line: 1
@@ -36,22 +38,21 @@ window:
         }
         0.623888:
         {
-          selected
           getting_started
           text:
           {
             selected
-            expression: "file:\"C:/Users/gmb/Workspace/Tools/jai/modules/Runtime_Support.jai\".data"
+            expression: "file:\"W:/code/BTHG/base.h\".data"
             auto: 1
             query:
             {
               input: ""
               cmd: search
             }
-            cursor_line: 224
-            cursor_column: 1
-            mark_line: 224
-            mark_column: 1
+            cursor_line: 633
+            cursor_column: 46
+            mark_line: 633
+            mark_column: 46
           }
           text:
           {
@@ -108,13 +109,13 @@ window:
     {
       0.50:
       {
-        watch: expression: "query:targets"
+        watch: selected expression: "query:targets"
         watch:
         {
           expression: ""
           watch: fonts
         }
-        watch: selected expression: "query:locals"
+        watch: expression: "query:locals"
       }
       0.50:
       {
@@ -129,7 +130,7 @@ window:
     }
   }
   split_x
-  pos: 281 144
+  pos: -11 -6
   monitor: "\\\\.\\DISPLAY1"
   font_size: 11
   maximized

@@ -210,7 +210,7 @@ typedef struct Arena {
 
 base_function Arena* arena_alloc (u64 cap, u64 commit_chunk_size, u64 decommit_granularity);
 base_function Arena* arena_alloc_default (); // NOTE: Find and cache OS page table size
-#define ArenaPush(a,T,c) arena_push_raw((a), sizeof(T)*(c), __alignof(T))
+#define ArenaPush(a,T,c) (T*)arena_push_raw((a), sizeof(T)*(c), __alignof(T))
 base_function void*  arena_push_raw (Arena *arena, u64 size, u64 align);
 base_function u64    arena_pos (Arena *arena);
 base_function void   arena_pop_to (Arena *arena, u64 pos);
@@ -239,6 +239,11 @@ typedef struct String8 {
   u8 *str;
   u64 count;
 } String8, Str8;
+
+typedef struct String16 {
+  u16 *str;
+  u64 count;
+} String16, Str16;
 
 typedef struct Str8_Node {
   struct Str8_Node *next;
@@ -325,14 +330,15 @@ char_to_back_slash (u8 c) {
 
 base_function u64 cstr_length (const char *cstr);
 
-base_function Str8 str8 (u8 *str, u64 count);
+base_function Str8  str8  (u8  *str, u64 count);
+base_function Str16 str16 (u16 *str, u64 count);
+
 #define str8_cstring(cstr) str8((u8*)cstr, cstr_length(cstr))
 #define str8_lit(s) str8((u8*)s, sizeof(s)-1)
-base_function Str8 str8_range (u8 *first, u8 *opl);
-
 // NOTE: %.*s in format string
 #define str8_expand(s) (int)((s).count), (char*)((s).str)
 
+base_function Str8 str8_range (u8 *first, u8 *opl);
 base_function Str8 str8_sub (Str8 string, u64 first, u64 opl);
 base_function Str8 str8_skip (Str8 string, u64 amount);
 base_function Str8 str8_chop (Str8 string, u64 amount);
@@ -355,10 +361,12 @@ base_function void str8_list_concat (Str8_List *base, Str8_List *to_append);
 base_function Str8_List str8_split (Arena *arena, Str8 string, u64 num_splitters, char *splits);
 base_function Str8 str8_list_join (Arena *arena, Str8_List list, Str8_Join *opt_join_params);
 
-base_function u8* str8_to_cstr (Arena *arena, Str8 string);
-base_function u64 u64_from_str8 (Str8 string, u32 radix);
-base_function s64 cint_from_str8 (Str8 string);
-base_function f64 f64_from_str8 (Str8 string);
+base_function u8*   str8_to_cstr  (Arena *arena, Str8 string);
+base_function Str16 str8_to_str16 (Arena *arena, Str8 string);
+
+base_function u64  u64_from_str8  (Str8 string, u32 radix);
+base_function s64  cint_from_str8 (Str8 string);
+base_function f64  f64_from_str8  (Str8 string);
 
 base_function u64 str8_hash (Str8 string);
 
@@ -636,7 +644,7 @@ arena_temp_end (Temp_Arena temp) {
 base_function Temp_Arena
 arena_scratch_get (Arena **conflicts, u64 num_conflicts) {
   __declspec(thread) local_persist Arena *reservoir[NUM_SCRATCH_ARENAS];
-  if (reservoir[0]->pos == 0) {
+  if (reservoir[0] == 0) {
     for EachInStaticArrayPtr(reservoir) {
       *it = arena_alloc_default();
     }
@@ -681,6 +689,11 @@ cstr_length (const char *cstr) {
 base_function Str8
 str8 (u8 *str, u64 count) {
   return CompLit(Str8, str, count);
+}
+
+base_function Str16
+str16 (u16 *str, u64 count) {
+  return CompLit(Str16, str, count);
 }
 
 base_function Str8
@@ -908,6 +921,17 @@ str8_to_cstr (Arena *arena, Str8 string) {
   memcpy(result, string.str, string.count);
 
   return result;
+}
+
+base_function Str16
+str8_to_str16 (Arena *arena, Str8 string) {
+  // TODO: Move away from CRT
+  u64 size = string.count+1;
+  u16 *str = ArenaPush(arena, u16, size);
+  size_t chars_converted = 0;
+  mbstowcs_s(&chars_converted, str, size, string.str, _TRUNCATE);
+
+  return str16(str, string.count);
 }
 
 /*
