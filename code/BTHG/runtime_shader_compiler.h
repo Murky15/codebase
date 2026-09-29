@@ -1,19 +1,10 @@
 #ifndef RUNTIME_SHADER_COMPILER_H
 #define RUNTIME_SHADER_COMPILER_H
 
-enum {
-  SHADER_FORMAT_SPIRV,
-  SHADER_FORMAT_DXIL,
-
-  SHADER_FORMAT_COUNT
-};
-typedef u32 Shader_Format;
-
 typedef struct Compiled_Shader_Data {
-  Shader_Format format;
-  u32 *data;
+  SDL_GPUShaderFormat format;
+  u8 *data;
   u64 count;
-  bool succeeded;
 } Compiled_Shader_Data;
 
 #if LANG_CPP

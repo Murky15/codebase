@@ -28,10 +28,7 @@ SDL_AppInit (void **appstate, int argc, char **argv) {
     return SDL_APP_FAILURE;
   }
 
-  // NOTE: Not quite sure what backend to use yet. I'm thinking Vulkan for easiest
-  // development on all platforms? Maybe if *everyone* uses Windows, and there's a performance
-  // improvement, I'll support D3D12 directly.
-  SDL_GPUDevice *gpu = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, true, NULL);
+  SDL_GPUDevice *gpu = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_SPIRV, true, NULL);
   if (gpu == NULL) {
     SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Could not create GPU device: %s", SDL_GetError());
     return SDL_APP_FAILURE;
@@ -40,19 +37,32 @@ SDL_AppInit (void **appstate, int argc, char **argv) {
     SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Could not claim window for GPU device: %s", SDL_GetError());
     return SDL_APP_FAILURE;
   }
+  Str8 driver = Str8CStr(SDL_GetGPUDeviceDriver(gpu));
+  bool vulkan = str8_match(driver, Str8Lit("vulkan"), 0);
+  Assert(!vulkan, "This GPU driver is not supported yet");
+  SDL_Log("GPU device created with %.*s driver\n", Str8Expand(driver));
 
-  SDL_GPUShaderCreateInfo vsinfo = {0};
+  SDL_GPUShader *vertex_shader = 0;
   ScratchBlock(&perm,1) {
+    Str8 entry_point = Str8Lit("vs_main");
     Str8_List vs_compilation_messages = {0};
     Compiled_Shader_Data vs_source = compile_shader_from_file(
       scratch.arena,
-      str8_lit("whatever.hlsl"),
-      str8_lit("vs_main"),
-      str8_lit("vs_6_0"),
+      Str8Lit("W:/code/BTHG/shader_default.hlsl"),
+      entry_point,
+      Str8Lit("vs_6_1"),
       &vs_compilation_messages
     );
-    for EachInList(vs_compilation_messages) SDL_Log("VS Compilation: %.*s\n", str8_expand(it->string));
-    //SDL_GPUShader *vertex_shader = SDL_CreateGPUShader(gpu, &vsinfo);
+    for EachInList(vs_compilation_messages) SDL_Log("VS Compilation: %.*s\n", Str8Expand(it->string));
+    if (vs_source.data) {
+      SDL_GPUShaderCreateInfo vsinfo = {0};
+      vsinfo.code_size = vs_source.count;
+      vsinfo.code = vs_source.data;
+      vsinfo.entrypoint = str8_to_cstr(scratch.arena, entry_point);
+      vsinfo.format = vs_source.format;
+      vsinfo.stage = SDL_GPU_SHADERSTAGE_VERTEX;
+      vertex_shader = SDL_CreateGPUShader(gpu, &vsinfo);
+    }
   }
 
   SDL_GPUGraphicsPipelineCreateInfo gfx_pipeline_info = {0};

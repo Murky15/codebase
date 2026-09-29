@@ -229,6 +229,7 @@ base_function void       arena_temp_end (Temp_Arena temp);
 #define NUM_SCRATCH_ARENAS 2
 base_function Temp_Arena arena_scratch_get (Arena **conflicts, u64 num_conflicts);
 #define ScratchBlock(c,n) for (Temp_Arena scratch=arena_scratch_get((c),(n)),__idx={0};__idx.restore_pos<1;__idx.restore_pos=(arena_temp_end(scratch),1))
+#define scratch_block_early_exit continue
 
 // NOTE: Strings
 
@@ -333,10 +334,10 @@ base_function u64 cstr_length (const char *cstr);
 base_function Str8  str8  (u8  *str, u64 count);
 base_function Str16 str16 (u16 *str, u64 count);
 
-#define str8_cstring(cstr) str8((u8*)cstr, cstr_length(cstr))
-#define str8_lit(s) str8((u8*)s, sizeof(s)-1)
+#define Str8CStr(cstr) str8((u8*)cstr, cstr_length(cstr))
+#define Str8Lit(s) str8((u8*)s, sizeof(s)-1)
 // NOTE: %.*s in format string
-#define str8_expand(s) (int)((s).count), (char*)((s).str)
+#define Str8Expand(s) (int)((s).count), (char*)((s).str)
 
 base_function Str8 str8_range (u8 *first, u8 *opl);
 base_function Str8 str8_sub (Str8 string, u64 first, u64 opl);
@@ -594,6 +595,9 @@ arena_push_raw (Arena *arena, u64 size, u64 align) {
     Commit(base + arena->commit_pos, commit_size);
     arena->commit_pos += commit_size;
   }
+
+  // TODO: Make this toggleable
+  memset(result, 0, size);
 
   return result;
 }

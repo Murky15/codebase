@@ -20,7 +20,6 @@ window:
           }
           0.50:
           {
-            selected
             watch: expression: "query:breakpoints"
             watch: expression: "query:watch_pins"
             text:
@@ -41,41 +40,41 @@ window:
           getting_started
           text:
           {
-            selected
-            expression: "file:\"W:/code/BTHG/base.h\".data"
+            expression: "file:\"W:/code/BTHG/win32_platform_interface.cpp\".data"
             auto: 1
             query:
             {
               input: ""
               cmd: search
             }
-            cursor_line: 633
-            cursor_column: 46
-            mark_line: 633
-            mark_column: 46
+            cursor_line: 86
+            cursor_column: 21
+            mark_line: 86
+            mark_column: 21
           }
           text:
           {
-            expression: "file:\"W:/code/bean_game/common.jai\".data"
+            expression: "file:\"W:/code/BTHG/base.h\".data"
             project: "W:/misc/root.raddbg_project"
             query:
             {
               input: ""
               cmd: search
             }
-            cursor_line: 305
+            cursor_line: 829
             cursor_column: 1
-            mark_line: 305
+            mark_line: 829
             mark_column: 1
           }
           text:
           {
-            expression: "file:\"W:/code/bean_game/test.jai\".data"
+            selected
+            expression: "file:\"W:/code/BTHG/main.c\".data"
             project: "W:/misc/root.raddbg_project"
             query: input: ""
-            cursor_line: 17
+            cursor_line: 64
             cursor_column: 1
-            mark_line: 17
+            mark_line: 64
             mark_column: 1
           }
         }
@@ -109,11 +108,17 @@ window:
     {
       0.50:
       {
-        watch: selected expression: "query:targets"
+        selected
+        watch: expression: "query:targets"
         watch:
         {
+          selected
           expression: ""
           watch: fonts
+          watch: wstr_file_path
+          watch: node
+          watch: vsinfo
+          watch: "vs_source.data,2836"
         }
         watch: expression: "query:locals"
       }
@@ -254,7 +259,7 @@ keybindings:
   { log_marker m ctrl shift alt }
   { toggle_dev_menu d ctrl shift alt }
 }
-current_path: "W:/build"
+current_path: "W:/code/BTHG"
 file_path_map:
 {
   source: "W:/code/soniboy/main.jai"
