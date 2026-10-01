@@ -1,7 +1,7 @@
 // raddbg 0.9.25 project file
 
-recent_file: path: "../code/BTHG/main.c"
 recent_file: path: "../code/BTHG/base.h"
+recent_file: path: "../code/BTHG/main.c"
 recent_file: path: "../code/BTHG/win32_platform_interface.cpp"
 recent_file: path: "C:/Users/gmb/Workspace/Tools/jai/modules/Runtime_Support.jai"
 recent_file: path: "../code/bean_game/website/website.jai"
@@ -68,10 +68,5 @@ target:
 debug_info:
 {
   path: "W:/build/BTHG.pdb"
-  timestamp: 66226894957374
-}
-breakpoint:
-{
-  source_location: "../code/BTHG/main.c:64:1"
-  hit_count: 1
+  timestamp: 66227035677369
 }

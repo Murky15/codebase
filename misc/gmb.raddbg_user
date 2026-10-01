@@ -54,6 +54,7 @@ window:
           }
           text:
           {
+            selected
             expression: "file:\"W:/code/BTHG/base.h\".data"
             project: "W:/misc/root.raddbg_project"
             query:
@@ -61,14 +62,13 @@ window:
               input: ""
               cmd: search
             }
-            cursor_line: 829
+            cursor_line: 659
             cursor_column: 1
-            mark_line: 829
+            mark_line: 659
             mark_column: 1
           }
           text:
           {
-            selected
             expression: "file:\"W:/code/BTHG/main.c\".data"
             project: "W:/misc/root.raddbg_project"
             query: input: ""

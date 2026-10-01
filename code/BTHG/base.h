@@ -115,7 +115,7 @@
 
 #define EachInArrayPtrIt(p,c,it) (TypeOf(p)it=(p);(it-(p))<(c);it+=1)
 #define EachInArrayPtr(p,c) EachInArrayPtrIt(p,c,it)
-#define EachInArrayIt(p,c,it) (TypeOf((p)[0])*__idx=(p),it=*__idx;(__idx-(p))<(c);it=*(__idx+=1))
+#define EachInArrayIt(p,c,it) (TypeOf((p)[0])*__idx=(p),it=(p)?*__idx:ZeroStruct(TypeOf((p)[0]));(__idx-(p))<(c);it=*(__idx+=1))
 #define EachInArray(p,c) EachInArrayIt(p,c,it)
 #define EachInStaticArrayPtrIt(a,it) (TypeOf(&(a)[0])it=(a);(it-(a))<ArrayCount(a);it+=1)
 #define EachInStaticArrayPtr(a) EachInStaticArrayPtrIt(a,it)
