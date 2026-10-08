@@ -134,7 +134,7 @@ SDL_AppInit (void **appstate, int argc, char **argv) {
 
   SDL_GPURasterizerState rsstate = {0};
   rsstate.fill_mode = SDL_GPU_FILLMODE_FILL;
-  rsstate.cull_mode = SDL_GPU_CULLMODE_NONE; // TODO: Change to BACK after intial setup is verified
+  rsstate.cull_mode = SDL_GPU_CULLMODE_BACK;
   rsstate.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
   rsstate.enable_depth_clip = false; // TODO: Change to true after initial setup is verified
 
