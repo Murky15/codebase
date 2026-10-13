@@ -25,7 +25,7 @@ set libs=%sdl3%lib\x64\SDL3.lib %sdl3ttf%lib\x64\SDL3_ttf.lib %sdl3img%lib\x64\S
 
 REM set system_libs=dxcompiler.lib
 set system_libs=
-set link_options=-SUBSYSTEM:WINDOWS -INCREMENTAL:NO
+set link_options=-SUBSYSTEM:CONSOLE -INCREMENTAL:NO
 
 if not exist build mkdir build
 pushd build

@@ -1,5 +1,7 @@
-// raddbg 0.9.25 project file
+// raddbg 0.9.30 project file
 
+recent_file: path: "../code/arduino_maze_runner/main.cpp"
+recent_file: path: "../code/third_party/SDL3-3.4.14/include/SDL3/SDL_main_impl.h"
 recent_file: path: "../code/BTHG/base.h"
 recent_file: path: "../code/BTHG/main.c"
 recent_file: path: "../code/BTHG/win32_platform_interface.cpp"
@@ -22,37 +24,12 @@ recent_file: path: "C:/Users/gmb/Workspace/Tools/jai/modules/Basic/module.jai"
 recent_file: path: "C:/Users/gmb/Workspace/Tools/jai/modules/Unicode.jai"
 recent_file: path: "../code/gameboy/platform_desktop.jai"
 recent_file: path: "../code/soniboy/main.jai"
-debug_info:
-{
-  path: "W:/code/soniboy/main.pdb"
-  timestamp: 66204913276095
-}
-debug_info:
-{
-  path: "W:/build/gameboy.pdb"
-  timestamp: 66206463801782
-}
 type_view
 type_view
-debug_info:
-{
-  path: "W:/build/BeanGame.pdb"
-  timestamp: 66219906272191
-}
-debug_info:
-{
-  path: "W:/code/bean_game/test.pdb"
-  timestamp: 66220741104713
-}
 breakpoint:
 {
   source_location: "../code/bean_game/test.jai:16:1"
   hit_count: 0
-}
-debug_info:
-{
-  path: "W:/build/index.pdb"
-  timestamp: 66221430784456
 }
 breakpoint:
 {
@@ -63,10 +40,10 @@ target:
 {
   executable: "../build/BTHG.exe"
   working_directory: "../build"
-  enabled: 1
 }
-debug_info:
+target:
 {
-  path: "W:/build/BTHG.pdb"
-  timestamp: 66227035677369
+  executable: "../build/Runner.exe"
+  working_directory: "../build"
+  enabled: 1
 }

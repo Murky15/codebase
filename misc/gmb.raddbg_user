@@ -1,6 +1,10 @@
-// raddbg 0.9.25 user file
+// raddbg 0.9.30 user file
 
-recent_project: path: "root.raddbg_project"
+recent_project:
+{
+  path: "root.raddbg_project"
+  name: ""
+}
 window:
 {
   size: 1942 1152
@@ -31,6 +35,8 @@ window:
               cursor_column: 1
               mark_line: 1
               mark_column: 1
+              cursor: 0x0
+              mark: 0x0
             }
             memory: expression: ""
           }
@@ -40,21 +46,20 @@ window:
           getting_started
           text:
           {
-            expression: "file:\"W:/code/BTHG/win32_platform_interface.cpp\".data"
+            expression: "file:\"W:/code/third_party/SDL3-3.4.14/include/SDL3/SDL_main_impl.h\".data"
             auto: 1
             query:
             {
               input: ""
               cmd: search
             }
-            cursor_line: 86
-            cursor_column: 21
-            mark_line: 86
-            mark_column: 21
+            cursor_line: 126
+            cursor_column: 1
+            mark_line: 126
+            mark_column: 1
           }
           text:
           {
-            selected
             expression: "file:\"W:/code/BTHG/base.h\".data"
             project: "W:/misc/root.raddbg_project"
             query:
@@ -77,6 +82,19 @@ window:
             mark_line: 64
             mark_column: 1
           }
+          text:
+          {
+            selected
+            expression: "file:\"W:/code/arduino_maze_runner/main.cpp\".data"
+            project: "W:/misc/root.raddbg_project"
+            query: input: ""
+            cursor_line: 168
+            cursor_column: 1
+            mark_line: 168
+            mark_column: 1
+            cursor: 0x246b
+            mark: 0x246b
+          }
         }
       }
       0.209915:
@@ -94,6 +112,7 @@ window:
         }
         0.40:
         {
+          selected
           watch:
           {
             expression: "query:call_stack"
@@ -108,11 +127,9 @@ window:
     {
       0.50:
       {
-        selected
         watch: expression: "query:targets"
         watch:
         {
-          selected
           expression: ""
           watch: fonts
           watch: wstr_file_path
@@ -120,7 +137,7 @@ window:
           watch: vsinfo
           watch: "vs_source.data,2836"
         }
-        watch: expression: "query:locals"
+        watch: selected expression: "query:locals"
       }
       0.50:
       {
@@ -135,8 +152,8 @@ window:
     }
   }
   split_x
-  pos: -11 -6
-  monitor: "\\\\.\\DISPLAY1"
+  pos: 281 144
+  monitor: "\\\\.\\DISPLAY6"
   font_size: 11
   maximized
 }
@@ -259,9 +276,15 @@ keybindings:
   { log_marker m ctrl shift alt }
   { toggle_dev_menu d ctrl shift alt }
 }
-current_path: "W:/code/BTHG"
+current_path: "W:/misc"
 file_path_map:
 {
   source: "W:/code/soniboy/main.jai"
   dest: "W:/code/gameboy/platform_desktop.jai"
+}
+debug_info:
+{
+  path: "W:/build/Runner.pdb"
+  timestamp: 66228259952727
+  project: "W:/misc/root.raddbg_project"
 }

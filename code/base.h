@@ -376,6 +376,13 @@ base_function u64 str8_hash (Str8 string);
 
 #include <math.h>
 
+#ifndef M_PI
+# define M_PI 3.14159265358979323846f
+#endif
+
+#define RAD2DEG (180.f / M_PI)
+#define DEG2RAD (M_PI / 180.f)
+
 typedef union Vec2 {
   struct { f32 x, y; };
   struct { f32 min, max; };
