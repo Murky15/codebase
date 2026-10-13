@@ -299,8 +299,8 @@ main (int argc, char **argv) {
         length.y = (local_pos.y - map_pos.y) * delta.y;
       }
 
-      int side = 0; // 0 - Vertical boundary, 1 - Horizontal boundary
-      for (;map_pos.x >= 0 && map_pos.x < MAP_WIDTH && map_pos.y >= 0 && map_pos.y < MAP_HEIGHT;) {
+      int side = 0; // NOTE: 0 - Vertical boundary, 1 - Horizontal boundary
+      for (;;) {
         if (length.x < length.y) {
           length.x  += delta.x;
           map_pos.x += step.x;
@@ -311,7 +311,8 @@ main (int argc, char **argv) {
           side = 1;
         }
 
-        if (test_map[(u64)map_pos.y][(u64)map_pos.x]) break;
+        if ((map_pos.x < 0 || map_pos.x >= MAP_WIDTH || map_pos.y < 0 || map_pos.y >= MAP_HEIGHT) ||
+            (test_map[(u64)map_pos.y][(u64)map_pos.x])) break;
       }
 
       f32 debug_line_length = 0;
@@ -321,55 +322,6 @@ main (int argc, char **argv) {
         debug_line_length = (length.y - delta.y) * MAP_TILE_SIZE;
       }
       r_line_2d(gs.backbuffer, gs.player.pos, angle, debug_line_length, V3(255, 0, 0));
-
-      /*
-      if (m > 0) {
-        f32 grid_x = ceil(gs.player.pos.x / MAP_TILE_SIZE) * MAP_TILE_SIZE;
-        f32 grid_y = ceil(gs.player.pos.y / MAP_TILE_SIZE) * MAP_TILE_SIZE;
-
-        f32 side_x = Clamp(gs.player.pos.x + ((grid_y - gs.player.pos.y) / m), 0, WINDOW_WIDTH);
-        f32 side_y = Clamp(gs.player.pos.y + (m * (grid_x - gs.player.pos.x)), 0, WINDOW_HEIGHT);
-
-        f32 dx = (side_x - grid_x);
-        f32 dy = (side_y - grid_y);
-
-        Vec2 p1 = {}, step = {};
-        if (dx < dy) {
-          p1 = V2(side_x, grid_y);
-          step = V2();
-        } else if (dy <= dx) {
-          p1 = V2(grid_x, side_y);
-          step = V2();
-        }
-
-        for (;0;) {
-
-        }
-
-      }
-      ------------------------------------------------------------------
-      Vec2 p1 = {}, step = {};
-      if (m >= 0 && m <= 1) {
-        f32 grid_x = ceil(gs.player.pos.x / MAP_TILE_SIZE) * MAP_TILE_SIZE;
-        f32 grid_y = gs.player.pos.y + (m * (grid_x - gs.player.pos.x));
-        p1 = V2(grid_x, grid_y);
-        step = v2muls(V2(1, m), MAP_TILE_SIZE);
-      } else if (m > 1) {,
-        f32 grid_y = ceil(gs.player.pos.y / MAP_TILE_SIZE) * MAP_TILE_SIZE;
-        f32 grid_x = gs.player.pos.x + ((grid_y - gs.player.pos.y) / m);
-        p1 = V2(grid_x, grid_y);
-        step = v2muls(V2(1/m, 1), MAP_TILE_SIZE);
-      }
-      for (;p1.x >= 0 && p1.x < WINDOW_WIDTH && p1.y >= 0 && p1.y < WINDOW_HEIGHT;
-              p1 = v2add(p1, step)) {
-        r_circle_2d(gs.backbuffer, p1, 5, V3(0,128,0));
-        u64 map_x = (u64)p1.x / MAP_TILE_SIZE;
-        u64 map_y = (u64)p1.y / MAP_TILE_SIZE;
-        if (test_map[map_y][map_x]) break;
-      }
-      */
-
-
     }
 
     SDL_BlitSurface(gs.backbuffer_surface, NULL, gs.display_surface, NULL);
