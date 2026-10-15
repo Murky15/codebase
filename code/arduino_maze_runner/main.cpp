@@ -11,10 +11,10 @@
 #define WINDOW_HEIGHT (MAP_TILE_SIZE * MAP_HEIGHT)
 
 #define RAYCAST_FOV (M_PI/3.f)
-#define RAYCAST_RESOLUTION WINDOW_WIDTH
+#define RAYCAST_RESOLUTION 32
 #define PIXELS_PER_RAYCAST (WINDOW_WIDTH / RAYCAST_RESOLUTION)
 
-#define CAMERA_FOCAL_LENGTH ((WINDOW_WIDTH/2) / tanf(RAYCAST_FOV/2))
+#define CAMERA_FOCAL_LENGTH ((WINDOW_WIDTH/2.f) / tanf(RAYCAST_FOV/2.f))
 
 struct Bitmap {
   u32 *pixels;
@@ -51,9 +51,7 @@ struct Raycast_Result {
 #define MAP_TILE_SIZE (32 * WINDOW_SCALE)
 #define MAP_WIDTH  10
 #define MAP_HEIGHT 10
-
 StaticAssert(MAP_WIDTH == MAP_HEIGHT, check_map_dimensions);
-StaticAssert((WINDOW_WIDTH % RAYCAST_RESOLUTION == 0), check_raycast_resolution);
 
 global u8 test_map[MAP_HEIGHT][MAP_WIDTH] = {
   {1,0,0,0,0,1,0,0,0,1},
@@ -347,8 +345,8 @@ main (int argc, char **argv) {
       f32 angle, length;
     } debug_rays[RAYCAST_RESOLUTION];
 
-    for (u64 x = 0; x < WINDOW_WIDTH; ++x) {
-      f32 proj_x = (f32)x - WINDOW_WIDTH/2;
+    for (u64 ray_idx = 0, x = 0; ray_idx < RAYCAST_RESOLUTION; ++ray_idx, x += PIXELS_PER_RAYCAST) {
+      f32 proj_x = (f32)(x + PIXELS_PER_RAYCAST/2.f) - WINDOW_WIDTH/2.f;
       f32 relative_angle = atan2(proj_x, CAMERA_FOCAL_LENGTH);
       f32 angle = gs.player.view_angle + relative_angle;
 
@@ -360,15 +358,16 @@ main (int argc, char **argv) {
       f32 perp_dist = dist * cosf(relative_angle);
 
       f32 wall_height = CAMERA_FOCAL_LENGTH / perp_dist;
-      f32 y0 = Max(WINDOW_HEIGHT/2 - wall_height/2, 0);
-      f32 y1 = Min(WINDOW_HEIGHT/2 + wall_height/2, WINDOW_HEIGHT);
-      Vec3 color = V3(255, 255, 255);
+      f32 y0 = Max(WINDOW_HEIGHT/2.f - wall_height/2.f, 0);
+      f32 y1 = Min(WINDOW_HEIGHT/2.f + wall_height/2.f, WINDOW_HEIGHT);
+      Vec3 color = V3(0, 255, 0);
       if (cast.collision == RAYCAST_WALL_EW) color = v3muls(color, 0.5f);
 
 #if RENDER_DEBUG_2D_VIEW
-      debug_rays[x] = {angle, cast.length};
+      debug_rays[ray_idx] = {angle, cast.length};
 #else
-      r_vert(gs.backbuffer, (f32)x, y0, y1, color);
+      for (u64 p = 0; p < PIXELS_PER_RAYCAST; ++p)
+        r_vert(gs.backbuffer, (f32)(x+p), y0, y1, color);
 #endif
     }
 
