@@ -29,5 +29,5 @@ set link_options=-SUBSYSTEM:CONSOLE -INCREMENTAL:NO
 
 if not exist build mkdir build
 pushd build
-cl %common% %debug% %ignored_warnings% %includes% %source%main.cpp -FeRunner.exe -link %link_options% %libs% %system_libs% || exit /b 1
+cl %common% %debug% %ignored_warnings% %includes% %source%platform_sdl3.cpp -FeRunner.exe -link %link_options% %libs% %system_libs% || exit /b 1
 popd

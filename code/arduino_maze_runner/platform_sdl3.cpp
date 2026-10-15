@@ -4,8 +4,6 @@
 #define BASE_IMPLEMENTATION
 #include "base.h"
 
-#define RENDER_DEBUG_2D_VIEW 1
-
 #define WINDOW_SCALE 2
 #define WINDOW_WIDTH  (MAP_TILE_SIZE * MAP_WIDTH)
 #define WINDOW_HEIGHT (MAP_TILE_SIZE * MAP_HEIGHT)
@@ -79,6 +77,9 @@ global struct {
 } gs;
 
 global bool game_running = true;
+
+global bool render_2d_debug_view = true, render_debug_raycasts = false;
+
 global bool move_up, move_down, strafe_left, strafe_right;
 global bool rotate_cw, rotate_ccw;
 
@@ -308,6 +309,8 @@ main (int argc, char **argv) {
 
           if (key.scancode == SDL_SCANCODE_Q) rotate_ccw = key.down;
           if (key.scancode == SDL_SCANCODE_E) rotate_cw  = key.down;
+
+          if (key.scancode == SDL_SCANCODE_T && !key.down) render_2d_debug_view = !render_2d_debug_view;
         } break;
       }
     }
@@ -363,41 +366,45 @@ main (int argc, char **argv) {
       Vec3 color = V3(0, 255, 0);
       if (cast.collision == RAYCAST_WALL_EW) color = v3muls(color, 0.5f);
 
-#if RENDER_DEBUG_2D_VIEW
-      debug_rays[ray_idx] = {angle, cast.length};
-#else
-      for (u64 p = 0; p < PIXELS_PER_RAYCAST; ++p)
-        r_vert(gs.backbuffer, (f32)(x+p), y0, y1, color);
-#endif
-    }
-
-#if RENDER_DEBUG_2D_VIEW
-    // NOTE: Draw test map
-    bool drew_vertical_gridlines = false;
-    for (u64 y = 0; y < WINDOW_HEIGHT; ++y) {
-      if (y % MAP_TILE_SIZE == 0)
-        r_line_2d(gs.backbuffer, V2(0,(f32)y), V2(WINDOW_WIDTH,(f32)y), V3());
-
-      for (u64 x = 0; x < WINDOW_WIDTH; ++x) {
-        if (!drew_vertical_gridlines && x % MAP_TILE_SIZE == 0)
-          r_line_2d(gs.backbuffer, V2((f32)x,0), V2((f32)x,WINDOW_HEIGHT), V3());
-
-        u64 map_x = x / MAP_TILE_SIZE;
-        u64 map_y = y / MAP_TILE_SIZE;
-
-        if (test_map[map_y][map_x]) {
-          r_set_pixel(gs.backbuffer, V2((f32)x,(f32)y), V3(255, 255, 255));
-        }
+      if (render_2d_debug_view) {
+        debug_rays[ray_idx] = {angle, cast.length};
+      } else {
+        for (u64 p = 0; p < PIXELS_PER_RAYCAST; ++p)
+          r_vert(gs.backbuffer, (f32)(x+p), y0, y1, color);
       }
-      drew_vertical_gridlines = true;
     }
 
-    r_circle_2d(gs.backbuffer, gs.player.pos, PLAYER_RADIUS, V3(0, 128, 255));
+    if (render_2d_debug_view) {
+      // NOTE: Draw test map
+      bool drew_vertical_gridlines = false;
+      for (u64 y = 0; y < WINDOW_HEIGHT; ++y) {
+        if (y % MAP_TILE_SIZE == 0)
+          r_line_2d(gs.backbuffer, V2(0,(f32)y), V2(WINDOW_WIDTH,(f32)y), V3());
 
-    for EachInStaticArray(debug_rays) {
-      r_line_2d(gs.backbuffer, gs.player.pos, it.angle, it.length * MAP_TILE_SIZE, V3(255, 0, 0));
+        for (u64 x = 0; x < WINDOW_WIDTH; ++x) {
+          if (!drew_vertical_gridlines && x % MAP_TILE_SIZE == 0)
+            r_line_2d(gs.backbuffer, V2((f32)x,0), V2((f32)x,WINDOW_HEIGHT), V3());
+
+          u64 map_x = x / MAP_TILE_SIZE;
+          u64 map_y = y / MAP_TILE_SIZE;
+
+          if (test_map[map_y][map_x]) {
+            r_set_pixel(gs.backbuffer, V2((f32)x,(f32)y), V3(255, 255, 255));
+          }
+        }
+        drew_vertical_gridlines = true;
+      }
+
+      r_circle_2d(gs.backbuffer, gs.player.pos, PLAYER_RADIUS, V3(0, 128, 255));
+
+      if (render_debug_raycasts) {
+        for EachInStaticArray(debug_rays) {
+          r_line_2d(gs.backbuffer, gs.player.pos, it.angle, it.length * MAP_TILE_SIZE, V3(255, 0, 0));
+        }
+      } else {
+        r_line_2d(gs.backbuffer, gs.player.pos, gs.player.view_angle, MAP_TILE_SIZE, V3(255, 0, 0));
+      }
     }
-#endif
 
     SDL_BlitSurface(gs.backbuffer_surface, NULL, gs.display_surface, NULL);
     SDL_UpdateWindowSurface(gs.window);
