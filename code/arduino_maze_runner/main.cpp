@@ -4,13 +4,17 @@
 #define BASE_IMPLEMENTATION
 #include "base.h"
 
+#define RENDER_DEBUG_2D_VIEW 1
+
 #define WINDOW_SCALE 2
 #define WINDOW_WIDTH  (MAP_TILE_SIZE * MAP_WIDTH)
 #define WINDOW_HEIGHT (MAP_TILE_SIZE * MAP_HEIGHT)
 
-#define RAYCAST_FOV (M_PI/2.f)
-#define RAYCAST_RESOLUTION 9
-#define RAYCAST_ANGLE_STEP (RAYCAST_FOV / (f32)(RAYCAST_RESOLUTION-1))
+#define RAYCAST_FOV (M_PI/3.f)
+#define RAYCAST_RESOLUTION WINDOW_WIDTH
+#define PIXELS_PER_RAYCAST (WINDOW_WIDTH / RAYCAST_RESOLUTION)
+
+#define CAMERA_FOCAL_LENGTH ((WINDOW_WIDTH/2) / tanf(RAYCAST_FOV/2))
 
 struct Bitmap {
   u32 *pixels;
@@ -21,10 +25,64 @@ struct Player {
   Vec2 pos;
   f32  view_angle;
 };
-
 #define PLAYER_RADIUS 10
 #define PLAYER_SPEED  250
 #define PLAYER_ROTATE_SPEED (90.f*DEG2RAD)
+
+struct Ray {
+  Vec2 pos;
+  Vec2 dir;
+};
+
+typedef u32 Raycast_Collision_Type;
+enum {
+  RAYCAST_NULL,
+  RAYCAST_WALL_NS,
+  RAYCAST_WALL_EW,
+
+  RAYCAST_COUNT
+};
+
+struct Raycast_Result {
+  Raycast_Collision_Type collision;
+  f32 length;
+};
+
+#define MAP_TILE_SIZE (32 * WINDOW_SCALE)
+#define MAP_WIDTH  10
+#define MAP_HEIGHT 10
+
+StaticAssert(MAP_WIDTH == MAP_HEIGHT, check_map_dimensions);
+StaticAssert((WINDOW_WIDTH % RAYCAST_RESOLUTION == 0), check_raycast_resolution);
+
+global u8 test_map[MAP_HEIGHT][MAP_WIDTH] = {
+  {1,0,0,0,0,1,0,0,0,1},
+  {0,0,0,1,0,0,1,1,0,0},
+  {0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,1,1,1,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,1,0,0,0},
+  {0,0,0,0,0,0,1,0,0,0},
+  {0,1,0,0,0,0,1,0,0,0},
+  {0,0,0,1,1,0,1,0,0,1},
+  {1,0,0,0,0,0,0,0,0,1},
+};
+
+global struct {
+  Arena *perm;
+  Arena *frame;
+
+  Bitmap backbuffer;
+  SDL_Window  *window;
+  SDL_Surface *backbuffer_surface;
+  SDL_Surface *display_surface;
+
+  Player player;
+} gs;
+
+global bool game_running = true;
+global bool move_up, move_down, strafe_left, strafe_right;
+global bool rotate_cw, rotate_ccw;
 
 function void
 r_test_gradient (Bitmap bitmap) {
@@ -137,6 +195,14 @@ r_line_2d (Bitmap bitmap, Vec2 p0, f32 angle, f32 length, Vec3 color) {
   r_line_2d(bitmap, p0, v2add(p0, V2(x,y)), color);
 }
 
+function void
+r_vert (Bitmap bitmap, f32 x, f32 y0, f32 y1, Vec3 color) {
+  Assert(y0 <= y1);
+  for (f32 y = round(y0); y <= round(y1); ++y) {
+    r_set_pixel(bitmap, V2((f32)x,(f32)y), color);
+  }
+}
+
 function f32
 fmod_cycling (f32 x, f32 y) {
   Assert(y != 0, "Cannot fmod_cycling with denominator 0.");
@@ -145,38 +211,54 @@ fmod_cycling (f32 x, f32 y) {
   return remainder;
 }
 
-#define MAP_TILE_SIZE (32 * WINDOW_SCALE)
-#define MAP_WIDTH  10
-#define MAP_HEIGHT 10
-StaticAssert(MAP_WIDTH == MAP_HEIGHT, check_map_dimensions);
-global u8 test_map[MAP_HEIGHT][MAP_WIDTH] = {
-  {1,0,0,0,0,1,0,0,0,1},
-  {0,0,0,1,0,0,1,1,0,0},
-  {0,0,0,0,0,0,0,0,0,0},
-  {0,0,0,1,1,1,0,0,0,0},
-  {0,0,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,1,0,0,0},
-  {0,0,0,0,0,0,1,0,0,0},
-  {0,1,0,0,0,0,1,0,0,0},
-  {0,0,0,1,1,0,1,0,0,1},
-  {1,0,0,0,0,0,0,0,0,1},
-};
+function Raycast_Result
+raycast (Ray ray) {
+  // NOTE: Apply digital differential analysis to find wall intersections.
+  Vec2 map_pos = V2(floorf(ray.pos.x), floorf(ray.pos.y));
+  Vec2 delta = V2(fabsf(1.f/ray.dir.x), fabsf(1.f/ray.dir.y));
+  Vec2 step = {}, length = {};
+  if (ray.dir.x > 0) {
+    step.x = 1;
+    length.x = ((map_pos.x + 1.f) - ray.pos.x) * delta.x;
+  } else if (ray.dir.x != 0) {
+    step.x = -1;
+    length.x = (ray.pos.x - map_pos.x) * delta.x;
+  }
+  if (ray.dir.y > 0) {
+    step.y = 1;
+    length.y = ((map_pos.y + 1.f) - ray.pos.y) * delta.y;
+  } else if (ray.dir.y != 0) {
+    step.y = -1;
+    length.y = (ray.pos.y - map_pos.y) * delta.y;
+  }
 
-global struct {
-  Arena *perm;
-  Arena *frame;
+  int side = 0; // NOTE: 0 - Vertical boundary, 1 - Horizontal boundary
+  for (;;) {
+    if (length.x < length.y) {
+      length.x  += delta.x;
+      map_pos.x += step.x;
+      side = 0;
+    } else {
+      length.y  += delta.y;
+      map_pos.y += step.y;
+      side = 1;
+    }
 
-  Bitmap backbuffer;
-  SDL_Window  *window;
-  SDL_Surface *backbuffer_surface;
-  SDL_Surface *display_surface;
+    if ((map_pos.x < 0 || map_pos.x >= MAP_WIDTH || map_pos.y < 0 || map_pos.y >= MAP_HEIGHT) ||
+        (test_map[(u64)map_pos.y][(u64)map_pos.x])) break;
+  }
 
-  Player player;
-} gs;
+  Raycast_Result result = {};
+  if (side == 0) {
+    result.collision = RAYCAST_WALL_NS;
+    result.length = length.x - delta.x;
+  } else {
+    result.collision = RAYCAST_WALL_EW;
+    result.length = length.y - delta.y;
+  }
 
-global bool game_running = true;
-global bool move_up, move_down, strafe_left, strafe_right;
-global bool rotate_cw, rotate_ccw;
+  return result;
+}
 
 int
 main (int argc, char **argv) {
@@ -237,14 +319,6 @@ main (int argc, char **argv) {
     last_time = current_time;
 
     // NOTE: Process input & move player
-    Vec2 move_amt = V2();
-    if (move_up)      move_amt.y -= PLAYER_SPEED * dt;
-    if (strafe_left)  move_amt.x -= PLAYER_SPEED * dt;
-    if (move_down)    move_amt.y += PLAYER_SPEED * dt;
-    if (strafe_right) move_amt.x += PLAYER_SPEED * dt;
-    if (v2len(move_amt) > 1.f)
-      move_amt = v2norm(move_amt);
-    gs.player.pos = v2add(gs.player.pos, move_amt);
 
     f32 rotation = 0;
     if (rotate_ccw) rotation -= PLAYER_ROTATE_SPEED * dt;
@@ -252,8 +326,53 @@ main (int argc, char **argv) {
     f32 new_angle = gs.player.view_angle + rotation;
     gs.player.view_angle = fmod_cycling(new_angle, 2.f * M_PI);
 
-    r_clear(gs.backbuffer, true);
+    Vec2 move_amt = V2();
+    f32 x = 0, y = 0;
+    if (move_up)      x += 1;
+    if (strafe_left)  y -= 1;
+    if (move_down)    x -= 1;
+    if (strafe_right) y += 1;
+    move_amt.x = x * cosf(gs.player.view_angle) - y * sinf(gs.player.view_angle);
+    move_amt.y = x * sinf(gs.player.view_angle) + y * cosf(gs.player.view_angle);
+    if (v2len(move_amt) > 1.f)
+      move_amt = v2norm(move_amt);
+    gs.player.pos = v2add(gs.player.pos, v2muls(move_amt, PLAYER_SPEED * dt));
 
+    r_clear(gs.backbuffer, false);
+
+    Vec2 local_pos = V2(gs.player.pos.x / MAP_TILE_SIZE,
+                      gs.player.pos.y / MAP_TILE_SIZE);
+
+    struct {
+      f32 angle, length;
+    } debug_rays[RAYCAST_RESOLUTION];
+
+    for (u64 x = 0; x < WINDOW_WIDTH; ++x) {
+      f32 proj_x = (f32)x - WINDOW_WIDTH/2;
+      f32 relative_angle = atan2(proj_x, CAMERA_FOCAL_LENGTH);
+      f32 angle = gs.player.view_angle + relative_angle;
+
+      Vec2 dir = V2(cosf(angle), sinf(angle));
+      Ray ray = {local_pos, dir};
+      Raycast_Result cast = raycast(ray);
+
+      f32 dist = cast.length;
+      f32 perp_dist = dist * cosf(relative_angle);
+
+      f32 wall_height = CAMERA_FOCAL_LENGTH / perp_dist;
+      f32 y0 = Max(WINDOW_HEIGHT/2 - wall_height/2, 0);
+      f32 y1 = Min(WINDOW_HEIGHT/2 + wall_height/2, WINDOW_HEIGHT);
+      Vec3 color = V3(255, 255, 255);
+      if (cast.collision == RAYCAST_WALL_EW) color = v3muls(color, 0.5f);
+
+#if RENDER_DEBUG_2D_VIEW
+      debug_rays[x] = {angle, cast.length};
+#else
+      r_vert(gs.backbuffer, (f32)x, y0, y1, color);
+#endif
+    }
+
+#if RENDER_DEBUG_2D_VIEW
     // NOTE: Draw test map
     bool drew_vertical_gridlines = false;
     for (u64 y = 0; y < WINDOW_HEIGHT; ++y) {
@@ -268,61 +387,18 @@ main (int argc, char **argv) {
         u64 map_y = y / MAP_TILE_SIZE;
 
         if (test_map[map_y][map_x]) {
-          r_set_pixel(gs.backbuffer, V2((f32)x,(f32)y), V3());
+          r_set_pixel(gs.backbuffer, V2((f32)x,(f32)y), V3(255, 255, 255));
         }
       }
       drew_vertical_gridlines = true;
     }
 
     r_circle_2d(gs.backbuffer, gs.player.pos, PLAYER_RADIUS, V3(0, 128, 255));
-    f32 angle = gs.player.view_angle - RAYCAST_FOV/2.f;
-    Vec2 local_pos = V2(gs.player.pos.x / MAP_TILE_SIZE,
-                      gs.player.pos.y / MAP_TILE_SIZE);
-    for (u64 i = 0; i < RAYCAST_RESOLUTION; ++i, angle += RAYCAST_ANGLE_STEP) {
-      // NOTE: Apply digital differential analysis to find wall intersections.
-      Vec2 map_pos = V2(floorf(local_pos.x), floorf(local_pos.y));
-      Vec2 dir   = V2(cosf(angle), sinf(angle));
-      Vec2 delta = V2(fabsf(1.f/dir.x), fabsf(1.f/dir.y));
-      Vec2 step = {}, length = {};
-      if (dir.x > 0) {
-        step.x = 1;
-        length.x = ((map_pos.x + 1.f) - local_pos.x) * delta.x;
-      } else {
-        step.x = -1;
-        length.x = (local_pos.x - map_pos.x) * delta.x;
-      }
-      if (dir.y > 0) {
-        step.y = 1;
-        length.y = ((map_pos.y + 1.f) - local_pos.y) * delta.y;
-      } else {
-        step.y = -1;
-        length.y = (local_pos.y - map_pos.y) * delta.y;
-      }
 
-      int side = 0; // NOTE: 0 - Vertical boundary, 1 - Horizontal boundary
-      for (;;) {
-        if (length.x < length.y) {
-          length.x  += delta.x;
-          map_pos.x += step.x;
-          side = 0;
-        } else {
-          length.y  += delta.y;
-          map_pos.y += step.y;
-          side = 1;
-        }
-
-        if ((map_pos.x < 0 || map_pos.x >= MAP_WIDTH || map_pos.y < 0 || map_pos.y >= MAP_HEIGHT) ||
-            (test_map[(u64)map_pos.y][(u64)map_pos.x])) break;
-      }
-
-      f32 debug_line_length = 0;
-      if (side == 0) {
-        debug_line_length = (length.x - delta.x) * MAP_TILE_SIZE;
-      } else {
-        debug_line_length = (length.y - delta.y) * MAP_TILE_SIZE;
-      }
-      r_line_2d(gs.backbuffer, gs.player.pos, angle, debug_line_length, V3(255, 0, 0));
+    for EachInStaticArray(debug_rays) {
+      r_line_2d(gs.backbuffer, gs.player.pos, it.angle, it.length * MAP_TILE_SIZE, V3(255, 0, 0));
     }
+#endif
 
     SDL_BlitSurface(gs.backbuffer_surface, NULL, gs.display_surface, NULL);
     SDL_UpdateWindowSurface(gs.window);

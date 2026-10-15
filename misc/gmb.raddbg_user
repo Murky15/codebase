@@ -43,6 +43,7 @@ window:
         }
         0.623888:
         {
+          selected
           getting_started
           text:
           {
@@ -57,6 +58,8 @@ window:
             cursor_column: 1
             mark_line: 126
             mark_column: 1
+            cursor: 0x1158
+            mark: 0x1158
           }
           text:
           {
@@ -92,8 +95,8 @@ window:
             cursor_column: 1
             mark_line: 168
             mark_column: 1
-            cursor: 0x246b
-            mark: 0x246b
+            cursor: 0x178c
+            mark: 0x178c
           }
         }
       }
@@ -112,7 +115,6 @@ window:
         }
         0.40:
         {
-          selected
           watch:
           {
             expression: "query:call_stack"
@@ -136,6 +138,16 @@ window:
           watch: node
           watch: vsinfo
           watch: "vs_source.data,2836"
+          watch_expression:
+          {
+            project: "W:/misc/root.raddbg_project"
+            expression: x
+          }
+          watch_expression:
+          {
+            project: "W:/misc/root.raddbg_project"
+            expression: proj_x
+          }
         }
         watch: selected expression: "query:locals"
       }
@@ -153,7 +165,7 @@ window:
   }
   split_x
   pos: 281 144
-  monitor: "\\\\.\\DISPLAY6"
+  monitor: "\\\\.\\DISPLAY1"
   font_size: 11
   maximized
 }
@@ -282,9 +294,16 @@ file_path_map:
   source: "W:/code/soniboy/main.jai"
   dest: "W:/code/gameboy/platform_desktop.jai"
 }
+breakpoint:
+{
+  project: "W:/misc/root.raddbg_project"
+  source_location: "../code/arduino_maze_runner/main.cpp:348:1"
+  condition: "proj_x == 0"
+  hit_count: 1
+}
 debug_info:
 {
   path: "W:/build/Runner.pdb"
-  timestamp: 66228259952727
+  timestamp: 66228375621133
   project: "W:/misc/root.raddbg_project"
 }
