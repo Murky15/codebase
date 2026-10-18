@@ -1,6 +1,10 @@
+/* TODO:
+  What if maze generation was animated after the player clicks start?
+*/
+
 #define PLAYER_RADIUS 10
 #define PLAYER_SPEED  250
-#define PLAYER_ROTATE_SPEED (90.f*DEG2RAD)
+#define PLAYER_ROTATE_SPEED (180.f*DEG2RAD)
 struct Player {
   Vec2 pos;
   f32  view_angle;
@@ -194,7 +198,7 @@ raycast (Ray ray) {
 }
 
 function void
-game_init (void *memory, u64 size) {
+game_init () {
   gs.player.pos = V2((MAP_WIDTH * MAP_TILE_SIZE) / 2.f, (MAP_HEIGHT * MAP_TILE_SIZE) / 2.f);
   gs.player.view_angle = M_PI/2.f;
 }

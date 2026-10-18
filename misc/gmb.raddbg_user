@@ -95,8 +95,8 @@ window:
             cursor_column: 1
             mark_line: 168
             mark_column: 1
-            cursor: 0x178c
-            mark: 0x178c
+            cursor: 0x17ab
+            mark: 0x17ab
           }
         }
       }

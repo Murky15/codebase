@@ -1,6 +1,5 @@
 #ifndef PLATFORM_H
 #define PLATFORM_H
-extern "C" {
 
 // NOTE: Game -> Platform
 
@@ -18,7 +17,7 @@ struct Debug_Render_Data {
   } rays[RAYCAST_RESOLUTION];
 };
 
-function void               game_init   (void *memory, u64 size);
+function void               game_init   ();
 function void               game_tick   (Game_Input input, f32 dt);
 function Debug_Render_Data  game_render (u64 resolution_width, u64 resolution_height);
 
@@ -26,5 +25,4 @@ function Debug_Render_Data  game_render (u64 resolution_width, u64 resolution_he
 
 function void r_set_pixel (Vec2 pos, Vec3 color);
 
-}
 #endif // PLATFORM_H

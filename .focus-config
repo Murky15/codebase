@@ -3,33 +3,10 @@
 [[workspace]]
 code
 T:\Jai
-/home/gmb/Tools/jai
 
 [ignore]
 .svn
 .git
-./geometry_compiler/**
-
-[[build commands]]
-build_working_dir: ../
-run_working_dir: ../build
-auto_jump_to_error: true
-
-[Build BTHG]
-error_regex: ^(?P<file>.*)\((?P<line>\d+),?(?P<col>\d+)?\)[ ]?: (?P<type>fatal error|error|warning) (?P<msg>.*)$
-build_command: %PROJECT_CONFIG_DIR%/code/BTHG/build.bat
-key_binding: F1
-[Run BTHG]
-run_command: %RUN_WORKING_DIR%/BTHG
-key_binding: F2
-
-[Build Maze Runner]
-error_regex: ^(?P<file>.*)\((?P<line>\d+),?(?P<col>\d+)?\)[ ]?: (?P<type>fatal error|error|warning) (?P<msg>.*)$
-build_command: %PROJECT_CONFIG_DIR%/code/arduino_maze_runner/build.bat
-key_binding: F3
-[Run Maze Runner]
-run_command: %RUN_WORKING_DIR%/Runner
-key_binding: F4
 
 # [Build Bean Game]
 # error_regex: ^(?P<file>.*):(?P<line>\d+),(?P<col>\d+): (?P<type>Error|Warning|Info|...):* (?P<msg>.*)|^(?P<msg1>.*error LNK.*)
@@ -53,13 +30,14 @@ key_binding: F4
 [allow]
 # Files and directories matching the wildcards in this section will be loaded, even if they are ignored in the previous section.
 # NOTE: known binary file extensions are ignored by default (*.exe, *.obj etc.). If this is not what you want, you can explicitly allow them here.
+*.focus-config
 
 [file associations]
 # Optional file associations in the format `<wildcard1> <wildcard2> ... : <language>`
 # Example:
 # *.hpp *.hh *.h : cpp
 # todo.txt : todo
-
+*.ino: cpp
 
 [[settings]]
 
@@ -146,6 +124,26 @@ show_tab_characters_in_selection:                true
 line_wrap_is_on_by_default:                         true
 draw_indent_guides:                                 false
 
+[[build commands]]
+build_working_dir: ../
+run_working_dir: ../build
+auto_jump_to_error: true
+
+[Build BTHG]
+error_regex: ^(?P<file>.*)\((?P<line>\d+),?(?P<col>\d+)?\)[ ]?: (?P<type>fatal error|error|warning) (?P<msg>.*)$
+build_command: %PROJECT_CONFIG_DIR%/code/BTHG/build.bat
+key_binding: F1
+[Run BTHG]
+run_command: %RUN_WORKING_DIR%/BTHG
+key_binding: F2
+
+[Build Maze Runner]
+error_regex: ^(?P<file>.*)\((?P<line>\d+),?(?P<col>\d+)?\)[ ]?: (?P<type>fatal error|error|warning) (?P<msg>.*)$
+build_command: %PROJECT_CONFIG_DIR%/code/arduino_maze_runner/build.bat
+key_binding: F3
+[Run Maze Runner]
+run_command: %RUN_WORKING_DIR%/Runner
+key_binding: F4
 
 [[keymap]]
 
