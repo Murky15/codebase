@@ -40,7 +40,7 @@ broadcast_to_matrix (u8 address, u8 data) {
   digitalWrite(CS, HIGH);
 }
 
-// NOTE: Assumes FC-16 layout
+// NOTE: Assumes fc16 layout
 function void
 blit_framebuffer () {
   for (u16 row = 0; row < ROWS_PER_SEGMENT; ++row) {
