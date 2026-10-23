@@ -111,7 +111,7 @@ main (int argc, char **argv) {
 
     r_clear(false);
 
-    Debug_Render_Data debug = game_render(WINDOW_WIDTH, WINDOW_HEIGHT);
+    Debug_Render_Data *debug = game_render(WINDOW_WIDTH, WINDOW_HEIGHT);
 
     if (render_2d_debug_view) {
       r_clear(false);
@@ -139,7 +139,7 @@ main (int argc, char **argv) {
       r_circle_2d(gs.player.pos, PLAYER_RADIUS, V3(0, 128, 255));
 
       if (render_debug_raycasts) {
-        for EachInStaticArray(debug.rays) {
+        for EachInStaticArray(debug->rays) {
           r_line_2d(gs.player.pos, it.angle, it.length * MAP_TILE_SIZE, V3(255, 0, 0));
         }
       } else {

@@ -8,7 +8,7 @@
 # if defined(_WIN64) || defined(_WIN32)
 #  define OS_WINDOWS 1
 # else
-#  error "Unsupported compiler/platform configuration"
+#  warning "Unknown compiler/platform configuration"
 # endif
 #endif
 
@@ -23,7 +23,7 @@
 #elif defined(__riscv)
 # define ARCH_RISCV 1
 #else
-# error "Unsupported architecture target"
+# warning "Unknown architecture target"
 #endif
 
 #if defined(__cplusplus)
@@ -55,13 +55,6 @@
 #endif
 
 // NOTE: Helper macros
-
-#ifndef base_function
-# define base_function static
-#endif
-#define function       static
-#define global         static
-#define local_persist  static
 
 #define Stmnt(s) do {s} while (0)
 
@@ -107,7 +100,11 @@
 #endif
 
 #if LANG_CPP
-# include <type_traits>
+# ifdef BASE_ARDUINO_SUPPORT
+#  include <ArxTypeTraits.h>
+# else
+#  include <type_traits>
+# endif
 # define TypeOf(T) std::remove_reference_t<decltype(T)>
 #else
 # define TypeOf(T) __typeof__(T)
@@ -166,6 +163,14 @@
 ((f)=(f)->next))
 #define SLLStackPop(f) SLLStackPopN(f,next)
 
+
+#ifndef base_function
+# define base_function static
+#endif
+#define function       static
+#define global         static
+#define local_persist  static
+
 #if LANG_CPP
 extern "C" {
 #endif
@@ -174,12 +179,15 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdbool.h>
+
 typedef int8_t   s8;
 typedef int16_t  s16;
 typedef int32_t  s32;
 typedef int64_t  s64;
 typedef uint8_t  u8;
+#ifndef BASE_ARDUINO_SUPPORT
 typedef uint16_t u16;
+#endif
 typedef uint32_t u32;
 typedef uint64_t u64;
 typedef float    f32;
@@ -554,7 +562,11 @@ int   __win32_virtual_free(void *lpAddress, size_t dwSize, u32 dwFreeType);
 # define Decommit(addr, size) __win32_virtual_free((addr), (size), __WIN32_MEM_DECOMMIT)
 # define Release(addr) __win32_virtual_free((addr), 0, __WIN32_MEM_RELEASE)
 #else
-# error "Missing memory backend implementation for this platform"
+# warning "Missing memory backend implementation for this platform, using malloc fallback backend. BEWARE OF LARGE ALLOCATIONS!"
+# define Reserve(size) malloc(size)
+# define Commit(addr, size)
+# define Decommit(addr, size)
+# define Release(addr) free(addr)
 #endif
 
 base_function Arena*
@@ -579,7 +591,10 @@ arena_alloc_default () {
   if (commit_chunk_size == 0) {
 #if OS_WINDOWS
 # define OS_VM_PAGE_SIZE KB(64)
+#else
+# define OS_VM_PAGE_SIZE KB(1)
 #endif
+
     commit_chunk_size = OS_VM_PAGE_SIZE;
     decommit_granularity = OS_VM_PAGE_SIZE * 2;
   }
@@ -655,7 +670,7 @@ arena_temp_end (Temp_Arena temp) {
 
 base_function Temp_Arena
 arena_scratch_get (Arena **conflicts, u64 num_conflicts) {
-  __declspec(thread) local_persist Arena *reservoir[NUM_SCRATCH_ARENAS];
+  thread_local local_persist Arena *reservoir[NUM_SCRATCH_ARENAS];
   if (reservoir[0] == 0) {
     for EachInStaticArrayPtr(reservoir) {
       *it = arena_alloc_default();
@@ -941,8 +956,11 @@ str8_to_str16 (Arena *arena, Str8 string) {
   u64 size = string.count+1;
   u16 *str = ArenaPush(arena, u16, size);
   size_t chars_converted = 0;
+  // TODO: Fix this!
+#ifndef BASE_ARDUINO_SUPPORT
   // TODO: Could this be a potential problem if the platform doesn't define wchar_t to be 2 bytes
   mbstowcs_s(&chars_converted, (wchar_t*)str, size, (const char*)string.str, _TRUNCATE);
+#endif
 
   return str16(str, string.count);
 }

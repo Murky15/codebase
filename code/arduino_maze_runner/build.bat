@@ -1,5 +1,5 @@
 @echo off
-setlocal enableextensions
+setlocal enabledelayedexpansion
 
 REM Context collection
 set source=%~dp0
@@ -11,13 +11,16 @@ if not exist assets (
   set assets=%cd%assets\
 )
 
+REM Unpack arguments
+for %%a in (%*) do set "%%~a=1"
+
 REM Libraries
 set sdl3=%third_party%\SDL3-3.4.14\
 set sdl3ttf=%third_party%\SDL3_ttf-3.2.2\
 set sdl3img=%third_party%\SDL3_image-3.4.4\
 
 REM Compiler options
-set common=-nologo -std:c11 -EHa- -GR-
+set common=-nologo -EHa- -GR-
 set debug=-DDEBUG=1 -DBASE_ENABLE_ASSERT=1 -Od -Zi -WX -W2
 set ignored_warnings=-wd4146 -wd4042
 set includes=-I%cd%\code -I%sdl3%include\ -I%sdl3ttf%include\ -I%sdl3img%include\
@@ -29,5 +32,12 @@ set link_options=-SUBSYSTEM:CONSOLE -INCREMENTAL:NO
 
 if not exist build mkdir build
 pushd build
-cl %common% %debug% %ignored_warnings% %includes% %source%platform_sdl3.cpp -FeRunner.exe -link %link_options% %libs% %system_libs% || exit /b 1
+if not "%arduino%"=="1" (
+  echo Compiling for desktop with SDL3...
+  cl %common% %debug% %ignored_warnings% %includes% %source%platform_sdl3.cpp -FeRunner.exe -link %link_options% %libs% %system_libs% || exit /b 1
+) else (
+  echo Compiling for Arduino UNO...
+  if not exist runner_arduino mkdir runner_arduino
+  arduino-cli compile --fqbn arduino:avr:uno --build-property "build.extra_flags=-IW:\code -IW:\code\arduino_maze_runner" %source%platform_arduino --build-path %cd%\runner_arduino
+)
 popd

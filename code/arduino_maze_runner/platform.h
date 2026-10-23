@@ -3,23 +3,16 @@
 
 // NOTE: Game -> Platform
 
-#define RAYCAST_FOV (M_PI/3.f)
-#define RAYCAST_RESOLUTION 32
-
 struct Game_Input {
   bool move_forward, move_back, strafe_left, strafe_right;
   bool rotate_cw, rotate_ccw;
 };
 
-struct Debug_Render_Data {
-  struct {
-    f32 angle, length;
-  } rays[RAYCAST_RESOLUTION];
-};
+struct Debug_Render_Data;
 
-function void               game_init   ();
-function void               game_tick   (Game_Input input, f32 dt);
-function Debug_Render_Data  game_render (u64 resolution_width, u64 resolution_height);
+function void                game_init   ();
+function void                game_tick   (Game_Input input, f32 dt);
+function Debug_Render_Data*  game_render (u16 resolution_width, u16 resolution_height);
 
 // NOTE: Platform -> Game
 

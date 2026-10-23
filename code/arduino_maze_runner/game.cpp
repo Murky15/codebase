@@ -2,6 +2,9 @@
   What if maze generation was animated after the player clicks start?
 */
 
+#define RAYCAST_FOV (M_PI/3.f)
+#define RAYCAST_RESOLUTION 32
+
 #define PLAYER_RADIUS 10
 #define PLAYER_SPEED  250
 #define PLAYER_ROTATE_SPEED (180.f*DEG2RAD)
@@ -182,7 +185,7 @@ raycast (Ray ray) {
     }
 
     if ((map_pos.x < 0 || map_pos.x >= MAP_WIDTH || map_pos.y < 0 || map_pos.y >= MAP_HEIGHT) ||
-        (test_map[(u64)map_pos.y][(u64)map_pos.x])) break;
+        (test_map[(u16)map_pos.y][(u16)map_pos.x])) break;
   }
 
   Raycast_Result result = {};
@@ -224,17 +227,23 @@ game_tick (Game_Input input, f32 dt) {
   gs.player.pos = v2add(gs.player.pos, v2muls(move_amt, PLAYER_SPEED * dt));
 }
 
-function Debug_Render_Data
-game_render (u64 resolution_width, u64 resolution_height) {
+struct Debug_Render_Data {
+  struct {
+    f32 angle, length;
+  } rays[RAYCAST_RESOLUTION];
+};
+
+function Debug_Render_Data*
+game_render (u16 resolution_width, u16 resolution_height) {
   Vec2 local_pos = V2(gs.player.pos.x / MAP_TILE_SIZE,
                       gs.player.pos.y / MAP_TILE_SIZE);
 
-  u64 pixels_per_raycast = resolution_width / RAYCAST_RESOLUTION;
+  u16 pixels_per_raycast = resolution_width / RAYCAST_RESOLUTION;
   f32 camera_focal_length = (resolution_width/2.f) / tanf(RAYCAST_FOV/2.f);
 
-  Debug_Render_Data debug = {};
+  local_persist Debug_Render_Data debug = {};
 
-  for (u64 ray_idx = 0, x = 0; ray_idx < RAYCAST_RESOLUTION; ++ray_idx, x += pixels_per_raycast) {
+  for (u16 ray_idx = 0, x = 0; ray_idx < RAYCAST_RESOLUTION; ++ray_idx, x += pixels_per_raycast) {
     f32 proj_x = (f32)(x + pixels_per_raycast/2.f) - resolution_width/2.f;
     f32 relative_angle = atan2(proj_x, camera_focal_length);
     f32 angle = gs.player.view_angle + relative_angle;
@@ -250,13 +259,13 @@ game_render (u64 resolution_width, u64 resolution_height) {
     f32 y0 = Max(resolution_height/2.f - wall_height/2.f, 0);
     f32 y1 = Min(resolution_height/2.f + wall_height/2.f, resolution_height);
     Vec3 color = V3(0, 255, 0);
-    if (cast.collision == RAYCAST_WALL_EW) color = v3muls(color, 0.5f);
+    //if (cast.collision == RAYCAST_WALL_EW) color = v3muls(color, 0.5f);
 
     debug.rays[ray_idx] = {angle, cast.length};
 
-    for (u64 p = 0; p < pixels_per_raycast; ++p)
+    for (u16 p = 0; p < pixels_per_raycast; ++p)
       r_vert((f32)(x+p), y0, y1, color);
   }
 
-  return debug;
+  return &debug;
 }
