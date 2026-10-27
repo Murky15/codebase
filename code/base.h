@@ -79,6 +79,7 @@
 #endif
 
 #define ArrayCount(a) (sizeof(a)/sizeof((a)[0]))
+#define Swap(a, b) Stmnt( TypeOf(a) __temp = a; a = b; b = __temp; )
 
 #define IsPow2(n) ((n) > 0 && !((n)&((n)-1)))
 #define RoundUpPow2(n,m) (((n)+((m)-1))&-(m))

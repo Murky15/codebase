@@ -59,7 +59,7 @@ r_circle_2d (Vec2 pos, s32 r, Vec3 color) {
   for (s32 y = -r; y <= r; ++y) {
     for (s32 x = -r; x <= r; ++x) {
       if (sqrtf((f32)(x*x + y*y)) <= r) {
-        r_set_pixel(v2add(pos, V2((f32)x,(f32)y)), color);
+        r_set_pixel_debug(v2add(pos, V2((f32)x,(f32)y)), color);
       }
     }
   }
@@ -78,7 +78,7 @@ r_impl_line_2d_low (Vec2 p0, Vec2 p1, Vec3 color) {
   f32 y = p0.y;
 
   for (f32 x = p0.x; x <= p1.x; ++x) {
-    r_set_pixel(V2(x,y), color);
+    r_set_pixel_debug(V2(x,y), color);
     if (d > 0) {
       y += yi;
       d += (2.f * (dy - dx));
@@ -101,7 +101,7 @@ r_impl_line_2d_high (Vec2 p0, Vec2 p1, Vec3 color) {
   f32 x = p0.x;
 
   for (f32 y = p0.y; y <= p1.y; ++y) {
-    r_set_pixel(V2(x,y), color);
+    r_set_pixel_debug(V2(x,y), color);
     if (d > 0) {
       x += xi;
       d += (2.f * (dx - dy));
@@ -136,10 +136,10 @@ r_line_2d (Vec2 p0, f32 angle, f32 length, Vec3 color) {
 }
 
 function void
-r_vert (f32 x, f32 y0, f32 y1, Vec3 color) {
+r_vert (f32 x, f32 y0, f32 y1, bool dim) {
   Assert(y0 <= y1);
   for (f32 y = round(y0); y <= round(y1); ++y) {
-    r_set_pixel(V2((f32)x,(f32)y), color);
+    r_set_pixel(V2((f32)x,(f32)y), dim);
   }
 }
 
@@ -258,13 +258,11 @@ game_render (u16 resolution_width, u16 resolution_height) {
     f32 wall_height = camera_focal_length / perp_dist;
     f32 y0 = Max(resolution_height/2.f - wall_height/2.f, 0);
     f32 y1 = Min(resolution_height/2.f + wall_height/2.f, resolution_height);
-    Vec3 color = V3(0, 255, 0);
-    //if (cast.collision == RAYCAST_WALL_EW) color = v3muls(color, 0.5f);
 
     debug.rays[ray_idx] = {angle, cast.length};
 
     for (u16 p = 0; p < pixels_per_raycast; ++p)
-      r_vert((f32)(x+p), y0, y1, color);
+      r_vert((f32)(x+p), y0, y1, cast.collision == RAYCAST_WALL_EW);
   }
 
   return &debug;

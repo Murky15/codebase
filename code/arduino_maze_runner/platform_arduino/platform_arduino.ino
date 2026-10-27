@@ -1,4 +1,5 @@
 #include <SPI.h>
+#include <TimerOne.h>
 
 #define BASE_ARDUINO_SUPPORT
 #define BASE_IMPLEMENTATION
@@ -7,19 +8,28 @@
 
 #include "game.cpp"
 
+#define RESOLUTION_W 32
+#define RESOLUTION_H 32
 #define H_SEGMENTS 4
 #define V_SEGMENTS 4
 #define NUM_SEGMENTS (H_SEGMENTS * V_SEGMENTS)
 #define ROWS_PER_SEGMENT 8
-
-#define RESOLUTION_W 32
-#define RESOLUTION_H 32
+#define BITS_PER_PIXEL 2
 
 #define CLK 13
 #define CS  10
 #define DIN 11
+#define BUTTON_UP    9
+#define BUTTON_DOWN  7
+#define BUTTON_LEFT  6
+#define BUTTON_RIGHT 8
 
-global u8 framebuffer[ROWS_PER_SEGMENT * NUM_SEGMENTS];
+#define FRAMEBUFFER_SIZE (ROWS_PER_SEGMENT * NUM_SEGMENTS)
+global u16 framebuffers[2][FRAMEBUFFER_SIZE];
+global u16 *backbuffer    = &framebuffers[0][0];
+global u16 *displaybuffer = &framebuffers[1][0];
+
+global u32 last_time;
 
 function u8
 flip_byte (u8 b) {
@@ -45,21 +55,24 @@ function void
 blit_framebuffer () {
   for (u16 row = 0; row < ROWS_PER_SEGMENT; ++row) {
     digitalWrite(CS, LOW);
-    //SPI.transfer(1+row);
-    //SPI.transfer(0xFF);
-    for (u16 segment = NUM_SEGMENTS-1; segment-- > 0;) {
+    for (u16 segment = NUM_SEGMENTS; segment-- > 0;) {
       u16 matrix_x = segment % H_SEGMENTS;
       u16 matrix_y = segment / H_SEGMENTS;
       u16 y_addr = (matrix_y * ROWS_PER_SEGMENT + row) * H_SEGMENTS;
 
       if (matrix_y % 2 == 0) {
+        u16 *pixels = &displaybuffer[y_addr + H_SEGMENTS - 1 - matrix_x];
+        u8 *b = (u8*)pixels;
+        *b ^= highByte(*pixels);
         SPI.transfer(1 + row);
-        SPI.transfer(framebuffer[y_addr + H_SEGMENTS - 1 - matrix_x]);
+        SPI.transfer(*b);
       } else {
-        u8 b = framebuffer[y_addr + matrix_x];
-        b = flip_byte(b);
+        u16 *pixels = &displaybuffer[y_addr + matrix_x];
+        u8 *b = (u8*)pixels;
+        *b ^= highByte(*pixels);
+        u8 flip = flip_byte(*b);
         SPI.transfer(8 - row);
-        SPI.transfer(b);
+        SPI.transfer(flip);
       }
     }
     digitalWrite(CS, HIGH);
@@ -68,28 +81,35 @@ blit_framebuffer () {
 
 function void
 r_clear () {
-  memset(framebuffer, 0, sizeof(framebuffer));
+  memset(backbuffer, 0, FRAMEBUFFER_SIZE * BITS_PER_PIXEL);
 }
 
 function void
-r_set_pixel (Vec2 pos, Vec3 color) {
+r_set_pixel (Vec2 pos, bool dim) {
   if ((pos.x >= 0 && pos.x < RESOLUTION_W) &&
       (pos.y >= 0 && pos.y < RESOLUTION_H)) {
     u16 x = (u16)pos.x, y = (u16)pos.y;
     u16 matrix_x = x / 8;
     u16 x_offset = x % 8;
-    u8 *row = &framebuffer[y * H_SEGMENTS + matrix_x];
+    u16 *row = &backbuffer[y * H_SEGMENTS + matrix_x];
     *row |= 1 << (7 - x_offset);
+    *row |= (dim & 0x01) << (15 - x_offset);
   }
 }
 
 void
 setup () {
-  pinMode(CLK, OUTPUT);
-  pinMode(CS,  OUTPUT);
-  pinMode(DIN, OUTPUT);
-  SPI.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE0));
+  Serial.begin(9600);
 
+  pinMode(CLK,          OUTPUT);
+  pinMode(CS,           OUTPUT);
+  pinMode(DIN,          OUTPUT);
+  pinMode(BUTTON_UP,    INPUT);
+  pinMode(BUTTON_DOWN,  INPUT);
+  pinMode(BUTTON_LEFT,  INPUT);
+  pinMode(BUTTON_RIGHT, INPUT);
+
+  SPI.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE0));
   broadcast_to_matrix(0x09, 0x00); // NOTE: No decode
   broadcast_to_matrix(0x0A, 0x0F); // NOTE: Max brightness
   broadcast_to_matrix(0x0B, 0x07); // NOTE: No digit limit
@@ -97,14 +117,29 @@ setup () {
   broadcast_to_matrix(0x0F, 0x00); // NOTE: Turn off display test mode
 
   game_init();
+  last_time = millis();
+
+  Timer1.initialize(5000); // 200Hz
+  Timer1.attachInterrupt(blit_framebuffer);
 }
 
 void
 loop () {
-  //game_tick();
+  u32 current_time = millis();
+  f32 dt = (current_time - last_time) / 1000.f;
+  last_time = current_time;
+
+  Game_Input input = {digitalRead(BUTTON_UP),
+                      digitalRead(BUTTON_DOWN),
+                      false,
+                      false,
+                      digitalRead(BUTTON_RIGHT),
+                      digitalRead(BUTTON_LEFT)};
+  game_tick(input, dt);
 
   r_clear();
   game_render(RESOLUTION_W, RESOLUTION_H);
-
-  blit_framebuffer();
+  noInterrupts();
+  Swap(backbuffer, displaybuffer);
+  interrupts();
 }

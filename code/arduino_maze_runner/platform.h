@@ -16,6 +16,7 @@ function Debug_Render_Data*  game_render (u16 resolution_width, u16 resolution_h
 
 // NOTE: Platform -> Game
 
-function void r_set_pixel (Vec2 pos, Vec3 color);
+function void r_set_pixel_debug (Vec2 pos, Vec3 color);
+function void r_set_pixel (Vec2 pos, bool dim);
 
 #endif // PLATFORM_H

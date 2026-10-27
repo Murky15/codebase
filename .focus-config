@@ -38,7 +38,7 @@ T:\Jai
 # *.hpp *.hh *.h : cpp
 # todo.txt : todo
 *.ino: cpp
-
+*.h *.c : cpp
 [[settings]]
 
 maximize_on_start:                                  false

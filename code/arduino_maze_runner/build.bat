@@ -22,7 +22,7 @@ set sdl3img=%third_party%\SDL3_image-3.4.4\
 REM Compiler options
 set common=-nologo -EHa- -GR-
 set debug=-DDEBUG=1 -DBASE_ENABLE_ASSERT=1 -Od -Zi -WX -W2
-set ignored_warnings=-wd4146 -wd4042
+set ignored_warnings=-wd4146 -wd4042 -wd4244
 set includes=-I%cd%\code -I%sdl3%include\ -I%sdl3ttf%include\ -I%sdl3img%include\
 set libs=%sdl3%lib\x64\SDL3.lib %sdl3ttf%lib\x64\SDL3_ttf.lib %sdl3img%lib\x64\SDL3_image.lib
 

@@ -3,12 +3,17 @@
 
 #define BASE_IMPLEMENTATION
 #include "base.h"
+#include "fix.h"
 #include "platform.h"
 
+#include "fix.cpp"
 #include "game.cpp"
 
 #define WINDOW_WIDTH  (MAP_TILE_SIZE * MAP_WIDTH)
 #define WINDOW_HEIGHT (MAP_TILE_SIZE * MAP_HEIGHT)
+
+#define WALL_COLOR (u32)(255 << 16)
+#define WALL_COLOR_DIM (u32)(128 << 16)
 
 struct Bitmap {
   u32 *pixels;
@@ -36,7 +41,7 @@ r_clear (bool white) {
 }
 
 function void
-r_set_pixel (Vec2 pos, Vec3 color) {
+r_set_pixel_debug (Vec2 pos, Vec3 color) {
   if ((pos.x >= 0 && pos.x < platform.backbuffer.width) &&
       (pos.y >= 0 && pos.y < platform.backbuffer.height)) {
     u64 x = (u64)pos.x, y = (u64)pos.y;
@@ -44,6 +49,15 @@ r_set_pixel (Vec2 pos, Vec3 color) {
     u8 g = (u8)color.y;
     u8 b = (u8)color.z;
     platform.backbuffer.pixels[y * platform.backbuffer.width + x] = (r << 24 | g << 16 | b << 8);
+  }
+}
+
+function void
+r_set_pixel (Vec2 pos, bool dim) {
+  if ((pos.x >= 0 && pos.x < platform.backbuffer.width) &&
+      (pos.y >= 0 && pos.y < platform.backbuffer.height)) {
+    u64 x = (u64)pos.x, y = (u64)pos.y;
+    platform.backbuffer.pixels[y * platform.backbuffer.width + x] = dim ? WALL_COLOR_DIM : WALL_COLOR;
   }
 }
 
@@ -130,7 +144,7 @@ main (int argc, char **argv) {
           u64 map_y = y / MAP_TILE_SIZE;
 
           if (test_map[map_y][map_x]) {
-            r_set_pixel(V2((f32)x,(f32)y), V3(255, 255, 255));
+            r_set_pixel_debug(V2((f32)x,(f32)y), V3(255, 255, 255));
           }
         }
         drew_vertical_gridlines = true;
