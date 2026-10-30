@@ -4,16 +4,19 @@
 #define BASE_IMPLEMENTATION
 #include "base.h"
 #include "fix.h"
+#include "trig.h"
 #include "platform.h"
 
 #include "fix.cpp"
+#include "trig.cpp"
 #include "game.cpp"
 
-#define WINDOW_WIDTH  (MAP_TILE_SIZE * MAP_WIDTH)
-#define WINDOW_HEIGHT (MAP_TILE_SIZE * MAP_HEIGHT)
+#define WINDOW_TILE_SIZE 64
+#define WINDOW_WIDTH  (WINDOW_TILE_SIZE * MAP_WIDTH)
+#define WINDOW_HEIGHT (WINDOW_TILE_SIZE * MAP_HEIGHT)
 
-#define WALL_COLOR (u32)(255 << 16)
-#define WALL_COLOR_DIM (u32)(128 << 16)
+#define WALL_COLOR (u32)(255 << 8)
+#define WALL_COLOR_DIM (u32)(128 << 8)
 
 struct Bitmap {
   u32 *pixels;
@@ -35,16 +38,98 @@ global bool render_2d_debug_view = true, render_debug_raycasts = false;
 global bool move_forward, move_back, strafe_left, strafe_right;
 global bool rotate_cw, rotate_ccw;
 
+
+function void
+r_circle_2d (Vec2 pos, s32 r, Vec3 color) {
+  for (s32 y = -r; y <= r; ++y) {
+    for (s32 x = -r; x <= r; ++x) {
+      if (sqrtf((f32)(x*x + y*y)) <= r) {
+        Vec2 p = v2add(pos, V2((f32)x,(f32)y));
+        r_set_pixel_debug(p.x, p.y, color);
+      }
+    }
+  }
+}
+
+function void
+r_impl_line_2d_low (Vec2 p0, Vec2 p1, Vec3 color) {
+  f32 dx = p1.x - p0.x;
+  f32 dy = p1.y - p0.y;
+  f32 yi = 1.f;
+  if (dy < 0) {
+    yi = -1.f;
+    dy = -dy;
+  }
+  f32 d = 2.f*dy - dx;
+  f32 y = p0.y;
+
+  for (f32 x = p0.x; x <= p1.x; ++x) {
+    r_set_pixel_debug(x,y, color);
+    if (d > 0) {
+      y += yi;
+      d += (2.f * (dy - dx));
+    } else {
+      d += 2.f * dy;
+    }
+  }
+}
+
+function void
+r_impl_line_2d_high (Vec2 p0, Vec2 p1, Vec3 color) {
+  f32 dx = p1.x - p0.x;
+  f32 dy = p1.y - p0.y;
+  f32 xi = 1.f;
+  if (dx < 0) {
+    xi = -1.f;
+    dx = -dx;
+  }
+  f32 d = 2.f*dx - dy;
+  f32 x = p0.x;
+
+  for (f32 y = p0.y; y <= p1.y; ++y) {
+    r_set_pixel_debug(x,y, color);
+    if (d > 0) {
+      x += xi;
+      d += (2.f * (dx - dy));
+    } else {
+      d += 2.f * dx;
+    }
+  }
+}
+
+function void
+r_line_2d (Vec2 p0, Vec2 p1, Vec3 color) {
+  if (fabs(p1.y - p0.y) < fabs(p1.x - p0.x)) {
+    if (p0.x > p1.x)
+      r_impl_line_2d_low(p1, p0, color);
+    else
+      r_impl_line_2d_low(p0, p1, color);
+  } else {
+    if (p0.y > p1.y)
+      r_impl_line_2d_high(p1, p0, color);
+    else
+      r_impl_line_2d_high(p0, p1, color);
+  }
+}
+
+function void
+r_line_2d (Vec2 p0, f32 angle, f32 length, Vec3 color) {
+  f32 x = p0.x, y = p0.y;
+  x = cosf(angle) * length;
+  y = sinf(angle) * length;
+
+  r_line_2d(p0, v2add(p0, V2(x,y)), color);
+}
+
 function void
 r_clear (bool white) {
   memset(platform.backbuffer.pixels, white ? 255 : 0, platform.backbuffer.width * platform.backbuffer.height * sizeof(u32));
 }
 
 function void
-r_set_pixel_debug (Vec2 pos, Vec3 color) {
-  if ((pos.x >= 0 && pos.x < platform.backbuffer.width) &&
-      (pos.y >= 0 && pos.y < platform.backbuffer.height)) {
-    u64 x = (u64)pos.x, y = (u64)pos.y;
+r_set_pixel_debug (u16 x, u16 y, Vec3 color) {
+  if ((x >= 0 && x < platform.backbuffer.width) &&
+      (y >= 0 && y < platform.backbuffer.height)) {
     u8 r = (u8)color.x;
     u8 g = (u8)color.y;
     u8 b = (u8)color.z;
@@ -53,10 +138,9 @@ r_set_pixel_debug (Vec2 pos, Vec3 color) {
 }
 
 function void
-r_set_pixel (Vec2 pos, bool dim) {
-  if ((pos.x >= 0 && pos.x < platform.backbuffer.width) &&
-      (pos.y >= 0 && pos.y < platform.backbuffer.height)) {
-    u64 x = (u64)pos.x, y = (u64)pos.y;
+r_set_pixel (u16 x, u16 y, bool dim) {
+  if ((x >= 0 && x < platform.backbuffer.width) &&
+      (y >= 0 && y < platform.backbuffer.height)) {
     platform.backbuffer.pixels[y * platform.backbuffer.width + x] = dim ? WALL_COLOR_DIM : WALL_COLOR;
   }
 }
@@ -117,7 +201,7 @@ main (int argc, char **argv) {
     }
 
     u64 current_time = SDL_GetTicks();
-    f32 dt = (current_time - last_time) / 1000.f;
+    f32 dt = (int)(current_time - last_time);
     last_time = current_time;
 
     Game_Input input = {move_forward, move_back, strafe_left, strafe_right, rotate_cw, rotate_ccw};
@@ -133,31 +217,32 @@ main (int argc, char **argv) {
       // NOTE: Draw test map
       bool drew_vertical_gridlines = false;
       for (u64 y = 0; y < WINDOW_HEIGHT; ++y) {
-        if (y % MAP_TILE_SIZE == 0)
+        if (y % WINDOW_TILE_SIZE == 0)
           r_line_2d(V2(0,(f32)y), V2(WINDOW_WIDTH,(f32)y), V3());
 
         for (u64 x = 0; x < WINDOW_WIDTH; ++x) {
-          if (!drew_vertical_gridlines && x % MAP_TILE_SIZE == 0)
+          if (!drew_vertical_gridlines && x % WINDOW_TILE_SIZE == 0)
             r_line_2d(V2((f32)x,0), V2((f32)x,WINDOW_HEIGHT), V3());
 
-          u64 map_x = x / MAP_TILE_SIZE;
-          u64 map_y = y / MAP_TILE_SIZE;
+          u64 map_x = x / WINDOW_TILE_SIZE;
+          u64 map_y = y / WINDOW_TILE_SIZE;
 
           if (test_map[map_y][map_x]) {
-            r_set_pixel_debug(V2((f32)x,(f32)y), V3(255, 255, 255));
+            r_set_pixel_debug(x, y, V3(255, 255, 255));
           }
         }
         drew_vertical_gridlines = true;
       }
 
-      r_circle_2d(gs.player.pos, PLAYER_RADIUS, V3(0, 128, 255));
+      Vec2 player_pos = v2muls(v2fx16_to_v2(gs.player.pos), WINDOW_TILE_SIZE);
+      r_circle_2d(player_pos, PLAYER_RADIUS, V3(0, 128, 255));
 
       if (render_debug_raycasts) {
         for EachInStaticArray(debug->rays) {
-          r_line_2d(gs.player.pos, it.angle, it.length * MAP_TILE_SIZE, V3(255, 0, 0));
+          r_line_2d(player_pos, it.angle, it.length * WINDOW_TILE_SIZE, V3(255, 0, 0));
         }
       } else {
-        r_line_2d(gs.player.pos, gs.player.view_angle, MAP_TILE_SIZE, V3(255, 0, 0));
+        r_line_2d(player_pos, gs.player.view_angle * ANGLE_U16TOF32, WINDOW_TILE_SIZE, V3(255, 0, 0));
       }
     }
 

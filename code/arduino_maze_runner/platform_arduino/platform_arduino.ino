@@ -4,8 +4,10 @@
 #define BASE_ARDUINO_SUPPORT
 #define BASE_IMPLEMENTATION
 #include "base.h"
+#include "fix.h"
 #include "platform.h"
 
+#include "fix.cpp"
 #include "game.cpp"
 
 #define RESOLUTION_W 32
@@ -126,8 +128,11 @@ setup () {
 void
 loop () {
   u32 current_time = millis();
-  f32 dt = (current_time - last_time) / 1000.f;
+  fix16 dt = (current_time - last_time);
   last_time = current_time;
+
+  Serial.print("FPS: ");
+  Serial.println(1.f/dt);
 
   Game_Input input = {digitalRead(BUTTON_UP),
                       digitalRead(BUTTON_DOWN),

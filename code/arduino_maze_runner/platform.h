@@ -11,12 +11,12 @@ struct Game_Input {
 struct Debug_Render_Data;
 
 function void                game_init   ();
-function void                game_tick   (Game_Input input, f32 dt);
+function void                game_tick   (Game_Input input, s16 dt);
 function Debug_Render_Data*  game_render (u16 resolution_width, u16 resolution_height);
 
 // NOTE: Platform -> Game
 
-function void r_set_pixel_debug (Vec2 pos, Vec3 color);
-function void r_set_pixel (Vec2 pos, bool dim);
+function void r_set_pixel_debug (u16 x, u16 y, Vec3 color);
+function void r_set_pixel (u16 x, u16 y, bool dim);
 
 #endif // PLATFORM_H

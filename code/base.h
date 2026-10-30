@@ -5,11 +5,16 @@
 
 #if defined(_MSC_VER)
 # define COMPILER_CL 1
-# if defined(_WIN64) || defined(_WIN32)
-#  define OS_WINDOWS 1
-# else
-#  warning "Unknown compiler/platform configuration"
-# endif
+#elif defined(__TINYC__)
+# define COMPILER_TCC 1
+#else
+# warning "Unknown compiler configuration"
+#endif
+
+#if defined(_WIN64) || defined(_WIN32)
+# define OS_WINDOWS 1
+#else
+# warning "Unknown OS configuration"
 #endif
 
 #if defined(__arm__) || defined(_M_ARM)
@@ -32,6 +37,10 @@
 
 #ifndef COMPILER_CL
 # define COMPILER_CL 0
+#endif
+
+#ifndef COMPILER_TCC
+# define COMPILER_TCC 0
 #endif
 
 #ifndef OS_WINDOWS
@@ -109,6 +118,12 @@
 # define TypeOf(T) std::remove_reference_t<decltype(T)>
 #else
 # define TypeOf(T) __typeof__(T)
+#endif
+
+#if LANG_CPP
+# define tls thread_local
+#else
+# define tls __declspec(thread)
 #endif
 
 #define EachInArrayPtrIt(p,c,it) (TypeOf(p)it=(p);(it-(p))<(c);it+=1)
@@ -549,11 +564,18 @@ v3cross (Vec3 a, Vec3 b) {
 #if LANG_CPP
 extern "C" {
 #endif
-#pragma comment(lib, "Kernel32")
-#pragma comment(linker, "/alternatename:__win32_virtual_alloc=VirtualAlloc")
-#pragma comment(linker, "/alternatename:__win32_virtual_free=VirtualFree")
+
+#ifndef BASE_WINDOWS_H
+# pragma comment(lib, "Kernel32")
+# pragma comment(linker, "/alternatename:__win32_virtual_alloc=VirtualAlloc")
+# pragma comment(linker, "/alternatename:__win32_virtual_free=VirtualFree")
 void *__win32_virtual_alloc(void *lpAddress, size_t dwSize, u32 flAllocationType, u32 flProtect);
 int   __win32_virtual_free(void *lpAddress, size_t dwSize, u32 dwFreeType);
+#else
+# define __win32_virtual_alloc VirtualAlloc
+# define __win32_virtual_free  VirtualFree
+#endif
+
 #if LANG_CPP
 }
 #endif
@@ -671,7 +693,7 @@ arena_temp_end (Temp_Arena temp) {
 
 base_function Temp_Arena
 arena_scratch_get (Arena **conflicts, u64 num_conflicts) {
-  thread_local local_persist Arena *reservoir[NUM_SCRATCH_ARENAS];
+  tls local_persist Arena *reservoir[NUM_SCRATCH_ARENAS];
   if (reservoir[0] == 0) {
     for EachInStaticArrayPtr(reservoir) {
       *it = arena_alloc_default();

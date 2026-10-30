@@ -26,10 +26,16 @@ set ignored_warnings=-wd4146 -wd4042 -wd4244
 set includes=-I%cd%\code -I%sdl3%include\ -I%sdl3ttf%include\ -I%sdl3img%include\
 set libs=%sdl3%lib\x64\SDL3.lib %sdl3ttf%lib\x64\SDL3_ttf.lib %sdl3img%lib\x64\SDL3_image.lib
 
-REM set system_libs=dxcompiler.lib
 set system_libs=
 set link_options=-SUBSYSTEM:CONSOLE -INCREMENTAL:NO
 
+REM Run metaprograms
+if "%meta%"=="1" (
+  echo [METAGEN]
+  tcc -run %source%meta.c
+)
+
+echo [BUILD]
 if not exist build mkdir build
 pushd build
 if not "%arduino%"=="1" (
