@@ -116,7 +116,7 @@ setup () {
 
   SPI.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE0));
   broadcast_to_matrix(0x09, 0x00); // NOTE: No decode
-  broadcast_to_matrix(0x0A, 0x0F); // NOTE: Max brightness
+  broadcast_to_matrix(0x0A, 0x02); // NOTE: Brightness (max: 0x0F)
   broadcast_to_matrix(0x0B, 0x07); // NOTE: No digit limit
   broadcast_to_matrix(0x0C, 0x01); // NOTE: Normal shutdown behavior
   broadcast_to_matrix(0x0F, 0x00); // NOTE: Turn off display test mode

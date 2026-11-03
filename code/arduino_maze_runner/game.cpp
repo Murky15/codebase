@@ -177,18 +177,17 @@ game_render () {
     Vec2_Fix16 dir = v2fx16(fix16_cos(angle), fix16_sin(angle));
     Ray ray = {local_pos, dir};
     Raycast_Result cast = raycast(ray);
+    fix16 dist = cast.length;
+#ifdef OS_WINDOWS
+    debug.rays[ray_idx] = {angle * ANGLE_U16TOF32, dist == 0 ? 100.f : Fix16ToF32(dist)};
+#endif
     if (cast.collision == RAYCAST_NULL) continue;
 
-    fix16 dist = cast.length;
     fix16 perp_dist = dist * fix16_cos(relative_angle);
 
     u16 wall_height = CAMERA_FOCAL_LENGTH / Fix16ToF32(perp_dist);
     u16 y0 = Max(resolution_height/2 - wall_height/2, 0);
     u16 y1 = Min(resolution_height/2 + wall_height/2, resolution_height);
-
-#ifdef OS_WINDOWS
-    debug.rays[ray_idx] = {angle * ANGLE_U16TOF32, Fix16ToF32(dist)};
-#endif
 
     for (u16 p = 0; p < PIXELS_PER_RAYCAST; ++p)
       r_vert(x+p, y0, y1, cast.collision == RAYCAST_WALL_EW);
