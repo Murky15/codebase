@@ -5,9 +5,11 @@
 #define BASE_IMPLEMENTATION
 #include "base.h"
 #include "fix.h"
+#include "trig.h"
 #include "platform.h"
 
 #include "fix.cpp"
+#include "trig.cpp"
 #include "game.cpp"
 
 #define RESOLUTION_W 32
@@ -87,10 +89,9 @@ r_clear () {
 }
 
 function void
-r_set_pixel (Vec2 pos, bool dim) {
-  if ((pos.x >= 0 && pos.x < RESOLUTION_W) &&
-      (pos.y >= 0 && pos.y < RESOLUTION_H)) {
-    u16 x = (u16)pos.x, y = (u16)pos.y;
+r_set_pixel (u16 x, u16 y, bool dim) {
+  if ((x >= 0 && x < RESOLUTION_W) &&
+      (y >= 0 && y < RESOLUTION_H)) {
     u16 matrix_x = x / 8;
     u16 x_offset = x % 8;
     u16 *row = &backbuffer[y * H_SEGMENTS + matrix_x];
@@ -118,7 +119,7 @@ setup () {
   broadcast_to_matrix(0x0C, 0x01); // NOTE: Normal shutdown behavior
   broadcast_to_matrix(0x0F, 0x00); // NOTE: Turn off display test mode
 
-  game_init();
+  game_init(RESOLUTION_W, RESOLUTION_H);
   last_time = millis();
 
   Timer1.initialize(5000); // 200Hz
@@ -128,11 +129,11 @@ setup () {
 void
 loop () {
   u32 current_time = millis();
-  fix16 dt = (current_time - last_time);
+  u16 dt = current_time - last_time;
   last_time = current_time;
 
   Serial.print("FPS: ");
-  Serial.println(1.f/dt);
+  Serial.println(1000.f/dt);
 
   Game_Input input = {digitalRead(BUTTON_UP),
                       digitalRead(BUTTON_DOWN),
@@ -143,7 +144,7 @@ loop () {
   game_tick(input, dt);
 
   r_clear();
-  game_render(RESOLUTION_W, RESOLUTION_H);
+  game_render();
   noInterrupts();
   Swap(backbuffer, displaybuffer);
   interrupts();

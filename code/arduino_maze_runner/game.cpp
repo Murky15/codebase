@@ -1,11 +1,11 @@
 /* TODO:
   What if maze generation was animated after the player clicks start?
   - [X] Fixed point
-  - [ ] Trig meta tables
+  - [X] Trig meta tables
   - [ ] Collision
 */
 
-#define RAYCAST_FOV (M_PI/3.f)
+#define RAYCAST_FOV (M_PI/2.f)
 #define RAYCAST_RESOLUTION 32
 
 #define PLAYER_RADIUS 10
@@ -63,6 +63,7 @@ r_vert (u16 x, u16 y0, u16 y1, bool dim) {
   }
 }
 
+/*
 function f32
 fmod_cycling (f32 x, f32 y) {
   Assert(y != 0, "Cannot fmod_cycling with denominator 0.");
@@ -70,6 +71,7 @@ fmod_cycling (f32 x, f32 y) {
 
   return remainder;
 }
+*/
 
 function Raycast_Result
 raycast (Ray ray) {
@@ -121,13 +123,31 @@ raycast (Ray ray) {
   return result;
 }
 
+global u16 resolution_width, resolution_height;
+global u16 pixels_per_raycast;
+global s16 camera_focal_length;
+// TODO: Could be made smaller
+global u16 ray_angle_lookup[RAYCAST_RESOLUTION];
+
 function void
-game_init () {
+game_init (u16 width, u16 height) {
   gs.player.pos = v2fx16((s16)5,5);
+
+  // NOTE: Precompute projection angles
+  pixels_per_raycast = width / RAYCAST_RESOLUTION;
+  camera_focal_length = (width/2) / tanf(RAYCAST_FOV/2.f);
+
+  for (u16 ray_idx = 0; ray_idx < RAYCAST_RESOLUTION; ++ray_idx) {
+    f32 proj_x = (f32)((ray_idx * pixels_per_raycast) + pixels_per_raycast/2.f) - width/2.f;
+    ray_angle_lookup[ray_idx] = atan2(proj_x, camera_focal_length) * ANGLE_F32TOU16;
+  }
+
+  resolution_width = width;
+  resolution_height = height;
 }
 
 function void
-game_tick (Game_Input input, s16 dt) {
+game_tick (Game_Input input, u16 dt) {
   u16 rotation = 0;
   if (input.rotate_ccw) rotation -= PLAYER_ROTATE_SPEED * dt;
   if (input.rotate_cw)  rotation += PLAYER_ROTATE_SPEED * dt;
@@ -155,17 +175,13 @@ struct Debug_Render_Data {
 };
 
 function Debug_Render_Data*
-game_render (u16 resolution_width, u16 resolution_height) {
+game_render () {
   Vec2_Fix16 local_pos = gs.player.pos;
-
-  u16 pixels_per_raycast = resolution_width / RAYCAST_RESOLUTION;
-  f32 camera_focal_length = (resolution_width/2.f) / tanf(RAYCAST_FOV/2.f);
 
   local_persist Debug_Render_Data debug = {};
 
   for (u16 ray_idx = 0, x = 0; ray_idx < RAYCAST_RESOLUTION; ++ray_idx, x += pixels_per_raycast) {
-    f32 proj_x = (f32)(x + pixels_per_raycast/2.f) - resolution_width/2.f;
-    u16 relative_angle = atan2(proj_x, camera_focal_length) * ANGLE_F32TOU16;
+    u16 relative_angle = ray_angle_lookup[ray_idx];
     u16 angle = gs.player.view_angle + relative_angle;
 
     Vec2_Fix16 dir = v2fx16(fix16_cos(angle), fix16_sin(angle));
@@ -179,7 +195,9 @@ game_render (u16 resolution_width, u16 resolution_height) {
     u16 y0 = Max(resolution_height/2 - wall_height/2, 0);
     u16 y1 = Min(resolution_height/2 + wall_height/2, resolution_height);
 
+#ifdef OS_WINDOWS
     debug.rays[ray_idx] = {angle * ANGLE_U16TOF32, Fix16ToF32(dist)};
+#endif
 
     for (u16 p = 0; p < pixels_per_raycast; ++p)
       r_vert(x+p, y0, y1, cast.collision == RAYCAST_WALL_EW);

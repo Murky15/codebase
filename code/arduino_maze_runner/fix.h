@@ -13,7 +13,7 @@ struct fix16 {
   constexpr fix16 (f32 x) : val(x*(f32)FIX16_SCALING_FACTOR) {}
 };
 
-#define Fix16ToInt(x) ((int)(((x).val)>>FIX16_FRACTIONAL_BITS))
+#define Fix16ToInt(x) ((s32)(((x).val)>>FIX16_FRACTIONAL_BITS))
 #define Fix16ToF32(x) ((f32)((x).val)/(f32)FIX16_SCALING_FACTOR)
 function fix16 fix16_raw   (s16 x);
 
@@ -42,11 +42,8 @@ function inline bool operator>(fix16 a, fix16 b)  { return a.val>b.val; }
 function inline bool operator<=(fix16 a, fix16 b) { return a.val<=b.val; }
 function inline bool operator>=(fix16 a, fix16 b) { return a.val>=b.val; }
 
-union Vec2_Fix16 {
-  struct { fix16 x, y; };
-  struct { fix16 min, max; };
-
-  fix16 e[2];
+struct Vec2_Fix16 {
+  fix16 x, y;
 };
 
 function inline Vec2_Fix16

@@ -1,10 +1,11 @@
 // raddbg 0.9.25 project file
 
 recent_file: path: "../code/arduino_maze_runner/game.cpp"
-recent_file: path: "../code/third_party/SDL3-3.4.14/include/SDL3/SDL_main_impl.h"
-recent_file: path: "../code/arduino_maze_runner/platform_sdl3.cpp"
+recent_file: path: "../code/arduino_maze_runner/trig.cpp"
 recent_file: path: "../code/arduino_maze_runner/fix.cpp"
 recent_file: path: "../code/arduino_maze_runner/fix.h"
+recent_file: path: "../code/third_party/SDL3-3.4.14/include/SDL3/SDL_main_impl.h"
+recent_file: path: "../code/arduino_maze_runner/platform_sdl3.cpp"
 recent_file: path: "../code/arduino_maze_runner/main.cpp"
 recent_file: path: "../code/BTHG/base.h"
 recent_file: path: "../code/BTHG/main.c"
@@ -40,4 +41,14 @@ target:
   executable: "../build/Runner.exe"
   working_directory: "../build"
   enabled: 1
+}
+breakpoint:
+{
+  source_location: "../code/arduino_maze_runner/game.cpp:184:1"
+  hit_count: 0
+}
+breakpoint:
+{
+  source_location: "../code/arduino_maze_runner/game.cpp:139:1"
+  hit_count: 1
 }

@@ -32,7 +32,9 @@ set link_options=-SUBSYSTEM:CONSOLE -INCREMENTAL:NO
 REM Run metaprograms
 if "%meta%"=="1" (
   echo [METAGEN]
-  tcc -run %source%meta.c
+  pushd %source%
+  tcc -run meta.c
+  popd
 )
 
 echo [BUILD]

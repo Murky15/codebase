@@ -10,9 +10,9 @@ struct Game_Input {
 
 struct Debug_Render_Data;
 
-function void                game_init   ();
-function void                game_tick   (Game_Input input, s16 dt);
-function Debug_Render_Data*  game_render (u16 resolution_width, u16 resolution_height);
+function void                game_init   (u16 width, u16 height);
+function void                game_tick   (Game_Input input, u16 dt);
+function Debug_Render_Data*  game_render ();
 
 // NOTE: Platform -> Game
 

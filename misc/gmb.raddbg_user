@@ -45,16 +45,16 @@ window:
           getting_started
           text:
           {
-            expression: "file:\"W:/code/third_party/SDL3-3.4.14/include/SDL3/SDL_main_impl.h\".data"
+            expression: "file:\"W:/code/arduino_maze_runner/trig.cpp\".data"
             auto: 1
             query:
             {
               input: ""
               cmd: search
             }
-            cursor_line: 104
+            cursor_line: 33
             cursor_column: 1
-            mark_line: 104
+            mark_line: 33
             mark_column: 1
             cursor: 0x1158
             mark: 0x1158
@@ -89,9 +89,9 @@ window:
             expression: "file:\"W:/code/arduino_maze_runner/game.cpp\".data"
             project: "W:/misc/root.raddbg_project"
             query: input: ""
-            cursor_line: 185
+            cursor_line: 139
             cursor_column: 1
-            mark_line: 185
+            mark_line: 139
             mark_column: 1
             cursor: 0x17ab
             mark: 0x17ab
@@ -123,7 +123,6 @@ window:
         }
         0.40:
         {
-          selected
           watch:
           {
             expression: "query:call_stack"
@@ -143,6 +142,7 @@ window:
     {
       0.50:
       {
+        selected
         watch: expression: "query:targets"
         watch:
         {
@@ -158,6 +158,7 @@ window:
             expression: proj_x
           }
           watch: "gs.player"
+          watch: ray_angle_lookup
         }
         watch: selected expression: "query:locals"
       }
@@ -307,7 +308,7 @@ file_path_map:
 debug_info:
 {
   path: "W:/build/Runner.pdb"
-  timestamp: 66229762330093
+  timestamp: 66230035318335
   project: "W:/misc/root.raddbg_project"
 }
 file_path_map:

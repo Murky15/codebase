@@ -175,7 +175,7 @@ main (int argc, char **argv) {
     return 1;
   }
 
-  game_init();
+  game_init(WINDOW_WIDTH, WINDOW_HEIGHT);
 
   u64 last_time = SDL_GetTicks();
   for (;game_running;) {
@@ -201,7 +201,7 @@ main (int argc, char **argv) {
     }
 
     u64 current_time = SDL_GetTicks();
-    f32 dt = (int)(current_time - last_time);
+    f32 dt = current_time - last_time;
     last_time = current_time;
 
     Game_Input input = {move_forward, move_back, strafe_left, strafe_right, rotate_cw, rotate_ccw};
@@ -209,7 +209,7 @@ main (int argc, char **argv) {
 
     r_clear(false);
 
-    Debug_Render_Data *debug = game_render(WINDOW_WIDTH, WINDOW_HEIGHT);
+    Debug_Render_Data *debug = game_render();
 
     if (render_2d_debug_view) {
       r_clear(false);
