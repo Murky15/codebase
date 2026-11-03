@@ -4,16 +4,18 @@
 #define BASE_ARDUINO_SUPPORT
 #define BASE_IMPLEMENTATION
 #include "base.h"
+#include "meta.h"
 #include "fix.h"
 #include "trig.h"
 #include "platform.h"
 
+#include "generated/trig_lookup.cpp"
 #include "fix.cpp"
 #include "trig.cpp"
 #include "game.cpp"
 
-#define RESOLUTION_W 32
-#define RESOLUTION_H 32
+#define RESOLUTION_WIDTH  32
+#define RESOLUTION_HEIGHT 32
 #define H_SEGMENTS 4
 #define V_SEGMENTS 4
 #define NUM_SEGMENTS (H_SEGMENTS * V_SEGMENTS)
@@ -90,8 +92,8 @@ r_clear () {
 
 function void
 r_set_pixel (u16 x, u16 y, bool dim) {
-  if ((x >= 0 && x < RESOLUTION_W) &&
-      (y >= 0 && y < RESOLUTION_H)) {
+  if ((x >= 0 && x < RESOLUTION_WIDTH) &&
+      (y >= 0 && y < RESOLUTION_HEIGHT)) {
     u16 matrix_x = x / 8;
     u16 x_offset = x % 8;
     u16 *row = &backbuffer[y * H_SEGMENTS + matrix_x];
@@ -119,7 +121,7 @@ setup () {
   broadcast_to_matrix(0x0C, 0x01); // NOTE: Normal shutdown behavior
   broadcast_to_matrix(0x0F, 0x00); // NOTE: Turn off display test mode
 
-  game_init(RESOLUTION_W, RESOLUTION_H);
+  game_init(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
   last_time = millis();
 
   Timer1.initialize(5000); // 200Hz

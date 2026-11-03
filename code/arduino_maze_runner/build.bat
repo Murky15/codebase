@@ -31,9 +31,12 @@ set link_options=-SUBSYSTEM:CONSOLE -INCREMENTAL:NO
 
 REM Run metaprograms
 if "%meta%"=="1" (
+  if "%arduino%"=="1" (
+    set arduino_resolution=-DRESOLUTION_WIDTH=32 -DRESOLUTION_HEIGHT=32
+  )
   echo [METAGEN]
   pushd %source%
-  tcc -run meta.c
+  tcc -run !arduino_resolution! meta.c
   popd
 )
 

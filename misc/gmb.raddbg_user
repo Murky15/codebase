@@ -42,6 +42,7 @@ window:
         }
         0.623888:
         {
+          selected
           getting_started
           text:
           {
@@ -89,10 +90,10 @@ window:
             expression: "file:\"W:/code/arduino_maze_runner/game.cpp\".data"
             project: "W:/misc/root.raddbg_project"
             query: input: ""
-            cursor_line: 139
-            cursor_column: 1
-            mark_line: 139
-            mark_column: 1
+            cursor_line: 90
+            cursor_column: 23
+            mark_line: 90
+            mark_column: 23
             cursor: 0x17ab
             mark: 0x17ab
           }
@@ -142,7 +143,6 @@ window:
     {
       0.50:
       {
-        selected
         watch: expression: "query:targets"
         watch:
         {
@@ -157,8 +157,9 @@ window:
             project: "W:/misc/root.raddbg_project"
             expression: proj_x
           }
-          watch: "gs.player"
-          watch: ray_angle_lookup
+          watch: dx
+          watch: dy
+          watch: result
         }
         watch: selected expression: "query:locals"
       }
@@ -178,7 +179,6 @@ window:
   pos: -11 -6
   monitor: "\\\\.\\DISPLAY1"
   font_size: 11
-  maximized
 }
 keybindings:
 {
@@ -308,7 +308,7 @@ file_path_map:
 debug_info:
 {
   path: "W:/build/Runner.pdb"
-  timestamp: 66230035318335
+  timestamp: 66230057035563
   project: "W:/misc/root.raddbg_project"
 }
 file_path_map:

@@ -44,11 +44,19 @@ target:
 }
 breakpoint:
 {
-  source_location: "../code/arduino_maze_runner/game.cpp:184:1"
+  source_location: "../code/arduino_maze_runner/game.cpp:189:1"
   hit_count: 0
+  enabled: 0
 }
 breakpoint:
 {
-  source_location: "../code/arduino_maze_runner/game.cpp:139:1"
-  hit_count: 1
+  source_location: "../code/arduino_maze_runner/game.cpp:82:1"
+  hit_count: 0
+  enabled: 0
+}
+breakpoint:
+{
+  source_location: "../code/arduino_maze_runner/game.cpp:122:1"
+  hit_count: 81
+  enabled: 1
 }

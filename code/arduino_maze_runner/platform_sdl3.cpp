@@ -1,19 +1,21 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL.h>
 
+#define WINDOW_TILE_SIZE 64
+#define RESOLUTION_WIDTH  (WINDOW_TILE_SIZE * MAP_WIDTH)
+#define RESOLUTION_HEIGHT (WINDOW_TILE_SIZE * MAP_HEIGHT)
+
 #define BASE_IMPLEMENTATION
 #include "base.h"
+#include "meta.h"
 #include "fix.h"
 #include "trig.h"
 #include "platform.h"
 
+#include "generated/trig_lookup.cpp"
 #include "fix.cpp"
 #include "trig.cpp"
 #include "game.cpp"
-
-#define WINDOW_TILE_SIZE 64
-#define WINDOW_WIDTH  (WINDOW_TILE_SIZE * MAP_WIDTH)
-#define WINDOW_HEIGHT (WINDOW_TILE_SIZE * MAP_HEIGHT)
 
 #define WALL_COLOR (u32)(255 << 8)
 #define WALL_COLOR_DIM (u32)(128 << 8)
@@ -150,8 +152,8 @@ main (int argc, char **argv) {
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
   platform.window = SDL_CreateWindow(
     "Arduino Maze Runner",
-    WINDOW_WIDTH,
-    WINDOW_HEIGHT,
+    RESOLUTION_WIDTH,
+    RESOLUTION_HEIGHT,
     0
   );
   if (platform.window == NULL) {
@@ -161,9 +163,9 @@ main (int argc, char **argv) {
 
   platform.arena  = arena_alloc_default();
 
-  u32 *pixels = ArenaPush(platform.arena, u32, WINDOW_WIDTH * WINDOW_HEIGHT);
-  platform.backbuffer = Bitmap{pixels, WINDOW_WIDTH, WINDOW_HEIGHT};
-  platform.backbuffer_surface = SDL_CreateSurfaceFrom(WINDOW_WIDTH, WINDOW_HEIGHT, SDL_PIXELFORMAT_RGBX8888, (void*)pixels, sizeof(u32) * WINDOW_WIDTH);
+  u32 *pixels = ArenaPush(platform.arena, u32, RESOLUTION_WIDTH * RESOLUTION_HEIGHT);
+  platform.backbuffer = Bitmap{pixels, RESOLUTION_WIDTH, RESOLUTION_HEIGHT};
+  platform.backbuffer_surface = SDL_CreateSurfaceFrom(RESOLUTION_WIDTH, RESOLUTION_HEIGHT, SDL_PIXELFORMAT_RGBX8888, (void*)pixels, sizeof(u32) * RESOLUTION_WIDTH);
   if (platform.backbuffer_surface == NULL) {
     SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Could not create backbuffer_surface: %s", SDL_GetError());
     return 1;
@@ -175,7 +177,7 @@ main (int argc, char **argv) {
     return 1;
   }
 
-  game_init(WINDOW_WIDTH, WINDOW_HEIGHT);
+  game_init(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
 
   u64 last_time = SDL_GetTicks();
   for (;game_running;) {
@@ -216,13 +218,13 @@ main (int argc, char **argv) {
 
       // NOTE: Draw test map
       bool drew_vertical_gridlines = false;
-      for (u64 y = 0; y < WINDOW_HEIGHT; ++y) {
+      for (u64 y = 0; y < RESOLUTION_HEIGHT; ++y) {
         if (y % WINDOW_TILE_SIZE == 0)
-          r_line_2d(V2(0,(f32)y), V2(WINDOW_WIDTH,(f32)y), V3());
+          r_line_2d(V2(0,(f32)y), V2(RESOLUTION_WIDTH,(f32)y), V3());
 
-        for (u64 x = 0; x < WINDOW_WIDTH; ++x) {
+        for (u64 x = 0; x < RESOLUTION_WIDTH; ++x) {
           if (!drew_vertical_gridlines && x % WINDOW_TILE_SIZE == 0)
-            r_line_2d(V2((f32)x,0), V2((f32)x,WINDOW_HEIGHT), V3());
+            r_line_2d(V2((f32)x,0), V2((f32)x,RESOLUTION_HEIGHT), V3());
 
           u64 map_x = x / WINDOW_TILE_SIZE;
           u64 map_y = y / WINDOW_TILE_SIZE;

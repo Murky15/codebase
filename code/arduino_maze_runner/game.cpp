@@ -5,7 +5,6 @@
   - [ ] Collision
 */
 
-#define RAYCAST_FOV (M_PI/2.f)
 #define RAYCAST_RESOLUTION 32
 
 #define PLAYER_RADIUS 10
@@ -13,7 +12,7 @@
 #define PLAYER_ROTATE_SPEED 65
 struct Player {
   Vec2_Fix16 pos;
-  u16  view_angle;
+  u16 view_angle;
 };
 
 struct Ray {
@@ -77,25 +76,25 @@ function Raycast_Result
 raycast (Ray ray) {
   // NOTE: Apply digital differential analysis to find wall intersections.
   Vec2_Fix16 map_pos = v2fx16(fix16_floor(ray.pos.x), fix16_floor(ray.pos.y));
-  fix16 dx = ray.dir.x == 0 ? FIX16_MAX : fix16_abs(1/ray.dir.x);
-  fix16 dy = ray.dir.y == 0 ? FIX16_MAX : fix16_abs(1/ray.dir.y);
-  Vec2_Fix16 step = {}, length = {};
+  fix16 dx = (fix16_abs(ray.dir.x) < fix16_raw(32)) ? FIX16_MAX : fix16_abs(1/ray.dir.x);
+  fix16 dy = (fix16_abs(ray.dir.y) < fix16_raw(32)) ? FIX16_MAX : fix16_abs(1/ray.dir.y);
+  Vec2_Fix16 step = {}, length = {FIX16_MAX, FIX16_MAX};
   if (ray.dir.x > 0) {
     step.x = 1;
     length.x = ((map_pos.x + 1) - ray.pos.x) * dx;
-  } else {
+  } else if (ray.dir.x < 0) {
     step.x = -1;
     length.x = (ray.pos.x - map_pos.x) * dx;
   }
   if (ray.dir.y > 0) {
     step.y = 1;
     length.y = ((map_pos.y + 1) - ray.pos.y) * dy;
-  } else {
+  } else if (ray.dir.y < 0) {
     step.y = -1;
     length.y = (ray.pos.y - map_pos.y) * dy;
   }
 
-  int side = 0; // NOTE: 0 - Vertical boundary, 1 - Horizontal boundary
+  bool collided = false, side = 0; // NOTE: 0 - Vertical boundary, 1 - Horizontal boundary
   for (;;) {
     if (length.x < length.y) {
       length.x  += dx;
@@ -107,41 +106,32 @@ raycast (Ray ray) {
       side = 1;
     }
 
-    if ((map_pos.x < 0 || map_pos.x >= MAP_WIDTH || map_pos.y < 0 || map_pos.y >= MAP_HEIGHT) ||
-        (test_map[Fix16ToInt(map_pos.y)][Fix16ToInt(map_pos.x)])) break;
+    bool outside_bounds = (map_pos.x < 0 || map_pos.x >= MAP_WIDTH || map_pos.y < 0 || map_pos.y >= MAP_HEIGHT);
+    if (outside_bounds || (test_map[Fix16ToInt(map_pos.y)][Fix16ToInt(map_pos.x)])) {
+      collided = !outside_bounds;
+      break;
+    }
   }
 
   Raycast_Result result = {};
-  if (side == 0) {
-    result.collision = RAYCAST_WALL_NS;
-    result.length = length.x - dx;
-  } else {
-    result.collision = RAYCAST_WALL_EW;
-    result.length = length.y - dy;
+  if (collided) {
+    if (side == 0) {
+      result.collision = RAYCAST_WALL_NS;
+      result.length = length.x - dx;
+    } else {
+      result.collision = RAYCAST_WALL_EW;
+      result.length = length.y - dy;
+    }
   }
 
   return result;
 }
 
 global u16 resolution_width, resolution_height;
-global u16 pixels_per_raycast;
-global s16 camera_focal_length;
-// TODO: Could be made smaller
-global u16 ray_angle_lookup[RAYCAST_RESOLUTION];
 
 function void
 game_init (u16 width, u16 height) {
   gs.player.pos = v2fx16((s16)5,5);
-
-  // NOTE: Precompute projection angles
-  pixels_per_raycast = width / RAYCAST_RESOLUTION;
-  camera_focal_length = (width/2) / tanf(RAYCAST_FOV/2.f);
-
-  for (u16 ray_idx = 0; ray_idx < RAYCAST_RESOLUTION; ++ray_idx) {
-    f32 proj_x = (f32)((ray_idx * pixels_per_raycast) + pixels_per_raycast/2.f) - width/2.f;
-    ray_angle_lookup[ray_idx] = atan2(proj_x, camera_focal_length) * ANGLE_F32TOU16;
-  }
-
   resolution_width = width;
   resolution_height = height;
 }
@@ -180,18 +170,19 @@ game_render () {
 
   local_persist Debug_Render_Data debug = {};
 
-  for (u16 ray_idx = 0, x = 0; ray_idx < RAYCAST_RESOLUTION; ++ray_idx, x += pixels_per_raycast) {
-    u16 relative_angle = ray_angle_lookup[ray_idx];
+  for (u16 ray_idx = 0, x = 0; ray_idx < RAYCAST_RESOLUTION; ++ray_idx, x += PIXELS_PER_RAYCAST) {
+    u16 relative_angle = PGMAccessU16(ray_angle_lookup + ray_idx);
     u16 angle = gs.player.view_angle + relative_angle;
 
     Vec2_Fix16 dir = v2fx16(fix16_cos(angle), fix16_sin(angle));
     Ray ray = {local_pos, dir};
     Raycast_Result cast = raycast(ray);
+    if (cast.collision == RAYCAST_NULL) continue;
 
     fix16 dist = cast.length;
     fix16 perp_dist = dist * fix16_cos(relative_angle);
 
-    u16 wall_height = camera_focal_length / Fix16ToF32(perp_dist);
+    u16 wall_height = CAMERA_FOCAL_LENGTH / Fix16ToF32(perp_dist);
     u16 y0 = Max(resolution_height/2 - wall_height/2, 0);
     u16 y1 = Min(resolution_height/2 + wall_height/2, resolution_height);
 
@@ -199,7 +190,7 @@ game_render () {
     debug.rays[ray_idx] = {angle * ANGLE_U16TOF32, Fix16ToF32(dist)};
 #endif
 
-    for (u16 p = 0; p < pixels_per_raycast; ++p)
+    for (u16 p = 0; p < PIXELS_PER_RAYCAST; ++p)
       r_vert(x+p, y0, y1, cast.collision == RAYCAST_WALL_EW);
   }
 

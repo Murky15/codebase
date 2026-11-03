@@ -1,6 +1,3 @@
-#include "meta.h"
-#include "generated/trig_lookup.cpp"
-
 function fix16
 fix16_sin (u16 angle) {
   u16 q    = angle >> 14;
@@ -10,7 +7,7 @@ fix16_sin (u16 angle) {
   u16 idx  = pos >> TRIG_FRAC_BITS;
   u16 frac = pos & ((1 << TRIG_FRAC_BITS)-1);
 
-  s32 a = sin_lookup[idx], b = sin_lookup[idx+1];
+  s32 a = PGMAccessU16(sin_lookup + idx), b = PGMAccessU16(sin_lookup + idx+1);
   s32 val = a + (((b - a) * (s32)frac) >> TRIG_FRAC_BITS);
   if (q & 2) val = -val;
 
