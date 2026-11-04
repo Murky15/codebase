@@ -1,3 +1,6 @@
+// NOTE: Upload command:
+// arduino-cli upload -p COM5 --fqbn arduino:avr:uno -i build\runner_arduino\platform_arduino.ino.hex
+
 #include <SPI.h>
 #include <TimerOne.h>
 
