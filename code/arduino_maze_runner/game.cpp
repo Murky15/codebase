@@ -138,6 +138,8 @@ game_init (u16 width, u16 height) {
 
 function void
 game_tick (Game_Input input, u16 dt) {
+  printf("%u\n", dt);
+
   u16 rotation = 0;
   if (input.rotate_ccw) rotation -= PLAYER_ROTATE_SPEED * dt;
   if (input.rotate_cw)  rotation += PLAYER_ROTATE_SPEED * dt;

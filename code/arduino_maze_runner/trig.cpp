@@ -18,13 +18,3 @@ function fix16
 fix16_cos (u16 angle) {
   return fix16_sin(angle + 0x4000);
 }
-
-function fix16
-fix16_tan (u16 angle) {
-  fix16 y = fix16_sin(angle);
-  fix16 x = fix16_cos(angle);
-  if (x == 0) return fix16_raw(y >= 0 ? INT16_MAX : INT16_MIN);
-  fix16 result = fix16_div(y,x);
-
-  return result;
-}

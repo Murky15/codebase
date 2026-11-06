@@ -26,6 +26,7 @@ function fix16
 fix16_mul (fix16 fa, fix16 fb) {
   s32 a = fa.val, b = fb.val;
   s32 mul = a * b;
+  mul += (1 << FIX16_FRACTIONAL_BITS-1);
   mul >>= FIX16_FRACTIONAL_BITS;
   mul = Clamp(mul, INT16_MIN, INT16_MAX);
 
@@ -35,7 +36,7 @@ fix16_mul (fix16 fa, fix16 fb) {
 function fix16
 fix16_div (fix16 fa, fix16 fb) {
   s32 a = fa.val, b = fb.val;
-  s32 div = (a << FIX16_FRACTIONAL_BITS) / b;
+  s32 div = ((a << FIX16_FRACTIONAL_BITS) + (b >> 1)) / b;
   div = Clamp(div, INT16_MIN, INT16_MAX);
 
   return fix16_raw(div);

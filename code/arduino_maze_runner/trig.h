@@ -6,6 +6,5 @@
 
 function fix16 fix16_sin (u16 angle);
 function fix16 fix16_cos (u16 angle);
-function fix16 fix16_tan (u16 angle);
 
 #endif // TRIG_H
