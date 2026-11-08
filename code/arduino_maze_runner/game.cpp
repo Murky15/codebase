@@ -20,8 +20,7 @@ struct Ray {
   Vec2_Fix16 dir;
 };
 
-typedef u32 Raycast_Collision_Type;
-enum {
+enum Raycast_Collision_Type : u32 {
   RAYCAST_NULL,
   RAYCAST_WALL_NS,
   RAYCAST_WALL_EW,
@@ -62,52 +61,45 @@ r_vert (u16 x, u16 y0, u16 y1, bool dim) {
   }
 }
 
-/*
-function f32
-fmod_cycling (f32 x, f32 y) {
-  Assert(y != 0, "Cannot fmod_cycling with denominator 0.");
-  f32 remainder = x - (floor(x/y) * y);
-
-  return remainder;
-}
-*/
-
 function Raycast_Result
 raycast (Ray ray) {
   // NOTE: Apply digital differential analysis to find wall intersections.
-  Vec2_Fix16 map_pos = v2fx16(fix16_floor(ray.pos.x), fix16_floor(ray.pos.y));
-  fix16 dx = (fix16_abs(ray.dir.x) < fix16_raw(32)) ? FIX16_MAX : fix16_abs(1/ray.dir.x);
-  fix16 dy = (fix16_abs(ray.dir.y) < fix16_raw(32)) ? FIX16_MAX : fix16_abs(1/ray.dir.y);
-  Vec2_Fix16 step = {}, length = {FIX16_MAX, FIX16_MAX};
+  s16 map_x = Fix16ToInt(ray.pos.x), map_y = Fix16ToInt(ray.pos.y);
+  s16 step_x = 0, step_y = 0;
+
+  fix16 dx = ray.dir.x == 0 ? FIX16_MAX : fix16_abs(1/ray.dir.x);
+  fix16 dy = ray.dir.y == 0 ? FIX16_MAX : fix16_abs(1/ray.dir.y);
+  Vec2_Fix16 length = {FIX16_MAX, FIX16_MAX};
+
   if (ray.dir.x > 0) {
-    step.x = 1;
-    length.x = ((map_pos.x + 1) - ray.pos.x) * dx;
+    step_x = 1;
+    length.x = ((map_x + 1) - ray.pos.x) * dx;
   } else if (ray.dir.x < 0) {
-    step.x = -1;
-    length.x = (ray.pos.x - map_pos.x) * dx;
+    step_x = -1;
+    length.x = (ray.pos.x - map_x) * dx;
   }
   if (ray.dir.y > 0) {
-    step.y = 1;
-    length.y = ((map_pos.y + 1) - ray.pos.y) * dy;
+    step_y = 1;
+    length.y = ((map_y + 1) - ray.pos.y) * dy;
   } else if (ray.dir.y < 0) {
-    step.y = -1;
-    length.y = (ray.pos.y - map_pos.y) * dy;
+    step_y = -1;
+    length.y = (ray.pos.y - map_y) * dy;
   }
 
   bool collided = false, side = 0; // NOTE: 0 - Vertical boundary, 1 - Horizontal boundary
   for (;;) {
     if (length.x < length.y) {
       length.x  += dx;
-      map_pos.x += step.x;
+      map_x += step_x;
       side = 0;
     } else {
       length.y  += dy;
-      map_pos.y += step.y;
+      map_y += step_y;
       side = 1;
     }
 
-    bool outside_bounds = (map_pos.x < 0 || map_pos.x >= MAP_WIDTH || map_pos.y < 0 || map_pos.y >= MAP_HEIGHT);
-    if (outside_bounds || (test_map[Fix16ToInt(map_pos.y)][Fix16ToInt(map_pos.x)])) {
+    bool outside_bounds = (map_x < 0 || map_x >= MAP_WIDTH || map_y < 0 || map_y >= MAP_HEIGHT);
+    if (outside_bounds || (test_map[map_y][map_x])) {
       collided = !outside_bounds;
       break;
     }
@@ -138,8 +130,6 @@ game_init (u16 width, u16 height) {
 
 function void
 game_tick (Game_Input input, u16 dt) {
-  printf("%u\n", dt);
-
   u16 rotation = 0;
   if (input.rotate_ccw) rotation -= PLAYER_ROTATE_SPEED * dt;
   if (input.rotate_cw)  rotation += PLAYER_ROTATE_SPEED * dt;

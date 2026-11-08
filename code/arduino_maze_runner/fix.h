@@ -57,16 +57,6 @@ v2fx16_to_v2 (Vec2_Fix16 v) {
 }
 
 function inline Vec2_Fix16
-v2fx16 (s16 x, s16 y) {
-  return {x,y};
-}
-
-function inline Vec2_Fix16
-v2fx16 (f32 x, f32 y) {
-  return {x,y};
-}
-
-function inline Vec2_Fix16
 v2fx16_add (Vec2_Fix16 a, Vec2_Fix16 b) {
   return v2fx16(a.x+b.x, a.y+b.y);
 }

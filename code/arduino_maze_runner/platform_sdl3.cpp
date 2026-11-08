@@ -40,7 +40,6 @@ global bool render_2d_debug_view = true, render_debug_raycasts = false;
 global bool move_forward, move_back, strafe_left, strafe_right;
 global bool rotate_cw, rotate_ccw;
 
-
 function void
 r_circle_2d (Vec2 pos, s32 r, Vec3 color) {
   for (s32 y = -r; y <= r; ++y) {
