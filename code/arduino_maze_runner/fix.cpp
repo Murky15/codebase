@@ -1,59 +1,63 @@
-function fix16
-fix16_raw (s16 x) {
-  fix16 result;
-  result.val = x;
-
-  return result;
-}
-
-function fix16
+function s32
 fix16_add (fix16 fa, fix16 fb) {
-  s32 add = (s32)fa.val + fb.val;
-  add = Clamp(add, INT16_MIN, INT16_MAX);
-
-  return fix16_raw(add);
+  return (s32)fa.val + fb.val;
 }
 
-function fix16
+function s32
 fix16_sub (fix16 fa, fix16 fb) {
-  s32 sub = (s32)fa.val - fb.val;
-  sub = Clamp(sub, INT16_MIN, INT16_MAX);
-
-  return fix16_raw(sub);
+  return (s32)fa.val - fb.val;
 }
 
-function fix16
+function s32
 fix16_mul (fix16 fa, fix16 fb) {
   s32 a = fa.val, b = fb.val;
   s32 mul = a * b;
-  mul += (1 << FIX16_FRACTIONAL_BITS-1);
-  mul >>= FIX16_FRACTIONAL_BITS;
-  mul = Clamp(mul, INT16_MIN, INT16_MAX);
+  mul += (1 << fix16::FRACTIONAL_BITS-1);
+  mul >>= fix16::FRACTIONAL_BITS;
 
-  return fix16_raw(mul);
+  return mul;
+}
+
+function s32
+fix16_div (fix16 fa, fix16 fb) {
+  s32 a = fa.val, b = fb.val;
+  s32 div = ((a << fix16::FRACTIONAL_BITS) + (b >> 1)) / b;
+
+  return div;
 }
 
 function fix16
-fix16_div (fix16 fa, fix16 fb) {
-  s32 a = fa.val, b = fb.val;
-  s32 div = ((a << FIX16_FRACTIONAL_BITS) + (b >> 1)) / b;
-  div = Clamp(div, INT16_MIN, INT16_MAX);
+fix16_add_saturated (fix16 fa, fix16 fb) {
+  return fix16::from_raw(Clamp(fix16_add(fa,fb), INT16_MIN, INT16_MAX));
+}
 
-  return fix16_raw(div);
+function fix16
+fix16_sub_saturated (fix16 fa, fix16 fb) {
+  return fix16::from_raw(Clamp(fix16_sub(fa,fb), INT16_MIN, INT16_MAX));
+}
+
+function fix16
+fix16_mul_saturated (fix16 fa, fix16 fb) {
+  return fix16::from_raw(Clamp(fix16_mul(fa,fb), INT16_MIN, INT16_MAX));
+}
+
+function fix16
+fix16_div_saturated (fix16 fa, fix16 fb) {
+  return fix16::from_raw(Clamp(fix16_div(fa,fb), INT16_MIN, INT16_MAX));
 }
 
 function fix16
 fix16_abs (fix16 x) {
-  if (x.val == INT16_MIN) return FIX16_MAX;
-  return fix16_raw(x.val < 0 ? -x.val : x.val);
+  if (x.val == INT16_MIN) return fix16::max();
+  return fix16::from_raw(x.val < 0 ? -x.val : x.val);
 }
 
 function fix16
 fix16_sqrt (fix16 x) {
-  return sqrtf(Fix16ToF32(x));
+  return sqrtf(x.to_f32());
 }
 
 function fix16
 fix16_floor (fix16 x) {
-  return fix16_raw(x.val & (s16)~(FIX16_SCALING_FACTOR - 1));
+  return fix16::from_raw(x.val & (s16)~(fix16::SCALING_FACTOR - 1));
 }

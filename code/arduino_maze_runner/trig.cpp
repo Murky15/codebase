@@ -11,7 +11,7 @@ fix16_sin (u16 angle) {
   s32 val = a + (((b - a) * (s32)frac) >> TRIG_FRAC_BITS);
   if (q & 2) val = -val;
 
-  return fix16_raw((s16)val);
+  return fix16::from_raw((s16)val);
 }
 
 function fix16

@@ -64,36 +64,39 @@ r_vert (u16 x, u16 y0, u16 y1, bool dim) {
 function Raycast_Result
 raycast (Ray ray) {
   // NOTE: Apply digital differential analysis to find wall intersections.
-  s16 map_x = Fix16ToInt(ray.pos.x), map_y = Fix16ToInt(ray.pos.y);
+  s16 map_x = ray.pos.x.to_int(), map_y = ray.pos.y.to_int();
   s16 step_x = 0, step_y = 0;
 
-  fix16 dx = ray.dir.x == 0 ? FIX16_MAX : fix16_abs(1/ray.dir.x);
-  fix16 dy = ray.dir.y == 0 ? FIX16_MAX : fix16_abs(1/ray.dir.y);
-  Vec2_Fix16 length = {FIX16_MAX, FIX16_MAX};
+  typedef fix<s32,fix16::FRACTIONAL_BITS> fix32;
+  #define fix32_quickmul(a,b) fix32::from_raw((((a).val*(b).val)+(1<<fix32::FRACTIONAL_BITS-1))>>fix32::FRACTIONAL_BITS)
+
+  fix32 dx = ray.dir.x == 0 ? fix32::max() : fix32::from_raw(abs(fix16_div(1,ray.dir.x)));
+  fix32 dy = ray.dir.y == 0 ? fix32::max() : fix32::from_raw(abs(fix16_div(1,ray.dir.y)));
+  fix32 length_x = fix32::max(), length_y = fix32::max();
 
   if (ray.dir.x > 0) {
     step_x = 1;
-    length.x = ((map_x + 1) - ray.pos.x) * dx;
+    length_x = fix32_quickmul((map_x + 1) - ray.pos.x, dx);
   } else if (ray.dir.x < 0) {
     step_x = -1;
-    length.x = (ray.pos.x - map_x) * dx;
+    length_x = fix32_quickmul(ray.pos.x - map_x, dx);
   }
   if (ray.dir.y > 0) {
     step_y = 1;
-    length.y = ((map_y + 1) - ray.pos.y) * dy;
+    length_y = fix32_quickmul((map_y + 1) - ray.pos.y, dy);
   } else if (ray.dir.y < 0) {
     step_y = -1;
-    length.y = (ray.pos.y - map_y) * dy;
+    length_y = fix32_quickmul(ray.pos.y - map_y, dy);
   }
 
   bool collided = false, side = 0; // NOTE: 0 - Vertical boundary, 1 - Horizontal boundary
   for (;;) {
-    if (length.x < length.y) {
-      length.x  += dx;
+    if (length_x < length_y) {
+      length_x.val += dx.val;
       map_x += step_x;
       side = 0;
     } else {
-      length.y  += dy;
+      length_y.val += dy.val;
       map_y += step_y;
       side = 1;
     }
@@ -109,14 +112,16 @@ raycast (Ray ray) {
   if (collided) {
     if (side == 0) {
       result.collision = RAYCAST_WALL_NS;
-      result.length = length.x - dx;
+      result.length = fix16::from_raw(length_x.val - dx.val);
     } else {
       result.collision = RAYCAST_WALL_EW;
-      result.length = length.y - dy;
+      result.length = fix16::from_raw(length_y.val - dy.val);
     }
   }
 
   return result;
+
+  #undef fix32_quickmul
 }
 
 global u16 resolution_width, resolution_height;
@@ -171,13 +176,13 @@ game_render () {
     Raycast_Result cast = raycast(ray);
     fix16 dist = cast.length;
 #ifdef OS_WINDOWS
-    debug.rays[ray_idx] = {angle * ANGLE_U16TOF32, dist == 0 ? 100.f : Fix16ToF32(dist)};
+    debug.rays[ray_idx] = {angle * ANGLE_U16TOF32, dist == 0 ? 100.f : dist.to_f32()};
 #endif
     if (cast.collision == RAYCAST_NULL) continue;
 
     fix16 perp_dist = dist * fix16_cos(relative_angle);
 
-    u16 wall_height = CAMERA_FOCAL_LENGTH / Fix16ToF32(perp_dist);
+    u16 wall_height = CAMERA_FOCAL_LENGTH / perp_dist.to_f32();
     u16 y0 = Max(resolution_height/2 - wall_height/2, 0);
     u16 y1 = Min(resolution_height/2 + wall_height/2, resolution_height);
 
