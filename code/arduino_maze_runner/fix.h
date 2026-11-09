@@ -9,7 +9,7 @@ struct fix {
   static constexpr T SCALING_FACTOR  = 1 << FRACTIONAL_BITS;
 
   static constexpr fix from_raw (T x) { fix result; result.val = x; return result; }
-  static constexpr fix max () { return from_raw(~T(1 << (sizeof(T)*8)-1)); }
+  static constexpr fix max () { return from_raw(~T(1LL << (sizeof(T)*8)-1)); }
 
   fix() = default;
   constexpr fix (int x) : val(x<<FRACTIONAL_BITS) {}

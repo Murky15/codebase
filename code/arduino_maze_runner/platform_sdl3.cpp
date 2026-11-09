@@ -1,6 +1,7 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL.h>
 
+#define WINDOW_PLAYER_RADIUS 10
 #define WINDOW_TILE_SIZE 64
 #define RESOLUTION_WIDTH  (WINDOW_TILE_SIZE * MAP_WIDTH)
 #define RESOLUTION_HEIGHT (WINDOW_TILE_SIZE * MAP_HEIGHT)
@@ -236,7 +237,7 @@ main (int argc, char **argv) {
       }
 
       Vec2 player_pos = v2muls(v2fx16_to_v2(gs.player.pos), WINDOW_TILE_SIZE);
-      r_circle_2d(player_pos, PLAYER_RADIUS, V3(0, 128, 255));
+      r_circle_2d(player_pos, WINDOW_PLAYER_RADIUS, V3(0, 128, 255));
 
       if (render_debug_raycasts) {
         for EachInStaticArray(debug->rays) {

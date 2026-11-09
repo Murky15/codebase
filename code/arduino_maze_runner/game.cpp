@@ -7,7 +7,7 @@
 
 #define RAYCAST_RESOLUTION 32
 
-#define PLAYER_RADIUS 10
+#define PLAYER_RADIUS 0.01f
 #define PLAYER_SPEED  0.005f
 #define PLAYER_ROTATE_SPEED 65
 struct Player {
@@ -35,6 +35,7 @@ struct Raycast_Result {
 
 global struct {
   Player player;
+  Player old_player;
 } gs;
 
 #define MAP_WIDTH  10
@@ -61,6 +62,11 @@ r_vert (u16 x, u16 y0, u16 y1, bool dim) {
   }
 }
 
+function bool
+map_index (Vec2_Fix16 pos) {
+  return test_map[pos.y.to_int()][pos.x.to_int()];
+}
+
 function Raycast_Result
 raycast (Ray ray) {
   // NOTE: Apply digital differential analysis to find wall intersections.
@@ -68,25 +74,27 @@ raycast (Ray ray) {
   s16 step_x = 0, step_y = 0;
 
   typedef fix<s32,fix16::FRACTIONAL_BITS> fix32;
-  #define fix32_quickmul(a,b) fix32::from_raw((((a).val*(b).val)+(1<<fix32::FRACTIONAL_BITS-1))>>fix32::FRACTIONAL_BITS)
+  #define QuickMul(a,b) fix32::from_raw((((a).val*(b).val)+(1<<fix32::FRACTIONAL_BITS-1))>>fix32::FRACTIONAL_BITS)
 
-  fix32 dx = ray.dir.x == 0 ? fix32::max() : fix32::from_raw(abs(fix16_div(1,ray.dir.x)));
-  fix32 dy = ray.dir.y == 0 ? fix32::max() : fix32::from_raw(abs(fix16_div(1,ray.dir.y)));
+  s32 inv_dir_x = fix16_div(1,ray.dir.x);
+  s32 inv_dir_y = fix16_div(1,ray.dir.y);
+  fix32 dx = ray.dir.x == 0 ? fix32::max() : fix32::from_raw(abs(inv_dir_x));
+  fix32 dy = ray.dir.y == 0 ? fix32::max() : fix32::from_raw(abs(inv_dir_y));
   fix32 length_x = fix32::max(), length_y = fix32::max();
 
   if (ray.dir.x > 0) {
     step_x = 1;
-    length_x = fix32_quickmul((map_x + 1) - ray.pos.x, dx);
+    length_x = QuickMul((map_x + 1) - ray.pos.x, dx);
   } else if (ray.dir.x < 0) {
     step_x = -1;
-    length_x = fix32_quickmul(ray.pos.x - map_x, dx);
+    length_x = QuickMul(ray.pos.x - map_x, dx);
   }
   if (ray.dir.y > 0) {
     step_y = 1;
-    length_y = fix32_quickmul((map_y + 1) - ray.pos.y, dy);
+    length_y = QuickMul((map_y + 1) - ray.pos.y, dy);
   } else if (ray.dir.y < 0) {
     step_y = -1;
-    length_y = fix32_quickmul(ray.pos.y - map_y, dy);
+    length_y = QuickMul(ray.pos.y - map_y, dy);
   }
 
   bool collided = false, side = 0; // NOTE: 0 - Vertical boundary, 1 - Horizontal boundary
@@ -121,7 +129,7 @@ raycast (Ray ray) {
 
   return result;
 
-  #undef fix32_quickmul
+  #undef QuickMul
 }
 
 global u16 resolution_width, resolution_height;
@@ -153,6 +161,20 @@ game_tick (Game_Input input, u16 dt) {
   if (v2fx16_len(move_amt) > 1)
     move_amt = v2fx16_norm(move_amt);
   gs.player.pos = v2fx16_add(gs.player.pos, v2fx16_muls(move_amt, PLAYER_SPEED * dt));
+
+  Vec2_Fix16 map_pos = v2fx16(fix16_floor(gs.player.pos.x), fix16_floor(gs.player.pos.y));
+  Vec2_Fix16 collision_queries[] = {
+    v2fx16(map_pos.x+1, map_pos.y),
+    v2fx16(map_pos.x-1, map_pos.y),
+    v2fx16(map_pos.x,   map_pos.y+1),
+    v2fx16(map_pos.x,   map_pos.y-1),
+  };
+  for EachInStaticArray(collision_queries) {
+    if (!map_index(it)) continue;
+  }
+
+
+  gs.old_player = gs.player;
 }
 
 struct Debug_Render_Data {
