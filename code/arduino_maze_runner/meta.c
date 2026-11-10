@@ -50,7 +50,7 @@ main (void) {
   u16 pixels_per_raycast = RESOLUTION_WIDTH / RAYCAST_RESOLUTION;
   str8_list_pushf(arena, &trig_lookup_builder, "#define PIXELS_PER_RAYCAST %d\n", pixels_per_raycast);
   f64 camera_focal_length = (RESOLUTION_WIDTH/2.0) / tan(RAYCAST_FOV/2.0);
-  str8_list_pushf(arena, &trig_lookup_builder, "#define CAMERA_FOCAL_LENGTH %f\n\n", camera_focal_length);
+  str8_list_pushf(arena, &trig_lookup_builder, "#define CAMERA_FOCAL_LENGTH %f_fx32\n\n", camera_focal_length);
 
   // NOTE: Access macros
   str8_list_push(arena, &trig_lookup_builder, Str8CStr(PGMAccessU16_str));

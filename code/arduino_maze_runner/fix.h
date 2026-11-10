@@ -1,6 +1,14 @@
 #ifndef FIX_H
 #define FIX_H
 
+/*
+TODO:
+- [X] Remove constructors and add literals
+- [X] Make designated fix32 type with quick operations
+- [X] Consolidate unsaturated & saturated fix16 functions
+- [X] Remove remaining f32 stragglers
+*/
+
 template <typename T, int F>
 struct fix {
   T val;
@@ -8,14 +16,12 @@ struct fix {
   static constexpr T FRACTIONAL_BITS = F;
   static constexpr T SCALING_FACTOR  = 1 << FRACTIONAL_BITS;
 
-  static constexpr fix from_raw (T x) { fix result; result.val = x; return result; }
   static constexpr fix max () { return from_raw(~T(1LL << (sizeof(T)*8)-1)); }
 
-  fix() = default;
-  constexpr fix (int x) : val(x<<FRACTIONAL_BITS) {}
-  constexpr fix (f32 x) : val(x*(f32)SCALING_FACTOR) {}
-
-  int to_int () { return val >> FRACTIONAL_BITS;  }
+  static constexpr fix from_raw (T x)   { return fix{x}; }
+  static constexpr fix from_int (int x) { return from_raw(x<<FRACTIONAL_BITS); }
+  static constexpr fix from_f32 (f32 x) { return from_raw(x*(f32)SCALING_FACTOR); }
+  int to_int () { return val>>FRACTIONAL_BITS;  }
   f32 to_f32 () { return val/(f32)SCALING_FACTOR; }
 
   inline bool operator==(fix rhs) { return this->val==rhs.val; }
@@ -27,10 +33,6 @@ struct fix {
 };
 
 typedef fix<s16, 10> fix16;
-function s32   fix16_add             (fix16 fa, fix16 fb);
-function s32   fix16_sub             (fix16 fa, fix16 fb);
-function s32   fix16_mul             (fix16 fa, fix16 fb);
-function s32   fix16_div             (fix16 fa, fix16 fb);
 function fix16 fix16_add_saturated   (fix16 fa, fix16 fb);
 function fix16 fix16_sub_saturated   (fix16 fa, fix16 fb);
 function fix16 fix16_mul_saturated   (fix16 fa, fix16 fb);
@@ -39,6 +41,7 @@ function fix16 fix16_abs             (fix16 x);
 function fix16 fix16_sqrt            (fix16 x);
 function fix16 fix16_floor           (fix16 x);
 
+constexpr fix16 operator"" _fx16(long double x) { return fix16::from_f32(x); };
 function inline fix16 operator+(fix16 a, fix16 b) { return fix16_add_saturated(a,b); }
 function inline fix16 operator-(fix16 a, fix16 b) { return fix16_sub_saturated(a,b); }
 function inline fix16 operator*(fix16 a, fix16 b) { return fix16_mul_saturated(a,b); }
@@ -47,6 +50,14 @@ function inline fix16& operator+=(fix16 &a, fix16 b) { a = a + b; return a; }
 function inline fix16& operator-=(fix16 &a, fix16 b) { a = a - b; return a; }
 function inline fix16& operator*=(fix16 &a, fix16 b) { a = a * b; return a; }
 function inline fix16& operator/=(fix16 &a, fix16 b) { a = a / b; return a; }
+
+typedef fix<s32, 10> fix32;
+constexpr fix32 operator"" _fx32(long double x) { return fix32::from_f32(x); };
+function fix32 fix32_add      (fix32 fa, fix32 fb);
+function fix32 fix32_sub      (fix32 fa, fix32 fb);
+function fix32 fix32_mul_lazy (fix32 fa, fix32 fb);
+function fix32 fix32_div_lazy (fix32 fa, fix32 fb);
+function fix32 fix32_abs      (fix32 x);
 
 struct Vec2_Fix16 {
   fix16 x, y;
@@ -94,7 +105,7 @@ v2fx16_len (Vec2_Fix16 v) {
 
 function inline Vec2_Fix16
 v2fx16_norm (Vec2_Fix16 v) {
-  return v2fx16_muls(v, 1/v2fx16_len(v));
+  return v2fx16_muls(v, 1.0_fx16/v2fx16_len(v));
 }
 
 function inline fix16

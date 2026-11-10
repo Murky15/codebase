@@ -7,8 +7,8 @@
 
 #define RAYCAST_RESOLUTION 32
 
-#define PLAYER_RADIUS 0.01f
-#define PLAYER_SPEED  0.005f
+#define PLAYER_RADIUS 0.01_fx16
+#define PLAYER_SPEED  0.005_fx16
 #define PLAYER_ROTATE_SPEED 65
 struct Player {
   Vec2_Fix16 pos;
@@ -73,28 +73,28 @@ raycast (Ray ray) {
   s16 map_x = ray.pos.x.to_int(), map_y = ray.pos.y.to_int();
   s16 step_x = 0, step_y = 0;
 
-  typedef fix<s32,fix16::FRACTIONAL_BITS> fix32;
-  #define QuickMul(a,b) fix32::from_raw((((a).val*(b).val)+(1<<fix32::FRACTIONAL_BITS-1))>>fix32::FRACTIONAL_BITS)
+  fix32 ray_pos_x = fix32::from_raw(ray.pos.x.val);
+  fix32 ray_pos_y = fix32::from_raw(ray.pos.y.val);
+  fix32 ray_dir_x = fix32::from_raw(ray.dir.x.val);
+  fix32 ray_dir_y = fix32::from_raw(ray.dir.y.val);
 
-  s32 inv_dir_x = fix16_div(1,ray.dir.x);
-  s32 inv_dir_y = fix16_div(1,ray.dir.y);
-  fix32 dx = ray.dir.x == 0 ? fix32::max() : fix32::from_raw(abs(inv_dir_x));
-  fix32 dy = ray.dir.y == 0 ? fix32::max() : fix32::from_raw(abs(inv_dir_y));
+  fix32 dx = ray.dir.x == 0.0_fx16 ? fix32::max() : fix32_abs(fix32_div_lazy(1.0_fx32,ray_dir_x));
+  fix32 dy = ray.dir.y == 0.0_fx16 ? fix32::max() : fix32_abs(fix32_div_lazy(1.0_fx32,ray_dir_y));
   fix32 length_x = fix32::max(), length_y = fix32::max();
 
-  if (ray.dir.x > 0) {
+  if (ray.dir.x > 0.0_fx16) {
     step_x = 1;
-    length_x = QuickMul((map_x + 1) - ray.pos.x, dx);
-  } else if (ray.dir.x < 0) {
+    length_x = fix32_mul_lazy(fix32_sub(fix32::from_int(map_x + 1), ray_pos_x), dx);
+  } else if (ray.dir.x < 0.0_fx16) {
     step_x = -1;
-    length_x = QuickMul(ray.pos.x - map_x, dx);
+    length_x = fix32_mul_lazy(fix32_sub(ray_pos_x, fix32::from_int(map_x)), dx);
   }
-  if (ray.dir.y > 0) {
+  if (ray.dir.y > 0.0_fx16) {
     step_y = 1;
-    length_y = QuickMul((map_y + 1) - ray.pos.y, dy);
-  } else if (ray.dir.y < 0) {
+    length_y = fix32_mul_lazy(fix32_sub(fix32::from_int(map_y + 1), ray_pos_y), dy);
+  } else if (ray.dir.y < 0.0_fx16) {
     step_y = -1;
-    length_y = QuickMul(ray.pos.y - map_y, dy);
+    length_y = fix32_mul_lazy(fix32_sub(ray_pos_y, fix32::from_int(map_y)), dy);
   }
 
   bool collided = false, side = 0; // NOTE: 0 - Vertical boundary, 1 - Horizontal boundary
@@ -128,15 +128,13 @@ raycast (Ray ray) {
   }
 
   return result;
-
-  #undef QuickMul
 }
 
-global u16 resolution_width, resolution_height;
+global s16 resolution_width, resolution_height;
 
 function void
 game_init (u16 width, u16 height) {
-  gs.player.pos = v2fx16((s16)5,5);
+  gs.player.pos = v2fx16(5.0_fx16,5.0_fx16);
   resolution_width = width;
   resolution_height = height;
 }
@@ -149,25 +147,25 @@ game_tick (Game_Input input, u16 dt) {
   gs.player.view_angle += rotation;
 
   Vec2_Fix16 move_amt = {};
-  fix16 x = 0, y = 0;
-  if (input.move_forward) x += 1;
-  if (input.strafe_left)  y -= 1;
-  if (input.move_back)    x -= 1;
-  if (input.strafe_right) y += 1;
+  fix16 x = 0.0_fx16, y = 0.0_fx16;
+  if (input.move_forward) x += 1.0_fx16;
+  if (input.strafe_left)  y -= 1.0_fx16;
+  if (input.move_back)    x -= 1.0_fx16;
+  if (input.strafe_right) y += 1.0_fx16;
   fix16 dx = x * fix16_cos(gs.player.view_angle) - y * fix16_sin(gs.player.view_angle);
   fix16 dy = x * fix16_sin(gs.player.view_angle) + y * fix16_cos(gs.player.view_angle);
   move_amt.x = dx;
   move_amt.y = dy;
-  if (v2fx16_len(move_amt) > 1)
+  if (v2fx16_len(move_amt) > 1.0_fx16)
     move_amt = v2fx16_norm(move_amt);
-  gs.player.pos = v2fx16_add(gs.player.pos, v2fx16_muls(move_amt, PLAYER_SPEED * dt));
+  gs.player.pos = v2fx16_add(gs.player.pos, v2fx16_muls(move_amt, PLAYER_SPEED * fix16::from_int(dt)));
 
   Vec2_Fix16 map_pos = v2fx16(fix16_floor(gs.player.pos.x), fix16_floor(gs.player.pos.y));
   Vec2_Fix16 collision_queries[] = {
-    v2fx16(map_pos.x+1, map_pos.y),
-    v2fx16(map_pos.x-1, map_pos.y),
-    v2fx16(map_pos.x,   map_pos.y+1),
-    v2fx16(map_pos.x,   map_pos.y-1),
+    v2fx16(map_pos.x+1.0_fx16, map_pos.y),
+    v2fx16(map_pos.x-1.0_fx16, map_pos.y),
+    v2fx16(map_pos.x,   map_pos.y+1.0_fx16),
+    v2fx16(map_pos.x,   map_pos.y-1.0_fx16),
   };
   for EachInStaticArray(collision_queries) {
     if (!map_index(it)) continue;
@@ -187,7 +185,9 @@ function Debug_Render_Data*
 game_render () {
   Vec2_Fix16 local_pos = gs.player.pos;
 
+#if OS_WINDOWS
   local_persist Debug_Render_Data debug = {};
+#endif
 
   for (u16 ray_idx = 0, x = 0; ray_idx < RAYCAST_RESOLUTION; ++ray_idx, x += PIXELS_PER_RAYCAST) {
     u16 relative_angle = PGMAccessU16(ray_angle_lookup + ray_idx);
@@ -197,20 +197,24 @@ game_render () {
     Ray ray = {local_pos, dir};
     Raycast_Result cast = raycast(ray);
     fix16 dist = cast.length;
-#ifdef OS_WINDOWS
-    debug.rays[ray_idx] = {angle * ANGLE_U16TOF32, dist == 0 ? 100.f : dist.to_f32()};
+#if OS_WINDOWS
+    debug.rays[ray_idx] = {angle * ANGLE_U16TOF32, dist == 0.0_fx16 ? 100.f : dist.to_f32()};
 #endif
     if (cast.collision == RAYCAST_NULL) continue;
 
     fix16 perp_dist = dist * fix16_cos(relative_angle);
 
-    u16 wall_height = CAMERA_FOCAL_LENGTH / perp_dist.to_f32();
-    u16 y0 = Max(resolution_height/2 - wall_height/2, 0);
-    u16 y1 = Min(resolution_height/2 + wall_height/2, resolution_height);
+    s16 wall_height = fix32_div_lazy(CAMERA_FOCAL_LENGTH, fix32::from_raw(perp_dist.val)).to_int();
+    s16 y0 = Max(resolution_height/2 - wall_height/2, 0);
+    s16 y1 = Min(resolution_height/2 + wall_height/2, resolution_height);
 
     for (u16 p = 0; p < PIXELS_PER_RAYCAST; ++p)
       r_vert(x+p, y0, y1, cast.collision == RAYCAST_WALL_EW);
   }
 
+#if OS_WINDOWS
   return &debug;
+#else
+  return nullptr;
+#endif
 }
