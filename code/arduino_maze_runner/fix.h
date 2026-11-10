@@ -9,6 +9,7 @@ TODO:
 - [X] Remove remaining f32 stragglers
 */
 
+// NOTE: Must be a signed integer
 template <typename T, int F>
 struct fix {
   T val;
@@ -17,6 +18,7 @@ struct fix {
   static constexpr T SCALING_FACTOR  = 1 << FRACTIONAL_BITS;
 
   static constexpr fix max () { return from_raw(~T(1LL << (sizeof(T)*8)-1)); }
+  static constexpr fix min () { return from_raw(~T(0)); }
 
   static constexpr fix from_raw (T x)   { return fix{x}; }
   static constexpr fix from_int (int x) { return from_raw(x<<FRACTIONAL_BITS); }
@@ -51,7 +53,7 @@ function inline fix16& operator-=(fix16 &a, fix16 b) { a = a - b; return a; }
 function inline fix16& operator*=(fix16 &a, fix16 b) { a = a * b; return a; }
 function inline fix16& operator/=(fix16 &a, fix16 b) { a = a / b; return a; }
 
-typedef fix<s32, 10> fix32;
+typedef fix<s32, fix16::FRACTIONAL_BITS> fix32;
 constexpr fix32 operator"" _fx32(long double x) { return fix32::from_f32(x); };
 function fix32 fix32_add      (fix32 fa, fix32 fb);
 function fix32 fix32_sub      (fix32 fa, fix32 fb);
@@ -61,6 +63,11 @@ function fix32 fix32_abs      (fix32 x);
 
 struct Vec2_Fix16 {
   fix16 x, y;
+};
+
+union Rect_Fix16 {
+  struct { fix16 x, y, w, h;  };
+  struct { Vec2_Fix16 xy, wh; };
 };
 
 function inline Vec2_Fix16
@@ -117,5 +124,7 @@ function inline fix16
 v2fx16_dot (Vec2_Fix16 a, Vec2_Fix16 b) {
   return a.x*b.x + a.y*b.y;
 }
+
+function bool rect_circle_intersect (Rect_Fix16 rect, Vec2_Fix16 c, fix16 r, fix16 *overlap = nullptr);
 
 #endif // FIX_H

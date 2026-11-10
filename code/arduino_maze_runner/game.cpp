@@ -7,7 +7,7 @@
 
 #define RAYCAST_RESOLUTION 32
 
-#define PLAYER_RADIUS 0.01_fx16
+#define PLAYER_RADIUS 0.15625_fx16
 #define PLAYER_SPEED  0.005_fx16
 #define PLAYER_ROTATE_SPEED 65
 struct Player {
@@ -164,13 +164,45 @@ game_tick (Game_Input input, u16 dt) {
   Vec2_Fix16 collision_queries[] = {
     v2fx16(map_pos.x+1.0_fx16, map_pos.y),
     v2fx16(map_pos.x-1.0_fx16, map_pos.y),
-    v2fx16(map_pos.x,   map_pos.y+1.0_fx16),
-    v2fx16(map_pos.x,   map_pos.y-1.0_fx16),
+    v2fx16(map_pos.x, map_pos.y+1.0_fx16),
+    v2fx16(map_pos.x, map_pos.y-1.0_fx16),
+
+    v2fx16(map_pos.x-1.0_fx16, map_pos.y+1.0_fx16),
+    v2fx16(map_pos.x+1.0_fx16, map_pos.y+1.0_fx16),
+    v2fx16(map_pos.x-1.0_fx16, map_pos.y-1.0_fx16),
+    v2fx16(map_pos.x+1.0_fx16, map_pos.y-1.0_fx16),
   };
   for EachInStaticArray(collision_queries) {
     if (!map_index(it)) continue;
-  }
 
+    Rect_Fix16 tile;
+    tile.xy = it;
+    tile.wh = v2fx16(1.0_fx16,1.0_fx16);
+
+    if (rect_circle_intersect(tile, gs.player.pos, PLAYER_RADIUS)) {
+      Vec2_Fix16 diff = v2fx16_sub(gs.player.pos, gs.old_player.pos);
+      Vec2_Fix16 test_x = v2fx16_add(gs.old_player.pos, {diff.x, 0.0_fx16});
+      Vec2_Fix16 test_y = v2fx16_add(gs.old_player.pos, {0.0_fx16, diff.y});
+
+      fix16 buffer = 0.01_fx16;
+      fix16 overlap_x, overlap_y;
+      if (rect_circle_intersect(tile, test_y, PLAYER_RADIUS, &overlap_y)) {
+        overlap_y += buffer;
+        if (diff.y > 0.0_fx16) {
+          gs.player.pos.y -= overlap_y;
+        } else {
+          gs.player.pos.y += overlap_y;
+        }
+      } else if (rect_circle_intersect(tile, test_x, PLAYER_RADIUS, &overlap_x)) {
+        overlap_x += buffer;
+        if (diff.x > 0.0_fx16) {
+          gs.player.pos.x -= overlap_x;
+        } else {
+          gs.player.pos.x += overlap_x;
+        }
+      }
+    }
+  }
 
   gs.old_player = gs.player;
 }
@@ -203,6 +235,7 @@ game_render () {
     if (cast.collision == RAYCAST_NULL) continue;
 
     fix16 perp_dist = dist * fix16_cos(relative_angle);
+    perp_dist = Max(fix16::from_raw(1), perp_dist);
 
     s16 wall_height = fix32_div_lazy(CAMERA_FOCAL_LENGTH, fix32::from_raw(perp_dist.val)).to_int();
     s16 y0 = Max(resolution_height/2 - wall_height/2, 0);

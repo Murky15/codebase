@@ -74,3 +74,17 @@ fix32_abs (fix32 x) {
   if (x.val == INT32_MIN) return fix32::max();
   return fix32::from_raw(x.val < 0 ? -x.val : x.val);
 }
+
+function bool
+rect_circle_intersect (Rect_Fix16 rect, Vec2_Fix16 c, fix16 r, fix16 *overlap) {
+  fix16 closest_x = Max(rect.x, Min(c.x, rect.x + rect.w));
+  fix16 closest_y = Max(rect.y, Min(c.y, rect.y + rect.h));
+  Vec2_Fix16 diff = v2fx16_sub(c, v2fx16(closest_x, closest_y));
+  fix16 dist = v2fx16_len(diff);
+  if (dist <= r) {
+    if (overlap) *overlap = r - dist;
+    return true;
+  }
+
+  return false;
+}
