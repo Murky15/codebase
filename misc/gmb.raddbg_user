@@ -42,6 +42,7 @@ window:
         }
         0.623888:
         {
+          selected
           getting_started
           text:
           {
@@ -89,10 +90,10 @@ window:
             expression: "file:\"W:/code/arduino_maze_runner/game.cpp\".data"
             project: "W:/misc/root.raddbg_project"
             query: input: ""
-            cursor_line: 223
-            cursor_column: 1
-            mark_line: 223
-            mark_column: 1
+            cursor_line: 232
+            cursor_column: 17
+            mark_line: 232
+            mark_column: 17
             cursor: 0x17ab
             mark: 0x17ab
           }
@@ -123,7 +124,6 @@ window:
         }
         0.40:
         {
-          selected
           watch:
           {
             expression: "query:call_stack"
@@ -308,7 +308,7 @@ file_path_map:
 debug_info:
 {
   path: "W:/build/Runner.pdb"
-  timestamp: 66230731371070
+  timestamp: 66230731411519
   project: "W:/misc/root.raddbg_project"
 }
 file_path_map:

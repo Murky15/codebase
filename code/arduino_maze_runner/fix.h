@@ -9,9 +9,9 @@ TODO:
 - [X] Remove remaining f32 stragglers
 */
 
-// NOTE: Must be a signed integer
 template <typename T, int F>
 struct fix {
+  static_assert(std::is_signed<T>::value && std::is_integral<T>::value);
   T val;
 
   static constexpr T FRACTIONAL_BITS = F;

@@ -17,6 +17,7 @@
     }                                                   \
   }                                                     \
 
+global u8 *PGMAccessU8_str  = "#if OS_WINDOWS\n# define PGMAccessU8(addr)  ((u8)(*(addr)))\n#else\n# define PGMAccessU8(addr)  pgm_read_byte_near(addr)\n#endif\n\n";
 global u8 *PGMAccessU16_str = "#if OS_WINDOWS\n# define PGMAccessU16(addr) ((u16)(*(addr)))\n#else\n# define PGMAccessU16(addr) pgm_read_word_near(addr)\n#endif\n\n";
 
 int
@@ -53,6 +54,7 @@ main (void) {
   str8_list_pushf(arena, &trig_lookup_builder, "#define CAMERA_FOCAL_LENGTH %f_fx32\n\n", camera_focal_length);
 
   // NOTE: Access macros
+  str8_list_push(arena, &trig_lookup_builder, Str8CStr(PGMAccessU8_str));
   str8_list_push(arena, &trig_lookup_builder, Str8CStr(PGMAccessU16_str));
 
   {

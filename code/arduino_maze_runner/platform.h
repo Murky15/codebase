@@ -14,6 +14,8 @@ function void                game_init   (u16 width, u16 height);
 function void                game_tick   (Game_Input input, u16 dt);
 function Debug_Render_Data*  game_render ();
 
+function bool map_index (s16 x, s16 y);
+
 // NOTE: Platform -> Game
 
 function void r_set_pixel_debug (u16 x, u16 y, Vec3 color);

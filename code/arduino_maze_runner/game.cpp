@@ -2,7 +2,7 @@
   What if maze generation was animated after the player clicks start?
   - [X] Fixed point
   - [X] Trig meta tables
-  - [ ] Collision
+  - [X] Collision
 */
 
 #define RAYCAST_RESOLUTION 32
@@ -41,17 +41,17 @@ global struct {
 #define MAP_WIDTH  10
 #define MAP_HEIGHT 10
 StaticAssert(MAP_WIDTH == MAP_HEIGHT, check_map_dimensions);
-global u8 test_map[MAP_HEIGHT][MAP_WIDTH] = {
-  {1,0,0,0,0,1,0,0,0,1},
-  {0,0,0,1,0,0,1,1,0,0},
-  {0,0,0,0,0,0,0,0,0,0},
-  {0,0,0,1,1,1,0,0,0,0},
-  {0,0,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,1,0,0,0},
-  {0,0,0,0,0,0,1,0,0,0},
-  {0,1,0,0,0,0,1,0,0,0},
-  {0,0,0,1,1,0,1,0,0,1},
-  {1,0,0,0,0,0,0,0,0,1},
+global const PROGMEM u8 test_map[MAP_WIDTH * MAP_HEIGHT] = {
+  1,0,0,0,0,1,0,0,0,1,
+  0,0,0,1,0,0,1,1,0,0,
+  0,0,0,0,0,0,0,0,0,0,
+  0,0,0,1,1,1,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,1,0,0,0,
+  0,0,0,0,0,0,1,0,0,0,
+  0,1,0,0,0,0,1,0,0,0,
+  0,0,0,1,1,0,1,0,0,1,
+  1,0,0,0,0,0,0,0,0,1,
 };
 
 function void
@@ -63,8 +63,13 @@ r_vert (u16 x, u16 y0, u16 y1, bool dim) {
 }
 
 function bool
+map_index (s16 x, s16 y) {
+  return PGMAccessU8(test_map + (y * MAP_WIDTH + x));
+}
+
+function bool
 map_index (Vec2_Fix16 pos) {
-  return test_map[pos.y.to_int()][pos.x.to_int()];
+  return map_index(pos.x.to_int(), pos.y.to_int());
 }
 
 function Raycast_Result
@@ -110,7 +115,7 @@ raycast (Ray ray) {
     }
 
     bool outside_bounds = (map_x < 0 || map_x >= MAP_WIDTH || map_y < 0 || map_y >= MAP_HEIGHT);
-    if (outside_bounds || (test_map[map_y][map_x])) {
+    if (outside_bounds || map_index(map_x, map_y)) {
       collided = !outside_bounds;
       break;
     }

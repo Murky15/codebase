@@ -229,7 +229,7 @@ main (int argc, char **argv) {
           u64 map_x = x / WINDOW_TILE_SIZE;
           u64 map_y = y / WINDOW_TILE_SIZE;
 
-          if (test_map[map_y][map_x]) {
+          if (map_index(map_x, map_y)) {
             r_set_pixel_debug(x, y, V3(255, 255, 255));
           }
         }
