@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="20px" height="40px" viewBox="0 0 20 40" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>0047 - G</title>
+    <g id="Original-/-Overview" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Original" transform="translate(-160.000000, -30.000000)" fill="#59FFF8">
+            <path d="M166,42 L177,42 C177.552285,42 178,42.4477153 178,43 L178,45 C178,45.5522847 177.552285,46 177,46 L167,46 C166.447715,46 166,46.4477153 166,47 L166,53 C166,53.5522847 166.447715,54 167,54 L173,54 C173.552285,54 174,53.5522847 174,53 L174,52 L168,52 L168,48 L177,48 C177.552285,48 178,48.4477153 178,49 L178,54 C178,56.209139 176.209139,58 174,58 L166,58 C163.790861,58 162,56.209139 162,54 L162,46 C162,43.790861 163.790861,42 166,42 Z" id="G"></path>
+        </g>
+    </g>
+</svg>

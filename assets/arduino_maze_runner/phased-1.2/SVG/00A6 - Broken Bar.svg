@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="20px" height="40px" viewBox="0 0 20 40" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>00A6 - Broken Bar</title>
+    <g id="Original-/-Overview" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Original" transform="translate(-520.000000, -70.000000)" fill="#59FFF8">
+            <path d="M529,82 L531,82 C531.552285,82 532,82.4477153 532,83 L532,88 C532,88.5522847 531.552285,89 531,89 L529,89 C528.447715,89 528,88.5522847 528,88 L528,83 C528,82.4477153 528.447715,82 529,82 Z M529,91 L531,91 C531.552285,91 532,91.4477153 532,92 L532,97 C532,97.5522847 531.552285,98 531,98 L529,98 C528.447715,98 528,97.5522847 528,97 L528,92 C528,91.4477153 528.447715,91 529,91 Z" id="Shape"></path>
+        </g>
+    </g>
+</svg>

@@ -8,7 +8,7 @@
 #define RAYCAST_RESOLUTION 32
 
 #define PLAYER_RADIUS 0.15625_fx16
-#define PLAYER_SPEED  0.005_fx16
+#define PLAYER_SPEED  2.5_fx16
 #define PLAYER_ROTATE_SPEED 65
 struct Player {
   Vec2_Fix16 pos;
@@ -20,7 +20,7 @@ struct Ray {
   Vec2_Fix16 dir;
 };
 
-enum Raycast_Collision_Type : u32 {
+enum Raycast_Collision_Type : u16 {
   RAYCAST_NULL,
   RAYCAST_WALL_NS,
   RAYCAST_WALL_EW,
@@ -33,34 +33,50 @@ struct Raycast_Result {
   fix16 length;
 };
 
+enum Game_State : u16 {
+  GAME_STATE_TITLE,
+  GAME_STATE_PLAY,
+  GAME_STATE_WIN,
+
+  GAME_STATE_COUNT
+};
+
 global struct {
+  Game_State state;
+
   Player player;
   Player old_player;
 } gs;
 
-#define MAP_WIDTH  10
-#define MAP_HEIGHT 10
+#define MAP_WIDTH  20
+#define MAP_HEIGHT 20
 StaticAssert(MAP_WIDTH == MAP_HEIGHT, check_map_dimensions);
-global const PROGMEM u8 test_map[MAP_WIDTH * MAP_HEIGHT] = {
-  1,0,0,0,0,1,0,0,0,1,
-  0,0,0,1,0,0,1,1,0,0,
-  0,0,0,0,0,0,0,0,0,0,
-  0,0,0,1,1,1,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,1,0,0,0,
-  0,0,0,0,0,0,1,0,0,0,
-  0,1,0,0,0,0,1,0,0,0,
-  0,0,0,1,1,0,1,0,0,1,
-  1,0,0,0,0,0,0,0,0,1,
-};
 
-function void
-r_vert (u16 x, u16 y0, u16 y1, bool dim) {
-  Assert(y0 <= y1);
-  for (u16 y = y0; y <= y1; ++y) {
-    r_set_pixel(x, y, dim);
-  }
-}
+#define MAZE_START {1.5_fx16, fix16::from_int(MAP_HEIGHT)-1.5_fx16}
+#define MAZE_END   {fix16::from_int(MAP_WIDTH)-0.5_fx16, 1.5_fx16}
+
+global const PROGMEM u8 test_map[MAP_WIDTH * MAP_HEIGHT] = {
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,0,1,1,0,1,0,1,1,1,1,0,0,0,0,1,0,0,0,
+  1,1,0,1,0,0,1,0,1,0,1,1,0,1,1,0,1,0,1,1,
+  1,1,0,1,0,1,1,0,1,0,0,1,0,0,1,0,1,0,1,1,
+  1,0,0,0,0,1,0,0,1,0,1,1,0,1,1,0,1,0,1,1,
+  1,1,1,0,1,1,0,1,1,0,1,1,0,0,1,0,1,0,1,1,
+  1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,1,
+  1,1,0,1,1,1,1,1,1,1,0,1,1,1,0,0,1,0,1,1,
+  1,1,0,0,0,0,0,0,1,0,0,1,0,0,0,1,1,0,1,1,
+  1,1,1,1,1,1,1,0,1,0,1,1,0,1,1,1,1,0,1,1,
+  1,0,0,0,0,0,1,0,1,1,1,0,0,1,1,0,0,0,1,1,
+  1,0,1,1,1,0,1,0,0,0,1,0,1,1,1,0,1,1,1,1,
+  1,0,1,0,0,0,1,1,1,0,1,0,1,1,1,0,1,0,1,1,
+  1,0,1,1,1,0,0,0,1,0,1,0,0,0,0,0,1,0,1,1,
+  1,0,0,0,1,0,1,1,1,0,1,1,1,0,1,1,1,0,1,1,
+  1,1,1,0,1,0,1,1,1,0,1,0,0,0,1,0,0,0,1,1,
+  1,1,1,0,1,0,1,0,0,0,1,1,0,1,1,0,1,0,1,1,
+  1,1,1,0,1,0,0,0,1,0,1,1,0,0,0,0,1,0,1,1,
+  1,0,0,0,1,1,0,1,1,0,1,1,0,1,1,0,1,0,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+};
 
 function bool
 map_index (s16 x, s16 y) {
@@ -70,6 +86,14 @@ map_index (s16 x, s16 y) {
 function bool
 map_index (Vec2_Fix16 pos) {
   return map_index(pos.x.to_int(), pos.y.to_int());
+}
+
+function void
+r_vert (u16 x, u16 y0, u16 y1, bool dim) {
+  Assert(y0 <= y1);
+  for (u16 y = y0; y <= y1; ++y) {
+    r_set_pixel(x, y, dim);
+  }
 }
 
 function Raycast_Result
@@ -139,16 +163,19 @@ global s16 resolution_width, resolution_height;
 
 function void
 game_init (u16 width, u16 height) {
-  gs.player.pos = v2fx16(5.0_fx16,5.0_fx16);
+  gs.state = GAME_STATE_PLAY;
+  gs.player.pos = MAZE_START;
+  gs.player.view_angle = 0;
   resolution_width = width;
   resolution_height = height;
 }
 
 function void
-game_tick (Game_Input input, u16 dt) {
+game_tick (Game_Input input, fix16 dt) {
+  // NOTE: Process input and move player
   u16 rotation = 0;
-  if (input.rotate_ccw) rotation -= PLAYER_ROTATE_SPEED * dt;
-  if (input.rotate_cw)  rotation += PLAYER_ROTATE_SPEED * dt;
+  if (input.rotate_ccw) rotation -= PLAYER_ROTATE_SPEED * dt.val;
+  if (input.rotate_cw)  rotation += PLAYER_ROTATE_SPEED * dt.val;
   gs.player.view_angle += rotation;
 
   Vec2_Fix16 move_amt = {};
@@ -163,8 +190,9 @@ game_tick (Game_Input input, u16 dt) {
   move_amt.y = dy;
   if (v2fx16_len(move_amt) > 1.0_fx16)
     move_amt = v2fx16_norm(move_amt);
-  gs.player.pos = v2fx16_add(gs.player.pos, v2fx16_muls(move_amt, PLAYER_SPEED * fix16::from_int(dt)));
+  gs.player.pos = v2fx16_add(gs.player.pos, v2fx16_muls(move_amt, PLAYER_SPEED * dt));
 
+  // NOTE: Collision
   Vec2_Fix16 map_pos = v2fx16(fix16_floor(gs.player.pos.x), fix16_floor(gs.player.pos.y));
   Vec2_Fix16 collision_queries[] = {
     v2fx16(map_pos.x+1.0_fx16, map_pos.y),
@@ -207,6 +235,11 @@ game_tick (Game_Input input, u16 dt) {
         }
       }
     }
+  }
+
+  // NOTE: Check win condition
+  if (v2fx16_dist(MAZE_END, gs.player.pos) <= PLAYER_RADIUS) {
+    gs.player.pos = MAZE_START;
   }
 
   gs.old_player = gs.player;

@@ -6,6 +6,9 @@
 
 #define BASE_IMPLEMENTATION
 #include "../base.h"
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_NO_SIMD
+#include "../third_party/stb_image.h"
 
 #include "meta.h"
 

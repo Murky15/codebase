@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="20px" height="40px" viewBox="0 0 20 40" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>0028 - Left Parenthesis</title>
+    <g id="Original-/-Overview" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Original" transform="translate(-120.000000, -110.000000)" fill="#59FFF8">
+            <path d="M133,122 L130,122 C127.790861,122 126,123.790861 126,126 L126,134 C126,136.209139 127.790861,138 130,138 L133,138 C133.552285,138 134,137.552285 134,137 L134,135 C134,134.447715 133.552285,134 133,134 L131,134 C130.447715,134 130,133.552285 130,133 L130,127 C130,126.447715 130.447715,126 131,126 L133,126 C133.552285,126 134,125.552285 134,125 L134,123 C134,122.447715 133.552285,122 133,122 Z" id="Path-56"></path>
+        </g>
+    </g>
+</svg>

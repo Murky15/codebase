@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="20px" height="40px" viewBox="0 0 20 40" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>0029 - Right Parenthesis</title>
+    <g id="Original-/-Overview" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Original" transform="translate(-140.000000, -110.000000)" fill="#59FFF8">
+            <path d="M147,122 L150,122 C152.209139,122 154,123.790861 154,126 L154,134 C154,136.209139 152.209139,138 150,138 L147,138 C146.447715,138 146,137.552285 146,137 L146,135 C146,134.447715 146.447715,134 147,134 L149,134 C149.552285,134 150,133.552285 150,133 L150,127 C150,126.447715 149.552285,126 149,126 L147,126 C146.447715,126 146,125.552285 146,125 L146,123 C146,122.447715 146.447715,122 147,122 Z" id="Path-56"></path>
+        </g>
+    </g>
+</svg>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="20px" height="40px" viewBox="0 0 20 40" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>0032 - Digit Two</title>
+    <g id="Original-/-Overview" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Original" transform="translate(-80.000000, -70.000000)" fill="#59FFF8">
+            <path d="M94,82 L83,82 C82.4477153,82 82,82.4477153 82,83 L82,85 C82,85.5522847 82.4477153,86 83,86 L93,86 C93.5522847,86 94,86.4477153 94,87 C94,87.5522847 93.5522847,88 93,88 L86,88 C83.790861,88 82,89.790861 82,92 L82,97 C82,97.5522847 82.4477153,98 83,98 L97,98 C97.5522847,98 98,97.5522847 98,97 L98,95 C98,94.4477153 97.5522847,94 97,94 L86,94 L86,93 C86,92.4477153 86.4477153,92 87,92 L94,92 C96.209139,92 98,90.209139 98,88 L98,86 C98,83.790861 96.209139,82 94,82 Z" id="Path-19"></path>
+        </g>
+    </g>
+</svg>

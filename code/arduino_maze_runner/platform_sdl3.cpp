@@ -1,8 +1,8 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL.h>
 
-#define WINDOW_PLAYER_RADIUS 10
-#define WINDOW_TILE_SIZE 64
+#define WINDOW_PLAYER_RADIUS 5
+#define WINDOW_TILE_SIZE 32
 #define RESOLUTION_WIDTH  (WINDOW_TILE_SIZE * MAP_WIDTH)
 #define RESOLUTION_HEIGHT (WINDOW_TILE_SIZE * MAP_HEIGHT)
 
@@ -198,16 +198,17 @@ main (int argc, char **argv) {
 
           if (key.scancode == SDL_SCANCODE_T && !key.down) render_2d_debug_view = !render_2d_debug_view;
           if (key.scancode == SDL_SCANCODE_R && !key.down) render_debug_raycasts = !render_debug_raycasts;
+          if (key.scancode == SDL_SCANCODE_B && !key.down) game_init(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
         } break;
       }
     }
 
     u64 current_time = SDL_GetTicks();
-    f32 dt = current_time - last_time;
+    s16 dt = current_time - last_time;
     last_time = current_time;
 
     Game_Input input = {move_forward, move_back, strafe_left, strafe_right, rotate_cw, rotate_ccw};
-    game_tick(input, dt);
+    game_tick(input, fix16::from_raw(dt));
 
     r_clear(false);
 
