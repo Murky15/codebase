@@ -36,7 +36,7 @@ if "%meta%"=="1" (
   )
   echo [METAGEN]
   pushd %source%
-  tcc -run !arduino_resolution! meta.c
+  tcc -run !arduino_resolution! meta.c || exit /b 1
   popd
 )
 
@@ -49,6 +49,6 @@ if not "%arduino%"=="1" (
 ) else (
   echo Compiling for Arduino UNO...
   if not exist runner_arduino mkdir runner_arduino
-  arduino-cli compile --fqbn arduino:avr:uno --build-property "build.extra_flags=-IW:\code -IW:\code\arduino_maze_runner" %source%platform_arduino --build-path %cd%\runner_arduino
+  arduino-cli compile --fqbn arduino:avr:uno --build-property "build.extra_flags=-IW:\code -IW:\code\arduino_maze_runner" %source%platform_arduino --build-path %cd%\runner_arduino || exit /b 1
 )
 popd

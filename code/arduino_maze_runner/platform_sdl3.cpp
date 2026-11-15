@@ -2,13 +2,13 @@
 #include <SDL3/SDL.h>
 
 #define WINDOW_PLAYER_RADIUS 5
-#define WINDOW_TILE_SIZE 32
+#define WINDOW_TILE_SIZE 64
 #define RESOLUTION_WIDTH  (WINDOW_TILE_SIZE * MAP_WIDTH)
 #define RESOLUTION_HEIGHT (WINDOW_TILE_SIZE * MAP_HEIGHT)
 
+#define PROGMEM
 #define BASE_IMPLEMENTATION
 #include "base.h"
-#include "meta.h"
 #include "fix.h"
 #include "trig.h"
 #include "platform.h"

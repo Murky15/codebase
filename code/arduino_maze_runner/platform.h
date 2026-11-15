@@ -18,6 +18,18 @@ function bool map_index (s16 x, s16 y);
 
 // NOTE: Platform -> Game
 
+#if OS_WINDOWS
+# define PGMAccessU8(addr)  ((u8)(*(addr)))
+#else
+# define PGMAccessU8(addr)  pgm_read_byte_near(addr)
+#endif
+
+#if OS_WINDOWS
+# define PGMAccessU16(addr) ((u16)(*(addr)))
+#else
+# define PGMAccessU16(addr) pgm_read_word_near(addr)
+#endif
+
 function void r_set_pixel_debug (u16 x, u16 y, Vec3 color);
 function void r_set_pixel (u16 x, u16 y, bool dim);
 

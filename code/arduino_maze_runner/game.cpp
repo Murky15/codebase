@@ -55,6 +55,7 @@ StaticAssert(MAP_WIDTH == MAP_HEIGHT, check_map_dimensions);
 #define MAZE_START {1.5_fx16, fix16::from_int(MAP_HEIGHT)-1.5_fx16}
 #define MAZE_END   {fix16::from_int(MAP_WIDTH)-0.5_fx16, 1.5_fx16}
 
+// TODO: Condense
 global const PROGMEM u8 test_map[MAP_WIDTH * MAP_HEIGHT] = {
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,0,1,1,0,1,0,1,1,1,1,0,0,0,0,1,0,0,0,

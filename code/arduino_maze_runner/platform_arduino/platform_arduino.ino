@@ -7,7 +7,6 @@
 #define BASE_ARDUINO_SUPPORT
 #define BASE_IMPLEMENTATION
 #include "base.h"
-#include "meta.h"
 #include "fix.h"
 #include "trig.h"
 #include "platform.h"
