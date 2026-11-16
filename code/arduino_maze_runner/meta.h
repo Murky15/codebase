@@ -35,3 +35,8 @@ StaticAssert(TRIG_INDEX_BITS <= 14, index_resolution_cap);
 #ifndef FONTS_TO_BAKE
 # error "FONTS_TO_BAKE missing! Please provided a comma separated list of quoted strings containing font paths."
 #endif
+
+// NOTE: This should also be an array because different fonts may require different unknown characters, but it's fine for now.
+#ifndef FONT_GLYPH_UNKNOWN
+# define FONT_GLYPH_UNKNOWN '?'
+#endif

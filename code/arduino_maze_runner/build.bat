@@ -29,6 +29,8 @@ set libs=%sdl3%lib\x64\SDL3.lib %sdl3ttf%lib\x64\SDL3_ttf.lib %sdl3img%lib\x64\S
 set system_libs=
 set link_options=-SUBSYSTEM:CONSOLE -INCREMENTAL:NO
 
+set fonts_to_bake=W:/assets/arduino_maze_runner/Phased__7x5
+
 REM Run metaprograms
 if "%meta%"=="1" (
   if "%arduino%"=="1" (
@@ -36,7 +38,7 @@ if "%meta%"=="1" (
   )
   echo [METAGEN]
   pushd %source%
-  tcc -run !arduino_resolution! meta.c || exit /b 1
+  tcc !arduino_resolution! -DFONT_GLYPH_UNKNOWN='Q' -DFONTS_TO_BAKE=\"%fonts_to_bake%\" meta.c -run || exit /b 1
   popd
 )
 

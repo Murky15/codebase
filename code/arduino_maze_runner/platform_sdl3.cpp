@@ -14,6 +14,7 @@
 #include "platform.h"
 
 #include "generated/trig_lookup.cpp"
+#include "generated/fonts.cpp"
 #include "fix.cpp"
 #include "trig.cpp"
 #include "game.cpp"

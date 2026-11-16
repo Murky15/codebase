@@ -3,6 +3,7 @@
   - [X] Fixed point
   - [X] Trig meta tables
   - [X] Collision
+  - [ ] Font rendering
 */
 
 #define RAYCAST_RESOLUTION 32

@@ -126,6 +126,18 @@
 # define tls __declspec(thread)
 #endif
 
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define ByteToBinary(byte)  \
+((byte) & 0x80 ? '1' : '0'), \
+((byte) & 0x40 ? '1' : '0'), \
+((byte) & 0x20 ? '1' : '0'), \
+((byte) & 0x10 ? '1' : '0'), \
+((byte) & 0x08 ? '1' : '0'), \
+((byte) & 0x04 ? '1' : '0'), \
+((byte) & 0x02 ? '1' : '0'), \
+((byte) & 0x01 ? '1' : '0')
+
+
 #define EachInArrayPtrIt(p,c,it) (TypeOf(p)it=(p);(it-(p))<(c);it+=1)
 #define EachInArrayPtr(p,c) EachInArrayPtrIt(p,c,it)
 #define EachInArrayIt(p,c,it) (TypeOf((p)[0])*idx_=(p),it=(p)?*idx_:ZeroStruct(TypeOf((p)[0]));(idx_-(p))<(c);it=*(idx_+=1))
@@ -843,6 +855,7 @@ str8_push_copy (Arena *arena, Str8 string) {
   return str8(str, count);
 }
 
+#if 0
 base_function Str8
 str8_pushfv (Arena *arena, char *fmt, va_list args) {
   va_list backup_args;
@@ -863,6 +876,16 @@ str8_pushfv (Arena *arena, char *fmt, va_list args) {
   va_end(backup_args);
 
   return str8(buff, actual_size-1);
+}
+#endif
+
+base_function Str8
+str8_pushfv (Arena *arena, char *fmt, va_list args) {
+  u64 size = _vscprintf(fmt, args);
+  u8 *buff = ArenaPush(arena, u8, size+1);
+  vsnprintf((char *const)buff, size, fmt, args);
+
+  return str8(buff, size);
 }
 
 base_function Str8
@@ -980,7 +1003,7 @@ str8_list_join (Arena *arena, Str8_List list, Str8_Join *opt_join_params) {
 
 base_function u8*
 str8_to_cstr (Arena *arena, Str8 string) {
-  u8 *result = ArenaPush(arena, u8, string.count);
+  u8 *result = ArenaPush(arena, u8, string.count+1);
   memcpy(result, string.str, string.count);
 
   return result;
