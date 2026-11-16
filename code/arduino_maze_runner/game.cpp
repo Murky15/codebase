@@ -8,6 +8,8 @@
 
 #define RAYCAST_RESOLUTION 32
 
+#define WIN_TIMER_LENGTH 5.0_fx16
+
 #define PLAYER_RADIUS 0.15625_fx16
 #define PLAYER_SPEED  2.5_fx16
 #define PLAYER_ROTATE_SPEED 65
@@ -44,10 +46,12 @@ enum Game_State : u16 {
 
 global struct {
   Game_State state;
+  fix16 win_reset_timer;
 
   Player player;
   Player old_player;
 } gs;
+global s16 resolution_width, resolution_height;
 
 #define MAP_WIDTH  20
 #define MAP_HEIGHT 20
@@ -95,6 +99,30 @@ r_vert (u16 x, u16 y0, u16 y1, bool dim) {
   Assert(y0 <= y1);
   for (u16 y = y0; y <= y1; ++y) {
     r_set_pixel(x, y, dim);
+  }
+}
+
+#define DESKTOP_FONT_SCALE 40
+function void
+r_string (u16 x, u16 y, Str8 string) {
+  for (u16 i = 0; i < string.count; ++i) {
+    const u8 *glyph = phased__7x5_glyph_lookup(string.str[i]);
+    if (glyph == nullptr) { // NOTE: Malformed string
+      x += 6 * DESKTOP_FONT_SCALE;
+      continue;
+    }
+    // TODO: Don't hardcode font dimensions, have meta.c write these in.
+    for (u16 gy = 0; gy < 5; ++gy) {
+      for (u16 gx = 0; gx < 7; ++gx) {
+        u8 pixel = glyph[gy] & (1 << (7 - gx - 1));
+        for (u16 scale_y = 0; scale_y < DESKTOP_FONT_SCALE; ++scale_y) {
+          for (u16 scale_x = 0; scale_x < DESKTOP_FONT_SCALE; ++scale_x) {
+            if (pixel) r_set_pixel(x+gx*DESKTOP_FONT_SCALE+scale_x, y+gy*DESKTOP_FONT_SCALE+scale_y, false);
+          }
+        }
+      }
+    }
+    x += 6 * DESKTOP_FONT_SCALE;
   }
 }
 
@@ -161,19 +189,18 @@ raycast (Ray ray) {
   return result;
 }
 
-global s16 resolution_width, resolution_height;
-
 function void
-game_init (u16 width, u16 height) {
-  gs.state = GAME_STATE_PLAY;
-  gs.player.pos = MAZE_START;
-  gs.player.view_angle = 0;
-  resolution_width = width;
-  resolution_height = height;
+game_tick_title (Game_Input input, fix16 dt) {
+  if (gs.state == GAME_STATE_TITLE) {
+    if (input.move_forward) gs.state = GAME_STATE_PLAY;
+  } else if (gs.state == GAME_STATE_WIN) {
+    gs.win_reset_timer += dt;
+    if (gs.win_reset_timer >= WIN_TIMER_LENGTH) gs.state = GAME_STATE_TITLE;
+  }
 }
 
 function void
-game_tick (Game_Input input, fix16 dt) {
+game_tick_play (Game_Input input, fix16 dt) {
   // NOTE: Process input and move player
   u16 rotation = 0;
   if (input.rotate_ccw) rotation -= PLAYER_ROTATE_SPEED * dt.val;
@@ -241,10 +268,24 @@ game_tick (Game_Input input, fix16 dt) {
 
   // NOTE: Check win condition
   if (v2fx16_dist(MAZE_END, gs.player.pos) <= PLAYER_RADIUS) {
-    gs.player.pos = MAZE_START;
+    gs.state = GAME_STATE_WIN;
+    gs.win_reset_timer = 0.0_fx16;
   }
 
   gs.old_player = gs.player;
+}
+
+function void
+game_render_title () {
+  if (gs.state == GAME_STATE_TITLE) {
+    r_string(4 * DESKTOP_FONT_SCALE, 0, Str8Lit("BACK"));
+    r_string(0, 7 * DESKTOP_FONT_SCALE, Str8Lit("SPACE"));
+    r_string(0, 21 * DESKTOP_FONT_SCALE, Str8Lit("PRESS"));
+    r_string(12 * DESKTOP_FONT_SCALE, 28 * DESKTOP_FONT_SCALE, Str8Lit("^"));
+  } else if (gs.state == GAME_STATE_WIN) {
+    r_string(6 * DESKTOP_FONT_SCALE, 7 * DESKTOP_FONT_SCALE, Str8Lit("YOU"));
+    r_string(5 * DESKTOP_FONT_SCALE, 14 * DESKTOP_FONT_SCALE, Str8Lit("WIN!"));
+  }
 }
 
 struct Debug_Render_Data {
@@ -254,7 +295,7 @@ struct Debug_Render_Data {
 };
 
 function Debug_Render_Data*
-game_render () {
+game_render_play () {
   Vec2_Fix16 local_pos = gs.player.pos;
 
 #if OS_WINDOWS
@@ -290,4 +331,34 @@ game_render () {
 #else
   return nullptr;
 #endif
+}
+
+function void
+game_init (u16 width, u16 height) {
+  gs.state = GAME_STATE_WIN;
+  gs.player.pos = MAZE_START;
+  gs.player.view_angle = 0;
+  resolution_width = width;
+  resolution_height = height;
+}
+
+function void
+game_tick (Game_Input input, fix16 dt) {
+  switch (gs.state) {
+    case GAME_STATE_WIN: // FALLTHROUGH
+    case GAME_STATE_TITLE: game_tick_title(input, dt); break;
+    case GAME_STATE_PLAY:  game_tick_play(input, dt);  break;
+  }
+}
+
+function Debug_Render_Data*
+game_render () {
+  Debug_Render_Data *result = nullptr;
+  switch (gs.state) {
+    case GAME_STATE_WIN: // FALLTHROUGH
+    case GAME_STATE_TITLE: game_render_title(); break;
+    case GAME_STATE_PLAY:  result = game_render_play();  break;
+  }
+
+  return result;
 }

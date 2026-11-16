@@ -294,7 +294,7 @@ global const PROGMEM u8 phased__7x5[][5] = {
 };
 global int phased__7x5_index_lookup[128];
 
-function void
+function const u8*
 phased__7x5_glyph_lookup (u8 c) {
   if (phased__7x5_index_lookup[0] != -1) {
     memset((void*)phased__7x5_index_lookup, -1, sizeof(phased__7x5_index_lookup));
@@ -334,36 +334,43 @@ phased__7x5_glyph_lookup (u8 c) {
 		phased__7x5_index_lookup['7'] = 32;
 		phased__7x5_index_lookup['8'] = 33;
 		phased__7x5_index_lookup['9'] = 34;
-		phased__7x5_index_lookup['$'] = 35;
-		phased__7x5_index_lookup['%'] = 37;
-		phased__7x5_index_lookup['*'] = 38;
-		phased__7x5_index_lookup['^'] = 39;
-		phased__7x5_index_lookup['`'] = 40;
-		phased__7x5_index_lookup['|'] = 41;
-		phased__7x5_index_lookup['~'] = 42;
-		phased__7x5_index_lookup['i'] = 43;
-		phased__7x5_index_lookup['!'] = 45;
-		phased__7x5_index_lookup['?'] = 46;
-		phased__7x5_index_lookup[':'] = 47;
-		phased__7x5_index_lookup[';'] = 48;
-		phased__7x5_index_lookup['('] = 49;
-		phased__7x5_index_lookup[')'] = 50;
-		phased__7x5_index_lookup['['] = 51;
-		phased__7x5_index_lookup[']'] = 52;
-		phased__7x5_index_lookup['{'] = 53;
-		phased__7x5_index_lookup['}'] = 54;
-		phased__7x5_index_lookup['<'] = 55;
-		phased__7x5_index_lookup['>'] = 56;
-		phased__7x5_index_lookup['.'] = 58;
-		phased__7x5_index_lookup[','] = 59;
-		phased__7x5_index_lookup['#'] = 60;
-		phased__7x5_index_lookup['/'] = 61;
-		phased__7x5_index_lookup['\\'] = 62;
-		phased__7x5_index_lookup['+'] = 63;
-		phased__7x5_index_lookup['-'] = 64;
-		phased__7x5_index_lookup['='] = 66;
-		phased__7x5_index_lookup['\''] = 67;
-		phased__7x5_index_lookup['"'] = 68;
-		phased__7x5_index_lookup['_'] = 69;
+		phased__7x5_index_lookup['$'] = 36;
+		phased__7x5_index_lookup['%'] = 40;
+		phased__7x5_index_lookup['*'] = 41;
+		phased__7x5_index_lookup['^'] = 42;
+		phased__7x5_index_lookup['`'] = 43;
+		phased__7x5_index_lookup['|'] = 44;
+		phased__7x5_index_lookup['~'] = 45;
+		phased__7x5_index_lookup['i'] = 46;
+		phased__7x5_index_lookup['!'] = 50;
+		phased__7x5_index_lookup['?'] = 51;
+		phased__7x5_index_lookup[':'] = 52;
+		phased__7x5_index_lookup[';'] = 53;
+		phased__7x5_index_lookup['('] = 54;
+		phased__7x5_index_lookup[')'] = 55;
+		phased__7x5_index_lookup['['] = 56;
+		phased__7x5_index_lookup[']'] = 57;
+		phased__7x5_index_lookup['{'] = 58;
+		phased__7x5_index_lookup['}'] = 59;
+		phased__7x5_index_lookup['<'] = 60;
+		phased__7x5_index_lookup['>'] = 61;
+		phased__7x5_index_lookup['.'] = 63;
+		phased__7x5_index_lookup[','] = 64;
+		phased__7x5_index_lookup['#'] = 65;
+		phased__7x5_index_lookup['/'] = 66;
+		phased__7x5_index_lookup['\\'] = 67;
+		phased__7x5_index_lookup['+'] = 68;
+		phased__7x5_index_lookup['-'] = 69;
+		phased__7x5_index_lookup['='] = 71;
+		phased__7x5_index_lookup['\''] = 72;
+		phased__7x5_index_lookup['"'] = 73;
+		phased__7x5_index_lookup['_'] = 74;
+  }
+
+  int glyph_index = phased__7x5_index_lookup[c];
+  if (glyph_index == -1) {
+    return nullptr;
+  } else {
+    return &phased__7x5[glyph_index][0];
   }
 }

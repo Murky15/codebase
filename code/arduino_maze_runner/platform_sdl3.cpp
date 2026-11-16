@@ -37,7 +37,7 @@ global struct {
 } platform;
 
 global bool game_running = true;
-global bool render_2d_debug_view = true, render_debug_raycasts = false;
+global bool render_2d_debug_view = false, render_debug_raycasts = false;
 
 global bool move_forward, move_back, strafe_left, strafe_right;
 global bool rotate_cw, rotate_ccw;

@@ -221,9 +221,12 @@ bake_fonts (Arena *arena, Str8 base_path) {
 
       str8_list_pushf(arena, &font_builder, func_template_str,
         Str8Expand(font_name), Str8Expand(font_name),
-        Str8Expand(font_name), Str8Expand(font_name), Str8Expand(glyph_lookup_init));
+        Str8Expand(font_name), Str8Expand(font_name),
+        Str8Expand(glyph_lookup_init),
+        Str8Expand(font_name), Str8Expand(font_name));
     }
   }
+
   return str8_list_join(arena, font_builder, NULL);
 }
 
