@@ -141,9 +141,14 @@ key_binding: F2
 error_regex: ^(?P<file>.*)\((?P<line>\d+),?(?P<col>\d+)?\)[ ]?: (?P<type>fatal error|error|warning) (?P<msg>.*)$
 build_command: %PROJECT_CONFIG_DIR%/code/arduino_maze_runner/build.bat meta
 key_binding: F3
+[Build Maze Runner Arduino]
+error_regex: ^(?P<file>.*)\((?P<line>\d+),?(?P<col>\d+)?\)[ ]?: (?P<type>fatal error|error|warning) (?P<msg>.*)$
+build_command: %PROJECT_CONFIG_DIR%/code/arduino_maze_runner/build.bat meta arduino
+key_binding: F4
+
 [Run Maze Runner]
 run_command: %RUN_WORKING_DIR%/Runner
-key_binding: F4
+key_binding: F5
 
 [[keymap]]
 

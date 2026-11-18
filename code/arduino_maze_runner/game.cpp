@@ -6,6 +6,17 @@
   - [ ] Font rendering
 */
 
+#define BASE_IMPLEMENTATION
+#include "base.h"
+#include "fix.h"
+#include "trig.h"
+#include "platform.h"
+
+#include "generated/trig_lookup.cpp"
+#include "generated/fonts.cpp"
+#include "fix.cpp"
+#include "trig.cpp"
+
 #define RAYCAST_RESOLUTION 32
 
 #define WIN_TIMER_LENGTH 5.0_fx16
@@ -46,6 +57,8 @@ enum Game_State : u16 {
 
 global struct {
   Game_State state;
+
+  fix32 completion_timer;
   fix16 win_reset_timer;
 
   Player player;
@@ -102,27 +115,28 @@ r_vert (u16 x, u16 y0, u16 y1, bool dim) {
   }
 }
 
-#define DESKTOP_FONT_SCALE 40
 function void
-r_string (u16 x, u16 y, Str8 string) {
+r_string (u16 x, u16 y, int scale, Str8 string) {
   for (u16 i = 0; i < string.count; ++i) {
     const u8 *glyph = phased__7x5_glyph_lookup(string.str[i]);
     if (glyph == nullptr) { // NOTE: Malformed string
-      x += 6 * DESKTOP_FONT_SCALE;
+      x += (PHASED__7X5_GLYPH_WIDTH-1) * scale;
       continue;
     }
-    // TODO: Don't hardcode font dimensions, have meta.c write these in.
-    for (u16 gy = 0; gy < 5; ++gy) {
-      for (u16 gx = 0; gx < 7; ++gx) {
-        u8 pixel = glyph[gy] & (1 << (7 - gx - 1));
-        for (u16 scale_y = 0; scale_y < DESKTOP_FONT_SCALE; ++scale_y) {
-          for (u16 scale_x = 0; scale_x < DESKTOP_FONT_SCALE; ++scale_x) {
-            if (pixel) r_set_pixel(x+gx*DESKTOP_FONT_SCALE+scale_x, y+gy*DESKTOP_FONT_SCALE+scale_y, false);
+
+    for (u16 gy = 0; gy < PHASED__7X5_GLYPH_HEIGHT; ++gy) {
+      for (u16 gx = 0; gx < PHASED__7X5_GLYPH_WIDTH; ++gx) {
+        u8 pixel = PGMAccessU8(glyph + gy) & (1 << (PHASED__7X5_GLYPH_WIDTH - gx - 1));
+        if (!pixel) continue;
+
+        for (u16 scale_y = 0; scale_y < scale; ++scale_y) {
+          for (u16 scale_x = 0; scale_x < scale; ++scale_x) {
+            r_set_pixel(x+gx*scale+scale_x, y+gy*scale+scale_y, false);
           }
         }
       }
     }
-    x += 6 * DESKTOP_FONT_SCALE;
+    x += (PHASED__7X5_GLYPH_WIDTH-1) * scale;
   }
 }
 
@@ -190,12 +204,14 @@ raycast (Ray ray) {
 }
 
 function void
-game_tick_title (Game_Input input, fix16 dt) {
+game_tick_menu (Game_Input input, fix16 dt) {
   if (gs.state == GAME_STATE_TITLE) {
     if (input.move_forward) gs.state = GAME_STATE_PLAY;
   } else if (gs.state == GAME_STATE_WIN) {
     gs.win_reset_timer += dt;
-    if (gs.win_reset_timer >= WIN_TIMER_LENGTH) gs.state = GAME_STATE_TITLE;
+    if (gs.win_reset_timer >= WIN_TIMER_LENGTH) {
+      game_init(resolution_width, resolution_height);
+    }
   }
 }
 
@@ -272,19 +288,37 @@ game_tick_play (Game_Input input, fix16 dt) {
     gs.win_reset_timer = 0.0_fx16;
   }
 
+  gs.completion_timer.val += dt.val;
   gs.old_player = gs.player;
 }
 
+#if OS_WINDOWS
+# define FONT_SCALE 40
+#else
+# define FONT_SCALE 1
+#endif
+
 function void
-game_render_title () {
+game_render_menu () {
   if (gs.state == GAME_STATE_TITLE) {
-    r_string(4 * DESKTOP_FONT_SCALE, 0, Str8Lit("BACK"));
-    r_string(0, 7 * DESKTOP_FONT_SCALE, Str8Lit("SPACE"));
-    r_string(0, 21 * DESKTOP_FONT_SCALE, Str8Lit("PRESS"));
-    r_string(12 * DESKTOP_FONT_SCALE, 28 * DESKTOP_FONT_SCALE, Str8Lit("^"));
+    r_string(4  * FONT_SCALE, 1  * FONT_SCALE,               FONT_SCALE, Str8Lit("BACK"));
+    r_string(0,               7  * FONT_SCALE, FONT_SCALE, Str8Lit("SPACE"));
+    r_string(0,               21 * FONT_SCALE, FONT_SCALE, Str8Lit("PRESS"));
+    r_string(12 * FONT_SCALE, 28 * FONT_SCALE, FONT_SCALE, Str8Lit("^"));
   } else if (gs.state == GAME_STATE_WIN) {
-    r_string(6 * DESKTOP_FONT_SCALE, 7 * DESKTOP_FONT_SCALE, Str8Lit("YOU"));
-    r_string(5 * DESKTOP_FONT_SCALE, 14 * DESKTOP_FONT_SCALE, Str8Lit("WIN!"));
+    gs.completion_timer = Min(gs.completion_timer, 3599.0_fx32);
+    fix32 formatted_timer = fix32_div_lazy(gs.completion_timer, 60.0_fx32);
+    fix32 minutes = fix32_floor(formatted_timer);
+    fix32 seconds = fix32_sub(formatted_timer, minutes);
+    seconds = fix32_mul_lazy(seconds, 60.0_fx32);
+
+    u8 timer_buffer[6];
+    sprintf((char *const)timer_buffer, "%02d:%02d", minutes.to_int(), seconds.to_int());
+
+    r_string(6 * FONT_SCALE,  1  * FONT_SCALE, FONT_SCALE, Str8Lit("YOU"));
+    r_string(5 * FONT_SCALE,  7  * FONT_SCALE, FONT_SCALE, Str8Lit("WIN!"));
+    r_string(1 * FONT_SCALE,  16 * FONT_SCALE, FONT_SCALE, Str8Lit("TIME: "));
+    r_string(1 * FONT_SCALE,  22 * FONT_SCALE, FONT_SCALE, Str8CStr((const char*)timer_buffer));
   }
 }
 
@@ -335,9 +369,16 @@ game_render_play () {
 
 function void
 game_init (u16 width, u16 height) {
-  gs.state = GAME_STATE_WIN;
+  gs.state = GAME_STATE_TITLE;
+
+  gs.completion_timer = 0.0_fx32;
+  gs.win_reset_timer  = 0.0_fx16;
+
+  //gs.player.pos = v2fx16_sub(MAZE_END, v2fx16(1.0_fx16, 0.0_fx16));
   gs.player.pos = MAZE_START;
   gs.player.view_angle = 0;
+  gs.old_player = Player{};
+
   resolution_width = width;
   resolution_height = height;
 }
@@ -346,7 +387,7 @@ function void
 game_tick (Game_Input input, fix16 dt) {
   switch (gs.state) {
     case GAME_STATE_WIN: // FALLTHROUGH
-    case GAME_STATE_TITLE: game_tick_title(input, dt); break;
+    case GAME_STATE_TITLE: game_tick_menu(input, dt); break;
     case GAME_STATE_PLAY:  game_tick_play(input, dt);  break;
   }
 }
@@ -356,7 +397,7 @@ game_render () {
   Debug_Render_Data *result = nullptr;
   switch (gs.state) {
     case GAME_STATE_WIN: // FALLTHROUGH
-    case GAME_STATE_TITLE: game_render_title(); break;
+    case GAME_STATE_TITLE: game_render_menu(); break;
     case GAME_STATE_PLAY:  result = game_render_play();  break;
   }
 

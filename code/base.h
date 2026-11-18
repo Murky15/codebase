@@ -391,6 +391,7 @@ base_function Str8 str8_pushfv (Arena *arena, char *fmt, va_list args);
 base_function Str8 str8_pushf (Arena *arena, char *fmt, ...);
 
 base_function Str8 str8_to_lower_copy (Arena *arena, Str8 string);
+base_function Str8 str8_to_upper_copy (Arena *arena, Str8 string);
 
 base_function void str8_list_push_node (Str8_List *list, Str8_Node *node);
 base_function void str8_list_push_node_front (Str8_List *list, Str8_Node *node);
@@ -879,6 +880,7 @@ str8_pushfv (Arena *arena, char *fmt, va_list args) {
 }
 #endif
 
+#ifndef BASE_ARDUINO_SUPPORT
 base_function Str8
 str8_pushfv (Arena *arena, char *fmt, va_list args) {
   u64 size = _vscprintf(fmt, args);
@@ -887,6 +889,7 @@ str8_pushfv (Arena *arena, char *fmt, va_list args) {
 
   return str8(buff, size);
 }
+#endif
 
 base_function Str8
 str8_pushf (Arena *arena, char *fmt, ...) {
@@ -904,6 +907,17 @@ str8_to_lower_copy (Arena *arena, Str8 string) {
   for (u64 i = 0; i < result.count; ++i) {
     u8 *c = &result.str[i];
     *c = char_to_lower(*c);
+  }
+
+  return result;
+}
+
+base_function Str8
+str8_to_upper_copy (Arena *arena, Str8 string) {
+  Str8 result = str8_push_copy(arena, string);
+  for (u64 i = 0; i < result.count; ++i) {
+    u8 *c = &result.str[i];
+    *c = char_to_upper(*c);
   }
 
   return result;

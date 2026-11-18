@@ -75,6 +75,11 @@ fix32_abs (fix32 x) {
   return fix32::from_raw(x.val < 0 ? -x.val : x.val);
 }
 
+function fix32
+fix32_floor (fix32 x) {
+  return fix32::from_raw(x.val & (s32)~(fix32::SCALING_FACTOR - 1));
+}
+
 function bool
 rect_circle_intersect (Rect_Fix16 rect, Vec2_Fix16 c, fix16 r, fix16 *overlap) {
   fix16 closest_x = Max(rect.x, Min(c.x, rect.x + rect.w));

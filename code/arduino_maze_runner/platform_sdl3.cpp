@@ -7,16 +7,6 @@
 #define RESOLUTION_HEIGHT (WINDOW_TILE_SIZE * MAP_HEIGHT)
 
 #define PROGMEM
-#define BASE_IMPLEMENTATION
-#include "base.h"
-#include "fix.h"
-#include "trig.h"
-#include "platform.h"
-
-#include "generated/trig_lookup.cpp"
-#include "generated/fonts.cpp"
-#include "fix.cpp"
-#include "trig.cpp"
 #include "game.cpp"
 
 #define WALL_COLOR (u32)(255 << 8)

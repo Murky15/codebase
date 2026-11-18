@@ -1,19 +1,10 @@
 // NOTE: Upload command:
-// arduino-cli upload -p COM5 --fqbn arduino:avr:uno -i build\runner_arduino\platform_arduino.ino.hex
+// arduino-cli upload -p COM# --fqbn arduino:avr:uno -i build\runner_arduino\platform_arduino.ino.hex
 
 #include <SPI.h>
 #include <TimerOne.h>
 
 #define BASE_ARDUINO_SUPPORT
-#define BASE_IMPLEMENTATION
-#include "base.h"
-#include "fix.h"
-#include "trig.h"
-#include "platform.h"
-
-#include "generated/trig_lookup.cpp"
-#include "fix.cpp"
-#include "trig.cpp"
 #include "game.cpp"
 
 #define RESOLUTION_WIDTH  32
@@ -31,6 +22,10 @@
 #define BUTTON_DOWN  7
 #define BUTTON_LEFT  6
 #define BUTTON_RIGHT 8
+
+#define JOYSTICK A0
+#define JOYSTICK_RESOLUTION ((1 << 10)-1)
+#define JOYSTICK_SENSITIVITY 10
 
 #define FRAMEBUFFER_SIZE (ROWS_PER_SEGMENT * NUM_SEGMENTS)
 global u16 framebuffers[2][FRAMEBUFFER_SIZE];
@@ -136,15 +131,18 @@ loop () {
   s16 dt = current_time - last_time;
   last_time = current_time;
 
+  /*
   Serial.print("FPS: ");
   Serial.println(1000.f/dt);
+  */
 
+  int joystick_value = analogRead(JOYSTICK);
   Game_Input input = {digitalRead(BUTTON_UP),
                       digitalRead(BUTTON_DOWN),
-                      false,
-                      false,
+                      digitalRead(BUTTON_LEFT),
                       digitalRead(BUTTON_RIGHT),
-                      digitalRead(BUTTON_LEFT)};
+                      joystick_value <= JOYSTICK_SENSITIVITY,
+                      joystick_value >= JOYSTICK_RESOLUTION - JOYSTICK_SENSITIVITY};
   game_tick(input, fix16::from_raw(dt));
 
   r_clear();

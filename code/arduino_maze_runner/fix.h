@@ -60,6 +60,7 @@ function fix32 fix32_sub      (fix32 fa, fix32 fb);
 function fix32 fix32_mul_lazy (fix32 fa, fix32 fb);
 function fix32 fix32_div_lazy (fix32 fa, fix32 fb);
 function fix32 fix32_abs      (fix32 x);
+function fix32 fix32_floor    (fix32 x);
 
 struct Vec2_Fix16 {
   fix16 x, y;
